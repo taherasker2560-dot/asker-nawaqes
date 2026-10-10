@@ -30,4 +30,15 @@ function show(rows){if(!rows.length){$('results').innerHTML='<p class="small">ل
 $('loadShortages').onclick=async()=>{let f=$('shortageFile').files[0];if(!f){$('shortageStatus').textContent='اختار ملف النواقص أولًا.';return}$('shortageStatus').textContent='جاري قراءة الملف...';try{let t=/\.pdf$/i.test(f.name)?await readPdf(f):await readSheet(f);let r=rowsFrom(t).filter(x=>norm(x.name).length>2&&!/^(كود الصنف|رقم|name|item name)$/.test(norm(x.name)));shortages=r.map(x=>({name:x.name,raw:x.raw})).filter((x,i,a)=>a.findIndex(y=>norm(y.name)===norm(x.name))===i);save();$('shortageStatus').textContent=`تمت قراءة ${shortages.length} سطرًا مبدئيًا وحفظها.\nراجع العدد مقارنةً بملفك؛ قد تحتاج ملفات PDF المصوّرة إلى OCR أو مراجعة يدوية.`}catch(e){$('shortageStatus').textContent='تعذرت قراءة الملف: '+e.message}};
 $('processIncoming').onclick=async()=>{if(!shortages.length){$('incomingStatus').textContent='حمّل شيت النواقص أولًا.';return}let t=$('incomingText').value.trim(),files=[...$('incomingFile').files];try{for(let f of files){$('incomingStatus').textContent='جاري قراءة '+f.name; if(/\.pdf$/i.test(f.name))t+='\n'+await readPdf(f);else if(/\.(xlsx|xls|csv)$/i.test(f.name))t+='\n'+await readSheet(f);else if(f.type.startsWith('image/'))t+='\n'+await readImage(f)}let inc=rowsFrom(t),seen=new Set();lastMatches=[];for(let x of inc){let k=norm(x.name);if(!k||seen.has(k))continue;seen.add(k);let best=null,score=0;for(let s of shortages){let sc=norm(x.name)===norm(s.name)?1:similarity(x.name,s.name);if(sc>score){score=sc;best=s}}if(best&&score>=.36)lastMatches.push({incoming:x.name,shortage:best.name,score})}lastMatches.sort((a,b)=>b.score-a.score);$('incomingStatus').textContent=`تمت مراجعة ${inc.length} سطرًا، وظهرت ${lastMatches.length} مطابقة محتملة. راجع درجة التطابق قبل الاعتماد.`;show(lastMatches)}catch(e){$('incomingStatus').textContent='حصلت مشكلة أثناء قراءة الوارد: '+e.message}};
 $('clearIncoming').onclick=()=>{$('incomingText').value='';$('incomingFile').value='';$('incomingStatus').textContent='تم مسح الوارد.'};function csv(name,arr){let s='\ufeff'+arr.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8;'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}$('download').onclick=()=>csv('ASKER_Matched_Incoming.csv',[['الوارد','الصنف في النواقص','درجة التطابق %','ملاحظة'],...lastMatches.map(x=>[x.incoming,x.shortage,Math.round(x.score*100),x.score>=.72?'مطابقة قوية':'تحتاج مراجعة'])]);$('exportShortages').onclick=()=>csv('ASKER_Shortages.csv',[['الصنف'],...shortages.map(x=>[x.name])]);$('reset').onclick=()=>{if(confirm('متأكد من مسح قائمة النواقص المحفوظة؟')){shortages=[];localStorage.removeItem('asker_shortages_v1');updateSaved();$('shortageStatus').textContent='تم مسح القائمة.'}};try{shortages=JSON.parse(localStorage.getItem('asker_shortages_v1')||'[]')}catch{}updateSaved();
-</script></body></html>
+
+
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+}
+</script>
+</body>
+</html>
