@@ -1,7 +1,5 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#123c8c">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>بوت نواقص صيدلية عسكر</title>
@@ -10,7 +8,7 @@
 </style></head><body>
 <header><h1>صيدلية عسكر | ASKER Pharmacy</h1><p>مطابقة الوارد اليومي مع شيت النواقص</p></header>
 <main>
-<section class="card"><h2>١) تحميل شيت النواقص</h2><p class="small">ارفع ملف Excel أو PDF للنواقص. القائمة تُحفظ في نفس المتصفح على جهازك، ويمكن تحديثها عند تغيير الشيت.</p><input id="shortageFile" type="file" accept=".xlsx,.xls,.csv,.pdf"><button id="loadShortages">قراءة وحفظ شيت النواقص</button><div id="shortageStatus" class="status">لم يتم تحميل شيت نواقص بعد.</div></section>
+<section class="card"><h2>١) تحديث شيت النواقص الشهري</h2><p class="small">تقدر ترفع ملف Excel أو PDF كالمعتاد، أو تنسخ بيانات الشيت من Excel وتلصقها هنا. القائمة تُحفظ في نفس المتصفح على جهازك.</p><label for="shortagePaste">الصق بيانات شيت النواقص هنا (كل صنف في سطر، أو الصق الصفوف المنسوخة من Excel)</label><textarea id="shortagePaste" placeholder="الصق أسماء الأصناف أو الصفوف المنسوخة من Excel هنا"></textarea><button id="pasteShortages" class="green">قراءة وحفظ الأصناف الملصوقة</button><p class="small">أو ارفع الملف بدل اللصق:</p><input id="shortageFile" type="file" accept=".xlsx,.xls,.csv,.pdf"><button id="loadShortages">قراءة وحفظ شيت النواقص من ملف</button><div id="shortageStatus" class="status">لم يتم تحميل شيت نواقص بعد.</div></section>
 <section class="card"><h2>٢) إدخال الوارد اليوم</h2><p class="small">الصق رسالة الشركة أو اكتب كل صنف في سطر، أو ارفع صورة/صور أو PDF أو Excel للوارد.</p><label for="incomingText">الوارد مكتوبًا</label><textarea id="incomingText" placeholder="مثال:\nاولفنت شراب كوتة\nكونجستال أقراص كوتة\nجلوكوفاج XR 500"></textarea><p><label for="incomingFile">أو ارفع صورة / PDF / Excel</label><input id="incomingFile" type="file" accept="image/*,.pdf,.xlsx,.xls,.csv" multiple></p><button id="processIncoming" class="green">طابق الوارد مع النواقص</button><button id="clearIncoming" class="secondary">مسح الوارد</button><div id="incomingStatus" class="status">جاهز لاستقبال الوارد.</div></section>
 <section class="card"><h2>٣) الأصناف الموجودة في الوارد من النواقص</h2><p class="small">راجع أسماء الأصناف ودرجة المطابقة قبل الاعتماد، خصوصًا الأسماء المتشابهة. لا يخترع التطبيق أسعارًا أو كميات غير موجودة بالملفات.</p><div id="results"></div><button id="download" class="secondary hidden">تنزيل النتيجة CSV</button><button id="exportShortages" class="secondary hidden">تنزيل قائمة النواقص CSV</button></section>
 <section class="card"><h2>البيانات المحفوظة</h2><div id="savedInfo" class="small">لم تُحمّل قائمة نواقص.</div><button id="reset" class="danger">مسح قائمة النواقص المحفوظة</button></section>
@@ -25,29 +23,29 @@ async function readPdf(file){if(!window.pdfjsLib)await loadScript('https://cdnjs
 async function readImage(file){if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');let r=await Tesseract.recognize(file,'ara+eng',{logger:m=>{if(m.status==='recognizing text')$('incomingStatus').textContent='جاري قراءة الصورة '+Math.round((m.progress||0)*100)+'٪'}});return r.data.text||''}
 async function readSheet(file){if(!window.XLSX)await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');let wb=XLSX.read(await file.arrayBuffer(),{type:'array'});return wb.SheetNames.map(n=>XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n')}
 function rowsFrom(text){return text.split(/\r?\n/).map(x=>x.trim()).filter(x=>x.length>1).map(raw=>{let bits=raw.split(/\s{2,}|\t|;|\|/).map(x=>x.trim()).filter(Boolean);return {name:bits.length?bits.join(' '):raw,raw}}).filter(r=>r.name&&!/^(اسم الصنف|الصنف|اسم المنتج|product name)$/i.test(r.name))}
+function pastedRowsFrom(text){
+ const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ if(!lines.length)return [];
+ const cells=lines.map(line=>line.includes('\t')?line.split('\t').map(x=>x.trim()).filter(Boolean):line.split(/\s{2,}|\s*\|\s*|;/).map(x=>x.trim()).filter(Boolean));
+ let nameCol=-1;
+ for(const row of cells){const idx=row.findIndex(c=>/^(اسم\s*الصنف|الصنف|اسم\s*المنتج|اسم\s*الدواء|product\s*name|item\s*name)$/i.test(norm(c)));if(idx>=0){nameCol=idx;break}}
+ return cells.map((row,i)=>{
+   if(!row.length)return null;
+   let name='';
+   if(nameCol>=0)name=row[nameCol]||'';
+   else if(row.length===1)name=row[0];
+   else {
+     const candidates=row.filter(c=>/[\u0600-\u06FFa-zA-Z]/i.test(c)&&!/^\d+(?:[.,]\d+)?$/.test(c)&&!/^(كود|باركود|الكمية|كمية|رصيد|سعر|رقم|code|barcode|qty|quantity|price)$/i.test(norm(c)));
+     name=(candidates.sort((a,b)=>b.length-a.length)[0]||row[0]||'');
+   }
+   if(i===0&&/^(اسم\s*الصنف|الصنف|اسم\s*المنتج|اسم\s*الدواء|product\s*name|item\s*name)$/i.test(norm(name)))return null;
+   return {name:name.trim(),raw:lines[i]};
+ }).filter(r=>r&&norm(r.name).length>2&&!/^(كود الصنف|رقم|name|item name)$/.test(norm(r.name)));
+}
 function save(){localStorage.setItem('asker_shortages_v1',JSON.stringify(shortages));updateSaved()}function updateSaved(){$('savedInfo').textContent=shortages.length?`القائمة المحفوظة تحتوي على ${shortages.length} سطرًا/صنفًا في هذا المتصفح.`:'لم تُحمّل قائمة نواقص.';$('exportShortages').classList.toggle('hidden',!shortages.length)}function escape(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function show(rows){if(!rows.length){$('results').innerHTML='<p class="small">لم تظهر مطابقات محتملة. تأكد من تحميل شيت النواقص ووضوح أسماء الأصناف.</p>';$('download').classList.add('hidden');return}$('results').innerHTML='<div class="wrap"><table><thead><tr><th>#</th><th>الصنف في الوارد</th><th>الصنف في النواقص</th><th>التطابق</th><th>الحالة</th></tr></thead><tbody>'+rows.map((r,i)=>`<tr><td>${i+1}</td><td>${escape(r.incoming)}</td><td>${escape(r.shortage)}</td><td>${Math.round(r.score*100)}٪</td><td>${r.score>=.72?'<span class="badge">مطابقة قوية</span>':'تحتاج مراجعة'}</td></tr>`).join('')+'</tbody></table></div>';$('download').classList.remove('hidden')}
+$('pasteShortages').onclick=()=>{const pasted=$('shortagePaste').value.trim();if(!pasted){$('shortageStatus').textContent='الصق بيانات شيت النواقص أولًا.';return}const parsed=pastedRowsFrom(pasted);shortages=parsed.map(x=>({name:x.name,raw:x.raw})).filter((x,i,a)=>a.findIndex(y=>norm(y.name)===norm(x.name))===i);save();$('shortageStatus').textContent=`تم حفظ ${shortages.length} صنفًا من النص الملصوق. راجع العدد مقارنةً بالشيت الأصلي.`;};
 $('loadShortages').onclick=async()=>{let f=$('shortageFile').files[0];if(!f){$('shortageStatus').textContent='اختار ملف النواقص أولًا.';return}$('shortageStatus').textContent='جاري قراءة الملف...';try{let t=/\.pdf$/i.test(f.name)?await readPdf(f):await readSheet(f);let r=rowsFrom(t).filter(x=>norm(x.name).length>2&&!/^(كود الصنف|رقم|name|item name)$/.test(norm(x.name)));shortages=r.map(x=>({name:x.name,raw:x.raw})).filter((x,i,a)=>a.findIndex(y=>norm(y.name)===norm(x.name))===i);save();$('shortageStatus').textContent=`تمت قراءة ${shortages.length} سطرًا مبدئيًا وحفظها.\nراجع العدد مقارنةً بملفك؛ قد تحتاج ملفات PDF المصوّرة إلى OCR أو مراجعة يدوية.`}catch(e){$('shortageStatus').textContent='تعذرت قراءة الملف: '+e.message}};
 $('processIncoming').onclick=async()=>{if(!shortages.length){$('incomingStatus').textContent='حمّل شيت النواقص أولًا.';return}let t=$('incomingText').value.trim(),files=[...$('incomingFile').files];try{for(let f of files){$('incomingStatus').textContent='جاري قراءة '+f.name; if(/\.pdf$/i.test(f.name))t+='\n'+await readPdf(f);else if(/\.(xlsx|xls|csv)$/i.test(f.name))t+='\n'+await readSheet(f);else if(f.type.startsWith('image/'))t+='\n'+await readImage(f)}let inc=rowsFrom(t),seen=new Set();lastMatches=[];for(let x of inc){let k=norm(x.name);if(!k||seen.has(k))continue;seen.add(k);let best=null,score=0;for(let s of shortages){let sc=norm(x.name)===norm(s.name)?1:similarity(x.name,s.name);if(sc>score){score=sc;best=s}}if(best&&score>=.36)lastMatches.push({incoming:x.name,shortage:best.name,score})}lastMatches.sort((a,b)=>b.score-a.score);$('incomingStatus').textContent=`تمت مراجعة ${inc.length} سطرًا، وظهرت ${lastMatches.length} مطابقة محتملة. راجع درجة التطابق قبل الاعتماد.`;show(lastMatches)}catch(e){$('incomingStatus').textContent='حصلت مشكلة أثناء قراءة الوارد: '+e.message}};
 $('clearIncoming').onclick=()=>{$('incomingText').value='';$('incomingFile').value='';$('incomingStatus').textContent='تم مسح الوارد.'};function csv(name,arr){let s='\ufeff'+arr.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8;'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}$('download').onclick=()=>csv('ASKER_Matched_Incoming.csv',[['الوارد','الصنف في النواقص','درجة التطابق %','ملاحظة'],...lastMatches.map(x=>[x.incoming,x.shortage,Math.round(x.score*100),x.score>=.72?'مطابقة قوية':'تحتاج مراجعة'])]);$('exportShortages').onclick=()=>csv('ASKER_Shortages.csv',[['الصنف'],...shortages.map(x=>[x.name])]);$('reset').onclick=()=>{if(confirm('متأكد من مسح قائمة النواقص المحفوظة؟')){shortages=[];localStorage.removeItem('asker_shortages_v1');updateSaved();$('shortageStatus').textContent='تم مسح القائمة.'}};try{shortages=JSON.parse(localStorage.getItem('asker_shortages_v1')||'[]')}catch{}updateSaved();
-
-
-</script>
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js");
-  });
-}
-</script>
-
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js");
-  });
-}
-</script>
-
-</body>
-</html>
+</script></body></html>
