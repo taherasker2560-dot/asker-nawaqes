@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const I=require('../file-import.js'),XLSX=require('../vendor/xlsx-0.20.3.full.min.js');
+assert.equal(XLSX.version,'0.20.3');
+for(const [v,wanted] of [['٢',2],['۳',3],['١٫٥',1.5],['1,5',1.5],['1,234',1234],['٠',null],['-1',null],['',null],['10 tablets',null],['Infinity',null]])assert.equal(I.quantity(v),wanted,v);
+const comma=I.parseCSV('\uFEFFProduct Name,Quantity,Price\r\n"Drug, 500mg",2,55\r\n"Drug ""B""",3,60');assert.equal(comma.delimiter,',');assert.equal(comma.matrix[1][0],'Drug, 500mg');assert.equal(comma.matrix[2][0],'Drug "B"');
+const semi=I.parseCSV('اسم الصنف;الكمية;السعر\n"دواء أ";"٢";99\n"دواء ب";"٣";30');assert.equal(semi.delimiter,';');
+assert.equal(I.parseCSV('name\tqty\nDrug\t2').delimiter,'\t');
+assert.throws(()=>I.parseCSV('name,qty\n"unclosed,2'),/اقتباس/);
+const priced=[['الصنف','السعر'],['دواء 500',80]];assert.equal(I.guessColumns(priced[0]).qty,-1);assert.throws(()=>I.makeRows(priced,0,0,1),/السعر/);
+const manual=I.makeRows(priced,0,0,-1);assert.equal(manual[0].rawQuantity,'');assert.throws(()=>I.pasteText(manual),/تصحيح/);manual[0].rawQuantity='٣';assert.equal(I.pasteText(manual),'دواء 500 | 3');
+const dup=I.makeRows([['name','qty'],['A',2],['A',2],['B',1]],0,0,1);assert.equal(dup[1].include,false);assert.equal(I.pasteText(dup),'A | 2\nB | 1');
+const conflict=I.makeRows([['name','qty'],['A',2],['A',3]],0,0,1);assert.ok(I.validate(conflict).every(Boolean));
+const bad=I.makeRows([['name','qty'],['',2],['A | B',1],['X',0]],0,0,1);assert.equal(I.validate(bad).filter(Boolean).length,3);
+assert.throws(()=>I.makeRows([['name','qty'],['A',2]],0,0,0),/عمودين/);
+assert.throws(()=>I.makeRows([['name','qty'],['A',2]],0,-1,1),/عمود/);
+assert.throws(()=>I.makeRows([['name','qty'],['A',2]],0,10,1),/عمود/);
+assert.throws(()=>I.makeRows([['name','qty'],...Array.from({length:10001},()=>['A',1])],0,0,1),/١٠٠٠٠/);
+const cp=[199, 211, 227, 32, 199, 225, 213, 228, 221, 59, 199, 225, 223, 227, 237, 201, 10, 207, 230, 199, 193, 59, 50];assert.equal(I.decodeCSV(Uint8Array.from(cp),'windows-1256')[1][0],'دواء');
+if(process.env.ASKER_SOURCE_XLSX){const wb=XLSX.read(fs.readFileSync(process.env.ASKER_SOURCE_XLSX),{type:'buffer'});const matrix=XLSX.utils.sheet_to_json(wb.Sheets.Nawqes,{header:1,raw:true,defval:'',blankrows:true});const header=I.detectHeader(matrix);assert.equal(header,3);const cols=I.guessColumns(matrix[header]);assert.deepEqual(cols,{name:1,qty:2});const rows=I.makeRows(matrix,header,cols.name,cols.qty);assert.equal(rows.length,2129);assert.equal(rows.filter(r=>r.include).length,2126);assert.equal(I.validate(rows).filter(Boolean).length,0);assert.equal(I.pasteText(rows).split('\n').length,2126);}
+console.log('PASS: CSV quoting/BOM/comma/semicolon/tab, Arabic/Persian quantities, Windows-1256, price rejection, missing/invalid quantities, duplicates, row limit, mapping and actual monthly XLSX when provided');
