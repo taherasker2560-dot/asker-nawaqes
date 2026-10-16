@@ -1,6 +1,6 @@
 # Excel and CSV import in V10
 
-Both monthly shortages and daily incoming now have an **استيراد Excel أو CSV** panel. Supported extensions are `.xlsx`, `.xls` and `.csv`. PDF and images remain a later feature.
+Both monthly shortages and daily incoming now have an **استيراد Excel أو CSV** panel. Supported extensions are `.xlsx`, `.xls` and `.csv`. PDF remains a later feature. Daily incoming images have a separate OCR panel documented in incoming-images.md.
 
 1. Choose a local file (up to 10 MiB), sheet and header row.
 2. Review the selected name and quantity columns. Price/cost/discount/amount columns cannot be mapped as quantities. If quantity is absent, the preview leaves it blank for manual entry.
