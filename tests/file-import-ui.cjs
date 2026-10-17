@@ -17,7 +17,7 @@ const XLSX=require('../vendor/xlsx-0.20.3.full.min.js');
  // A canceled import must preserve staged text.
  await page.locator('#shortageImportFile').setInputFiles({name:'bad.csv',buffer:Buffer.from('name,qty\nB,0')});await short.locator('[data-role=preview]').click();assert.equal(await short.locator('[data-role=apply]').isDisabled(),true);await short.locator('[data-role=cancel]').click();assert.ok((await page.locator('#shortageText').inputValue()).startsWith('Drug A'));
  // Price-only incoming data has no default quantity and cannot be staged until explicitly entered.
- await page.locator('[data-tab=incoming]').click();const incoming=widget('incoming');
+ await page.locator('[data-tab=incoming]').click();await page.locator('#incomingMode').selectOption('receipt');const incoming=widget('incoming');
  await page.locator('#incomingImportFile').setInputFiles({name:'prices.csv',buffer:Buffer.from('الصنف,السعر\nزابيميرت 30 مجم أقراص,165')});await incoming.locator('[data-role=preview]').click();assert.equal(await incoming.locator('[data-field=rawQuantity]').inputValue(),'');assert.equal(await incoming.locator('[data-role=apply]').isDisabled(),true);assert.equal(await page.locator('#incomingImportQty option[value="1"]').isDisabled(),true);
  await incoming.locator('[data-field=rawQuantity]').fill('٤');await incoming.locator('[data-role=apply]').click();assert.equal(await page.locator('#incomingText').inputValue(),'زابيميرت 30 مجم أقراص | 4');
  // Legacy XLS is parsed by the locally bundled reader.
