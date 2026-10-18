@@ -1,0 +1,21 @@
+name: V10 OCR regression tests
+on:
+  push:
+    branches:
+      - fix/v10-ocr-partial-results
+  workflow_dispatch:
+jobs:
+  ocr-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Run mocked OCR UI regression tests
+        run: node tests/incoming-images-ui.cjs
