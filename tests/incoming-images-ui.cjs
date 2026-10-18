@@ -7,6 +7,11 @@ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(
 const url=`http://127.0.0.1:${server.address().port}/asker-nawaqes-test-10.html`;await page.goto(url);await page.waitForSelector('#workspace:not(.hidden)');await page.locator('[data-tab=incoming]').click();await page.locator('#incomingMode').selectOption('receipt');
 const tiny=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAHgAAAA8CAIAAAAiz+n/AAAAnklEQVR4nO3QQREAIRDAsOP8e15UUB4kCjpdM/Nx3n874BVGR4yOGB0xOmJ0xOiI0RGjI0ZHjI4YHTE6YnTE6IjREaMjRkeMjhgdMTpidMToiNERoyNGR4yOGB0xOmJ0xOiI0RGjI0ZHjI4YHTE6YnTE6IjREaMjRkeMjhgdMTpidMToiNERoyNGR4yOGB0xOmJ0xOiI0RGjI0ZHjI5sCV0Ddeok22MAAAAASUVORK5CYII=','base64'),upload=n=>Array.from({length:n},(_,i)=>({name:'photo-'+i+'.png',mimeType:'image/png',buffer:tiny}));
 const images=page.locator('.incoming-images'),review=page.locator('#incomingImportFile').locator('..');
+// Price-column crop is opt-in and must not silently change existing imports.
+const crop=images.locator('[data-image-role=crop-prices]');
+assert.equal(await crop.isChecked(),false);
+await crop.check();assert.equal(await crop.isChecked(),true);
+await crop.uncheck();assert.equal(await crop.isChecked(),false);
 await page.locator('#incomingImages').setInputFiles(upload(2));assert.equal(await images.locator('img').count(),2);assert.equal(await page.locator('#saveIncomingBtn').isDisabled(),true);await images.locator('[data-image-role=extract]').click();await page.waitForFunction(()=>document.querySelector('#incomingImportFile').parentElement.querySelector('[data-role=status]').textContent.includes('مختار 2')).catch(async e=>{console.error(await images.locator('[data-image-role=status]').textContent());console.error(errors);throw e});
 assert.equal(await review.locator('[data-field=rawQuantity]').count(),3);assert.equal(await review.locator('[data-field=rawQuantity]').nth(0).inputValue(),'');assert.equal(await review.locator('[data-role=apply]').isDisabled(),true);assert.equal(await review.locator('[data-field=include]').nth(2).isChecked(),false);
 await review.locator('[data-field=rawQuantity]').nth(0).fill('٢');await review.locator('[data-field=rawQuantity]').nth(1).fill('3');await review.locator('[data-role=apply]').click();assert.equal(await page.locator('#incomingText').inputValue(),'Drug 500mg | 2\nDrug Two | 3');assert.equal(await page.evaluate(()=>window.testWrites),0);
