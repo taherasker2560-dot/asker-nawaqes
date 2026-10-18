@@ -27,22 +27,23 @@ function draftRows(results){const rows=[],seen=new Set();for(const result of res
 let loader;
 function loadOCR(){if(root.Tesseract)return Promise.resolve(root.Tesseract);if(!loader)loader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='vendor/tesseract-6.0.1.min.js';script.onload=()=>root.Tesseract?resolve(root.Tesseract):reject(Error('تعذر تجهيز قارئ الصور.'));script.onerror=()=>reject(Error('تعذر تحميل قارئ الصور؛ حدّث الصفحة وحاول مرة أخرى.'));document.head.append(script)}).catch(e=>{loader=null;throw e});return loader}
 function detectPriceDivider(ctx,width,height){
- // Conservative detection: only use a continuous, pale-gray vertical table divider.
- const sample=ctx.getImageData(0,0,width,height).data;
- const start=Math.floor(width*0.58),end=Math.floor(width*0.86);
+ // Detect a persistent darker vertical separator relative to both neighbors.
+ // Supplier screenshots have yellow-tinted backgrounds, so neutral-gray detection fails.
+ const pixels=ctx.getImageData(0,0,width,height).data;
+ const start=Math.floor(width*0.62),end=Math.floor(width*0.9);
  let bestX=-1,bestScore=0;
- for(let x=start;x<end;x+=2){
+ const brightness=(x,y)=>{const i=(y*width+x)*4;return (pixels[i]+pixels[i+1]+pixels[i+2])/3};
+ for(let x=Math.max(3,start);x<Math.min(width-3,end);x++){
   let hits=0,total=0;
-  for(let y=Math.floor(height*0.1);y<Math.floor(height*0.9);y+=8){
-   const i=(y*width+x)*4,r=sample[i],g=sample[i+1],b=sample[i+2];
-   // Thin neutral gray line on pale table background, not black text.
-   if(Math.abs(r-g)<12&&Math.abs(g-b)<12&&r>=140&&r<=225)hits++;
+  for(let y=Math.floor(height*0.1);y<Math.floor(height*0.9);y+=6){
+   const center=brightness(x,y);
+   if(center>190&&brightness(x-3,y)-center>3&&brightness(x+3,y)-center>3)hits++;
    total++;
   }
   const score=hits/Math.max(1,total);
   if(score>bestScore){bestScore=score;bestX=x}
  }
- return bestScore>=0.78?bestX:-1;
+ return bestScore>=0.85?bestX:-1;
 }
 async function imageCanvas(file,removeRightPriceColumn=false){
  const bitmap=await createImageBitmap(file);
