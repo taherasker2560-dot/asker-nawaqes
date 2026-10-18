@@ -23,12 +23,14 @@ document.addEventListener('DOMContentLoaded',()=>{
  const section=document.createElement('section');section.className='card';
  section.innerHTML='<h2>مراجعة أسماء الأدوية</h2><p class="hint">الاقتراحات هنا من تصحيحاتك السابقة على نفس الجهاز فقط. راجع الأسماء والتركيزات قبل الاعتماد. لا يتم إرسال أي شيء لقاعدة البيانات.</p><div id="reviewRows"></div><button id="reviewSave" type="button">حفظ التصحيحات المحددة</button> <button id="reviewExport" type="button">تصدير قاموس التصحيحات</button>';
  out.before(section);
+ const feedback=document.createElement('p');feedback.id='reviewFeedback';feedback.setAttribute('role','status');feedback.style.fontWeight='bold';section.append(feedback);
  const observer=new MutationObserver(render);observer.observe(out,{attributes:true,attributeFilter:['data-ocr-ready']});
  $('reviewSave').onclick=()=>{
   const dict=read();let count=0;
   for(const row of $('reviewRows').children){const {raw,field,check}=row._ocr;if(check.checked&&field.value.trim()){dict[normalize(raw)]=field.value.trim();count++}}
-  try{localStorage.setItem(KEY,JSON.stringify(dict));$('status').textContent='تم حفظ '+count+' تصحيحًا على هذا الجهاز.'}
-  catch(e){$('status').textContent='تعذر الحفظ: '+e.message}
+  if(!count){feedback.textContent='لم يتم تحديد أي تصحيح للحفظ. فعّل علامة الصح أسفل الاسم الذي عدّلته.';return}
+  try{localStorage.setItem(KEY,JSON.stringify(dict));feedback.textContent='تم حفظ '+count+' تصحيح على هذا الجهاز بنجاح.';render()}
+  catch(e){feedback.textContent='تعذر الحفظ على الجهاز: '+e.message}
  };
  $('reviewExport').onclick=()=>{
   const blob=new Blob([JSON.stringify(read(),null,2)],{type:'application/json'});
