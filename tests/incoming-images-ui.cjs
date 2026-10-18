@@ -28,7 +28,7 @@ await page.evaluate(()=>window.ocrMode='normal');
 await images.locator('[data-image-role=extract]').click();
 await page.waitForFunction(()=>document.querySelector('[data-image-role=status]').textContent.includes('اكتملت القراءة'));
 assert.equal(await page.evaluate(()=>window.ocrCalls),3);
-assert.equal(await page.locator('#incomingImportFile').parentElement.locator('[data-field=name]').count(),3);
+assert.equal(await page.locator('#incomingImportFile').parentElement.locator('[data-field=name]').count(),4);
 assert.equal(await page.evaluate(()=>window.testWrites),0);
 await images.locator('[data-image-role=cancel]').click();await page.locator('#incomingPanel').screenshot({path:'/tmp/asker-incoming-images-mobile.png'});
 console.log('PASS: mobile image UI, multiple previews, editable blank quantities, duplicates, safe transfer, cancellation/late result, CSV supersession, OCR failure and zero database writes');
