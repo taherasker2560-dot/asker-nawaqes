@@ -3,7 +3,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const mockDB=`window.testWrites=0;window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{}}}),onAuthStateChange:()=>{}},from:()=>{const q=new Proxy({},{get:(t,k)=>k==='then'?r=>r({data:[],error:null}):()=>{if(['insert','update','upsert','delete'].includes(k)){window.testWrites++;throw Error('Unexpected write')}return q}});return q},rpc:()=>{window.testWrites++;throw Error('Unexpected RPC')}})};`;
 (async()=>{let browser;const root=path.resolve(__dirname,'..');const server=http.createServer((req,res)=>{const p=path.join(root,new URL(req.url,'http://localhost').pathname);if(!p.startsWith(root+path.sep))return res.writeHead(403).end();fs.readFile(p,(e,d)=>{if(e)return res.writeHead(404).end();res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':'text/html');res.end(d)})});await new Promise(r=>server.listen(0,'127.0.0.1',r));
 try{browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE,args:['--no-sandbox','--disable-gpu']});const context=await browser.newContext({viewport:{width:390,height:844}});await context.route('https://cdn.jsdelivr.net/npm/@supabase/**',r=>r.fulfill({contentType:'application/javascript',body:mockDB}));
-const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(()=>{window.ocrCalls=0;window.ocrMode='normal';window.Tesseract={createWorker:async()=>({setParameters:async()=>{},terminate:async()=>{},recognize:async()=>{window.ocrCalls++;if(window.ocrMode==='pending')await new Promise(r=>window.releaseOCR=r);if(window.ocrMode==='failure')throw Error('OCR failed');return {data:{text:window.ocrCalls%2?'Drug 500mg\nDrug Two':'Drug 500mg'}}}})}});
+const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(()=>{window.ocrCalls=0;window.ocrMode='normal';window.Tesseract={createWorker:async()=>({setParameters:async()=>{},terminate:async()=>{},recognize:async()=>{window.ocrCalls++;if(window.ocrMode==='pending')await new Promise(r=>window.releaseOCR=r);if(window.ocrMode==='failure'||(window.ocrMode==='failSecond'&&window.ocrCalls===2))throw Error('OCR failed');return {data:{text:window.ocrCalls%2?'Drug 500mg\nDrug Two':'Drug 500mg'}}}})}});
 const url=`http://127.0.0.1:${server.address().port}/asker-nawaqes-test-10.html`;await page.goto(url);await page.waitForSelector('#workspace:not(.hidden)');await page.locator('[data-tab=incoming]').click();await page.locator('#incomingMode').selectOption('receipt');
 const tiny=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAHgAAAA8CAIAAAAiz+n/AAAAnklEQVR4nO3QQREAIRDAsOP8e15UUB4kCjpdM/Nx3n874BVGR4yOGB0xOmJ0xOiI0RGjI0ZHjI4YHTE6YnTE6IjREaMjRkeMjhgdMTpidMToiNERoyNGR4yOGB0xOmJ0xOiI0RGjI0ZHjI4YHTE6YnTE6IjREaMjRkeMjhgdMTpidMToiNERoyNGR4yOGB0xOmJ0xOiI0RGjI0ZHjI5sCV0Ddeok22MAAAAASUVORK5CYII=','base64'),upload=n=>Array.from({length:n},(_,i)=>({name:'photo-'+i+'.png',mimeType:'image/png',buffer:tiny}));
 const images=page.locator('.incoming-images'),review=page.locator('#incomingImportFile').locator('..');
@@ -16,6 +16,20 @@ await page.evaluate(()=>window.ocrMode='pending');await page.locator('#incomingI
 await page.evaluate(()=>{window.releaseOCR=null;window.ocrMode='pending'});await page.locator('#incomingImages').setInputFiles(upload(1));await images.locator('[data-image-role=extract]').click();await page.waitForFunction(()=>typeof window.releaseOCR==='function');await page.locator('#incomingImportFile').setInputFiles({name:'new.csv',buffer:Buffer.from('name,qty\nCSV Drug,4')});await review.locator('[data-role=preview]').click();await page.evaluate(()=>window.releaseOCR());await page.waitForTimeout(30);assert.equal(await review.locator('[data-field=name]').inputValue(),'CSV Drug');await review.locator('[data-role=cancel]').click();
 // Failure must leave earlier text untouched and release the disabled Save button.
 await page.evaluate(()=>window.ocrMode='failure');await page.locator('#incomingImages').setInputFiles(upload(1));await images.locator('[data-image-role=extract]').click();await page.waitForFunction(()=>document.querySelector('[data-image-role=status]').textContent.includes('تعذر إتمام'));assert.equal(await page.locator('#saveIncomingBtn').isEnabled(),true);assert.equal(await page.locator('#incomingText').inputValue(),'Drug 500mg | 2\nDrug Two | 3');assert.deepEqual(errors,[]);
+await images.locator('[data-image-role=cancel]').click();
+// Regression: partial OCR results survive one failed image; retry skips successful images.
+await page.evaluate(()=>{window.ocrCalls=0;window.ocrMode='failSecond'});
+await page.locator('#incomingImages').setInputFiles(upload(2));
+await images.locator('[data-image-role=extract]').click();
+await page.waitForFunction(()=>document.querySelector('[data-image-role=status]').textContent.includes('فشلت 1 صورة'));
+assert.equal(await page.locator('#incomingImportFile').parentElement.locator('[data-field=name]').count(),2);
+assert.equal(await page.evaluate(()=>window.ocrCalls),2);
+await page.evaluate(()=>window.ocrMode='normal');
+await images.locator('[data-image-role=extract]').click();
+await page.waitForFunction(()=>document.querySelector('[data-image-role=status]').textContent.includes('اكتملت القراءة'));
+assert.equal(await page.evaluate(()=>window.ocrCalls),3);
+assert.equal(await page.locator('#incomingImportFile').parentElement.locator('[data-field=name]').count(),3);
+assert.equal(await page.evaluate(()=>window.testWrites),0);
 await images.locator('[data-image-role=cancel]').click();await page.locator('#incomingPanel').screenshot({path:'/tmp/asker-incoming-images-mobile.png'});
 console.log('PASS: mobile image UI, multiple previews, editable blank quantities, duplicates, safe transfer, cancellation/late result, CSV supersession, OCR failure and zero database writes');
 if(process.env.ASKER_OCR_IMAGE&&process.env.OCR_DEPENDENCIES){
