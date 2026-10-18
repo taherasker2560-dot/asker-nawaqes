@@ -26,8 +26,46 @@ function extractNames(data){
 function draftRows(results){const rows=[],seen=new Set();for(const result of results)for(let i=0;i<result.names.length;i++){const name=clean(result.names[i]),signature=normalized(name),duplicate=seen.has(signature);seen.add(signature);rows.push({sourceRow:i+1,sourceLabel:result.fileName,name,rawQuantity:'',include:!duplicate,duplicate})}return rows}
 let loader;
 function loadOCR(){if(root.Tesseract)return Promise.resolve(root.Tesseract);if(!loader)loader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='vendor/tesseract-6.0.1.min.js';script.onload=()=>root.Tesseract?resolve(root.Tesseract):reject(Error('تعذر تجهيز قارئ الصور.'));script.onerror=()=>reject(Error('تعذر تحميل قارئ الصور؛ حدّث الصفحة وحاول مرة أخرى.'));document.head.append(script)}).catch(e=>{loader=null;throw e});return loader}
-async function imageCanvas(file,removeRightPriceColumn=false){const bitmap=await createImageBitmap(file);try{if(bitmap.width*bitmap.height>24000000)throw Error('دقة الصورة كبيرة جدًا؛ صدّر نسخة أصغر.');const sourceWidth=removeRightPriceColumn?Math.round(bitmap.width*0.77):bitmap.width;const scale=Math.min(2,4000/Math.max(sourceWidth,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(sourceWidth*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,sourceWidth,bitmap.height,0,0,canvas.width,canvas.height);return canvas}finally{bitmap.close()}}
-function init(){const panel=document.getElementById('incomingPanel');if(!panel)return;const host=document.createElement('details');host.className='file-import incoming-images';host.open=true;host.innerHTML=`<summary>إضافة صور الوارد</summary><p class="hint">اختار صور الأصناف أو الفاتورة، ثم استخرج الأسماء وراجعها. القراءة قد تخطئ؛ مقارنة قائمة الشركة تعمل بالأسماء فقط، دون كميات أو مراجعة إجبارية لكل سطر. الأسعار لا تتحول لكميات. الصور للقراءة والمراجعة، ولا تُرفق بالسجل بعد الحفظ.</p><label for="incomingImages">صور الوارد — حتى ١٠ صور</label><input id="incomingImages" type="file" accept="image/jpeg,image/png,image/webp" multiple><label for="incomingImageLanguage">لغة الأسماء في الصور</label><select id="incomingImageLanguage"><option value="ara">عربي</option><option value="ara+eng">عربي وإنجليزي</option><option value="eng">إنجليزي</option></select><label for="incomingImageQuality">دقة القراءة</label><select id="incomingImageQuality"><option value="best">دقة أعلى — تنزيل أكبر أول مرة</option><option value="fast">أسرع للصور الواضحة</option></select><label><input type="checkbox" data-image-role="crop-prices"> الصورة فيها عمود أسعار على اليمين (استبعاد آخر ٢٣٪ من عرض الصورة قبل القراءة)</label><p class="hint">فعّل الاختيار فقط لو أسماء الأصناف كلها في الجزء الأيسر؛ قد يقطع أسماء طويلة في صور أخرى.</p><div class="incoming-thumbnails" data-image-role="thumbnails"></div><div class="row"><button type="button" data-image-role="extract" disabled>استخراج الأسماء من الصور</button><button type="button" class="secondary" data-image-role="cancel" disabled>إلغاء قراءة الصور</button></div><div class="status" role="status" aria-live="polite" data-image-role="status">لم يتم اختيار صور.</div><p class="hint">أول استخدام يحتاج اتصالًا لتنزيل قارئ العربي والإنجليزي، وقد يأخذ وقتًا. الصور تُقرأ على جهازك. PDF في خطوة لاحقة.</p>`;
+function detectPriceDivider(ctx,width,height){
+ // Conservative detection: only use a continuous, pale-gray vertical table divider.
+ const sample=ctx.getImageData(0,0,width,height).data;
+ const start=Math.floor(width*0.58),end=Math.floor(width*0.86);
+ let bestX=-1,bestScore=0;
+ for(let x=start;x<end;x+=2){
+  let hits=0,total=0;
+  for(let y=Math.floor(height*0.1);y<Math.floor(height*0.9);y+=8){
+   const i=(y*width+x)*4,r=sample[i],g=sample[i+1],b=sample[i+2];
+   // Thin neutral gray line on pale table background, not black text.
+   if(Math.abs(r-g)<12&&Math.abs(g-b)<12&&r>=140&&r<=225)hits++;
+   total++;
+  }
+  const score=hits/Math.max(1,total);
+  if(score>bestScore){bestScore=score;bestX=x}
+ }
+ return bestScore>=0.78?bestX:-1;
+}
+async function imageCanvas(file,removeRightPriceColumn=false){
+ const bitmap=await createImageBitmap(file);
+ try{
+  if(bitmap.width*bitmap.height>24000000)throw Error('دقة الصورة كبيرة جدًا؛ صدّر نسخة أصغر.');
+  let sourceWidth=bitmap.width;
+  if(removeRightPriceColumn){
+   const probe=document.createElement('canvas');
+   probe.width=bitmap.width;probe.height=bitmap.height;
+   const ctx=probe.getContext('2d',{willReadFrequently:true});
+   ctx.drawImage(bitmap,0,0);
+   const divider=detectPriceDivider(ctx,probe.width,probe.height);
+   if(divider>0)sourceWidth=divider;
+  }
+  const scale=Math.min(2,4000/Math.max(sourceWidth,bitmap.height));
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.round(sourceWidth*scale));
+  canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+  canvas.getContext('2d').drawImage(bitmap,0,0,sourceWidth,bitmap.height,0,0,canvas.width,canvas.height);
+  return canvas;
+ }finally{bitmap.close()}
+}
+function init(){const panel=document.getElementById('incomingPanel');if(!panel)return;const host=document.createElement('details');host.className='file-import incoming-images';host.open=true;host.innerHTML=`<summary>إضافة صور الوارد</summary><p class="hint">اختار صور الأصناف أو الفاتورة، ثم استخرج الأسماء وراجعها. القراءة قد تخطئ؛ مقارنة قائمة الشركة تعمل بالأسماء فقط، دون كميات أو مراجعة إجبارية لكل سطر. الأسعار لا تتحول لكميات. الصور للقراءة والمراجعة، ولا تُرفق بالسجل بعد الحفظ.</p><label for="incomingImages">صور الوارد — حتى ١٠ صور</label><input id="incomingImages" type="file" accept="image/jpeg,image/png,image/webp" multiple><label for="incomingImageLanguage">لغة الأسماء في الصور</label><select id="incomingImageLanguage"><option value="ara">عربي</option><option value="ara+eng">عربي وإنجليزي</option><option value="eng">إنجليزي</option></select><label for="incomingImageQuality">دقة القراءة</label><select id="incomingImageQuality"><option value="best">دقة أعلى — تنزيل أكبر أول مرة</option><option value="fast">أسرع للصور الواضحة</option></select><label><input type="checkbox" data-image-role="crop-prices"> الصورة فيها عمود أسعار على اليمين (محاولة تحديد الفاصل تلقائيًا)</label><p class="hint">لو الفاصل مش واضح، البوت هيقرأ الصورة كاملة بدل القص بنسبة ثابتة.</p><div class="incoming-thumbnails" data-image-role="thumbnails"></div><div class="row"><button type="button" data-image-role="extract" disabled>استخراج الأسماء من الصور</button><button type="button" class="secondary" data-image-role="cancel" disabled>إلغاء قراءة الصور</button></div><div class="status" role="status" aria-live="polite" data-image-role="status">لم يتم اختيار صور.</div><p class="hint">أول استخدام يحتاج اتصالًا لتنزيل قارئ العربي والإنجليزي، وقد يأخذ وقتًا. الصور تُقرأ على جهازك. PDF في خطوة لاحقة.</p>`;
  panel.querySelector('h2').after(host);const el=r=>host.querySelector('[data-image-role="'+r+'"]'),input=host.querySelector('input');let files=[],urls=[],worker=null,run=0,token=null,busy=false,completed=new Map(),pending=[];
  const status=(message,bad=false)=>{el('status').textContent=message;el('status').className='status'+(bad?' bad':'')};
  const release=()=>{for(const url of urls)URL.revokeObjectURL(url);urls=[];el('thumbnails').replaceChildren()};
