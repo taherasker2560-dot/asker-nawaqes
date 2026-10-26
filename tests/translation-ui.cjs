@@ -5,7 +5,7 @@ const dom=new JSDOM(html,{url:'https://example.test/',runScripts:'outside-only',
 let writes=0,requests=0;const rows=[{id:'one',product_name:'GLUCOPHAGE 500MG 30TAB',quantity_needed:1,is_active:true},{id:'two',product_name:'GLUCOPHAGE 1000MG 30TAB',quantity_needed:1,is_active:true}];
 w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{}}}),onAuthStateChange:()=>{}},from:table=>{requests++;let active;const q=new Proxy({},{get:(t,k)=>k==='then'?resolve=>resolve({data:table==='shortage_items'?rows:[],error:null}):(...a)=>{if(['insert','update','delete','upsert'].includes(k)){writes++;throw Error('Unexpected write')}return q}});return q},rpc:()=>{writes++;throw Error('Unexpected RPC')}})};
 w.confirm=()=>true;w.alert=()=>{};w.URL.createObjectURL=()=> 'blob:local';w.URL.revokeObjectURL=()=>{};
-for(const f of ['file-import.js','incoming-images.js','name-translation.js','availability.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
+for(const f of ['file-import.js','incoming-images.js','name-translation.js','availability.js','gemini-bridge.js'])w.eval(fs.readFileSync(path.join(root,f),'utf8'));
 w.eval(html.match(/<script>\s*([\s\S]*?)<\/script>/)[1]);
 const $=id=>w.document.getElementById(id),tick=()=>new Promise(r=>setTimeout(r,0));
 (async()=>{await tick();$('incomingText').value='جلوكوفاج ٥٠٠ اقراص';$('saveIncomingBtn').click();await tick();
