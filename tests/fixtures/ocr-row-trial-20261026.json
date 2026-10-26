@@ -1,0 +1,125 @@
+{
+  "engine": "Tesseract.js 6.0.1; tesseract.js-core 6.0.0; Arabic best e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+  "rows": [
+    {
+      "file": "03-1000448802.jpg",
+      "reference": "ليبانتيل ١٤٥ كبسول",
+      "baseline": "ليبائئيل 186 كبسول",
+      "candidate": "ليبائثيل 186كبسول",
+      "baselineEdit": 4,
+      "candidateEdit": 4,
+      "length": 16,
+      "baselineNumbers": "186",
+      "candidateNumbers": "186",
+      "expected": "145"
+    },
+    {
+      "file": "03-1000448802.jpg",
+      "reference": "جلوكوفاج ٥٠٠ اقراص",
+      "baseline": "جلوكو ثاج ..ه اقراص",
+      "candidate": "اجلوكوفاج . .ماقراص.",
+      "baselineEdit": 4,
+      "candidateEdit": 4,
+      "length": 16,
+      "baselineNumbers": "",
+      "candidateNumbers": "",
+      "expected": "500"
+    },
+    {
+      "file": "04-1000448796.jpg",
+      "reference": "كابوتن ٥٠ اقراص",
+      "baseline": "كابوتن .ه اقراص",
+      "candidate": "كابوتن .0اقراص.",
+      "baselineEdit": 2,
+      "candidateEdit": 1,
+      "length": 13,
+      "baselineNumbers": "",
+      "candidateNumbers": "0",
+      "expected": "50"
+    },
+    {
+      "file": "04-1000448796.jpg",
+      "reference": "تيجريتول ٢٠٠ مجم اقراص",
+      "baseline": "تيجربتول 0٠؟ مجم اقراص |",
+      "candidate": "تيجربتول 700 مجماقراص.",
+      "baselineEdit": 2,
+      "candidateEdit": 2,
+      "length": 19,
+      "baselineNumbers": "00",
+      "candidateNumbers": "700",
+      "expected": "200"
+    },
+    {
+      "file": "06-1000448800.jpg",
+      "reference": "زيبركسا ٥ مجم ٧ قرص",
+      "baseline": "زببركسا د مجم ١ قرص",
+      "candidate": "زببركساه مجم ‎١‏قرص.",
+      "baselineEdit": 3,
+      "candidateEdit": 3,
+      "length": 15,
+      "baselineNumbers": "1",
+      "candidateNumbers": "1",
+      "expected": "5|7"
+    },
+    {
+      "file": "06-1000448800.jpg",
+      "reference": "زيبركسا ١٠ مجم اقراص",
+      "baseline": "زيبركسا ١٠مجم اقراص",
+      "candidate": "زببركسا ١٠مجم‏اقراص.",
+      "baselineEdit": 0,
+      "candidateEdit": 1,
+      "length": 17,
+      "baselineNumbers": "10",
+      "candidateNumbers": "10",
+      "expected": "10"
+    },
+    {
+      "file": "09-1000448579.jpg",
+      "reference": "مينيرين ملت ١٢٠ ميكروجرام",
+      "baseline": "مينيرين ملث +17 ميكروجرام.",
+      "candidate": "مينيرين ملت +17ميكروجرام",
+      "baselineEdit": 3,
+      "candidateEdit": 2,
+      "length": 22,
+      "baselineNumbers": "17",
+      "candidateNumbers": "17",
+      "expected": "120"
+    },
+    {
+      "file": "09-1000448579.jpg",
+      "reference": "اندرال ١٠ مجم اقراص",
+      "baseline": "اندرال + أ مجم افراص",
+      "candidate": "اندرال ‎1١‏ مجماقراص",
+      "baselineEdit": 3,
+      "candidateEdit": 1,
+      "length": 16,
+      "baselineNumbers": "",
+      "candidateNumbers": "11",
+      "expected": "10"
+    },
+    {
+      "file": "10-1000448577.jpg",
+      "reference": "سبانيلا ٣٥ مجم اقراص",
+      "baseline": "سبائيلا ه؟مجم افراضص_.",
+      "candidate": "سبائيلا ه؟مجماقراص",
+      "baselineEdit": 5,
+      "candidateEdit": 3,
+      "length": 17,
+      "baselineNumbers": "",
+      "candidateNumbers": "",
+      "expected": "35"
+    },
+    {
+      "file": "10-1000448577.jpg",
+      "reference": "باوريكتا ٤ قرص",
+      "baseline": "باوريكتاع فرص",
+      "candidate": "باوريكتاعفرص",
+      "baselineEdit": 2,
+      "candidateEdit": 2,
+      "length": 12,
+      "baselineNumbers": "",
+      "candidateNumbers": "",
+      "expected": "4"
+    }
+  ]
+}
