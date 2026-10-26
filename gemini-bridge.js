@@ -9,7 +9,7 @@ root.addEventListener('message',async event=>{if(!popup||event.source!==popup||e
   if(contextSent)return;contextSent=true;const activeNonce=nonce,activePopup=popup;try{const {data,error}=await deps.readAllRows('shortage_items',q=>q.eq('is_active',true));if(error)throw error;if(activeNonce!==nonce||activePopup!==popup)return;const files=Array.from($('incomingImages')?.files||[]).slice(0,20);if(files.some(f=>f.size>8*1024*1024))throw Error('image too large');activePopup.postMessage({type:'asker-gemini-context',nonce:activeNonce,context:{rows:(data||[]).map(r=>({id:String(r.id),name:r.product_name})),label:'آخر قائمة V10',asOf:new Date().toISOString()},...(files.length?{photos:files}:{})},READER_ORIGIN)}catch{status('تعذّر إرسال مرجع النواقص لتجربة Gemini. لن نستخدم قائمة جزئية؛ أعد فتح التجربة بعد تحديث النواقص.');}return;
  }
  if(event.data.type!=='asker-gemini-result')return;const names=event.data.names;
- if(!Array.isArray(names)||!names.length||names.length>1000||names.some(n=>typeof n!=='string'||n.length<2||n.length>250||/[\r\n|]/.test(n)))return;
+ if(!Array.isArray(names)||!names.length||names.length>1600||names.some(n=>typeof n!=='string'||n.length<2||n.length>250||/[\r\n|]/.test(n)))return;
  if($('incomingMode')?.value!=='availability'||$('incomingText').value!==originalText){status('اتغير محتوى الوارد أو وضع الإدخال أثناء تجربة Gemini. الأسماء الحالية محفوظة؛ انسخ نتيجة Gemini وقارنها بعد مراجعة المحتوى.');return}
  const unique=[...new Set(names)];$('incomingText').value=unique.join('\n');await root.AskerAvailability.compare(unique);popup=null;nonce=null;
 });
