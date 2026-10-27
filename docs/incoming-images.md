@@ -29,3 +29,14 @@ The same real-browser test ran actual Tesseract/WASM on the owner's `1000455127.
 Test env: `PLAYWRIGHT_MODULE`, `CHROMIUM_EXECUTABLE`, optional `ASKER_OCR_IMAGE`, `OCR_DEPENDENCIES` (local Tesseract core/model test assets), `OCR_BEST_MODELS` (local official best models).
 
 No SQL is required. PDF remains deferred.
+
+## Line-by-line second pass (added 2026-10-27)
+
+After the normal full-page read finds the names (and, when present, the price column), each text line is read again on its own:
+
+1. `image-prep.js` finds horizontal text bands in the original-resolution pixels (specks are ignored; unusually tall bands are flagged and read in page mode).
+2. Each band is upscaled so the text is about 34 px tall (never shrunk, at most 4x), turned to grayscale and thresholded per line (Otsu), so tinted or highlighted rows and uneven backgrounds do not hurt. Light-on-dark rows are inverted.
+3. Each cleaned band is read in single-line mode. The name column only is used when a price column was identified.
+4. The result replaces the first pass only when it returns at least 60% as many names; otherwise the first-pass names stay. Images over 16 megapixels skip this pass. Any failure silently keeps the first-pass result. The second pass has a total budget of 90 seconds per extraction run (`REFINE_BUDGET_MS` in `incoming-images.js`): when it runs out, the remaining images keep their first-pass names and the status message says how many. Quantities remain blank and manual review is still mandatory.
+
+Measured on three real supplier screenshots (about 80 hand-read lines), with the real browser code and a real in-browser Tesseract.js worker: the full-page baseline scored 0.71 and 0.92 similarity (0 and 11 lines read near-perfectly) and the second pass 0.83 and 0.97 (3 and 18). Small Arabic-Indic digits remain the weakest part: strengths such as ٣٠٠ or ٧٥٠ can still be misread, which is why every strength must be reviewed. These were measured with the bundled `ara` model (4.0.0_best_int); the app's "higher accuracy" model was not run here. Tests: `tests/image-prep.cjs`.
