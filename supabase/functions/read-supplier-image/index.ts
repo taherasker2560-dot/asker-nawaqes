@@ -129,25 +129,33 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
 
   const model = (env.GEMINI_MODEL || DEFAULT_MODEL).trim();
   if (!/^[a-z0-9.\-]+$/i.test(model)) return reply(503, { error: 'model', message: 'اسم الموديل في GEMINI_MODEL مش صالح.' }, headers);
-  // Copying names off a table needs no "thinking"; it only makes newer Flash models slow (first live call
-  // waited over a minute). Ask for no thinking budget; if this model rejects that setting, retry once without it.
-  const call = (noThinking: boolean) => fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  // Copying names off a table needs no "thinking"; it only makes newer Flash models slow. Some models reject
+  // optional settings with a bare 400 "invalid argument", so on a 400 we step down: no thinking setting, then
+  // no response schema (plain JSON). Each step is logged; the key and image are never logged.
+  const variants = [
+    { name: 'schema+no-thinking', config: { responseSchema: RESPONSE_SCHEMA, thinkingConfig: { thinkingBudget: 0 } } },
+    { name: 'schema', config: { responseSchema: RESPONSE_SCHEMA } },
+    { name: 'plain-json', config: {} },
+  ];
+  const call = (config: Record<string, unknown>) => fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY as string },
     body: JSON.stringify({
       contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: image.replace(/\s+/g, '') } }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', ...config },
     }),
     signal: deadline,
   });
   const deadline = AbortSignal.timeout(GEMINI_TIMEOUT_MS);
-  let gemini: Response;
+  let gemini!: Response;
   const t1 = Date.now();
   try {
-    gemini = await call(true);
-    if (gemini.status === 400) {
-      const reason = String(((await gemini.clone().json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message || '');
-      if (/thinking/i.test(reason)) { log('gemini-retry-without-thinking-setting', t1, { model }); gemini = await call(false); }
+    for (const v of variants) {
+      gemini = await call(v.config);
+      if (gemini.status !== 400) break;
+      const reason = String(((await gemini.clone().json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message || '').slice(0, 200);
+      log('gemini-400', t1, { model, variant: v.name, reason });
+      if (/api key|location/i.test(reason)) break; // a settings change will not fix these
     }
   } catch (e) {
     const timeout = (e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError';
@@ -162,7 +170,9 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   if (gemini.status === 400 || gemini.status === 403) {
     // Google's own reason (never contains the key), e.g. invalid key or unsupported location on the free tier.
     const reason = String(((await gemini.json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message || '').slice(0, 200);
-    const where = /location/i.test(reason) ? 'Google مش بيقبل الطلب من مكان سيرفر Supabase في الخطة المجانية.' : 'Google رفض الطلب؛ راجع مفتاح GEMINI_API_KEY.';
+    const where = /location/i.test(reason) ? 'Google مش بيقبل الطلب من مكان سيرفر Supabase في الخطة المجانية.'
+      : /api key|permission|forbidden/i.test(reason) || gemini.status === 403 ? 'Google رفض الطلب؛ راجع مفتاح GEMINI_API_KEY.'
+      : `Google رفض إعدادات الطلب مع الموديل ${model}؛ جرّب موديل تاني في GEMINI_MODEL.`;
     return reply(502, { error: 'key', message: where + (reason ? ' (' + reason + ')' : '') }, headers);
   }
   if (!gemini.ok) return reply(502, { error: 'gemini', message: 'Gemini رجّع خطأ (' + gemini.status + ').' }, headers);

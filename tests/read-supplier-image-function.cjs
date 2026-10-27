@@ -46,11 +46,14 @@ r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{throw Error('off
 const te=Object.assign(Error('t'),{name:'TimeoutError'});r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{throw te}})));assert.equal(r.status,504);assert.match(r.body.message,/اتأخر/);
 const slowAuth=async(u,o)=>{if(u.endsWith('/auth/v1/user'))throw Object.assign(Error('t'),{name:'TimeoutError'});};r=await json(await handle(req(),env,slowAuth));assert.equal(r.status,504);
 assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
-// a model that rejects the thinking setting gets one retry without it
-{let n=0;const bodies=[];const ff=fakeFetch({gemini:async(u,o)=>{n++;bodies.push(JSON.parse(o.body));return n===1?new Response(JSON.stringify({error:{message:'Thinking budget is not supported for this model.'}}),{status:400}):new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"rows":[{"name":"اسم صنف"}]}'}]}}]}),{status:200})}});
- r=await json(await handle(req(),env,ff));assert.equal(r.status,200);assert.equal(n,2);assert.equal('thinkingConfig' in bodies[1].generationConfig,false);}
-// other 400s are not retried
-{let n=0;r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'API key not valid'}}),{status:400})}})));assert.equal(n,1);assert.equal(r.status,502);assert.match(r.body.message,/GEMINI_API_KEY/);}
+// a model that rejects optional settings with a bare 400 steps down: no thinking, then no schema
+{let n=0;const bodies=[];const ff=fakeFetch({gemini:async(u,o)=>{n++;bodies.push(JSON.parse(o.body).generationConfig);return n<3?new Response(JSON.stringify({error:{message:'Request contains an invalid argument.'}}),{status:400}):new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"rows":[{"name":"اسم صنف"}]}'}]}}]}),{status:200})}});
+ r=await json(await handle(req(),env,ff));assert.equal(r.status,200);assert.equal(n,3);
+ assert.ok(bodies[0].thinkingConfig&&bodies[0].responseSchema);assert.ok(!bodies[1].thinkingConfig&&bodies[1].responseSchema);assert.ok(!bodies[2].thinkingConfig&&!bodies[2].responseSchema);assert.equal(bodies[2].responseMimeType,'application/json');}
+// a bad key is not retried
+{let n=0;r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'API key not valid. Please pass a valid API key.'}}),{status:400})}})));assert.equal(n,1);assert.equal(r.status,502);assert.match(r.body.message,/GEMINI_API_KEY/);}
+// all variants rejected: one clear error after 3 tries
+{let n=0;r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'Request contains an invalid argument.'}}),{status:400})}})));assert.equal(n,3);assert.equal(r.status,502);}
 assert.throws(()=>parseRows(JSON.stringify({rows:Array(601).fill({name:'اسم'})})),/too-many-rows/);
 assert.deepEqual(parseRows(JSON.stringify({rows:[]})),[]);
 console.log('PASS: read-supplier-image: CORS allow-list, fails closed without secrets, Supabase auth + email allow-list before any Gemini call, type/size checks, key only in header, model setting, cleaned rows with unclear flags, Google errors mapped');
