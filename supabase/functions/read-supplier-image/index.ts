@@ -50,6 +50,7 @@ const RESPONSE_SCHEMA = {
 type Env = Record<string, string | undefined>;
 type Row = { name: string; english: string; unclear: boolean };
 type Alias = { alias_key: string; target_name: string; target_code: string | null };
+type Fix = { read_key: string; corrected_text: string };
 
 const CATALOG_PATH = '/storage/v1/object/authenticated/asker-private/catalog.json';
 let catalog: Catalog | null = null;
@@ -71,20 +72,42 @@ async function getCatalog(env: Env, auth: string, fetchImpl: typeof fetch): Prom
   return catalog;
 }
 
-// Adds item candidates and the decision; an owner-confirmed name always wins.
-export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[]) {
+// Tests only: forget the cached item list.
+export function resetCatalogCache(): void { catalog = null; catalogLoadedAt = 0; }
+
+// Adds item candidates and the decision. An owner reading fix (reading_fixes) replaces the Arabic text used for
+// matching; an owner-confirmed name (name_aliases, for the text as read or as corrected) always wins.
+export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[], fixes: Fix[] = []) {
   const byKey = new Map<string, Alias[]>();
   for (const a of aliases) { const l = byKey.get(a.alias_key) || []; l.push(a); byKey.set(a.alias_key, l); }
+  const fixByKey = new Map(fixes.map((f) => [f.read_key, f.corrected_text]));
   return rows.map((r) => {
     const key = aliasKey(r.name);
-    const confirmed = byKey.get(key) || [];
-    const candidates: Candidate[] = cat ? cat.candidates(r.name, r.english) : [];
+    const corrected = fixByKey.get(key) || null;
+    const text = corrected || r.name;
+    const confirmed = byKey.get(key) || (corrected ? byKey.get(aliasKey(corrected)) : undefined) || [];
+    // Gemini's Latin name still helps find the brand; the numbers come from the (corrected) Arabic text.
+    const candidates: Candidate[] = cat ? cat.candidates(text, r.english) : [];
     let match: Match | null = decide(candidates);
     if (confirmed.length === 1) match = { id: confirmed[0].target_code || '', name: confirmed[0].target_name, score: 1, confidence: 'confirmed' };
     else if (confirmed.length > 1 && match) match = { ...match, confidence: 'review' };
-    return { ...r, key, match, candidates };
+    return { ...r, key, corrected, match, candidates };
   });
 }
+
+// Owner tables read with the caller's own session (owner-only RLS). A missing table or error just means "none yet".
+async function ownerRows<T>(env: Env, auth: string, fetchImpl: typeof fetch, path: string): Promise<T[]> {
+  try {
+    const r = await fetchImpl(env.SUPABASE_URL!.replace(/\/$/, '') + '/rest/v1/' + path, {
+      headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' }, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+    });
+    if (r.ok) return await r.json() as T[];
+    log('owner-rows-unavailable', Date.now(), { path: path.split('?')[0], status: r.status });
+  } catch { log('owner-rows-unavailable', Date.now(), { path: path.split('?')[0] }); }
+  return [];
+}
+const ALIASES = 'name_aliases?select=alias_key,target_name,target_code&limit=20000';
+const FIXES = 'reading_fixes?select=read_key,corrected_text&limit=20000';
 
 function list(value: string | undefined): string[] {
   return String(value || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -172,8 +195,25 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return reply(403, { error: 'forbidden', message: 'الحساب ده مش مسموح له يستخدم قراءة Gemini.' }, headers);
   }
 
-  let body: { image?: unknown; mimeType?: unknown };
+  let body: { image?: unknown; mimeType?: unknown; action?: unknown; q?: unknown; name?: unknown; english?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
+
+  // Owner tools on the private item list: search box, and re-matching a line after an Arabic correction.
+  if (body.action === 'search' || body.action === 'match') {
+    const cat = await getCatalog(env, auth, fetchImpl);
+    if (!cat) return reply(503, { error: 'catalog', message: 'قاعدة الأصناف مش مرفوعة على Supabase.' }, headers);
+    if (body.action === 'search') {
+      const q = typeof body.q === 'string' ? body.q.trim() : '';
+      if (q.length < 2 || q.length > 100) return reply(400, { error: 'q', message: 'اكتب حرفين على الأقل.' }, headers);
+      return reply(200, { items: cat.search(q) }, headers);
+    }
+    const name = typeof body.name === 'string' ? arabicLetters(body.name).replace(/\s+/g, ' ').trim() : '';
+    if (name.length < 2 || name.length > 250) return reply(400, { error: 'name', message: 'الاسم قصير أو طويل جدًا.' }, headers);
+    const english = typeof body.english === 'string' ? body.english.trim().slice(0, 250) : '';
+    const aliases = await ownerRows<Alias>(env, auth, fetchImpl, ALIASES);
+    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases)[0] }, headers);
+  }
+
   const image = typeof body.image === 'string' ? body.image : '';
   const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
   if (!MIME_TYPES.includes(mimeType)) return reply(400, { error: 'type', message: 'الصور المدعومة JPG وPNG وWebP.' }, headers);
@@ -240,18 +280,11 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const msg = (e as Error).message === 'too-many-rows' ? 'Gemini رجّع سطور أكتر من المعقول؛ قسّم الصورة.' : 'رد Gemini مش مفهوم؛ جرّب تاني.';
     return reply(502, { error: 'parse', message: msg }, headers);
   }
-  // Owner-confirmed names, read with the caller's own session (owner-only table). Missing table or error: carry on without.
-  let aliases: Alias[] = [];
-  try {
-    const a = await fetchImpl(env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/name_aliases?select=alias_key,target_name,target_code&limit=20000', {
-      headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' }, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
-    });
-    if (a.ok) aliases = await a.json(); else log('aliases-unavailable', t1, { status: a.status });
-  } catch { log('aliases-unavailable', t1); }
+  const [aliases, fixes] = await Promise.all([ownerRows<Alias>(env, auth, fetchImpl, ALIASES), ownerRows<Fix>(env, auth, fetchImpl, FIXES)]);
   const t2 = Date.now();
   const cat = await getCatalog(env, auth, fetchImpl);
-  const annotated = annotate(rows, cat, aliases);
-  log('match', t2, { rows: annotated.length, aliases: aliases.length, catalog: cat?.size || 0, high: annotated.filter((r) => r.match?.confidence === 'high').length, confirmed: annotated.filter((r) => r.match?.confidence === 'confirmed').length });
+  const annotated = annotate(rows, cat, aliases, fixes);
+  log('match', t2, { rows: annotated.length, aliases: aliases.length, fixes: fixes.length, catalog: cat?.size || 0, high: annotated.filter((r) => r.match?.confidence === 'high').length, confirmed: annotated.filter((r) => r.match?.confidence === 'confirmed').length });
   return reply(200, { rows: annotated, model, catalog: cat?.size || 0, truncated: candidate?.finishReason === 'MAX_TOKENS' }, headers);
 }
 
