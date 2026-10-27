@@ -201,7 +201,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return reply(403, { error: 'forbidden', message: 'الحساب ده مش مسموح له يستخدم قراءة Gemini.' }, headers);
   }
 
-  let body: { image?: unknown; mimeType?: unknown; action?: unknown; q?: unknown; name?: unknown; english?: unknown };
+  let body: { image?: unknown; mimeType?: unknown; action?: unknown; q?: unknown; name?: unknown; english?: unknown; read?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
 
   // Owner tools on the private item list: search box, and re-matching a line after an Arabic correction.
@@ -216,8 +216,13 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const name = typeof body.name === 'string' ? arabicLetters(body.name).replace(/\s+/g, ' ').trim() : '';
     if (name.length < 2 || name.length > 250) return reply(400, { error: 'name', message: 'الاسم قصير أو طويل جدًا.' }, headers);
     const english = typeof body.english === 'string' ? body.english.trim().slice(0, 250) : '';
-    const [aliases, rejections] = await Promise.all([ownerRows<Alias>(env, auth, fetchImpl, ALIASES), ownerRows<Rejection>(env, auth, fetchImpl, REJECTIONS)]);
-    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases, [], rejections)[0] }, headers);
+    const [aliases, fixes, rejections] = await Promise.all([ownerRows<Alias>(env, auth, fetchImpl, ALIASES), ownerRows<Fix>(env, auth, fetchImpl, FIXES), ownerRows<Rejection>(env, auth, fetchImpl, REJECTIONS)]);
+    // `read` = the text as first read, when `name` is the owner's correction: what the owner rejected for the
+    // first reading still never comes back for the corrected one.
+    const readKey = typeof body.read === 'string' ? aliasKey(arabicLetters(body.read)) : '';
+    const nameKey = aliasKey(name);
+    const extra = readKey && readKey !== nameKey ? rejections.filter((x) => x.alias_key === readKey).map((x) => ({ ...x, alias_key: nameKey })) : [];
+    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases, readKey && readKey !== nameKey ? [] : fixes, [...rejections, ...extra])[0] }, headers);
   }
 
   const image = typeof body.image === 'string' ? body.image : '';

@@ -35,7 +35,18 @@ function editorHtml(r,ed){
  `<p class="hint">الاسم اليدوي مش هيتطابق مع النواقص إلا لو مكتوب زيها بالظبط.</p><button type="button" class="secondary" data-ed-cancel>إلغاء</button><p class="status" data-ed-status>${esc(ed.status||'')}</p></div>`;
 }
 
+// One line per name with its closest item: used by the review list («أسماء محتاجة مراجعة»).
+const flatTop=r=>r.match||(r.candidates||[]).find(c=>c.numbersOk!==false&&c.formOk!==false)||null;
+function renderFlat(container,rows,view){
+ const ed=i=>view.editing&&view.editing.i===i?editorHtml(rows[i],view.editing):'';
+ container.innerHTML=(view.undo?`<div class="status" data-undo-bar>${esc(view.undo.label)} <button type="button" class="secondary" data-undo>تراجع عن الحفظ ده</button></div>`:'')+
+  rows.map((r,i)=>{if(r.done)return `<div class="item"><span dir="auto">${esc(r.name)}</span> <span class="pill good">اتحفظ</span></div>`;const top=flatTop(r);
+   return `<div class="item" data-flat="${i}"><strong dir="auto">${esc(r.name)}</strong>${fixedLine(r.name,r.corrected)}${r.english?`<div class="hint">Gemini فهمها: ${esc(r.english)}</div>`:''}`+
+   (top?`<div>الأقرب: <strong dir="auto">${esc(top.name)}</strong> <button type="button" data-flat-yes="${i}">أيوه، ده هو</button> <button type="button" class="secondary" data-flat-no="${i}">مش ده</button></div>`:'<p class="hint">مفيش صنف قريب؛ استخدم «تصحيح».</p>')+
+   ` ${editButton(i)}${ed(i)}</div>`}).join('');
+}
 function render(container,report,rows,view){
+ if(view.flat)return renderFlat(container,rows,view);
  const conf={confirmed:'اسم مؤكد منك',high:'مطابقة واضحة','same-name':'نفس الاسم بالظبط'};
  const ed=i=>view.editing&&view.editing.i===i?editorHtml(rows[i],view.editing):'';
  const arrived=report.arrived.map(a=>`<div class="item" data-arrived="${esc(a.shortage.id)}"><strong>${esc(a.shortage.product_name)}</strong>${a.sources.map(s=>`<div class="hint">في صورة الشركة: <span dir="auto">${esc(s.name)}</span> · ${esc(s.fileName)} · ${conf[s.confidence]||''} ${s.confidence==='same-name'?'':notThisButton(s.index)} ${editButton(s.index)}</div>${fixedLine(s.name,s.corrected)}${ed(s.index)}`).join('')}</div>`).join('');
@@ -68,6 +79,9 @@ async function saveChoice(client,invoke,r,target,text){
  const {data:added,error:e2}=await client.from('name_aliases').insert(rowsToAdd).select('id');
  if(e2){if(undo.removedAliases.length)await client.from('name_aliases').insert(undo.removedAliases.map(({id,...x})=>x));throw Error('ماتحفظش الاختيار: '+e2.message)}
  undo.addedAliasIds=(added||[]).map(a=>a.id);
+ // the name is settled: take it off the review list
+ const {data:queued}=await client.from('name_review_queue').select('id,alias_key,read_text,english,file_name,last_seen').in('alias_key',keys);
+ if(queued?.length){const {error}=await client.from('name_review_queue').delete().in('id',queued.map(q=>q.id));if(!error)undo.queueRows=queued}
  return {undo,corrected:changed?corrected:r.corrected||null};
 }
 // "Not this item": removes the owner's saved choice of these items for the line and remembers the rejection.
@@ -97,6 +111,7 @@ async function saveFix(client,r,text){
  return {undo,corrected};
 }
 async function undoSave(client,u){
+ if(u.queueRows?.length)await client.from('name_review_queue').upsert(u.queueRows.map(({id,...x})=>x),{onConflict:'alias_key'});
  if(u.addedRejectionIds?.length){const {error}=await client.from('name_rejections').delete().in('id',u.addedRejectionIds);if(error)throw Error(error.message)}
  if(u.addedAliasIds.length){const {error}=await client.from('name_aliases').delete().in('id',u.addedAliasIds);if(error)throw Error(error.message)}
  if(u.removedAliases.length){const {error}=await client.from('name_aliases').insert(u.removedAliases.map(({id,...x})=>x));if(error)throw Error(error.message)}
@@ -105,14 +120,14 @@ async function undoSave(client,u){
 
 // Report with corrections. deps: {client, invoke(body) -> {data,error}}.
 function show(container,rows,shortages,deps,setStatus){
- const state=rows.map(r=>({...r})),view={editing:null,undo:null,openOther:false,openUnknown:false};
+ const state=rows.map(r=>({...r})),view={editing:null,undo:null,openOther:false,openUnknown:false,flat:!!deps.flat};
  const report=()=>buildReport(state,shortages);
  const draw=()=>{render(container,report(),state,view);wire()};
  const edStatus=m=>{const p=container.querySelector('[data-ed-status]');if(p)p.textContent=m;if(view.editing)view.editing.status=m};
  async function commit(i,target,text,label){
-  const r=state[i],before={match:r.match,corrected:r.corrected||null};
+  const r=state[i],before={match:r.match,corrected:r.corrected||null,done:!!r.done};
   try{const {undo,corrected}=await saveChoice(deps.client,deps.invoke,r,target,text);
-   r.match={id:target.id||'',name:target.name,score:1,confidence:'confirmed'};r.corrected=corrected;
+   r.match={id:target.id||'',name:target.name,score:1,confidence:'confirmed'};r.corrected=corrected;if(view.flat)r.done=true;deps.onChange?.();
    view.editing=null;view.undo={...undo,i,before,label};draw();setStatus(label+' المرة الجاية هيتعرف لوحده.')}
   catch(e){edStatus(e.message);setStatus(e.message)}}
  async function reject(i,names,label){
@@ -124,24 +139,52 @@ function show(container,rows,shortages,deps,setStatus){
  function wire(){
   container.querySelectorAll('details[data-sec]').forEach(d=>d.addEventListener('toggle',()=>{view[d.dataset.sec==='other'?'openOther':'openUnknown']=d.open}));
   container.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',async()=>{const [i,j]=b.dataset.confirm.split(':').map(Number);const opt=report().review.find(x=>x.index===i)?.options[j];if(!opt)return;b.disabled=true;await commit(i,{id:opt.id,name:opt.name},'',`اتحفظ: «${state[i].name}» = ${opt.name}.`)}));
+  container.querySelectorAll('[data-flat-yes]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.flatYes),t=flatTop(state[i]);if(!t)return;b.disabled=true;await commit(i,{id:t.id||'',name:t.name},'',`اتحفظ: «${state[i].name}» = ${t.name}.`)}));
+  container.querySelectorAll('[data-flat-no]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.flatNo),t=flatTop(state[i]);if(!t)return;b.disabled=true;await reject(i,[t.name],`اتسجّل إن «${state[i].name}» مش ${t.name}، ومش هيتقترح تاني.`)}));
   container.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.reject);const opt=report().review.find(x=>x.index===i);if(!opt)return;b.disabled=true;await reject(i,opt.options.map(o=>o.name),`اتسجّل إن «${state[i].name}» مش واحد من دول، ومش هيتقترحوا تاني.`)}));
   container.querySelectorAll('[data-notthis]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.notthis);const m=state[i].match;if(!m)return;b.disabled=true;await reject(i,[m.name],`اتسجّل إن «${state[i].name}» مش ${m.name}، ومش هيتقترح تاني. استخدم «تصحيح» لو عايز تختار الصح.`)}));
   container.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.edit),r=state[i];view.editing={i,text:r.corrected||r.name,q:'',manual:''};if(report().unknown.some(u=>u.index===i))view.openUnknown=true;if(report().other.some(o=>o.index===i))view.openOther=true;draw()}));
-  container.querySelector('[data-undo]')?.addEventListener('click',async e=>{const u=view.undo;if(!u)return;e.target.disabled=true;try{await undoSave(deps.client,u);Object.assign(state[u.i],u.before);view.undo=null;draw();setStatus('اتلغى الحفظ، ورجع زي ما كان.')}catch(err){e.target.disabled=false;setStatus('تعذّر التراجع: '+err.message)}});
+  container.querySelector('[data-undo]')?.addEventListener('click',async e=>{const u=view.undo;if(!u)return;e.target.disabled=true;try{await undoSave(deps.client,u);Object.assign(state[u.i],u.before);view.undo=null;draw();deps.onChange?.();setStatus('اتلغى الحفظ، ورجع زي ما كان.')}catch(err){e.target.disabled=false;setStatus('تعذّر التراجع: '+err.message)}});
   const box=container.querySelector('[data-editor]');if(!box)return;const ed=view.editing,r=state[ed.i];
   const val=s=>box.querySelector(s).value;
   box.querySelector('[data-ed-cancel]').addEventListener('click',()=>{view.editing=null;draw()});
-  box.querySelector('[data-ed-rematch]').addEventListener('click',async()=>{ed.text=val('[data-ed-text]');ed.q=val('[data-ed-q]');ed.manual=val('[data-ed-manual]');edStatus('بيدوّر…');const {data,error}=await deps.invoke({action:'match',name:ed.text,english:''});if(error){edStatus('تعذّر البحث');return}ed.results=null;ed.rematch=(data.row.candidates||[]);ed.status=ed.rematch.length?'دي أقرب أصناف للاسم المصحح؛ اختار الصح أو دوّر.':'مالقيتش أصناف قريبة؛ دوّر بالاسم الإنجليزي أو الكود.';draw()});
+  box.querySelector('[data-ed-rematch]').addEventListener('click',async()=>{ed.text=val('[data-ed-text]');ed.q=val('[data-ed-q]');ed.manual=val('[data-ed-manual]');edStatus('بيدوّر…');const {data,error}=await deps.invoke({action:'match',name:ed.text,english:'',read:r.name});if(error){edStatus('تعذّر البحث');return}ed.results=null;ed.rematch=(data.row.candidates||[]);ed.status=ed.rematch.length?'دي أقرب أصناف للاسم المصحح؛ اختار الصح أو دوّر.':'مالقيتش أصناف قريبة؛ دوّر بالاسم الإنجليزي أو الكود.';draw()});
   box.querySelector('[data-ed-fix-save]').addEventListener('click',async e=>{const text=val('[data-ed-text]');e.target.disabled=true;const before={match:r.match,candidates:r.candidates,corrected:r.corrected||null};
    try{const {undo,corrected}=await saveFix(deps.client,r,text);r.corrected=corrected;
-    const {data}=await deps.invoke({action:'match',name:corrected,english:''});if(data?.row){r.candidates=data.row.candidates||[];r.match=data.row.match||null}
+    const {data}=await deps.invoke({action:'match',name:corrected,english:'',read:r.name});if(data?.row){r.candidates=data.row.candidates||[];r.match=data.row.match||null}
     const label=`اتحفظ التصحيح: «${r.name}» ← «${corrected}». المرة الجاية هيتقري صح لوحده.`;view.editing=null;view.undo={...undo,i:ed.i,before,label};draw();setStatus(label)}
    catch(err){e.target.disabled=false;edStatus(err.message)}});
   box.querySelector('[data-ed-search]').addEventListener('click',async()=>{ed.text=val('[data-ed-text]');ed.q=val('[data-ed-q]').trim();ed.manual=val('[data-ed-manual]');if(ed.q.length<2){edStatus('اكتب حرفين على الأقل.');return}edStatus('بيدوّر…');const {data,error}=await deps.invoke({action:'search',q:ed.q});if(error){edStatus('تعذّر البحث');return}ed.results=data.items||[];ed.status=ed.results.length?'':'مفيش نتايج.';draw()});
   box.querySelectorAll('[data-ed-pick]').forEach(b=>b.addEventListener('click',async()=>{const opts=ed.results||ed.rematch||(r.candidates||[]);const o=opts[Number(b.dataset.edPick)];if(!o)return;b.disabled=true;await commit(ed.i,{id:o.id,name:o.name},val('[data-ed-text]'),`اتحفظ: «${r.name}» = ${o.name}.`)}));
   box.querySelector('[data-ed-manual-save]').addEventListener('click',async e=>{const name=val('[data-ed-manual]').replace(/\s+/g,' ').trim().toUpperCase();if(name.length<2){edStatus('اكتب الاسم الإنجليزي.');return}e.target.disabled=true;await commit(ed.i,{id:'',name},val('[data-ed-text]'),`اتحفظ اسم يدوي: «${r.name}» = ${name}.`)});
  }
- draw();return report();
+ draw();const rep=report();
+ // Names read but not tied to an item go to the review list, to correct and confirm later.
+ if(!view.flat&&deps.client){const now=new Date().toISOString(),seen=new Set();
+  const todo=[...rep.review.map(x=>x.row),...rep.unknown.map(u=>state[u.index])].filter(r=>r.key&&r.key.length>=2&&!seen.has(r.key)&&seen.add(r.key))
+   .map(r=>({alias_key:r.key.slice(0,250),read_text:String(r.name).slice(0,250),english:r.english||null,file_name:r.fileName||null,last_seen:now}));
+  if(todo.length)Promise.resolve(deps.client.from('name_review_queue').upsert(todo,{onConflict:'alias_key'})).then(()=>deps.onQueued?.(todo.length)).catch(()=>{})}
+ return rep;
+}
+
+// «أسماء محتاجة مراجعة»: every name a reading could not tie to an item, kept until the owner settles it.
+function reviewList(host,deps,setStatus){
+ const box=document.createElement('details');box.className='file-import';box.id='reviewQueue';
+ box.innerHTML='<summary>أسماء محتاجة مراجعة</summary><p class="hint">أسماء البوت قراها ومش متأكد هي أنهي صنف. اضغط «راجع»: أكّد الصنف، أو قول «مش ده»، أو صحّح الاسم. اللي تأكده بيتحفظ ويتعرف لوحده بعد كده ويخرج من القايمة.</p><input type="search" data-q-filter placeholder="دوّر في الأسماء" dir="auto"><div data-q-list><p class="hint">افتح القسم عشان يتحمّل.</p></div>';
+ host.append(box);let items=[],shown=30;const list=box.querySelector('[data-q-list]'),filter=box.querySelector('[data-q-filter]'),summary=box.querySelector('summary');
+ const count=()=>{summary.textContent=`أسماء محتاجة مراجعة: ${items.length}`};
+ const draw=()=>{const f=key(filter.value),vis=items.filter(q=>!f||key(q.read_text+' '+(q.english||'')).includes(f));count();
+  list.innerHTML=vis.slice(0,shown).map(q=>`<div class="item" data-q="${esc(q.id)}"><span dir="auto">${esc(q.read_text)}</span>${q.file_name?` <span class="hint">${esc(q.file_name)}</span>`:''} <button type="button" class="secondary" data-q-open="${esc(q.id)}">راجع</button> <button type="button" class="secondary" data-q-drop="${esc(q.id)}">شيلها من القايمة</button><div data-q-body></div></div>`).join('')+(vis.length>shown?`<button type="button" class="secondary" data-q-more>اعرض أكتر (${vis.length-shown})</button>`:'')+(vis.length?'':'<p class="hint">مفيش أسماء محتاجة مراجعة.</p>');
+  list.querySelector('[data-q-more]')?.addEventListener('click',()=>{shown+=30;draw()});
+  list.querySelectorAll('[data-q-drop]').forEach(b=>b.addEventListener('click',async()=>{const id=b.dataset.qDrop;b.disabled=true;const {error}=await deps.client.from('name_review_queue').delete().eq('id',id);if(error){setStatus('ماتشالتش: '+error.message);b.disabled=false;return}items=items.filter(q=>q.id!==id);draw()}));
+  list.querySelectorAll('[data-q-open]').forEach(b=>b.addEventListener('click',async()=>{const q=items.find(x=>x.id===b.dataset.qOpen);if(!q)return;const body=b.parentElement.querySelector('[data-q-body]');b.disabled=true;body.innerHTML='<p class="hint">بيدوّر…</p>';
+   const {data,error}=await deps.invoke({action:'match',name:q.read_text,english:q.english||''});if(error||!data?.row){body.innerHTML='<p class="status bad">تعذّر البحث؛ جرّب تاني.</p>';b.disabled=false;return}
+   show(body,[{...data.row,name:q.read_text,english:q.english||'',key:q.alias_key,fileName:q.file_name||''}],[],{...deps,flat:true,onChange:()=>load(true)},setStatus)}))};
+ // keepOpen: refresh the count after a save without closing the line being reviewed
+ const load=async(keepOpen)=>{const {data,error}=await deps.client.from('name_review_queue').select('id,alias_key,read_text,english,file_name,last_seen').order('last_seen',{ascending:false}).limit(2000);
+  if(error){if(box.open)list.innerHTML=`<p class="status bad">تعذّر تحميل القايمة: ${esc(error.message)}</p>`;return}items=data||[];if(keepOpen===true||!box.open)count();else draw()};
+ box.addEventListener('toggle',()=>{if(box.open)load()});filter.addEventListener('input',draw);load();
+ return {reload:()=>load()};
 }
 
 // Dictionary of everything the owner saved, with delete (two taps).
@@ -164,5 +207,5 @@ function manager(host,client){
  return {reload:()=>box.open&&load()};
 }
 
-const api={buildReport,render,show,manager,saveChoice,saveFix,rejectChoice,undoSave};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiReport=api;
+const api={buildReport,render,show,manager,reviewList,saveChoice,saveFix,rejectChoice,undoSave};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiReport=api;
 })(typeof window==='undefined'?globalThis:window);

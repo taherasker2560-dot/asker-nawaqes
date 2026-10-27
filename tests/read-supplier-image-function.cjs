@@ -77,6 +77,14 @@ assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
  const rows=annotate([{name:'نيوروتون',english:'NEUROTON',unclear:false}],c,[],[],[{alias_key:'نيوروتون',target_name:'NEUROTON 30TAB'}]);
  assert.ok(!rows[0].candidates.some(x=>x.name==='NEUROTON 30TAB'),'rejected item removed');assert.equal(rows[0].candidates.length,2);
  const g=annotate([{name:'نيوروتون جل',english:'NEUROTONE GEL',unclear:false}],c,[]);assert.equal(g[0].match.name,'NEUROTONE GEL 30GM');assert.equal(g[0].candidates.find(x=>x.name==='NEUROTON 30TAB').formOk,false,'gel is not a tablet');}
+// match action: a rejection made for the first reading still applies after an Arabic correction, and fixes apply
+{const cat2=async()=>new Response(JSON.stringify([['1','NEUROTON 30TAB'],['2','NEUROTONE GEL 30GM']]),{status:200});resetCatalogCache();
+ const rej=async()=>new Response(JSON.stringify([{alias_key:'نيوتون جل',target_name:'NEUROTONE GEL 30GM'}]),{status:200});
+ let x=await json(await handle(req({body:{action:'match',name:'نيوروتون جل',english:'NEUROTONE GEL',read:'نيوتون جل'}}),env,fakeFetch({catalogResponse:cat2,rejectionsResponse:rej})));
+ assert.ok(x.body.row.candidates.length>0&&!x.body.row.candidates.some(c=>c.name==='NEUROTONE GEL 30GM'),'rejected for the first reading');
+ const fx=async()=>new Response(JSON.stringify([{read_key:'نيوتون جل',corrected_text:'نيوروتون جل'}]),{status:200});
+ x=await json(await handle(req({body:{action:'match',name:'نيوتون جل',english:'NEUROTONE GEL'}}),env,fakeFetch({catalogResponse:cat2,fixesResponse:fx})));
+ assert.equal(x.body.row.corrected,'نيوروتون جل','reading fix applied in the review list');assert.equal(x.body.row.candidates[0].name,'NEUROTONE GEL 30GM');resetCatalogCache();}
 // two different confirmations for the same supplier name -> review, never a silent pick
 {const cat=null;const rows=annotate([{name:'اسم',english:'',unclear:false}],cat,[{alias_key:'اسم',target_name:'A',target_code:'1'},{alias_key:'اسم',target_name:'B',target_code:'2'}]);assert.equal(rows[0].match,null);}
 // a model that rejects optional settings with a bare 400 steps down: no thinking, then no schema
