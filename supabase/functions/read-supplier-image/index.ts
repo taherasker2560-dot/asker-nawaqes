@@ -1,8 +1,14 @@
 // ASKER V10 — reads the product-name column of a supplier screenshot with Gemini.
-// One self-contained file so it can be pasted into the Supabase dashboard editor.
+// Deployed together with match.ts (item matching).
 // Secrets (Supabase > Edge Functions > Secrets): GEMINI_API_KEY (required), ALLOWED_EMAILS (required,
 // comma separated), GEMINI_MODEL (optional), ALLOWED_ORIGINS (optional).
 // The key never leaves this function; the browser only sends the image and the signed-in user's session.
+// Each line is also mapped to the pharmacy's item list and to the owner's confirmed names (table name_aliases);
+// the page compares the result with shortages. The item list (codes + names only, built from the ASKER_ITEMS
+// export by scripts/build-catalog.py) is private: it lives in the owner-only Storage bucket asker-private as
+// catalog.json, never in this public repository. Without it, reading still works, just without item matching.
+
+import { Catalog, aliasKey, decide, type CatalogItem, type Candidate, type Match } from './match.ts';
 
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
@@ -25,7 +31,9 @@ export const PROMPT = [
   'Do not translate, do not correct spelling, do not add or guess missing words.',
   'Do not include the header row, the quantity column or the price column.',
   'If any character of a name is hard to read, still return your best reading and set unclear to true.',
+  'For each row also give "english": the same product as an Egyptian pharmacy system would list it, in Latin capital letters: brand name, strength, pack (for example "JANUVIA 100MG 28TAB", "FLAGYL 125MG SYP"). If you are not sure of the brand, transliterate the Arabic letters; never replace it with a different product.',
   'Never invent rows. If the image has no product table, return an empty list.',
+  'Answer only with JSON of this shape: {"rows":[{"name":"...","english":"...","unclear":false}]}',
 ].join('\n');
 
 const RESPONSE_SCHEMA = {
@@ -33,14 +41,50 @@ const RESPONSE_SCHEMA = {
   properties: {
     rows: {
       type: 'ARRAY',
-      items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, unclear: { type: 'BOOLEAN' } }, required: ['name'] },
+      items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, unclear: { type: 'BOOLEAN' } }, required: ['name'] },
     },
   },
   required: ['rows'],
 };
 
 type Env = Record<string, string | undefined>;
-type Row = { name: string; unclear: boolean };
+type Row = { name: string; english: string; unclear: boolean };
+type Alias = { alias_key: string; target_name: string; target_code: string | null };
+
+const CATALOG_PATH = '/storage/v1/object/authenticated/asker-private/catalog.json';
+let catalog: Catalog | null = null;
+let catalogLoadedAt = 0;
+// Loaded with the caller's own session (bucket readable by the owner only), kept while the worker is warm (1 hour).
+async function getCatalog(env: Env, auth: string, fetchImpl: typeof fetch): Promise<Catalog | null> {
+  if (catalog && Date.now() - catalogLoadedAt < 3600_000) return catalog;
+  const t = Date.now();
+  try {
+    const r = await fetchImpl(env.SUPABASE_URL!.replace(/\/$/, '') + CATALOG_PATH, {
+      headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' }, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+    });
+    if (!r.ok) { log('catalog-missing', t, { status: r.status }); return catalog; }
+    const items = await r.json() as CatalogItem[];
+    if (!Array.isArray(items) || !items.length) { log('catalog-empty', t); return catalog; }
+    catalog = new Catalog(items); catalogLoadedAt = Date.now();
+    log('catalog-index', t, { items: catalog.size });
+  } catch { log('catalog-missing', t); }
+  return catalog;
+}
+
+// Adds item candidates and the decision; an owner-confirmed name always wins.
+export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[]) {
+  const byKey = new Map<string, Alias[]>();
+  for (const a of aliases) { const l = byKey.get(a.alias_key) || []; l.push(a); byKey.set(a.alias_key, l); }
+  return rows.map((r) => {
+    const key = aliasKey(r.name);
+    const confirmed = byKey.get(key) || [];
+    const candidates: Candidate[] = cat ? cat.candidates(r.name, r.english) : [];
+    let match: Match | null = decide(candidates);
+    if (confirmed.length === 1) match = { id: confirmed[0].target_code || '', name: confirmed[0].target_name, score: 1, confidence: 'confirmed' };
+    else if (confirmed.length > 1 && match) match = { ...match, confidence: 'review' };
+    return { ...r, key, match, candidates };
+  });
+}
 
 function list(value: string | undefined): string[] {
   return String(value || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -84,7 +128,8 @@ export function parseRows(text: string): Row[] {
   for (const r of rows) {
     const name = typeof (r as Row)?.name === 'string' ? arabicLetters((r as Row).name).replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
     if (name.length < 2 || name.length > 250) continue;
-    out.push({ name, unclear: (r as Row).unclear === true });
+    const english = typeof (r as Row)?.english === 'string' ? (r as Row).english.replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 250) : '';
+    out.push({ name, english, unclear: (r as Row).unclear === true });
   }
   return out;
 }
@@ -195,7 +240,19 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const msg = (e as Error).message === 'too-many-rows' ? 'Gemini رجّع سطور أكتر من المعقول؛ قسّم الصورة.' : 'رد Gemini مش مفهوم؛ جرّب تاني.';
     return reply(502, { error: 'parse', message: msg }, headers);
   }
-  return reply(200, { rows, model, truncated: candidate?.finishReason === 'MAX_TOKENS' }, headers);
+  // Owner-confirmed names, read with the caller's own session (owner-only table). Missing table or error: carry on without.
+  let aliases: Alias[] = [];
+  try {
+    const a = await fetchImpl(env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/name_aliases?select=alias_key,target_name,target_code&limit=20000', {
+      headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' }, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+    });
+    if (a.ok) aliases = await a.json(); else log('aliases-unavailable', t1, { status: a.status });
+  } catch { log('aliases-unavailable', t1); }
+  const t2 = Date.now();
+  const cat = await getCatalog(env, auth, fetchImpl);
+  const annotated = annotate(rows, cat, aliases);
+  log('match', t2, { rows: annotated.length, aliases: aliases.length, catalog: cat?.size || 0, high: annotated.filter((r) => r.match?.confidence === 'high').length, confirmed: annotated.filter((r) => r.match?.confidence === 'confirmed').length });
+  return reply(200, { rows: annotated, model, catalog: cat?.size || 0, truncated: candidate?.finishReason === 'MAX_TOKENS' }, headers);
 }
 
 // Runs only inside Supabase (Deno); Node tests import handle() directly.
