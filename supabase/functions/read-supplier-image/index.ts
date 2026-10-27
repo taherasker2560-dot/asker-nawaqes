@@ -10,7 +10,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_ROWS = 600;
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AUTH_TIMEOUT_MS = 15000;
-const GEMINI_TIMEOUT_MS = 110000; // Supabase stops a request at 150 s
+const GEMINI_TIMEOUT_MS = 55000; // the phone browser gave up after about a minute; Supabase's own limit is 150 s
 
 // Timing log without any secret or image content, to see which step is slow.
 function log(stage: string, started: number, extra: Record<string, unknown> = {}): void {
@@ -129,18 +129,26 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
 
   const model = (env.GEMINI_MODEL || DEFAULT_MODEL).trim();
   if (!/^[a-z0-9.\-]+$/i.test(model)) return reply(503, { error: 'model', message: 'اسم الموديل في GEMINI_MODEL مش صالح.' }, headers);
+  // Copying names off a table needs no "thinking"; it only makes newer Flash models slow (first live call
+  // waited over a minute). Ask for no thinking budget; if this model rejects that setting, retry once without it.
+  const call = (noThinking: boolean) => fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY as string },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: image.replace(/\s+/g, '') } }] }],
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA, ...(noThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+    }),
+    signal: deadline,
+  });
+  const deadline = AbortSignal.timeout(GEMINI_TIMEOUT_MS);
   let gemini: Response;
   const t1 = Date.now();
   try {
-    gemini = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: image.replace(/\s+/g, '') } }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
-      }),
-      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
-    });
+    gemini = await call(true);
+    if (gemini.status === 400) {
+      const reason = String(((await gemini.clone().json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message || '');
+      if (/thinking/i.test(reason)) { log('gemini-retry-without-thinking-setting', t1, { model }); gemini = await call(false); }
+    }
   } catch (e) {
     const timeout = (e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError';
     log(timeout ? 'gemini-timeout' : 'gemini-network', t1, { model, imageBytes: decodeBase64Length(image) });
