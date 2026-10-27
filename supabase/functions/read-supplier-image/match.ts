@@ -58,34 +58,79 @@ export function strengthAndCount(s: string): { strength: string[]; count: string
   return { strength: [...new Set(strength)], count: [...new Set(count)] };
 }
 
-// Dosage form groups. A gel must not match a tablet: when both names state a form and they differ, the item
-// gets formOk=false, a lower score, and is never a clear match or a shortage suggestion.
+// Dosage form groups, from the owner's list of abbreviations (28 Oct 2026). A suppository must not match an
+// ampoule: when both names state a form and none agree, the item gets formOk=false, a lower score, and is never
+// a clear match or a shortage suggestion. فوار is listed by the owner under sachets and granules; an
+// effervescent tablet still matches because the item name also says TAB.
 const FORMS: Record<string, string[]> = {
-  solid: ['قرص', 'اقراص', 'فوار', 'فواره', 'EFF', 'EFFERVESCENT', 'تاب', 'كبسول', 'كبسوله', 'كبسولات', 'TAB', 'TABS', 'TABLET', 'TABLETS', 'CAP', 'CAPS', 'CAPSULE', 'CAPSULES'],
+  tablet: ['قرص', 'اقراص', 'حبوب', 'حبه', 'تاب', 'TAB', 'TABS', 'TABLET', 'TABLETS'],
+  capsule: ['كبسول', 'كبسوله', 'كبسولات', 'CAP', 'CAPS', 'CAPSULE', 'CAPSULES'],
   liquid: ['شراب', 'معلق', 'SYP', 'SYR', 'SYRUP', 'SUSP', 'SUSPENSION'],
-  injection: ['امبول', 'امبولات', 'فيال', 'حقن', 'AMP', 'AMPS', 'AMPOULE', 'VIAL', 'VIALS', 'VL', 'INJ'],
-  cream: ['كريم', 'CREAM'],
-  gel: ['جل', 'جيل', 'GEL'],
-  ointment: ['مرهم', 'OINT', 'OINTMENT'],
   drops: ['نقط', 'نقطه', 'قطره', 'DROPS', 'DROP', 'DRP'],
-  spray: ['بخاخ', 'سبراي', 'اسبراي', 'SPRAY'],
+  powder: ['بودره', 'POWDER', 'PWD'],
+  spray: ['سبراي', 'اسبراي', 'بخاخ', 'SPRAY'],
   supp: ['لبوس', 'SUP', 'SUPP', 'SUPPOSITORY', 'SUPPOSITORIES'],
-  sachet: ['كيس', 'اكياس', 'SACH', 'SACHET', 'SACHETS'],
-  lotion: ['لوسيون', 'لوشن', 'LOTION'],
-  wash: ['غسول', 'WASH'],
+  mouthwash: ['مضمضه', 'MW', 'M.W'],
+  vdouche: ['دوش', 'VG', 'DOUCHE', 'DOUCH'],
+  amp: ['امبول', 'امبولات', 'AMP', 'AMPS', 'AMPOULE', 'AMPOULES', 'OMPOULES'],
+  vial: ['فيال', 'VIAL', 'VIALS', 'VL'],
+  cream: ['كريم', 'CREAM'],
+  gel: ['جل', 'جيل', 'GEL', 'EMULGEL', 'ايمولجيل'],
+  ointment: ['مرهم', 'OINT', 'OINTMENT'],
+  shampoo: ['شامبو', 'SHAMPOO'],
+  oil: ['زيت', 'OIL'],
+  lotion: ['لوشن', 'لوسيون', 'LOTION'],
+  soap: ['صابون', 'صابونه', 'SOAP'],
+  cleanser: ['غسول', 'CLEANSER', 'WASH'],
+  sachet: ['كيس', 'اكياس', 'فوار', 'فواره', 'حبيبات', 'SACH', 'SACHET', 'SACHETS', 'SACHESTS', 'GRANULES', 'EFF', 'EFFERVESCENT'],
 };
+// Words that make a form more specific: لبوس مهبلي, سبراي للفم, لوشن للشعر, mouth wash.
+const VAGINAL = new Set(['مهبلي', 'مهبليه', 'VAGINAL', 'VAG']);
+const MOUTH = new Set(['فم', 'للفم', 'الفم', 'MOUTH', 'ORAL']);
+const HAIR = new Set(['شعر', 'للشعر', 'الشعر', 'HAIR']);
+// A specific form also agrees with its general form (a mouth spray is still a spray) but not with a sibling.
+const PARENT: Record<string, string> = { vsupp: 'supp', mouthspray: 'spray', hairspray: 'spray', hairlotion: 'lotion', vdouche: 'cleanser', mouthwash: 'cleanser' };
+// Supplier lists often write اقراص/حبوب for capsules and the other way round.
+const CLOSE = new Set(['tablet|capsule', 'capsule|tablet']);
+// "حقن / INJ" can be an ampoule or a vial.
+const EITHER: Record<string, string[]> = { حقن: ['amp', 'vial'], INJ: ['amp', 'vial'], INJECTION: ['amp', 'vial'] };
 const FORM_OF = new Map<string, string>();
 for (const [g, ws] of Object.entries(FORMS)) for (const w of ws) FORM_OF.set(w, g);
 // One-letter packs used by the item list right after a count (30T, 6A, 20C); never on their own (VITAMIN A).
-const SHORT_FORM: Record<string, string> = { T: 'solid', C: 'solid', A: 'injection' };
+const SHORT_FORM: Record<string, string> = { T: 'tablet', C: 'capsule', A: 'amp' };
 export function forms(s: string): Set<string> {
   const out = new Set<string>();
   const tokens = normalize(s).split(' ').map((t) => t.replace(/^\.+|\.+$/g, ''));
+  const vag = tokens.some((t) => VAGINAL.has(t)), mouth = tokens.some((t) => MOUTH.has(t)), hair = tokens.some((t) => HAIR.has(t));
   tokens.forEach((t, i) => {
-    const g = FORM_OF.get(t) || (SHORT_FORM[t] && /^\d/.test(tokens[i - 1] || '') ? SHORT_FORM[t] : undefined);
-    if (g) out.add(g);
+    for (const e of EITHER[t] || []) out.add(e);
+    let g = FORM_OF.get(t) || (SHORT_FORM[t] && /^\d/.test(tokens[i - 1] || '') ? SHORT_FORM[t] : undefined);
+    if (!g) return;
+    if (g === 'supp' && vag) g = 'vsupp';
+    else if (g === 'cleanser' && vag) g = 'vdouche';
+    else if (g === 'cleanser' && mouth) g = 'mouthwash';
+    else if (g === 'spray' && mouth) g = 'mouthspray';
+    else if (g === 'spray' && hair) g = 'hairspray';
+    else if (g === 'lotion' && hair) g = 'hairlotion';
+    out.add(g);
   });
   return out;
+}
+// Injection route: وريدي (I.V) is a different item from عضل (I.M).
+const ROUTE: Record<string, string> = { وريد: 'iv', وريدي: 'iv', IV: 'iv', 'I.V': 'iv', عضل: 'im', عضلي: 'im', IM: 'im', 'I.M': 'im' };
+function routes(s: string): Set<string> {
+  const out = new Set<string>();
+  for (const t of normalize(s).split(' ')) { const r = ROUTE[t.replace(/^\.+|\.+$/g, '')]; if (r) out.add(r); }
+  return out;
+}
+export function routesAgree(a: string, b: string): boolean {
+  const x = routes(a), y = routes(b);
+  return !x.size || !y.size || [...x].some((r) => y.has(r));
+}
+export function formsAgree(a: Set<string>, b: Set<string>): boolean {
+  if (!a.size || !b.size) return true;
+  for (const x of a) for (const y of b) if (x === y || PARENT[x] === y || PARENT[y] === x || CLOSE.has(x + '|' + y)) return true;
+  return false;
 }
 
 function words(s: string): string[] {
@@ -138,6 +183,7 @@ export class Catalog {
     const shortlist = [...hits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 300).map(([i]) => i);
     const src = strengthAndCount(numbers(arabic).length ? arabic : latin);
     const arForms = forms(arabic), srcForms = arForms.size ? arForms : forms(latin);
+    const routeSrc = /[\u0600-\u06FF]/.test(arabic) && routes(arabic).size ? arabic : latin;
     const scored = shortlist.map((i) => {
       const e = this.entries[i];
       let sim = 0; for (const q of queries) for (const g of e.g) sim = Math.max(sim, dice(q, g));
@@ -145,7 +191,7 @@ export class Catalog {
       const itemCount = strengthAndCount(e.name).count;
       const countOff = src.count.length > 0 && itemCount.length > 0 && !src.count.some((n) => itemCount.includes(n));
       const itemForms = srcForms.size ? forms(e.name) : new Set<string>();
-      const formOk = !srcForms.size || !itemForms.size || [...srcForms].some((f) => itemForms.has(f));
+      const formOk = formsAgree(srcForms, itemForms) && routesAgree(routeSrc, e.name);
       const factor = (!src.strength.length ? (e.nums.length ? 0.95 : 1) : numbersOk ? 1.05 : 0.5) * (countOff ? 0.9 : 1) * (formOk ? 1 : 0.6);
       return { id: e.id, name: e.name, score: Math.min(1, Math.round(sim * factor * 1000) / 1000), numbersOk, formOk };
     });
