@@ -90,6 +90,15 @@ export class Catalog {
   get size(): number { return this.entries.length; }
   byName(name: string): Entry | undefined { const k = normalize(name); return this.entries.find((e) => normalize(e.name) === k); }
 
+  // Owner search box: item code, or name text in Arabic/English. No number rule here: the owner decides.
+  search(q: string, limit = 10): { id: string; name: string }[] {
+    const t = String(q || '').trim();
+    if (/^\d{1,10}$/.test(t)) { const e = this.entries.find((x) => x.id === t); if (e) return [{ id: e.id, name: e.name }]; }
+    const exact = normalize(t);
+    const scored = this.candidates(t, t, 60).map((c) => ({ ...c, score: c.score + (normalize(c.name).startsWith(exact) ? 0.5 : 0) }));
+    return scored.sort((a, b) => b.score - a.score).slice(0, limit).map(({ id, name }) => ({ id, name }));
+  }
+
   // Best catalogue items for one supplier line. `arabic` is the name as read; `latin` is Gemini's guess.
   candidates(arabic: string, latin: string, limit = 3): Candidate[] {
     const queries = [grams(arabic), grams(latin)].filter((q) => q.size);

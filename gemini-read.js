@@ -13,6 +13,8 @@ function init(deps){const host=document.querySelector('#incomingPanel .incoming-
  const button=document.createElement('button');button.type='button';button.className='secondary';button.id='geminiReadImages';button.textContent='قراءة الصور بـ Gemini — أدق في الأرقام';button.disabled=true;
  const hint=document.createElement('p');hint.className='hint';hint.textContent='الصور بتتبعت لـ Google Gemini عن طريق Supabase، والمفتاح مش موجود في الصفحة. في الخطة المجانية Google ممكن تستخدم الصور لتحسين خدماتها، فماتبعتش صور فيها بيانات مرضى. النتيجة بتنزل للمراجعة زي القراءة المحلية، ومفيش حاجة بتتحفظ أوتوماتيك.';
  el('extract').parentElement.after(button,hint);
+ const invoke=body=>deps.client.functions.invoke(FUNCTION_NAME,{body});
+ const dictionary=root.AskerGeminiReport?.manager?root.AskerGeminiReport.manager(hint.parentElement,deps.client):null;
  let run=0,busy=false;const status=(m,bad=false)=>{el('status').textContent=m;el('status').className='status'+(bad?' bad':'')};
  input.addEventListener('change',()=>{run++;busy=false;button.disabled=!input.files.length});
  root.addEventListener('asker-import-reset',()=>{if(busy){run++;busy=false;button.disabled=!input.files.length}});
@@ -30,7 +32,7 @@ function init(deps){const host=document.querySelector('#incomingPanel .incoming-
    if(document.getElementById('incomingMode')?.value==='availability'&&root.AskerGeminiReport&&deps.readAllRows){
     root.AskerFileImport.cancelIncomingImages(token);status('جارٍ مقارنة الأصناف بالنواقص…');
     const {data:shortages,error}=await deps.readAllRows('shortage_items',q=>q.eq('is_active',true));if(ticket!==run)return;if(error)throw Error('تعذّر قراءة النواقص: '+(error.message||error));
-    const rep=root.AskerGeminiReport.show(document.getElementById('availabilityResults'),allRows,shortages||[],deps.client,m=>status(m));
+    const rep=root.AskerGeminiReport.show(document.getElementById('availabilityResults'),allRows,shortages||[],{client:deps.client,invoke},m=>{status(m);dictionary?.reload()});
     status(`اتقرى ${count} سطر من ${files.length} صور. وصل من النواقص: ${rep.arrived.length}، محتاج تأكيدك: ${rep.review.length}.${noCatalog} ${cut?`في ${cut} صورة النتيجة ممكن تكون ناقصة؛ قسّمها.`:''} مفيش حاجة اتحفظت غير الأسماء اللي هتأكدها.`.replace(/\s+/g,' '));return}
    const rows=root.AskerIncomingImages.draftRows(results);
    if(!root.AskerFileImport.reviewIncomingImages(token,rows,`قراءة Gemini لـ ${files.length} صور`)){status('تم تجاهل نتيجة Gemini لأنك بدأت استيرادًا آخر. النص السابق محفوظ.');return}

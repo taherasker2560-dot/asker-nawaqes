@@ -1,14 +1,15 @@
 // Tests the Supabase function with Node (22.18+ strips the TypeScript types). No network: fetch is faked.
 const assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
-const {handle,parseRows,decodeBase64Length,PROMPT,arabicLetters,annotate}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','index.ts'));
+const {handle,parseRows,decodeBase64Length,PROMPT,arabicLetters,annotate,resetCatalogCache}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','index.ts'));
 const ORIGIN='https://taherasker2560-dot.github.io';
 const env={GEMINI_API_KEY:'test-key',ALLOWED_EMAILS:'Owner@Example.com, second@example.com',SUPABASE_URL:'https://proj.supabase.co/',SUPABASE_ANON_KEY:'anon'};
 const png=Buffer.from('fake image bytes').toString('base64');
-function fakeFetch({user={email:'owner@example.com'},userStatus=200,gemini,catalogResponse,aliasesResponse}={}){const calls=[];const f=async(url,opts={})=>{calls.push({url,opts});
+function fakeFetch({user={email:'owner@example.com'},userStatus=200,gemini,catalogResponse,aliasesResponse,fixesResponse}={}){const calls=[];const f=async(url,opts={})=>{calls.push({url,opts});
   if(url.endsWith('/auth/v1/user'))return new Response(JSON.stringify(user),{status:userStatus});
   if(url.includes('/storage/v1/object/authenticated/asker-private/catalog.json'))return catalogResponse?catalogResponse(url,opts):new Response('not found',{status:404});
   if(url.includes('/rest/v1/name_aliases'))return aliasesResponse?aliasesResponse(url,opts):new Response('[]',{status:200});
+  if(url.includes('/rest/v1/reading_fixes'))return fixesResponse?fixesResponse(url,opts):new Response('[]',{status:200});
   if(url.startsWith('https://generativelanguage.googleapis.com/'))return gemini?gemini(url,opts):new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify({rows:[{name:'جانوفيا ١٠٠مجم ٢٨ قرص'},{name:'ديكسافين شراب س ج',unclear:true},{name:'x'},{name:'سطر\nمكسور | فيه علامات'}]})}]}}]}),{status:200});
   throw Error('unexpected url '+url)};f.calls=calls;return f}
 const req=(o={})=>new Request('https://proj.supabase.co/functions/v1/read-supplier-image',{method:o.method||'POST',headers:{origin:o.origin??ORIGIN,...(o.auth===false?{}:{authorization:'Bearer user-jwt'}),'content-type':'application/json'},...(o.method==='OPTIONS'?{}:{body:JSON.stringify(o.body??{image:png,mimeType:'image/png'})})});
@@ -57,6 +58,18 @@ assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
  assert.deepEqual(m[0],['JANUVIA 100MG 28TAB','high']);assert.deepEqual(m[1],['JANUVIA 50MG 28TAB','high'],'50 never matched to 100');
  assert.deepEqual(m[2],['FLAGYL 125MG SYP','high'],'Arabic alt name + Persian yeh');assert.deepEqual(m[3],['TEGRETOL 200MG 30T.','confirmed'],'confirmed name wins over two equal candidates');
  assert.equal(r.body.rows[3].key,'تيجيريتول 200 اقراص');}
+// owner tools: item search and re-matching after an Arabic correction; a saved reading fix is applied before matching
+{resetCatalogCache();const items=[['24738','JANUVIA 100MG 28TAB'],['24739','JANUVIA 50MG 28TAB'],['500','FLAGYL 125MG SYP',['فلاجيل شراب']],['77','CLEXANE 4000/0.4ML 2AMP']];
+ const cat=async()=>new Response(JSON.stringify(items),{status:200});
+ r=await json(await handle(req({body:{action:'search',q:'janu'}}),{...env},fakeFetch({catalogResponse:cat})));assert.equal(r.status,200);assert.deepEqual(r.body.items.map(x=>x.id).sort(),['24738','24739']);
+ r=await json(await handle(req({body:{action:'search',q:'77'}}),env,fakeFetch({catalogResponse:cat})));assert.deepEqual(r.body.items,[{id:'77',name:'CLEXANE 4000/0.4ML 2AMP'}],'item code search');
+ r=await json(await handle(req({body:{action:'search',q:'j'}}),env,fakeFetch({catalogResponse:cat})));assert.equal(r.status,400);
+ resetCatalogCache();r=await json(await handle(req({body:{action:'search',q:'janu'}}),env,fakeFetch()));assert.equal(r.status,503,'no catalogue uploaded');
+ f=fakeFetch({user:{email:'stranger@example.com'},catalogResponse:cat});r=await json(await handle(req({body:{action:'search',q:'janu'}}),env,f));assert.equal(r.status,403,'search is owner-only too');
+ r=await json(await handle(req({body:{action:'match',name:'جانوفيا ٥٠ مجم ٢٨ قرص',english:'JANUVIA 50MG'}}),env,fakeFetch({catalogResponse:cat})));assert.equal(r.status,200);assert.equal(r.body.row.match.name,'JANUVIA 50MG 28TAB');
+ const gem=async()=>new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({rows:[{name:'جانوفيا ٥٠٠ مجم ٢٨ قرص',english:'JANUVIA 500MG 28TAB'}]})}]}}]}),{status:200});
+ r=await json(await handle(req(),{...env,GEMINI_MODEL:'gemini-fix-test'},fakeFetch({gemini:gem,catalogResponse:cat,fixesResponse:async()=>new Response(JSON.stringify([{read_key:'جانوفيا 500 مجم 28 قرص',corrected_text:'جانوفيا ٥٠ مجم ٢٨ قرص'}]),{status:200})})));
+ assert.equal(r.body.rows[0].corrected,'جانوفيا ٥٠ مجم ٢٨ قرص');assert.equal(r.body.rows[0].name,'جانوفيا ٥٠٠ مجم ٢٨ قرص','text as read is kept for display');assert.equal(r.body.rows[0].match.name,'JANUVIA 50MG 28TAB','matched on the corrected text');}
 // two different confirmations for the same supplier name -> review, never a silent pick
 {const cat=null;const rows=annotate([{name:'اسم',english:'',unclear:false}],cat,[{alias_key:'اسم',target_name:'A',target_code:'1'},{alias_key:'اسم',target_name:'B',target_code:'2'}]);assert.equal(rows[0].match,null);}
 // a model that rejects optional settings with a bare 400 steps down: no thinking, then no schema

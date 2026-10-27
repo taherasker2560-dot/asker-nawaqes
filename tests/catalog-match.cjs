@@ -14,4 +14,5 @@ assert.equal(best('تيجيريتول ٢٠٠ اقراص','TEGRETOL 200 TAB')[1],
 assert.deepEqual(best('فلاجیل شراب',''),['FLAGYL 125MG SYP','high'],'Arabic alternative name, Persian yeh');
 assert.equal(M.decide(cat.candidates('منتج غير موجود خالص','UNKNOWN THING')),null);
 assert.equal(M.aliasKey('  گاست ٤ مجم '),'كاست 4 مجم');
+assert.deepEqual(cat.search('5').map(x=>x.id),['5'],'code');assert.equal(cat.search('tegretol').length,2);assert.equal(cat.search('napib')[0].name.startsWith('NAPIBRADINE'),true);
 console.log('PASS: catalogue matcher: normalization, strength vs pack count, 50/100 never confused, pack count tolerated, ties go to review, Arabic alt names, unknown -> none')})().catch(e=>{console.error(e);process.exitCode=1});
