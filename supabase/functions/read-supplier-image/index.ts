@@ -123,7 +123,12 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   }
   if (gemini.status === 429) return reply(429, { error: 'quota', message: 'خلصت حصة Gemini المجانية دلوقتي. جرّب بعدين أو استخدم القراءة المحلية.' }, headers);
   if (gemini.status === 404) return reply(502, { error: 'model', message: `الموديل ${model} مش موجود عند Google؛ غيّر GEMINI_MODEL.` }, headers);
-  if (gemini.status === 400 || gemini.status === 403) return reply(502, { error: 'key', message: 'Google رفض الطلب؛ راجع مفتاح GEMINI_API_KEY.' }, headers);
+  if (gemini.status === 400 || gemini.status === 403) {
+    // Google's own reason (never contains the key), e.g. invalid key or unsupported location on the free tier.
+    const reason = String(((await gemini.json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message || '').slice(0, 200);
+    const where = /location/i.test(reason) ? 'Google مش بيقبل الطلب من مكان سيرفر Supabase في الخطة المجانية.' : 'Google رفض الطلب؛ راجع مفتاح GEMINI_API_KEY.';
+    return reply(502, { error: 'key', message: where + (reason ? ' (' + reason + ')' : '') }, headers);
+  }
   if (!gemini.ok) return reply(502, { error: 'gemini', message: 'Gemini رجّع خطأ (' + gemini.status + ').' }, headers);
 
   const data = await gemini.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[] } | null;
