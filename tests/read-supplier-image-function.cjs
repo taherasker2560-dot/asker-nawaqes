@@ -33,7 +33,7 @@ assert.equal(decodeBase64Length(Buffer.alloc(10).toString('base64')),10);
 // success: key only in a header, chosen model, image inline, deterministic settings, rows cleaned
 f=fakeFetch();r=await json(await handle(req(),{...env,GEMINI_MODEL:'gemini-test-flash'},f));assert.equal(r.status,200);assert.equal(r.cors,ORIGIN);
 const g=f.calls.find(c=>c.url.includes('generativelanguage'));assert.match(g.url,/models\/gemini-test-flash:generateContent$/);assert.equal(g.url.includes('test-key'),false,'key never in the URL');assert.equal(g.opts.headers['x-goog-api-key'],'test-key');
-const sent=JSON.parse(g.opts.body);assert.equal(sent.generationConfig.temperature,0);assert.equal(sent.contents[0].parts[1].inline_data.data,png);assert.equal(sent.contents[0].parts[0].text,PROMPT);
+const sent=JSON.parse(g.opts.body);assert.equal(sent.generationConfig.temperature,0);assert.deepEqual(sent.generationConfig.thinkingConfig,{thinkingBudget:0},'no thinking for a copy task');assert.equal(sent.contents[0].parts[1].inline_data.data,png);assert.equal(sent.contents[0].parts[0].text,PROMPT);
 assert.equal(f.calls.find(c=>c.url.endsWith('/auth/v1/user')).opts.headers.Authorization,'Bearer user-jwt');
 assert.deepEqual(r.body.rows,[{name:'جانوفيا ١٠٠مجم ٢٨ قرص',unclear:false},{name:'ديكسافين شراب س ج',unclear:true},{name:'سطر مكسور فيه علامات',unclear:false}]);assert.equal(r.body.model,'gemini-test-flash');
 assert.equal(JSON.stringify(r.body).includes('test-key'),false,'key never returned');
@@ -46,6 +46,11 @@ r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{throw Error('off
 const te=Object.assign(Error('t'),{name:'TimeoutError'});r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{throw te}})));assert.equal(r.status,504);assert.match(r.body.message,/اتأخر/);
 const slowAuth=async(u,o)=>{if(u.endsWith('/auth/v1/user'))throw Object.assign(Error('t'),{name:'TimeoutError'});};r=await json(await handle(req(),env,slowAuth));assert.equal(r.status,504);
 assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
+// a model that rejects the thinking setting gets one retry without it
+{let n=0;const bodies=[];const ff=fakeFetch({gemini:async(u,o)=>{n++;bodies.push(JSON.parse(o.body));return n===1?new Response(JSON.stringify({error:{message:'Thinking budget is not supported for this model.'}}),{status:400}):new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"rows":[{"name":"اسم صنف"}]}'}]}}]}),{status:200})}});
+ r=await json(await handle(req(),env,ff));assert.equal(r.status,200);assert.equal(n,2);assert.equal('thinkingConfig' in bodies[1].generationConfig,false);}
+// other 400s are not retried
+{let n=0;r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'API key not valid'}}),{status:400})}})));assert.equal(n,1);assert.equal(r.status,502);assert.match(r.body.message,/GEMINI_API_KEY/);}
 assert.throws(()=>parseRows(JSON.stringify({rows:Array(601).fill({name:'اسم'})})),/too-many-rows/);
 assert.deepEqual(parseRows(JSON.stringify({rows:[]})),[]);
 console.log('PASS: read-supplier-image: CORS allow-list, fails closed without secrets, Supabase auth + email allow-list before any Gemini call, type/size checks, key only in header, model setting, cleaned rows with unclear flags, Google errors mapped');
