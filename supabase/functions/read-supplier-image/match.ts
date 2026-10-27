@@ -3,7 +3,7 @@
 // list (shortages) is compared in the page. Strength numbers read from the image must all appear in the item.
 
 export type CatalogItem = [id: string, name: string, alts?: string[]];
-export type Candidate = { id: string; name: string; score: number; numbersOk: boolean };
+export type Candidate = { id: string; name: string; score: number; numbersOk: boolean; formOk?: boolean };
 export type Match = { id: string; name: string; score: number; confidence: 'confirmed' | 'high' | 'review' };
 
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -58,6 +58,36 @@ export function strengthAndCount(s: string): { strength: string[]; count: string
   return { strength: [...new Set(strength)], count: [...new Set(count)] };
 }
 
+// Dosage form groups. A gel must not match a tablet: when both names state a form and they differ, the item
+// gets formOk=false, a lower score, and is never a clear match or a shortage suggestion.
+const FORMS: Record<string, string[]> = {
+  solid: ['قرص', 'اقراص', 'تاب', 'كبسول', 'كبسوله', 'كبسولات', 'TAB', 'TABS', 'TABLET', 'TABLETS', 'CAP', 'CAPS', 'CAPSULE', 'CAPSULES'],
+  liquid: ['شراب', 'معلق', 'SYP', 'SYR', 'SYRUP', 'SUSP', 'SUSPENSION'],
+  injection: ['امبول', 'امبولات', 'فيال', 'حقن', 'AMP', 'AMPS', 'AMPOULE', 'VIAL', 'VIALS', 'VL', 'INJ'],
+  cream: ['كريم', 'CREAM'],
+  gel: ['جل', 'جيل', 'GEL'],
+  ointment: ['مرهم', 'OINT', 'OINTMENT'],
+  drops: ['نقط', 'نقطه', 'قطره', 'DROPS', 'DROP', 'DRP'],
+  spray: ['بخاخ', 'سبراي', 'اسبراي', 'SPRAY'],
+  supp: ['لبوس', 'SUPP', 'SUPPOSITORIES'],
+  sachet: ['كيس', 'اكياس', 'SACH', 'SACHET', 'SACHETS'],
+  lotion: ['لوسيون', 'لوشن', 'LOTION'],
+  wash: ['غسول', 'WASH'],
+};
+const FORM_OF = new Map<string, string>();
+for (const [g, ws] of Object.entries(FORMS)) for (const w of ws) FORM_OF.set(w, g);
+// One-letter packs used by the item list right after a count (30T, 6A, 20C); never on their own (VITAMIN A).
+const SHORT_FORM: Record<string, string> = { T: 'solid', C: 'solid', A: 'injection' };
+export function forms(s: string): Set<string> {
+  const out = new Set<string>();
+  const tokens = normalize(s).split(' ').map((t) => t.replace(/^\.+|\.+$/g, ''));
+  tokens.forEach((t, i) => {
+    const g = FORM_OF.get(t) || (SHORT_FORM[t] && /^\d/.test(tokens[i - 1] || '') ? SHORT_FORM[t] : undefined);
+    if (g) out.add(g);
+  });
+  return out;
+}
+
 function words(s: string): string[] {
   return normalize(s).replace(/[\d.\/]+/g, ' ').split(' ').filter((w) => w.length >= 2 && !STOP.has(w));
 }
@@ -107,14 +137,17 @@ export class Catalog {
     for (const q of queries) for (const t of q) { const l = this.index.get(t); if (l && l.length < 6000) for (const i of l) hits.set(i, (hits.get(i) || 0) + 1); }
     const shortlist = [...hits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 300).map(([i]) => i);
     const src = strengthAndCount(numbers(arabic).length ? arabic : latin);
+    const arForms = forms(arabic), srcForms = arForms.size ? arForms : forms(latin);
     const scored = shortlist.map((i) => {
       const e = this.entries[i];
       let sim = 0; for (const q of queries) for (const g of e.g) sim = Math.max(sim, dice(q, g));
       const numbersOk = src.strength.every((n) => e.nums.includes(n));
       const itemCount = strengthAndCount(e.name).count;
       const countOff = src.count.length > 0 && itemCount.length > 0 && !src.count.some((n) => itemCount.includes(n));
-      const factor = (!src.strength.length ? (e.nums.length ? 0.95 : 1) : numbersOk ? 1.05 : 0.5) * (countOff ? 0.9 : 1);
-      return { id: e.id, name: e.name, score: Math.min(1, Math.round(sim * factor * 1000) / 1000), numbersOk };
+      const itemForms = srcForms.size ? forms(e.name) : new Set<string>();
+      const formOk = !srcForms.size || !itemForms.size || [...srcForms].some((f) => itemForms.has(f));
+      const factor = (!src.strength.length ? (e.nums.length ? 0.95 : 1) : numbersOk ? 1.05 : 0.5) * (countOff ? 0.9 : 1) * (formOk ? 1 : 0.6);
+      return { id: e.id, name: e.name, score: Math.min(1, Math.round(sim * factor * 1000) / 1000), numbersOk, formOk };
     });
     return scored.sort((a, b) => b.score - a.score).slice(0, limit);
   }
@@ -124,7 +157,7 @@ export class Catalog {
 export function decide(c: Candidate[]): Match | null {
   const top = c[0];
   if (!top || top.score < 0.35) return null;
-  const next = c.find((x, i) => i > 0 && x.numbersOk);
-  const clear = top.numbersOk && top.score >= 0.6 && (!next || top.score - next.score >= 0.08);
+  const next = c.find((x, i) => i > 0 && x.numbersOk && x.formOk !== false);
+  const clear = top.numbersOk && top.formOk !== false && top.score >= 0.6 && (!next || top.score - next.score >= 0.08);
   return { id: top.id, name: top.name, score: top.score, confidence: clear ? 'high' : 'review' };
 }

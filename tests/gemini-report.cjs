@@ -13,4 +13,5 @@ assert.equal(r.arrived.length,1,'two lines for the same shortage are grouped');a
 assert.deepEqual(r.review.map(x=>[x.row.key,x.options.map(o=>o.shortage.id)]),[['k3',['s3']]],'only shortage candidates with matching numbers are offered; 50 never offered as 100');
 assert.deepEqual(r.other.map(x=>x.item),['PANADOL 500']);assert.deepEqual(r.unknown.map(x=>x.name).sort(),['اسم غريب','جانوفيا ٥٠ مجم'].sort());
 const r2=R.buildReport([{fileName:'x.jpg',name:'tegretol 200mg 30t.',key:'t',match:null,candidates:[]}],shortages);assert.equal(r2.arrived[0].sources[0].confidence,'same-name','exact same name counts even without the item list');
+{const r3=R.buildReport([{fileName:'x.jpg',name:'نيوتون جل',key:'n',match:null,candidates:[{id:'1',name:'TEGRETOL 200MG 30T.',numbersOk:true,formOk:false}]}],shortages);assert.equal(r3.review.length,0,'a different dosage form is never offered');}
 console.log('PASS: report: clear matches grouped per shortage, review only offers shortage items with matching strength, other items and unknown names separated');

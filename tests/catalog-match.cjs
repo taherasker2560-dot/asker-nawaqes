@@ -15,4 +15,8 @@ assert.deepEqual(best('فلاجیل شراب',''),['FLAGYL 125MG SYP','high'],'A
 assert.equal(M.decide(cat.candidates('منتج غير موجود خالص','UNKNOWN THING')),null);
 assert.equal(M.aliasKey('  گاست ٤ مجم '),'كاست 4 مجم');
 assert.deepEqual(cat.search('5').map(x=>x.id),['5'],'code');assert.equal(cat.search('tegretol').length,2);assert.equal(cat.search('napib')[0].name.startsWith('NAPIBRADINE'),true);
-console.log('PASS: catalogue matcher: normalization, strength vs pack count, 50/100 never confused, pack count tolerated, ties go to review, Arabic alt names, unknown -> none')})().catch(e=>{console.error(e);process.exitCode=1});
+{const f=new M.Catalog([['1','NEUROTON 30TAB'],['2','FLAGYL 500MG 20TAB.'],['3','FLAGYL 100ML SUSP125 MG .'],['4','VITAMIN A CREAM'],['5','CARBIMAZOLE 5MG 50T.']]);
+ assert.deepEqual([...M.forms('FLAGYL 500MG 20TAB.')],['solid'],'dotted TAB.');assert.deepEqual([...M.forms('CARBIMAZOLE 5MG 50T.')],['solid'],'50T');assert.deepEqual([...M.forms('VITAMIN A CREAM')],['cream'],'lone A is not an ampoule');
+ const g=f.candidates('نيوتون جل','NEOTONE GEL');assert.equal(g.find(x=>x.id==='1').formOk,false);assert.notEqual(M.decide(g)?.confidence,'high','a gel never matches a tablet clearly');
+ const s=f.candidates('فلاجيل شراب','FLAGYL SYP');assert.equal(s[0].id,'3','syrup beats tablet');assert.equal(M.decide(s).confidence,'high');}
+console.log('PASS: catalogue matcher: dosage form must agree (gel/tab, syrup/tab); normalization, strength vs pack count, 50/100 never confused, pack count tolerated, ties go to review, Arabic alt names, unknown -> none')})().catch(e=>{console.error(e);process.exitCode=1});
