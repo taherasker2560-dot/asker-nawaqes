@@ -51,6 +51,7 @@ type Env = Record<string, string | undefined>;
 type Row = { name: string; english: string; unclear: boolean };
 type Alias = { alias_key: string; target_name: string; target_code: string | null };
 type Fix = { read_key: string; corrected_text: string };
+type Rejection = { alias_key: string; target_name: string };
 
 const CATALOG_PATH = '/storage/v1/object/authenticated/asker-private/catalog.json';
 let catalog: Catalog | null = null;
@@ -77,17 +78,21 @@ export function resetCatalogCache(): void { catalog = null; catalogLoadedAt = 0;
 
 // Adds item candidates and the decision. An owner reading fix (reading_fixes) replaces the Arabic text used for
 // matching; an owner-confirmed name (name_aliases, for the text as read or as corrected) always wins.
-export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[], fixes: Fix[] = []) {
+// Items the owner rejected for a name (name_rejections) are dropped from that name's suggestions.
+export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[], fixes: Fix[] = [], rejections: Rejection[] = []) {
   const byKey = new Map<string, Alias[]>();
   for (const a of aliases) { const l = byKey.get(a.alias_key) || []; l.push(a); byKey.set(a.alias_key, l); }
   const fixByKey = new Map(fixes.map((f) => [f.read_key, f.corrected_text]));
+  const rejected = new Map<string, Set<string>>();
+  for (const x of rejections) { const l = rejected.get(x.alias_key) || new Set<string>(); l.add(x.target_name); rejected.set(x.alias_key, l); }
   return rows.map((r) => {
     const key = aliasKey(r.name);
     const corrected = fixByKey.get(key) || null;
     const text = corrected || r.name;
     const confirmed = byKey.get(key) || (corrected ? byKey.get(aliasKey(corrected)) : undefined) || [];
     // Gemini's Latin name still helps find the brand; the numbers come from the (corrected) Arabic text.
-    const candidates: Candidate[] = cat ? cat.candidates(text, r.english) : [];
+    const no = new Set([...(rejected.get(key) || []), ...(corrected ? rejected.get(aliasKey(corrected)) || [] : [])]);
+    const candidates: Candidate[] = cat ? cat.candidates(text, r.english, 3 + no.size).filter((c) => !no.has(c.name)).slice(0, 3) : [];
     let match: Match | null = decide(candidates);
     if (confirmed.length === 1) match = { id: confirmed[0].target_code || '', name: confirmed[0].target_name, score: 1, confidence: 'confirmed' };
     else if (confirmed.length > 1 && match) match = { ...match, confidence: 'review' };
@@ -108,6 +113,7 @@ async function ownerRows<T>(env: Env, auth: string, fetchImpl: typeof fetch, pat
 }
 const ALIASES = 'name_aliases?select=alias_key,target_name,target_code&limit=20000';
 const FIXES = 'reading_fixes?select=read_key,corrected_text&limit=20000';
+const REJECTIONS = 'name_rejections?select=alias_key,target_name&limit=20000';
 
 function list(value: string | undefined): string[] {
   return String(value || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -210,8 +216,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const name = typeof body.name === 'string' ? arabicLetters(body.name).replace(/\s+/g, ' ').trim() : '';
     if (name.length < 2 || name.length > 250) return reply(400, { error: 'name', message: 'الاسم قصير أو طويل جدًا.' }, headers);
     const english = typeof body.english === 'string' ? body.english.trim().slice(0, 250) : '';
-    const aliases = await ownerRows<Alias>(env, auth, fetchImpl, ALIASES);
-    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases)[0] }, headers);
+    const [aliases, rejections] = await Promise.all([ownerRows<Alias>(env, auth, fetchImpl, ALIASES), ownerRows<Rejection>(env, auth, fetchImpl, REJECTIONS)]);
+    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases, [], rejections)[0] }, headers);
   }
 
   const image = typeof body.image === 'string' ? body.image : '';
@@ -280,11 +286,11 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const msg = (e as Error).message === 'too-many-rows' ? 'Gemini رجّع سطور أكتر من المعقول؛ قسّم الصورة.' : 'رد Gemini مش مفهوم؛ جرّب تاني.';
     return reply(502, { error: 'parse', message: msg }, headers);
   }
-  const [aliases, fixes] = await Promise.all([ownerRows<Alias>(env, auth, fetchImpl, ALIASES), ownerRows<Fix>(env, auth, fetchImpl, FIXES)]);
+  const [aliases, fixes, rejections] = await Promise.all([ownerRows<Alias>(env, auth, fetchImpl, ALIASES), ownerRows<Fix>(env, auth, fetchImpl, FIXES), ownerRows<Rejection>(env, auth, fetchImpl, REJECTIONS)]);
   const t2 = Date.now();
   const cat = await getCatalog(env, auth, fetchImpl);
-  const annotated = annotate(rows, cat, aliases, fixes);
-  log('match', t2, { rows: annotated.length, aliases: aliases.length, fixes: fixes.length, catalog: cat?.size || 0, high: annotated.filter((r) => r.match?.confidence === 'high').length, confirmed: annotated.filter((r) => r.match?.confidence === 'confirmed').length });
+  const annotated = annotate(rows, cat, aliases, fixes, rejections);
+  log('match', t2, { rows: annotated.length, aliases: aliases.length, fixes: fixes.length, rejections: rejections.length, catalog: cat?.size || 0, high: annotated.filter((r) => r.match?.confidence === 'high').length, confirmed: annotated.filter((r) => r.match?.confidence === 'confirmed').length });
   return reply(200, { rows: annotated, model, catalog: cat?.size || 0, truncated: candidate?.finishReason === 'MAX_TOKENS' }, headers);
 }
 
