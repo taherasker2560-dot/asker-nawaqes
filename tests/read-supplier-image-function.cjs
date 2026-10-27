@@ -1,7 +1,7 @@
 // Tests the Supabase function with Node (22.18+ strips the TypeScript types). No network: fetch is faked.
 const assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
-const {handle,parseRows,decodeBase64Length,PROMPT}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','index.ts'));
+const {handle,parseRows,decodeBase64Length,PROMPT,arabicLetters}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','index.ts'));
 const ORIGIN='https://taherasker2560-dot.github.io';
 const env={GEMINI_API_KEY:'test-key',ALLOWED_EMAILS:'Owner@Example.com, second@example.com',SUPABASE_URL:'https://proj.supabase.co/',SUPABASE_ANON_KEY:'anon'};
 const png=Buffer.from('fake image bytes').toString('base64');
@@ -48,12 +48,19 @@ const slowAuth=async(u,o)=>{if(u.endsWith('/auth/v1/user'))throw Object.assign(E
 assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
 // a model that rejects optional settings with a bare 400 steps down: no thinking, then no schema
 {let n=0;const bodies=[];const ff=fakeFetch({gemini:async(u,o)=>{n++;bodies.push(JSON.parse(o.body).generationConfig);return n<3?new Response(JSON.stringify({error:{message:'Request contains an invalid argument.'}}),{status:400}):new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"rows":[{"name":"اسم صنف"}]}'}]}}]}),{status:200})}});
- r=await json(await handle(req(),env,ff));assert.equal(r.status,200);assert.equal(n,3);
+ r=await json(await handle(req(),{...env,GEMINI_MODEL:'gemini-step-down-test'},ff));assert.equal(r.status,200);assert.equal(n,3);
  assert.ok(bodies[0].thinkingConfig&&bodies[0].responseSchema);assert.ok(!bodies[1].thinkingConfig&&bodies[1].responseSchema);assert.ok(!bodies[2].thinkingConfig&&!bodies[2].responseSchema);assert.equal(bodies[2].responseMimeType,'application/json');}
 // a bad key is not retried
 {let n=0;r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'API key not valid. Please pass a valid API key.'}}),{status:400})}})));assert.equal(n,1);assert.equal(r.status,502);assert.match(r.body.message,/GEMINI_API_KEY/);}
 // all variants rejected: one clear error after 3 tries
-{let n=0;r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'Request contains an invalid argument.'}}),{status:400})}})));assert.equal(n,3);assert.equal(r.status,502);}
+{let n=0;r=await json(await handle(req(),{...env,GEMINI_MODEL:'gemini-all-reject-test'},fakeFetch({gemini:async()=>{n++;return new Response(JSON.stringify({error:{message:'Request contains an invalid argument.'}}),{status:400})}})));assert.equal(n,3);assert.equal(r.status,502);}
+// Persian look-alike letters from the suppliers' font become the Arabic ones V10 matches on (real Gemini output, 27 Oct)
+assert.equal(arabicLetters('گاربیمازول اقراص'),'كاربيمازول اقراص');assert.equal(arabicLetters('کليکسان ٦٠ امبول'),'كليكسان ٦٠ امبول');
+assert.equal(arabicLetters('بی ای ايه ٤٠٠ مجم كبسول'),'بى اى ايه ٤٠٠ مجم كبسول');assert.equal(arabicLetters('ایفی مارش شراب'),'ايفى مارش شراب');assert.equal(arabicLetters('فلاجیل شراب'),'فلاجيل شراب');
+assert.deepEqual(parseRows(JSON.stringify({rows:[{name:'گاست ٤ مجم ١٤ كيس'}]})),[{name:'كاست ٤ مجم ١٤ كيس',unclear:false}]);
+// a rejected setting is remembered per model: the next image skips the failing call
+{let n=0;const mk=()=>fakeFetch({gemini:async(u,o)=>{n++;return JSON.parse(o.body).generationConfig.thinkingConfig?new Response(JSON.stringify({error:{message:'Request contains an invalid argument.'}}),{status:400}):new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"rows":[{"name":"اسم صنف"}]}'}]}}]}),{status:200})}});
+ const e2={...env,GEMINI_MODEL:'gemini-remember-test'};await handle(req(),e2,mk());assert.equal(n,2);n=0;r=await json(await handle(req(),e2,mk()));assert.equal(r.status,200);assert.equal(n,1,'second image: one call only');}
 assert.throws(()=>parseRows(JSON.stringify({rows:Array(601).fill({name:'اسم'})})),/too-many-rows/);
 assert.deepEqual(parseRows(JSON.stringify({rows:[]})),[]);
 console.log('PASS: read-supplier-image: CORS allow-list, fails closed without secrets, Supabase auth + email allow-list before any Gemini call, type/size checks, key only in header, model setting, cleaned rows with unclear flags, Google errors mapped');

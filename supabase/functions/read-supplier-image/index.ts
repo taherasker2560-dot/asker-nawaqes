@@ -10,6 +10,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_ROWS = 600;
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const AUTH_TIMEOUT_MS = 15000;
+const REJECTED = new Set<string>(); // model|variant pairs Google refused (kept while the worker is warm)
 const GEMINI_TIMEOUT_MS = 55000; // the phone browser gave up after about a minute; Supabase's own limit is 150 s
 
 // Timing log without any secret or image content, to see which step is slow.
@@ -65,6 +66,13 @@ function reply(status: number, body: unknown, headers: Record<string, string>): 
   return new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
 
+// The suppliers' Windows font draws Arabic kaf like Persian gaf, so Gemini sometimes returns Persian letters
+// (گ ک ی). V10 matches names exactly, so they are mapped back to the Arabic letters the catalogue uses:
+// gaf/keheh -> ك, Persian yeh -> ي inside a word and ى at its end (how the lists write سى / بى).
+export function arabicLetters(s: string): string {
+  return s.replace(/[گک]/g, 'ك').replace(/ی(?=\p{L})/gu, 'ي').replace(/ی/g, 'ى');
+}
+
 // Checks the Gemini answer: only names, sane lengths, no invented structure.
 export function parseRows(text: string): Row[] {
   let data: unknown;
@@ -74,7 +82,7 @@ export function parseRows(text: string): Row[] {
   if (rows.length > MAX_ROWS) throw new Error('too-many-rows');
   const out: Row[] = [];
   for (const r of rows) {
-    const name = typeof (r as Row)?.name === 'string' ? (r as Row).name.replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    const name = typeof (r as Row)?.name === 'string' ? arabicLetters((r as Row).name).replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
     if (name.length < 2 || name.length > 250) continue;
     out.push({ name, unclear: (r as Row).unclear === true });
   }
@@ -151,11 +159,13 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   const t1 = Date.now();
   try {
     for (const v of variants) {
+      if (REJECTED.has(model + '|' + v.name)) continue;
       gemini = await call(v.config);
       if (gemini.status !== 400) break;
       const reason = String(((await gemini.clone().json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message || '').slice(0, 200);
       log('gemini-400', t1, { model, variant: v.name, reason });
       if (/api key|location/i.test(reason)) break; // a settings change will not fix these
+      if (v.name !== 'plain-json') REJECTED.add(model + '|' + v.name);
     }
   } catch (e) {
     const timeout = (e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError';
