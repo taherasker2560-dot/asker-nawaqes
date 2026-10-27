@@ -43,6 +43,9 @@ for(const [status,code] of [[429,429],[404,502],[403,502],[500,502]]){r=await js
 r=await json(await handle(req(),{...env,GEMINI_MODEL:'bad/model'},fakeFetch()));assert.equal(r.status,503);
 r=await json(await handle(req(),env,fakeFetch({gemini:async()=>new Response(JSON.stringify({candidates:[{content:{parts:[{text:'not json'}]}}]}),{status:200})})));assert.equal(r.status,502);
 r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{throw Error('offline')}})));assert.equal(r.status,502);
+const te=Object.assign(Error('t'),{name:'TimeoutError'});r=await json(await handle(req(),env,fakeFetch({gemini:async()=>{throw te}})));assert.equal(r.status,504);assert.match(r.body.message,/اتأخر/);
+const slowAuth=async(u,o)=>{if(u.endsWith('/auth/v1/user'))throw Object.assign(Error('t'),{name:'TimeoutError'});};r=await json(await handle(req(),env,slowAuth));assert.equal(r.status,504);
+assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
 assert.throws(()=>parseRows(JSON.stringify({rows:Array(601).fill({name:'اسم'})})),/too-many-rows/);
 assert.deepEqual(parseRows(JSON.stringify({rows:[]})),[]);
 console.log('PASS: read-supplier-image: CORS allow-list, fails closed without secrets, Supabase auth + email allow-list before any Gemini call, type/size checks, key only in header, model setting, cleaned rows with unclear flags, Google errors mapped');
