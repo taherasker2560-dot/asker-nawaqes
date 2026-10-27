@@ -69,7 +69,9 @@ const FORMS: Record<string, string[]> = {
   drops: ['نقط', 'نقطه', 'قطره', 'DROPS', 'DROP', 'DRP'],
   powder: ['بودره', 'POWDER', 'PWD'],
   spray: ['سبراي', 'اسبراي', 'بخاخ', 'SPRAY'],
-  supp: ['لبوس', 'SUP', 'SUPP', 'SUPPOSITORY', 'SUPPOSITORIES'],
+  supp: ['لبوس', 'اقماع', 'SUP', 'SUPP', 'SUPPOSITORY', 'SUPPOSITORIES', 'OVULE', 'OVULES', 'OVL'],
+  pen: ['قلم', 'PEN', 'PENFILL', 'FLEXPEN', 'CARTRIDGE'],
+  inhaler: ['بخاخه', 'INHALER', 'EVOHALER', 'ACCUHALER', 'DISKUS', 'TURBUHALER'],
   mouthwash: ['مضمضه', 'MW', 'M.W'],
   vdouche: ['دوش', 'VG', 'DOUCHE', 'DOUCH'],
   amp: ['امبول', 'امبولات', 'AMP', 'AMPS', 'AMPOULE', 'AMPOULES', 'OMPOULES'],
@@ -85,11 +87,11 @@ const FORMS: Record<string, string[]> = {
   sachet: ['كيس', 'اكياس', 'فوار', 'فواره', 'حبيبات', 'SACH', 'SACHET', 'SACHETS', 'SACHESTS', 'GRANULES', 'EFF', 'EFFERVESCENT'],
 };
 // Words that make a form more specific: لبوس مهبلي, سبراي للفم, لوشن للشعر, mouth wash.
-const VAGINAL = new Set(['مهبلي', 'مهبليه', 'VAGINAL', 'VAG']);
+const VAGINAL = new Set(['مهبلي', 'مهبليه', 'VAGINAL', 'VAG', 'OVULE', 'OVULES', 'OVL']);
 const MOUTH = new Set(['فم', 'للفم', 'الفم', 'MOUTH', 'ORAL']);
 const HAIR = new Set(['شعر', 'للشعر', 'الشعر', 'HAIR']);
 // A specific form also agrees with its general form (a mouth spray is still a spray) but not with a sibling.
-const PARENT: Record<string, string> = { vsupp: 'supp', mouthspray: 'spray', hairspray: 'spray', hairlotion: 'lotion', vdouche: 'cleanser', mouthwash: 'cleanser' };
+const PARENT: Record<string, string> = { inhaler: 'spray', vsupp: 'supp', mouthspray: 'spray', hairspray: 'spray', hairlotion: 'lotion', vdouche: 'cleanser', mouthwash: 'cleanser' };
 // Supplier lists often write اقراص/حبوب for capsules and the other way round.
 const CLOSE = new Set(['tablet|capsule', 'capsule|tablet']);
 // "حقن / INJ" can be an ampoule or a vial.
@@ -98,9 +100,20 @@ const FORM_OF = new Map<string, string>();
 for (const [g, ws] of Object.entries(FORMS)) for (const w of ws) FORM_OF.set(w, g);
 // One-letter packs used by the item list right after a count (30T, 6A, 20C); never on their own (VITAMIN A).
 const SHORT_FORM: Record<string, string> = { T: 'tablet', C: 'capsule', A: 'amp' };
+// Words with inner dots (VAG.OVULES, I.V., M.W) are kept whole and also split into their parts.
+function splitDots(s: string): string[] {
+  const out: string[] = [];
+  for (const raw of normalize(s).split(' ')) {
+    const t = raw.replace(/^\.+|\.+$/g, '');
+    if (!t) continue;
+    out.push(t);
+    if (t.includes('.')) for (const p of t.split('.')) if (p.length > 1) out.push(p);
+  }
+  return out;
+}
 export function forms(s: string): Set<string> {
   const out = new Set<string>();
-  const tokens = normalize(s).split(' ').map((t) => t.replace(/^\.+|\.+$/g, ''));
+  const tokens = splitDots(s);
   const vag = tokens.some((t) => VAGINAL.has(t)), mouth = tokens.some((t) => MOUTH.has(t)), hair = tokens.some((t) => HAIR.has(t));
   tokens.forEach((t, i) => {
     for (const e of EITHER[t] || []) out.add(e);
@@ -120,7 +133,7 @@ export function forms(s: string): Set<string> {
 const ROUTE: Record<string, string> = { وريد: 'iv', وريدي: 'iv', IV: 'iv', 'I.V': 'iv', عضل: 'im', عضلي: 'im', IM: 'im', 'I.M': 'im' };
 function routes(s: string): Set<string> {
   const out = new Set<string>();
-  for (const t of normalize(s).split(' ')) { const r = ROUTE[t.replace(/^\.+|\.+$/g, '')]; if (r) out.add(r); }
+  for (const t of splitDots(s)) { const r = ROUTE[t]; if (r) out.add(r); }
   return out;
 }
 export function routesAgree(a: string, b: string): boolean {

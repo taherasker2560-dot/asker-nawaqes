@@ -15,7 +15,7 @@ function buildReport(rows,shortages){
   // a clear item match, or the line already written exactly like a shortage (works even without the item list)
   const target=(sure(r.match)&&byName.get(key(r.match.name)))||byName.get(key(r.corrected||r.name))||null;
   if(target){const a=arrived.get(target.id)||{shortage:target,sources:[]};a.sources.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,confidence:sure(r.match)&&byName.get(key(r.match.name))?r.match.confidence:'same-name'});arrived.set(target.id,a);return}
-  const options=(r.candidates||[]).filter(c=>c.numbersOk&&c.formOk!==false&&byName.has(key(c.name))).slice(0,3).map(c=>({id:c.id,name:c.name,score:c.score,shortage:byName.get(key(c.name))}));
+  const options=(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&byName.has(key(c.name))&&a.findIndex(x=>key(x.name)===key(c.name))===i).slice(0,3).map(c=>({id:c.id,name:c.name,score:c.score,shortage:byName.get(key(c.name))}));
   if(options.length){review.push({index,row:r,options});return}
   if(sure(r.match))other.push({index,name:r.name,corrected:r.corrected,item:r.match.name,fileName:r.fileName});else unknown.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,unclear:!!r.unclear});
  });
@@ -45,7 +45,7 @@ function render(container,report,rows,view){
   `<h3>وصل من النواقص: ${report.arrived.length}</h3>${arrived||'<p>مفيش صنف من النواقص اتعرف بثقة في الصور دي.</p>'}`+
   `<section data-gemini-review><h3>محتاج تأكيدك: ${report.review.length}</h3>${review||'<p class="hint">مفيش.</p>'}</section>`+
   `<details ${view.openOther?'open':''} data-sec="other"><summary>أصناف اتعرفت ومش في النواقص: ${report.other.length}</summary>${report.other.map(o=>line(o,`${esc(o.item)} · ${esc(o.fileName)} ${notThisButton(o.index)}`)).join('')}</details>`+
-  `<details ${view.openUnknown?'open':''} data-sec="unknown"><summary>أسماء مااتعرفتش: ${report.unknown.length}</summary><p class="hint">مش معناها إنها مش موجودة؛ ممكن الاسم مكتوب بشكل مختلف أو القراءة غلط. استخدم «تصحيح».</p>${report.unknown.map(u=>line(u,`${esc(u.fileName)}${u.unclear?' · قراءة مش واضحة':''}`)).join('')}</details>`;
+  `<details ${view.openUnknown?'open':''} data-sec="unknown"><summary>اتقرت ومش متأكد من صنفها: ${report.unknown.length}</summary><p class="hint">الأسماء دي اتقرت من الصورة، بس البوت مش متأكد هي أنهي صنف عندك، ومفيش واحد منها شبه النواقص. لو شايف فيها صنف من النواقص، استخدم «تصحيح».</p>${report.unknown.map(u=>line(u,`${esc(u.fileName)}${u.unclear?' · قراءة مش واضحة':''}`)).join('')}</details>`;
 }
 
 // Saves an item choice for one line, replacing any earlier choice for the same name; returns what is needed to undo it.
@@ -72,6 +72,7 @@ async function saveChoice(client,invoke,r,target,text){
 }
 // "Not this item": removes the owner's saved choice of these items for the line and remembers the rejection.
 async function rejectChoice(client,r,names){
+ names=[...new Set(names)];
  const undo={removedAliases:[],addedAliasIds:[],addedRejectionIds:[],fixId:null,fixBefore:null};
  const {data:olds,error:e1}=await client.from('name_aliases').select('id,alias_text,alias_key,target_name,target_code,source').in('target_name',names);
  if(e1)throw Error('تعذّر قراءة الاختيارات: '+e1.message);
