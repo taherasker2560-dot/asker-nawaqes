@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),I=require('../incoming-images.js'),F=require('../file-import.js');
 const file=(type='image/jpeg',size=100)=>({type,size,name:'photo.jpg'});
-I.validFiles([file()]);assert.throws(()=>I.validFiles([]));assert.throws(()=>I.validFiles(Array(11).fill(file())));assert.throws(()=>I.validFiles([file('application/pdf')]));assert.throws(()=>I.validFiles([file('image/jpeg',9*1024*1024)]));assert.throws(()=>I.validFiles(Array(4).fill(file('image/jpeg',8*1024*1024))));
+I.validFiles([file()]);assert.throws(()=>I.validFiles([]));assert.doesNotThrow(()=>I.validFiles(Array(20).fill(file())));assert.throws(()=>I.validFiles(Array(21).fill(file())));assert.throws(()=>I.validFiles([file('application/pdf')]));assert.throws(()=>I.validFiles([file('image/jpeg',9*1024*1024)]));assert.doesNotThrow(()=>I.validFiles(Array(20).fill(file('image/jpeg',8*1024*1024))),'20 images at the 8 MiB cap fit the 160 MiB total');
 const word=(text,x,y,w=30)=>({text,bbox:{x0:x,y0:y,x1:x+w,y1:y+20}});
 const data={blocks:[{paragraphs:[{lines:[{words:[word('الصنف',20,0),word('السعر',400,0)]},{words:[word('زابيميرت',250,40,80),word('30',210,40),word('مجم',160,40),word('أقراص',100,40),word('165',450,40)]},{words:[word('دونازيل',250,80,80),word('5',210,80),word('مجم',160,80),word('أقراص',100,80),word('144',450,80)]}]}]}]};
 const extracted=I.extractNames(data);assert.equal(extracted.priceSeparated,true);assert.equal(extracted.names.length,2);assert.ok(extracted.names[0].includes('30'));assert.ok(!extracted.names[0].includes('165'));
