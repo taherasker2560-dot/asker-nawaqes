@@ -9,6 +9,13 @@ const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_ROWS = 600;
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const AUTH_TIMEOUT_MS = 15000;
+const GEMINI_TIMEOUT_MS = 110000; // Supabase stops a request at 150 s
+
+// Timing log without any secret or image content, to see which step is slow.
+function log(stage: string, started: number, extra: Record<string, unknown> = {}): void {
+  console.log(JSON.stringify({ stage, ms: Date.now() - started, ...extra }));
+}
 
 export const PROMPT = [
   'This image is a supplier list of pharmacy products, usually a table with a product-name column (الصنف) and a quantity or price column (الكمية / السعر).',
@@ -94,9 +101,18 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   // Who is asking? Ask Supabase Auth with the caller's own session token.
   const auth = req.headers.get('authorization') || '';
   if (!/^Bearer\s+\S+$/.test(auth)) return reply(401, { error: 'auth', message: 'سجّل الدخول الأول.' }, headers);
-  const userRes = await fetchImpl(env.SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/user', {
-    headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' },
-  });
+  const t0 = Date.now();
+  let userRes: Response;
+  try {
+    userRes = await fetchImpl(env.SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/user', {
+      headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' },
+      signal: AbortSignal.timeout(AUTH_TIMEOUT_MS),
+    });
+  } catch {
+    log('auth-timeout', t0);
+    return reply(504, { error: 'auth-timeout', message: 'التأكد من تسجيل الدخول اتأخر؛ جرّب تاني.' }, headers);
+  }
+  log('auth', t0, { status: userRes.status });
   if (!userRes.ok) return reply(401, { error: 'auth', message: 'الجلسة انتهت؛ سجّل الدخول تاني.' }, headers);
   const user = await userRes.json().catch(() => null) as { email?: string } | null;
   if (!user?.email || !allowedEmails.includes(user.email.toLowerCase())) {
@@ -114,6 +130,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   const model = (env.GEMINI_MODEL || DEFAULT_MODEL).trim();
   if (!/^[a-z0-9.\-]+$/i.test(model)) return reply(503, { error: 'model', message: 'اسم الموديل في GEMINI_MODEL مش صالح.' }, headers);
   let gemini: Response;
+  const t1 = Date.now();
   try {
     gemini = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
@@ -122,10 +139,16 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
         contents: [{ role: 'user', parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: image.replace(/\s+/g, '') } }] }],
         generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
       }),
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
     });
-  } catch {
-    return reply(502, { error: 'network', message: 'تعذّر الوصول لـ Gemini. جرّب تاني بعد شوية.' }, headers);
+  } catch (e) {
+    const timeout = (e as Error)?.name === 'TimeoutError' || (e as Error)?.name === 'AbortError';
+    log(timeout ? 'gemini-timeout' : 'gemini-network', t1, { model, imageBytes: decodeBase64Length(image) });
+    return timeout
+      ? reply(504, { error: 'gemini-timeout', message: `Gemini اتأخر أكتر من ${GEMINI_TIMEOUT_MS / 1000} ثانية. جرّب تاني أو غيّر GEMINI_MODEL لموديل أسرع.` }, headers)
+      : reply(502, { error: 'network', message: 'تعذّر الوصول لـ Gemini. جرّب تاني بعد شوية.' }, headers);
   }
+  log('gemini', t1, { status: gemini.status, model, imageBytes: decodeBase64Length(image) });
   if (gemini.status === 429) return reply(429, { error: 'quota', message: 'خلصت حصة Gemini المجانية دلوقتي. جرّب بعدين أو استخدم القراءة المحلية.' }, headers);
   if (gemini.status === 404) return reply(502, { error: 'model', message: `الموديل ${model} مش موجود عند Google؛ غيّر GEMINI_MODEL.` }, headers);
   if (gemini.status === 400 || gemini.status === 403) {
