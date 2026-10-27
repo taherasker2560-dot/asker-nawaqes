@@ -28,7 +28,7 @@ const notThisButton=i=>`<button type="button" class="secondary" data-notthis="${
 function editorHtml(r,ed){
  const opts=ed.results||ed.rematch||(r.candidates||[]).map(c=>({id:c.id,name:c.name,numbersOk:c.numbersOk}));
  return `<div class="file-import" data-editor><p class="hint">في الصورة: <span dir="auto">${esc(r.name)}</span>${r.english?` · Gemini فهمها: ${esc(r.english)}`:''}</p>`+
- `<label>الاسم العربي الصح (لو القراءة غلط)</label><input type="text" data-ed-text dir="auto" maxlength="250" value="${esc(ed.text)}"><button type="button" class="secondary" data-ed-rematch>دوّر بالاسم ده</button>`+
+ `<label>الاسم العربي الصح (لو القراءة غلط)</label><input type="text" data-ed-text dir="auto" maxlength="250" value="${esc(ed.text)}"><button type="button" class="secondary" data-ed-rematch>دوّر بالاسم ده</button> <button type="button" data-ed-fix-save>احفظ التصحيح بس</button>`+
  `<label>دوّر على الصنف في القاعدة: اسم إنجليزي أو كود</label><input type="search" data-ed-q dir="auto" maxlength="100" value="${esc(ed.q||'')}"><button type="button" class="secondary" data-ed-search>ابحث</button>`+
  `<div data-ed-options>${opts.length?opts.slice(0,10).map((o,j)=>`<div><span dir="auto">${esc(o.name)}</span>${o.numbersOk===false?' <span class="hint">(التركيز مختلف)</span>':''}${o.formOk===false?' <span class="hint">(الشكل مختلف)</span>':''} <button type="button" data-ed-pick="${j}">اختار ده</button></div>`).join(''):'<p class="hint">مفيش أصناف مقترحة؛ دوّر بالاسم أو الكود.</p>'}</div>`+
  `<label>مش موجود في القاعدة خالص؟ اكتب اسمه الإنجليزي</label><input type="text" data-ed-manual dir="ltr" maxlength="250" value="${esc(ed.manual||'')}"><button type="button" class="secondary" data-ed-manual-save>احفظ الاسم ده</button>`+
@@ -84,6 +84,17 @@ async function rejectChoice(client,r,names){
   undo.addedRejectionIds=(data||[]).map(x=>x.id)}
  return undo;
 }
+// Saves only the Arabic reading fix (no item choice); later readings of the same text use the corrected one.
+async function saveFix(client,r,text){
+ const corrected=(text||'').replace(/\s+/g,' ').trim();
+ if(corrected.length<2||corrected===r.name)throw Error('اكتب الاسم الصح الأول.');
+ const undo={removedAliases:[],addedAliasIds:[],addedRejectionIds:[],fixId:null,fixBefore:null};
+ const {data:old}=await client.from('reading_fixes').select('id,read_key,read_text,corrected_text').eq('read_key',r.key);
+ undo.fixBefore=old?.[0]||null;
+ const {data,error}=await client.from('reading_fixes').upsert({read_key:r.key,read_text:r.name,corrected_text:corrected},{onConflict:'read_key'}).select('id');
+ if(error)throw Error('ماتحفظش التصحيح: '+error.message);undo.fixId=data?.[0]?.id||null;
+ return {undo,corrected};
+}
 async function undoSave(client,u){
  if(u.addedRejectionIds?.length){const {error}=await client.from('name_rejections').delete().in('id',u.addedRejectionIds);if(error)throw Error(error.message)}
  if(u.addedAliasIds.length){const {error}=await client.from('name_aliases').delete().in('id',u.addedAliasIds);if(error)throw Error(error.message)}
@@ -120,6 +131,11 @@ function show(container,rows,shortages,deps,setStatus){
   const val=s=>box.querySelector(s).value;
   box.querySelector('[data-ed-cancel]').addEventListener('click',()=>{view.editing=null;draw()});
   box.querySelector('[data-ed-rematch]').addEventListener('click',async()=>{ed.text=val('[data-ed-text]');ed.q=val('[data-ed-q]');ed.manual=val('[data-ed-manual]');edStatus('بيدوّر…');const {data,error}=await deps.invoke({action:'match',name:ed.text,english:''});if(error){edStatus('تعذّر البحث');return}ed.results=null;ed.rematch=(data.row.candidates||[]);ed.status=ed.rematch.length?'دي أقرب أصناف للاسم المصحح؛ اختار الصح أو دوّر.':'مالقيتش أصناف قريبة؛ دوّر بالاسم الإنجليزي أو الكود.';draw()});
+  box.querySelector('[data-ed-fix-save]').addEventListener('click',async e=>{const text=val('[data-ed-text]');e.target.disabled=true;const before={match:r.match,candidates:r.candidates,corrected:r.corrected||null};
+   try{const {undo,corrected}=await saveFix(deps.client,r,text);r.corrected=corrected;
+    const {data}=await deps.invoke({action:'match',name:corrected,english:''});if(data?.row){r.candidates=data.row.candidates||[];r.match=data.row.match||null}
+    const label=`اتحفظ التصحيح: «${r.name}» ← «${corrected}». المرة الجاية هيتقري صح لوحده.`;view.editing=null;view.undo={...undo,i:ed.i,before,label};draw();setStatus(label)}
+   catch(err){e.target.disabled=false;edStatus(err.message)}});
   box.querySelector('[data-ed-search]').addEventListener('click',async()=>{ed.text=val('[data-ed-text]');ed.q=val('[data-ed-q]').trim();ed.manual=val('[data-ed-manual]');if(ed.q.length<2){edStatus('اكتب حرفين على الأقل.');return}edStatus('بيدوّر…');const {data,error}=await deps.invoke({action:'search',q:ed.q});if(error){edStatus('تعذّر البحث');return}ed.results=data.items||[];ed.status=ed.results.length?'':'مفيش نتايج.';draw()});
   box.querySelectorAll('[data-ed-pick]').forEach(b=>b.addEventListener('click',async()=>{const opts=ed.results||ed.rematch||(r.candidates||[]);const o=opts[Number(b.dataset.edPick)];if(!o)return;b.disabled=true;await commit(ed.i,{id:o.id,name:o.name},val('[data-ed-text]'),`اتحفظ: «${r.name}» = ${o.name}.`)}));
   box.querySelector('[data-ed-manual-save]').addEventListener('click',async e=>{const name=val('[data-ed-manual]').replace(/\s+/g,' ').trim().toUpperCase();if(name.length<2){edStatus('اكتب الاسم الإنجليزي.');return}e.target.disabled=true;await commit(ed.i,{id:'',name},val('[data-ed-text]'),`اتحفظ اسم يدوي: «${r.name}» = ${name}.`)});
@@ -147,5 +163,5 @@ function manager(host,client){
  return {reload:()=>box.open&&load()};
 }
 
-const api={buildReport,render,show,manager,saveChoice,rejectChoice,undoSave};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiReport=api;
+const api={buildReport,render,show,manager,saveChoice,saveFix,rejectChoice,undoSave};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiReport=api;
 })(typeof window==='undefined'?globalThis:window);

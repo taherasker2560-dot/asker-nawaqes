@@ -61,7 +61,7 @@ export function strengthAndCount(s: string): { strength: string[]; count: string
 // Dosage form groups. A gel must not match a tablet: when both names state a form and they differ, the item
 // gets formOk=false, a lower score, and is never a clear match or a shortage suggestion.
 const FORMS: Record<string, string[]> = {
-  solid: ['قرص', 'اقراص', 'تاب', 'كبسول', 'كبسوله', 'كبسولات', 'TAB', 'TABS', 'TABLET', 'TABLETS', 'CAP', 'CAPS', 'CAPSULE', 'CAPSULES'],
+  solid: ['قرص', 'اقراص', 'فوار', 'فواره', 'EFF', 'EFFERVESCENT', 'تاب', 'كبسول', 'كبسوله', 'كبسولات', 'TAB', 'TABS', 'TABLET', 'TABLETS', 'CAP', 'CAPS', 'CAPSULE', 'CAPSULES'],
   liquid: ['شراب', 'معلق', 'SYP', 'SYR', 'SYRUP', 'SUSP', 'SUSPENSION'],
   injection: ['امبول', 'امبولات', 'فيال', 'حقن', 'AMP', 'AMPS', 'AMPOULE', 'VIAL', 'VIALS', 'VL', 'INJ'],
   cream: ['كريم', 'CREAM'],
@@ -69,7 +69,7 @@ const FORMS: Record<string, string[]> = {
   ointment: ['مرهم', 'OINT', 'OINTMENT'],
   drops: ['نقط', 'نقطه', 'قطره', 'DROPS', 'DROP', 'DRP'],
   spray: ['بخاخ', 'سبراي', 'اسبراي', 'SPRAY'],
-  supp: ['لبوس', 'SUPP', 'SUPPOSITORIES'],
+  supp: ['لبوس', 'SUP', 'SUPP', 'SUPPOSITORY', 'SUPPOSITORIES'],
   sachet: ['كيس', 'اكياس', 'SACH', 'SACHET', 'SACHETS'],
   lotion: ['لوسيون', 'لوشن', 'LOTION'],
   wash: ['غسول', 'WASH'],
