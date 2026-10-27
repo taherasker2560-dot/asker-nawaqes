@@ -16,7 +16,15 @@ assert.equal(M.decide(cat.candidates('منتج غير موجود خالص','UNKN
 assert.equal(M.aliasKey('  گاست ٤ مجم '),'كاست 4 مجم');
 assert.deepEqual(cat.search('5').map(x=>x.id),['5'],'code');assert.equal(cat.search('tegretol').length,2);assert.equal(cat.search('napib')[0].name.startsWith('NAPIBRADINE'),true);
 {const f=new M.Catalog([['1','NEUROTON 30TAB'],['2','FLAGYL 500MG 20TAB.'],['3','FLAGYL 100ML SUSP125 MG .'],['4','VITAMIN A CREAM'],['5','CARBIMAZOLE 5MG 50T.']]);
- assert.deepEqual([...M.forms('FLAGYL 500MG 20TAB.')],['solid'],'dotted TAB.');assert.deepEqual([...M.forms('CARBIMAZOLE 5MG 50T.')],['solid'],'50T');assert.deepEqual([...M.forms('VITAMIN A CREAM')],['cream'],'lone A is not an ampoule');
+ assert.deepEqual([...M.forms('FLAGYL 500MG 20TAB.')],['tablet'],'dotted TAB.');assert.deepEqual([...M.forms('CARBIMAZOLE 5MG 50T.')],['tablet'],'50T');assert.deepEqual([...M.forms('VITAMIN A CREAM')],['cream'],'lone A is not an ampoule');
  const g=f.candidates('نيوتون جل','NEOTONE GEL');assert.equal(g.find(x=>x.id==='1').formOk,false);assert.notEqual(M.decide(g)?.confidence,'high','a gel never matches a tablet clearly');
  const s=f.candidates('فلاجيل شراب','FLAGYL SYP');assert.equal(s[0].id,'3','syrup beats tablet');assert.equal(M.decide(s).confidence,'high');}
-console.log('PASS: catalogue matcher: dosage form must agree (gel/tab, syrup/tab); normalization, strength vs pack count, 50/100 never confused, pack count tolerated, ties go to review, Arabic alt names, unknown -> none')})().catch(e=>{console.error(e);process.exitCode=1});
+{const F=x=>M.forms(x),ok=(a,b)=>M.formsAgree(F(a),F(b));
+ assert.equal(ok('فولتارين لبوس','VOLTAREN 100MG 5SUPP'),true);assert.equal(ok('فولتارين امبول','VOLTAREN 100MG 5SUPP'),false,'ampoule is not a suppository');
+ assert.equal(ok('امبول','X 1GM VIAL'),false,'ampoule is not a vial');assert.equal(ok('حقن','X 1GM VIAL'),true,'injection may be a vial');
+ assert.equal(ok('لبوس مهبلي','X VAGINAL SUPP'),true);assert.equal(ok('لبوس','X VAGINAL SUPP'),true,'general agrees with specific');assert.equal(ok('لبوس مهبلى','X 5SUPP'),true);
+ assert.equal(ok('سبراي للفم','X HAIR SPRAY'),false,'mouth spray vs hair spray');assert.equal(ok('مضمضه','X M.W 120ML'),true);assert.equal(ok('غسول مهبلي','X VG 200ML'),true);
+ assert.equal(ok('شامبو قشره','X ANTIDANDRUFF SHAMPOO'),true);assert.equal(ok('شامبو','X SOAP'),false);assert.equal(ok('فوار','X 10 SACH'),true);assert.equal(ok('اقراص فواره','X EFF 10TAB'),true);
+ assert.equal(ok('اقراص','X 20CAP'),true,'tablets/capsules are often mixed up in lists');assert.equal(ok('زيت شعر','HAIR OIL 100ML'),true);assert.equal(ok('بودره','X POWDER 30G'),true);assert.equal(ok('جل','VOLTAREN EMULGEL'),true);
+ assert.equal(M.routesAgree('ابيسفين ١جم فيال وريدي','EPICEPHIN 1GM I.M.'),false,'IV is not IM');assert.equal(M.routesAgree('ابيسفين ١جم وريدي','EPICEPHIN 1GM I.V INJECTION'),true);assert.equal(M.routesAgree('ابيسفين ١جم','EPICEPHIN 1GM I.M.'),true);}
+console.log('PASS: catalogue matcher: owner form list (supp/amp/vial, vaginal, mouth, hair, sachet/فوار), dosage form must agree (gel/tab, syrup/tab); normalization, strength vs pack count, 50/100 never confused, pack count tolerated, ties go to review, Arabic alt names, unknown -> none')})().catch(e=>{console.error(e);process.exitCode=1});
