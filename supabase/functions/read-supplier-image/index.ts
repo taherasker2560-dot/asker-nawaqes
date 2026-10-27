@@ -38,10 +38,15 @@ function list(value: string | undefined): string[] {
   return String(value || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
 
-function cors(origin: string | null, env: Env): Record<string, string> {
+// Newer supabase-js versions send extra headers, so the preflight echoes the requested header names
+// (only well-formed names, and only for the allowed page origin).
+function cors(origin: string | null, env: Env, requested?: string | null): Record<string, string> {
   const allowed = list(env.ALLOWED_ORIGINS || DEFAULT_ORIGINS);
+  const base = 'authorization, x-client-info, apikey, content-type';
+  const extra = String(requested || '').split(',').map((h) => h.trim().toLowerCase()).filter((h) => /^[a-z0-9-]{1,64}$/.test(h)).slice(0, 30);
   const headers: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': [...new Set([...base.split(', '), ...extra])].join(', '),
+    'Access-Control-Max-Age': '600',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin',
   };
@@ -76,7 +81,7 @@ export function decodeBase64Length(b64: string): number {
 }
 
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
-  const headers = cors(req.headers.get('origin'), env);
+  const headers = cors(req.headers.get('origin'), env, req.headers.get('access-control-request-headers'));
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
   if (req.method !== 'POST') return reply(405, { error: 'method' }, headers);
   if (!headers['Access-Control-Allow-Origin']) return reply(403, { error: 'origin', message: 'الطلب جاي من صفحة مش مسموح لها.' }, headers);

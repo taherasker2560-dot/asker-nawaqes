@@ -14,6 +14,9 @@ const json=async r=>({status:r.status,body:await r.json(),cors:r.headers.get('ac
 
 // CORS: preflight only for the allowed page; other origins refused
 let r=await handle(req({method:'OPTIONS'}),env,fakeFetch());assert.equal(r.status,200);assert.equal(r.headers.get('access-control-allow-origin'),ORIGIN);
+// newer supabase-js sends extra headers: the preflight must allow them, and drop malformed names
+const pre=await handle(new Request('https://x/f',{method:'OPTIONS',headers:{origin:ORIGIN,'access-control-request-headers':'authorization, x-client-info, apikey, content-type, x-supabase-api-version, x-region, bad header!'}}),env,fakeFetch());
+const allowH=pre.headers.get('access-control-allow-headers').split(', ');for(const h of ['x-supabase-api-version','x-region','authorization','content-type'])assert.ok(allowH.includes(h),h);assert.equal(allowH.some(h=>/ /.test(h)||h.includes('!')),false);
 r=await json(await handle(req({origin:'https://evil.example'}),env,fakeFetch()));assert.equal(r.status,403);assert.equal(r.cors,null);
 // fails closed when secrets are missing (no key, or no allow-list)
 assert.equal((await handle(req(),{...env,GEMINI_API_KEY:''},fakeFetch())).status,503);
