@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>بوت النواقص بالعربي — تجربة</title>
+<style>
+:root{--blue:#123d8c;--blue2:#1e56ad;--bg:#f3f6fb;--ink:#172033;--muted:#667085;--line:#dbe3ef;--good:#176b42;--bad:#a12626;--amber:#8a5b00}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6}
+header{background:var(--blue);color:#fff;padding:14px 16px}header h1{margin:0;font-size:20px}header p{margin:4px 0 0;opacity:.85;font-size:14px}
+main{max-width:860px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.hidden{display:none!important}
+label{display:block;font-weight:600;margin:10px 0 4px}
+input[type=text],input[type=email],input[type=password],input[type=search]{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px}
+button{min-height:44px;padding:8px 14px;border-radius:10px;border:0;background:var(--blue2);color:#fff;font-size:15px;margin:4px 2px;cursor:pointer}
+button.secondary{background:#e8eef9;color:var(--blue)}button:disabled{opacity:.5}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs button{flex:1}
+.status{margin:8px 0;color:var(--muted)}.status.bad{color:var(--bad)}.status.good{color:var(--good)}
+.item{border-top:1px solid var(--line);padding:10px 0}.item:first-child{border-top:0}
+.en{font-weight:700;direction:ltr;text-align:right}.hint{color:var(--muted);font-size:14px}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px}.pill.good{background:#e3f4ea;color:var(--good)}.pill.warn{background:#fdf1d8;color:var(--amber)}.pill.bad{background:#fbe5e5;color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:var(--bg);border-radius:10px;padding:8px;text-align:center}.stat strong{display:block;font-size:20px}
+details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
+.pick{margin-top:6px}
+</style>
+</head>
+<body>
+<header><h1>بوت النواقص بالعربي — تجربة</h1><p>نسخة منفصلة للتجربة: بتترجم النواقص للعربي مرة واحدة، وبعدين تقارن صور الشركات عربي بعربي. مابتغيّرش أي حاجة في V10.</p></header>
+<main>
+<section id="loginCard" class="card"><h2>تسجيل الدخول</h2><label for="email">الإيميل</label><input id="email" type="email" autocomplete="username"><label for="password">كلمة السر</label><input id="password" type="password" autocomplete="current-password"><button id="loginBtn">دخول</button><p id="loginStatus" class="status"></p></section>
+<div id="app" class="hidden">
+<div class="tabs"><button data-tab="translate">١. ترجمة النواقص</button><button data-tab="read" class="secondary">٢. قراءة صور الشركة</button><button id="logoutBtn" class="secondary">خروج</button></div>
+
+<section id="translatePanel" class="card">
+<h2>ترجمة النواقص للعربي</h2>
+<p class="hint">البوت بيقترح الاسم العربي لكل صنف ناقص زي ما الشركات بتكتبه. إنت تراجع: «تمام» لو صح، أو تعدّل وتحفظ. الترجمة المقترحة بتشتغل في المقارنة من أول يوم، والمراجعة بتخليها أدق.</p>
+<div class="grid" id="trStats"></div>
+<button id="trOne">ترجم ٦٠ صنف</button><button id="trAll" class="secondary">ترجم الباقي كله</button><button id="trStop" class="secondary hidden">وقّف</button>
+<p id="trStatus" class="status"></p>
+<label for="trFilter">دوّر</label><input id="trFilter" type="search" placeholder="اسم إنجليزي أو عربي">
+<div class="tabs" style="margin-top:8px"><button data-show="suggested">محتاجة مراجعة</button><button data-show="approved" class="secondary">اتأكدت</button><button data-show="none" class="secondary">لسه ماتترجمتش</button></div>
+<div id="trList"></div><button id="trMore" class="secondary hidden">اعرض أكتر</button>
+</section>
+
+<section id="readPanel" class="card hidden">
+<h2>قراءة صور الشركة</h2>
+<label for="supplier">اسم الشركة (اختياري)</label><input id="supplier" type="text">
+<label for="images">صور الشركة (لحد ٢٠ صورة)</label><input id="images" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+<button id="readBtn" disabled>اقرا الصور وقارن بالنواقص</button>
+<p id="readStatus" class="status"></p>
+<div id="undoBar" class="status hidden"></div>
+<div id="results"></div>
+</section>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){'use strict';
+const SUPABASE_URL='https://qwrzdjdgvanmhaicncuk.supabase.co',SUPABASE_PUBLISHABLE_KEY='sb_publishable_af0XfsvB0Fwwo3HORqMN2g_iJNd9o0q',FN='arabic-shortages',OFFER_MIN=0.45;
+const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const key=s=>String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
+const status=(id,m,cls='')=>{$(id).textContent=m;$(id).className='status '+cls};
+let shortages=[],names=new Map(),show='suggested',shown=30,results=[],undo=null,stopAll=false;
+
+async function invoke(body){const {data,error}=await client.functions.invoke(FN,{body});if(error){let m=error.message;try{const j=await error.context?.json?.();if(j?.message)m=j.message}catch(e){}throw Error(m)}return data}
+async function all(table,cols,q=x=>x){const out=[];for(let from=0;;from+=1000){const {data,error}=await q(client.from(table).select(cols)).order(table==='ar_shortage_names'?'shortage_item_id':'id').range(from,from+999);if(error)throw Error(error.message);out.push(...(data||[]));if(!data||data.length<1000)return out}}
+
+// ---------- login ----------
+async function refresh(){const {data}=await client.auth.getSession();const on=!!data.session;$('loginCard').classList.toggle('hidden',on);$('app').classList.toggle('hidden',!on);if(on)await loadAll()}
+$('loginBtn').onclick=async()=>{status('loginStatus','بيدخل…');const {error}=await client.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){status('loginStatus','مادخلش: '+error.message,'bad');return}status('loginStatus','');refresh()};
+$('logoutBtn').onclick=async()=>{await client.auth.signOut();refresh()};
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('secondary',x!==b));$('translatePanel').classList.toggle('hidden',b.dataset.tab!=='translate');$('readPanel').classList.toggle('hidden',b.dataset.tab!=='read')});
+
+async function loadAll(){try{shortages=(await all('shortage_items','id,product_name',q=>q.eq('is_active',true))).sort((a,b)=>a.product_name.localeCompare(b.product_name));
+ names=new Map((await all('ar_shortage_names','shortage_item_id,arabic_name,status')).map(n=>[n.shortage_item_id,n]));drawTranslate()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
+
+// ---------- translate ----------
+function drawTranslate(){const appr=[...names.values()].filter(n=>n.status==='approved').length,act=shortages.filter(s=>names.has(s.id)).length;
+ $('trStats').innerHTML=`<div class="stat"><strong>${shortages.length}</strong>نواقص</div><div class="stat"><strong>${act}</strong>اتترجمت</div><div class="stat"><strong>${appr}</strong>اتأكدت منك</div>`;
+ const f=key($('trFilter').value);const list=shortages.filter(s=>{const n=names.get(s.id);const st=n?n.status:'none';return st===show&&(!f||key(s.product_name+' '+(n?.arabic_name||'')).includes(f))});
+ $('trList').innerHTML=list.slice(0,shown).map(s=>{const n=names.get(s.id);return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}</div>${n?`<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><button data-ok>${n.status==='approved'?'احفظ التعديل':'تمام'}</button>`:'<p class="hint">لسه ماتترجمش.</p>'}</div>`}).join('')||'<p class="hint">مفيش.</p>';
+ $('trMore').classList.toggle('hidden',list.length<=shown);
+ $('trList').querySelectorAll('[data-ok]').forEach(b=>b.onclick=async()=>{const box=b.closest('[data-id]'),id=box.dataset.id,ar=box.querySelector('[data-ar]').value.replace(/\s+/g,' ').trim();if(ar.length<2)return;b.disabled=true;
+  const {error}=await client.from('ar_shortage_names').upsert({shortage_item_id:id,arabic_name:ar,status:'approved',updated_at:new Date().toISOString()},{onConflict:'shortage_item_id'});
+  if(error){status('trStatus','ماتحفظش: '+error.message,'bad');b.disabled=false;return}names.set(id,{shortage_item_id:id,arabic_name:ar,status:'approved'});status('trStatus','اتحفظ: '+ar,'good');drawTranslate()})}
+$('trFilter').oninput=()=>{shown=30;drawTranslate()};$('trMore').onclick=()=>{shown+=30;drawTranslate()};
+document.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>{show=b.dataset.show;shown=30;document.querySelectorAll('[data-show]').forEach(x=>x.classList.toggle('secondary',x!==b));drawTranslate()});
+async function translateOnce(){const r=await invoke({action:'translate',limit:60});names=new Map((await all('ar_shortage_names','shortage_item_id,arabic_name,status')).map(n=>[n.shortage_item_id,n]));drawTranslate();return r}
+$('trOne').onclick=async()=>{$('trOne').disabled=true;status('trStatus','بيترجم…');try{const r=await translateOnce();status('trStatus',`اتترجم ${r.translated} صنف. فاضل ${r.remaining}.`,'good')}catch(e){status('trStatus','تعذّر: '+e.message,'bad')}$('trOne').disabled=false};
+$('trAll').onclick=async()=>{stopAll=false;$('trAll').disabled=$('trOne').disabled=true;$('trStop').classList.remove('hidden');let done=0;
+ try{for(;;){if(stopAll)break;status('trStatus',`بيترجم… (${done} لحد دلوقتي) — سيب الصفحة مفتوحة`);const r=await translateOnce();done+=r.translated;if(!r.remaining||!r.translated)break}status('trStatus',`خلص: اتترجم ${done} صنف.`,'good')}
+ catch(e){status('trStatus',`وقف بعد ${done} صنف: ${e.message}`,'bad')}$('trAll').disabled=$('trOne').disabled=false;$('trStop').classList.add('hidden')};
+$('trStop').onclick=()=>{stopAll=true};
+
+// ---------- read ----------
+const toBase64=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=()=>no(r.error);r.readAsDataURL(f)});
+$('images').onchange=()=>{$('readBtn').disabled=!$('images').files.length};
+$('readBtn').onclick=async()=>{const files=[...$('images').files].slice(0,20);if(!files.length)return;$('readBtn').disabled=true;results=[];$('results').innerHTML='';
+ try{for(let i=0;i<files.length;i++){if(files[i].size>8*1024*1024)throw Error(`الصورة ${i+1} أكبر من ٨ ميجا`);status('readStatus',`بيقرا الصورة ${i+1} من ${files.length}…`);
+   const d=await invoke({action:'read',image:await toBase64(files[i]),mimeType:files[i].type||'image/jpeg'});results.push(...(d.rows||[]).map(r=>({...r,file:files[i].name})))}
+  drawResults();const sure=results.filter(isSure).length;status('readStatus',`اتقرا ${results.length} سطر. وصل من النواقص: ${new Set(results.filter(isSure).map(r=>r.match.id)).size}.`,'good')}
+ catch(e){status('readStatus','تعذّرت القراءة: '+e.message,'bad')}$('readBtn').disabled=false};
+const sName=id=>shortages.find(s=>s.id===id)?.product_name||'',aName=id=>names.get(id)?.arabic_name||'';
+const isSure=r=>r.match&&(r.match.confidence==='high'||r.match.confidence==='confirmed');
+const options=r=>(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&(c.score??1)>=OFFER_MIN&&a.findIndex(x=>x.id===c.id)===i);
+function pickBox(i){return `<details class="pick"><summary>اختار الصنف من النواقص</summary><input type="search" data-pick-q="${i}" placeholder="اكتب جزء من الاسم"><div data-pick-list="${i}"></div></details>`}
+function drawResults(){const arrived=new Map(),review=[],unknown=[];
+ results.forEach((r,i)=>{if(r.done==='no-all')return unknown.push(i);if(isSure(r)){const l=arrived.get(r.match.id)||[];l.push(i);arrived.set(r.match.id,l);return}if(options(r).length&&!r.done)return review.push(i);unknown.push(i)});
+ const conf={confirmed:'أكدته قبل كده',high:'مطابقة واضحة'};
+ $('results').innerHTML=`<h3>وصل من النواقص: ${arrived.size}</h3>`+([...arrived].map(([id,ix])=>`<div class="item"><div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>${ix.map(i=>`<div class="hint">في الصورة: <span dir="auto">${esc(results[i].name)}</span> · ${conf[results[i].match.confidence]||''} <button class="secondary" data-no="${i}:${esc(id)}">مش ده</button></div>`).join('')}</div>`).join('')||'<p class="hint">مفيش.</p>')+
+  `<h3>محتاج تأكيدك: ${review.length}</h3>`+(review.map(i=>{const r=results[i];return `<div class="item"><strong dir="auto">${esc(r.name)}</strong>${r.unclear?' <span class="pill warn">قراءة مش واضحة</span>':''}<div class="hint">${esc(r.file)}</div>${options(r).map(c=>`<div><span class="en">${esc(sName(c.id))}</span> <span class="hint">${esc(aName(c.id))}</span> <button data-yes="${i}:${esc(c.id)}">أيوه، ده هو</button></div>`).join('')}<button class="secondary" data-noall="${i}">مش واحد منهم</button>${pickBox(i)}</div>`}).join('')||'<p class="hint">مفيش.</p>')+
+  `<details><summary>مش من النواقص أو مااتعرفتش: ${unknown.length}</summary>${unknown.map(i=>`<div class="item"><span dir="auto">${esc(results[i].name)}</span>${pickBox(i)}</div>`).join('')}</details>`;
+ wire()}
+async function decide(i,id,decision){const r=results[i];const row={alias_key:r.key,read_text:r.name.slice(0,250),shortage_item_id:id,decision};
+ let removed=[];if(decision==='yes'){const {data}=await client.from('ar_decisions').select('id,alias_key,read_text,shortage_item_id,decision').eq('alias_key',r.key).eq('decision','yes');removed=(data||[]).filter(x=>x.shortage_item_id!==id);if(removed.length)await client.from('ar_decisions').delete().in('id',removed.map(x=>x.id))}
+ const {data,error}=await client.from('ar_decisions').upsert(row,{onConflict:'alias_key,shortage_item_id'}).select('id');if(error)throw Error(error.message);return {ids:(data||[]).map(x=>x.id),removed}}
+function setUndo(label,u,before,i){undo={u,before,i};$('undoBar').innerHTML=`${esc(label)} <button class="secondary" id="undoBtn">تراجع</button>`;$('undoBar').classList.remove('hidden');
+ $('undoBtn').onclick=async()=>{const x=undo;if(!x)return;undo=null;$('undoBar').classList.add('hidden');for(const u of x.u){if(u.ids.length)await client.from('ar_decisions').delete().in('id',u.ids);if(u.removed.length)await client.from('ar_decisions').insert(u.removed.map(({id,...y})=>y))}Object.assign(results[x.i],x.before);drawResults();status('readStatus','اتلغى.')}}
+function wire(){const box=$('results');
+ box.querySelectorAll('[data-yes]').forEach(b=>b.onclick=async()=>{const [i,id]=b.dataset.yes.split(':');const r=results[i],before={match:r.match,done:r.done};b.disabled=true;
+  try{const u=await decide(i,id,'yes');r.match={id,confidence:'confirmed',score:1};drawResults();setUndo(`اتحفظ: «${r.name}» = ${sName(id)}`,[u],before,i)}catch(e){status('readStatus','ماتحفظش: '+e.message,'bad');b.disabled=false}});
+ box.querySelectorAll('[data-no]').forEach(b=>b.onclick=async()=>{const [i,id]=b.dataset.no.split(':');const r=results[i],before={match:r.match,candidates:r.candidates,done:r.done};b.disabled=true;
+  try{const u=await decide(i,id,'no');r.match=null;r.candidates=(r.candidates||[]).filter(c=>c.id!==id);drawResults();setUndo(`اتسجّل إن «${r.name}» مش ${sName(id)}`,[u],before,i)}catch(e){status('readStatus','ماتحفظش: '+e.message,'bad');b.disabled=false}});
+ box.querySelectorAll('[data-noall]').forEach(b=>b.onclick=async()=>{const i=b.dataset.noall,r=results[i],before={match:r.match,candidates:r.candidates,done:r.done};b.disabled=true;
+  try{const us=[];for(const c of options(r))us.push(await decide(i,c.id,'no'));r.done='no-all';drawResults();setUndo(`اتسجّل إن «${r.name}» مش واحد منهم`,us,before,i)}catch(e){status('readStatus','ماتحفظش: '+e.message,'bad');b.disabled=false}});
+ box.querySelectorAll('[data-pick-q]').forEach(inp=>inp.oninput=()=>{const i=inp.dataset.pickQ,f=key(inp.value),out=box.querySelector(`[data-pick-list="${i}"]`);if(f.length<2){out.innerHTML='';return}
+  out.innerHTML=shortages.filter(s=>key(s.product_name+' '+aName(s.id)).includes(f)).slice(0,10).map(s=>`<div><span class="en">${esc(s.product_name)}</span> <button data-yes="${i}:${esc(s.id)}">اختار ده</button></div>`).join('')||'<p class="hint">مفيش في النواقص.</p>';
+  out.querySelectorAll('[data-yes]').forEach(b=>b.onclick=async()=>{const [i2,id]=b.dataset.yes.split(':');const r=results[i2],before={match:r.match,done:r.done};b.disabled=true;
+   try{const u=await decide(i2,id,'yes');r.match={id,confidence:'confirmed',score:1};r.done=null;drawResults();setUndo(`اتحفظ: «${r.name}» = ${sName(id)}`,[u],before,i2)}catch(e){status('readStatus','ماتحفظش: '+e.message,'bad');b.disabled=false}})})}
+
+client.auth.onAuthStateChange(()=>setTimeout(refresh,0));refresh();
+})();
+</script>
+</body>
+</html>
