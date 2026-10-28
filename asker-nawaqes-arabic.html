@@ -61,11 +61,15 @@ const SUPABASE_URL='https://qwrzdjdgvanmhaicncuk.supabase.co',SUPABASE_PUBLISHAB
 const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const key=s=>String(s||'').toUpperCase().replace(/\s+/g,' ').trim();
+// Arabic names and answers are kept per product (English name), so an item that leaves the shortage list and comes
+// back later keeps its approved translation. Same key as the function and the database.
+const nk=s=>key(s).slice(0,250);
+async function loadNames(){const byKey=new Map((await all('ar_names','name_key,arabic_name,status')).map(n=>[n.name_key,n]));names=new Map();shortages.forEach(x=>{const n=byKey.get(nk(x.product_name));if(n)names.set(x.id,n)})}
 const status=(id,m,cls='')=>{$(id).textContent=m;$(id).className='status '+cls};
 let shortages=[],names=new Map(),show='suggested',shown=30,results=[],undo=null,stopAll=false;
 
 async function invoke(body){const {data,error}=await client.functions.invoke(FN,{body});if(error){let m=error.message;try{const j=await error.context?.json?.();if(j?.message)m=j.message}catch(e){}throw Error(m)}return data}
-async function all(table,cols,q=x=>x){const out=[];for(let from=0;;from+=1000){const {data,error}=await q(client.from(table).select(cols)).order(table==='ar_shortage_names'?'shortage_item_id':'id').range(from,from+999);if(error)throw Error(error.message);out.push(...(data||[]));if(!data||data.length<1000)return out}}
+async function all(table,cols,q=x=>x){const out=[];for(let from=0;;from+=1000){const {data,error}=await q(client.from(table).select(cols)).order(table==='ar_names'?'name_key':'id').range(from,from+999);if(error)throw Error(error.message);out.push(...(data||[]));if(!data||data.length<1000)return out}}
 
 // ---------- login ----------
 async function refresh(){const {data}=await client.auth.getSession();const on=!!data.session;$('loginCard').classList.toggle('hidden',on);$('app').classList.toggle('hidden',!on);if(on)await loadAll()}
@@ -74,7 +78,7 @@ $('logoutBtn').onclick=async()=>{await client.auth.signOut();refresh()};
 document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('secondary',x!==b));$('translatePanel').classList.toggle('hidden',b.dataset.tab!=='translate');$('readPanel').classList.toggle('hidden',b.dataset.tab!=='read')});
 
 async function loadAll(){try{shortages=(await all('shortage_items','id,product_name',q=>q.eq('is_active',true))).sort((a,b)=>a.product_name.localeCompare(b.product_name));
- names=new Map((await all('ar_shortage_names','shortage_item_id,arabic_name,status')).map(n=>[n.shortage_item_id,n]));drawTranslate()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
+ await loadNames();drawTranslate()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
 
 // ---------- translate ----------
 function drawTranslate(){const appr=[...names.values()].filter(n=>n.status==='approved').length,act=shortages.filter(s=>names.has(s.id)).length;
@@ -83,11 +87,12 @@ function drawTranslate(){const appr=[...names.values()].filter(n=>n.status==='ap
  $('trList').innerHTML=list.slice(0,shown).map(s=>{const n=names.get(s.id);return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}</div>${n?`<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><button data-ok>${n.status==='approved'?'احفظ التعديل':'تمام'}</button>`:'<p class="hint">لسه ماتترجمش.</p>'}</div>`}).join('')||'<p class="hint">مفيش.</p>';
  $('trMore').classList.toggle('hidden',list.length<=shown);
  $('trList').querySelectorAll('[data-ok]').forEach(b=>b.onclick=async()=>{const box=b.closest('[data-id]'),id=box.dataset.id,ar=box.querySelector('[data-ar]').value.replace(/\s+/g,' ').trim();if(ar.length<2)return;b.disabled=true;
-  const {error}=await client.from('ar_shortage_names').upsert({shortage_item_id:id,arabic_name:ar,status:'approved',updated_at:new Date().toISOString()},{onConflict:'shortage_item_id'});
-  if(error){status('trStatus','ماتحفظش: '+error.message,'bad');b.disabled=false;return}names.set(id,{shortage_item_id:id,arabic_name:ar,status:'approved'});status('trStatus','اتحفظ: '+ar,'good');drawTranslate()})}
+  const en=shortages.find(x=>x.id===id)?.product_name||'';
+  const {error}=await client.from('ar_names').upsert({name_key:nk(en),english_name:en,arabic_name:ar,status:'approved',updated_at:new Date().toISOString()},{onConflict:'name_key'});
+  if(error){status('trStatus','ماتحفظش: '+error.message,'bad');b.disabled=false;return}shortages.filter(x=>nk(x.product_name)===nk(en)).forEach(x=>names.set(x.id,{name_key:nk(en),arabic_name:ar,status:'approved'}));status('trStatus','اتحفظ: '+ar,'good');drawTranslate()})}
 $('trFilter').oninput=()=>{shown=30;drawTranslate()};$('trMore').onclick=()=>{shown+=30;drawTranslate()};
 document.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>{show=b.dataset.show;shown=30;document.querySelectorAll('[data-show]').forEach(x=>x.classList.toggle('secondary',x!==b));drawTranslate()});
-async function translateOnce(){const r=await invoke({action:'translate',limit:60});names=new Map((await all('ar_shortage_names','shortage_item_id,arabic_name,status')).map(n=>[n.shortage_item_id,n]));drawTranslate();return r}
+async function translateOnce(){const r=await invoke({action:'translate',limit:60});await loadNames();drawTranslate();return r}
 $('trOne').onclick=async()=>{$('trOne').disabled=true;status('trStatus','بيترجم…');try{const r=await translateOnce();status('trStatus',`اتترجم ${r.translated} صنف. فاضل ${r.remaining}.`,'good')}catch(e){status('trStatus','تعذّر: '+e.message,'bad')}$('trOne').disabled=false};
 // Google's free plan also limits requests per minute: wait between batches, and after a "quota" answer wait a
 // minute and try once more; a second refusal is most likely the daily limit (back at midnight Pacific = 10 AM Cairo).
@@ -121,11 +126,11 @@ function drawResults(){const arrived=new Map(),review=[],unknown=[];
   `<h3>محتاج تأكيدك: ${review.length}</h3>`+(review.map(i=>{const r=results[i];return `<div class="item"><strong dir="auto">${esc(r.name)}</strong>${r.unclear?' <span class="pill warn">قراءة مش واضحة</span>':''}<div class="hint">${esc(r.file)}</div>${options(r).map(c=>`<div><span class="en">${esc(sName(c.id))}</span> <span class="hint">${esc(aName(c.id))}</span> <button data-yes="${i}:${esc(c.id)}">أيوه، ده هو</button></div>`).join('')}<button class="secondary" data-noall="${i}">مش واحد منهم</button>${pickBox(i)}</div>`}).join('')||'<p class="hint">مفيش.</p>')+
   `<details><summary>مش من النواقص أو مااتعرفتش: ${unknown.length}</summary>${unknown.map(i=>`<div class="item"><span dir="auto">${esc(results[i].name)}</span>${pickBox(i)}</div>`).join('')}</details>`;
  wire()}
-async function decide(i,id,decision){const r=results[i];const row={alias_key:r.key,read_text:r.name.slice(0,250),shortage_item_id:id,decision};
- let removed=[];if(decision==='yes'){const {data}=await client.from('ar_decisions').select('id,alias_key,read_text,shortage_item_id,decision').eq('alias_key',r.key).eq('decision','yes');removed=(data||[]).filter(x=>x.shortage_item_id!==id);if(removed.length)await client.from('ar_decisions').delete().in('id',removed.map(x=>x.id))}
- const {data,error}=await client.from('ar_decisions').upsert(row,{onConflict:'alias_key,shortage_item_id'}).select('id');if(error)throw Error(error.message);return {ids:(data||[]).map(x=>x.id),removed}}
+async function decide(i,id,decision){const r=results[i],k=nk(sName(id));const row={alias_key:r.key,read_text:r.name.slice(0,250),name_key:k,decision};
+ let removed=[];if(decision==='yes'){const {data}=await client.from('ar_answers').select('id,alias_key,read_text,name_key,decision').eq('alias_key',r.key).eq('decision','yes');removed=(data||[]).filter(x=>x.name_key!==k);if(removed.length)await client.from('ar_answers').delete().in('id',removed.map(x=>x.id))}
+ const {data,error}=await client.from('ar_answers').upsert(row,{onConflict:'alias_key,name_key'}).select('id');if(error)throw Error(error.message);return {ids:(data||[]).map(x=>x.id),removed}}
 function setUndo(label,u,before,i){undo={u,before,i};$('undoBar').innerHTML=`${esc(label)} <button class="secondary" id="undoBtn">تراجع</button>`;$('undoBar').classList.remove('hidden');
- $('undoBtn').onclick=async()=>{const x=undo;if(!x)return;undo=null;$('undoBar').classList.add('hidden');for(const u of x.u){if(u.ids.length)await client.from('ar_decisions').delete().in('id',u.ids);if(u.removed.length)await client.from('ar_decisions').insert(u.removed.map(({id,...y})=>y))}Object.assign(results[x.i],x.before);drawResults();status('readStatus','اتلغى.')}}
+ $('undoBtn').onclick=async()=>{const x=undo;if(!x)return;undo=null;$('undoBar').classList.add('hidden');for(const u of x.u){if(u.ids.length)await client.from('ar_answers').delete().in('id',u.ids);if(u.removed.length)await client.from('ar_answers').insert(u.removed.map(({id,...y})=>y))}Object.assign(results[x.i],x.before);drawResults();status('readStatus','اتلغى.')}}
 function wire(){const box=$('results');
  box.querySelectorAll('[data-yes]').forEach(b=>b.onclick=async()=>{const [i,id]=b.dataset.yes.split(':');const r=results[i],before={match:r.match,done:r.done};b.disabled=true;
   try{const u=await decide(i,id,'yes');r.match={id,confidence:'confirmed',score:1};drawResults();setUndo(`اتحفظ: «${r.name}» = ${sName(id)}`,[u],before,i)}catch(e){status('readStatus','ماتحفظش: '+e.message,'bad');b.disabled=false}});
