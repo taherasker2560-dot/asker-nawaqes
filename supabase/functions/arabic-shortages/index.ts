@@ -6,11 +6,16 @@
 // Arabic names and the owner's answers are kept per product (name_key = the English name, upper case, single
 // spaces), not per shortage row: an item that leaves the shortage list and comes back later keeps them.
 //   read {image, mimeType}  -> Gemini reads the supplier image; each line is matched to the shortages
+//   match {name, english, read} -> re-match one line after the owner corrects its Arabic text
+// Smart matching uses the same tools as V10: strength/pack/form/brand rules (match.ts), the owner's reading
+// corrections, «أيوه» / «مش ده» answers (exact and near: same numbers, same form, very close text), names marked
+// «مش مهم» — and it also reads, without changing them, what the owner already taught V10 (name_aliases,
+// name_rejections, reading_fixes) when the item there is one of the shortages.
 // Tables are read and written with the caller's own session (owner-only RLS). V10 tables are only read.
 
-import { Catalog, aliasKey, decide, type CatalogItem, type Candidate, type Match } from './match.ts';
+import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar2';
+export const VERSION = 'ar3';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -24,6 +29,9 @@ type Decision = { alias_key: string; read_text: string; name_key: string; decisi
 // Same key in the page (asker-nawaqes-arabic.html) and in the database migration.
 export const nameKey = (s: string) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim().slice(0, 250);
 type Row = { name: string; english: string; unclear: boolean };
+type Fix = { read_key: string; corrected_text: string };
+// Everything the owner taught (this bot and V10), loaded once per request.
+export type Knowledge = { names: ArName[]; answers: Decision[]; fixes: Fix[]; ignored: Set<string> };
 
 function log(stage: string, started: number, extra: Record<string, unknown> = {}): void {
   console.log(JSON.stringify({ stage, ms: Date.now() - started, ...extra }));
@@ -79,6 +87,27 @@ async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schem
   return data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
 }
 
+async function knowledge(env: Env, auth: string, fetchImpl: typeof fetch): Promise<Knowledge> {
+  const soft = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]); // a missing V10 table just means "nothing taught there"
+  const [names, answers, fixes, ignored, v10Aliases, v10Rejections, v10Fixes] = await Promise.all([
+    restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
+    restAll<Decision>(env, auth, fetchImpl, 'ar_answers?select=alias_key,read_text,name_key,decision&order=id'),
+    soft(restAll<Fix>(env, auth, fetchImpl, 'ar_fixes?select=read_key,corrected_text&order=read_key')),
+    soft(restAll<{ alias_key: string }>(env, auth, fetchImpl, 'ar_ignored?select=alias_key&order=alias_key')),
+    soft(restAll<{ alias_key: string; target_name: string }>(env, auth, fetchImpl, 'name_aliases?select=alias_key,target_name&order=id')),
+    soft(restAll<{ alias_key: string; target_name: string }>(env, auth, fetchImpl, 'name_rejections?select=alias_key,target_name&order=id')),
+    soft(restAll<Fix>(env, auth, fetchImpl, 'reading_fixes?select=read_key,corrected_text&order=id')),
+  ]);
+  // V10 answers are written per English item name too, so they translate directly; this bot's own answers win.
+  const own = new Set(answers.map((a) => a.alias_key + '|' + a.name_key));
+  const fromV10 = [
+    ...v10Aliases.map((a) => ({ alias_key: a.alias_key, read_text: a.alias_key, name_key: nameKey(a.target_name), decision: 'yes' as const })),
+    ...v10Rejections.map((a) => ({ alias_key: a.alias_key, read_text: a.alias_key, name_key: nameKey(a.target_name), decision: 'no' as const })),
+  ].filter((a) => !own.has(a.alias_key + '|' + a.name_key));
+  const ownFix = new Set(fixes.map((f) => f.read_key));
+  return { names, answers: [...answers, ...fromV10], fixes: [...fixes, ...v10Fixes.filter((f) => !ownFix.has(f.read_key))], ignored: new Set(ignored.map((x) => x.alias_key)) };
+}
+
 export const TRANSLATE_PROMPT = [
   'You get product names from an Egyptian pharmacy system (English, PharmaFly style, e.g. "BRUFEN 400MG 30TAB", "FLAGYL 125MG SYP").',
   'Write each one the way Egyptian medicine distributors write it in their Arabic availability lists:',
@@ -114,21 +143,36 @@ export function shortageCatalog(shortages: Shortage[], names: ArName[], decision
   return new Catalog(items);
 }
 
-export function matchRows(rows: Row[], cat: Catalog, decisions: Decision[], shortages: Shortage[]) {
+// readKey: the key of the text as first read, when `rows` hold the owner's correction (its «مش ده» still applies).
+export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Shortage[], readKey = '') {
   const idOf = new Map<string, string>(), keyOf = new Map<string, string>();
-  for (const s of shortages) { const k = nameKey(s.product_name); keyOf.set(s.id, k); if (!idOf.has(k)) idOf.set(k, s.id); }
+  for (const s of shortages) { const n = nameKey(s.product_name); keyOf.set(s.id, n); if (!idOf.has(n)) idOf.set(n, s.id); }
   const yes = new Map<string, string>(), no = new Map<string, Set<string>>();
-  for (const d of decisions) {
-    if (d.decision === 'yes') yes.set(d.alias_key, d.name_key);
+  for (const d of k.answers) {
+    if (d.decision === 'yes') { if (!yes.has(d.alias_key)) yes.set(d.alias_key, d.name_key); }
     else { const s = no.get(d.alias_key) || new Set<string>(); s.add(d.name_key); no.set(d.alias_key, s); }
   }
+  const fixOf = new Map(k.fixes.map((f) => [f.read_key, f.corrected_text]));
+  const yesTexts = k.answers.filter((d) => d.decision === 'yes' && idOf.has(d.name_key));
   return rows.map((r) => {
-    const key = aliasKey(r.name), rejected = no.get(key) || new Set<string>();
-    const candidates: Candidate[] = cat.candidates(r.name, r.english, 3 + rejected.size).filter((c) => !rejected.has(keyOf.get(c.id) || '')).slice(0, 3);
+    const key = aliasKey(r.name);
+    const corrected = readKey ? null : fixOf.get(key) || null;
+    const text = corrected || r.name, textKey = aliasKey(text);
+    const rejected = new Set([...(no.get(key) || []), ...(no.get(textKey) || []), ...(readKey ? no.get(readKey) || [] : [])]);
+    const candidates: Candidate[] = cat.candidates(text, r.english, 3 + rejected.size).filter((c) => !rejected.has(keyOf.get(c.id) || '')).slice(0, 3);
     let match: Match | null = decide(candidates);
-    const y = yes.get(key), yid = y ? idOf.get(y) : undefined;
+    const y = yes.get(key) || yes.get(textKey), yid = y && !rejected.has(y) ? idOf.get(y) : undefined;
     if (yid) match = { id: yid, name: '', score: 1, confidence: 'confirmed' };
-    return { ...r, key, match, candidates };
+    else {
+      // written a little differently from a line the owner (or V10) confirmed: same numbers, same form, very close text
+      const near = new Set<string>(), textForms = forms(text);
+      for (const d of yesTexts) {
+        if (rejected.has(d.name_key) || !sameNumbers(text, d.read_text) || !formsAgree(textForms, forms(d.read_text))) continue;
+        if (similarity(text, d.read_text) >= 0.85) near.add(d.name_key);
+      }
+      if (near.size === 1) match = { id: idOf.get([...near][0])!, name: '', score: 0.95, confidence: 'high', via: 'alias' };
+    }
+    return { ...r, key, corrected, match, candidates, ignored: k.ignored.has(key) };
   });
 }
 
@@ -149,7 +193,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   } catch { return reply(504, { error: 'auth-timeout', message: 'التأكد من تسجيل الدخول اتأخر؛ جرّب تاني.' }, headers); }
   if (!user?.email || !allowedEmails.includes(user.email.toLowerCase())) return reply(403, { error: 'forbidden', message: 'الحساب ده مش مسموح له.' }, headers);
 
-  let body: { action?: unknown; limit?: unknown; image?: unknown; mimeType?: unknown };
+  let body: { action?: unknown; limit?: unknown; image?: unknown; mimeType?: unknown; name?: unknown; english?: unknown; read?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
   const t0 = Date.now();
   try {
@@ -183,21 +227,28 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const image = typeof body.image === 'string' ? body.image.replace(/\s+/g, '') : '', mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
       if (!MIME_TYPES.includes(mimeType) || !image || !/^[A-Za-z0-9+/=]+$/.test(image)) return reply(400, { error: 'image', message: 'الصورة مش واصلة صح (JPG أو PNG أو WebP).' }, headers);
       if (Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) return reply(413, { error: 'size', message: 'الصورة أكبر من ٨ ميجا.' }, headers);
-      const [text, shortages, names, decisions] = await Promise.all([
+      const [text, shortages, k] = await Promise.all([
         gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: mimeType, data: image } }], READ_SCHEMA),
         restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'),
-        restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
-        restAll<Decision>(env, auth, fetchImpl, 'ar_answers?select=alias_key,read_text,name_key,decision&order=id'),
+        knowledge(env, auth, fetchImpl),
       ]);
       let parsed: unknown;
       try { parsed = JSON.parse(text); } catch { return reply(502, { error: 'parse', message: 'رد Gemini مش مفهوم؛ جرّب تاني.' }, headers); }
       const rows: Row[] = (((parsed as { rows?: unknown[] })?.rows) || []).slice(0, 600)
         .map((r) => ({ name: clean((r as Row)?.name), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
         .filter((r) => r.name.length >= 2 && r.name.length <= 250);
-      const cat = shortageCatalog(shortages, names, decisions);
-      const out = matchRows(rows, cat, decisions, shortages);
-      log('read', t0, { rows: out.length, shortages: shortages.length, arabic: names.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
-      return reply(200, { rows: out, shortages: shortages.length, arabic: names.length, version: VERSION }, headers);
+      const cat = shortageCatalog(shortages, k.names, k.answers);
+      const out = matchRows(rows, cat, k, shortages);
+      log('read', t0, { rows: out.length, shortages: shortages.length, arabic: k.names.length, answers: k.answers.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
+      return reply(200, { rows: out, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
+    }
+
+    if (body.action === 'match') {
+      const name = clean(body.name), english = clean(body.english).slice(0, 250), read = clean(body.read);
+      if (name.length < 2 || name.length > 250) return reply(400, { error: 'name', message: 'الاسم قصير أو طويل جدًا.' }, headers);
+      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+      const row = matchRows([{ name, english, unclear: false }], shortageCatalog(shortages, k.names, k.answers), k, shortages, read ? aliasKey(read) : '')[0];
+      return reply(200, { row, version: VERSION }, headers);
     }
     return reply(400, { error: 'action', message: 'أمر مش معروف.' }, headers);
   } catch (e) {
