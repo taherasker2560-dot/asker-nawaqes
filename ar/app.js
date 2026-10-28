@@ -56,7 +56,8 @@
     if (data?.version && data.version !== SERVER_VERSION && !warnedVersion) {
       warnedVersion = true;
       console.warn('arabic-shortages', data.version, 'expected', SERVER_VERSION);
-      $('versionWarn').textContent = `تنبيه: السيرفر شغال بنسخة ${data.version} والصفحة مستنية ${SERVER_VERSION}. النتايج ممكن تكون ناقصة؛ قول للمطوّر يرفع الدالة.`;
+      $('versionWarn').textContent =
+        `تنبيه: السيرفر شغال بنسخة ${data.version} والصفحة مستنية ${SERVER_VERSION}. النتايج ممكن تكون ناقصة؛ قول للمطوّر يرفع الدالة.`;
       $('versionWarn').classList.remove('hidden');
     }
     return data;
@@ -242,14 +243,22 @@
     const list = shortages.filter((s) => {
       const n = names.get(s.id);
       const st = n ? n.status : 'none';
-      return st === show && (!f || key(s.product_name + ' ' + (n?.arabic_name || '')).includes(f));
+      // a search looks in every list (reviewed, approved, not translated), so a saved translation is always findable
+      return f ? key(s.product_name + ' ' + (n?.arabic_name || '')).includes(f) : st === show;
     });
     $('trList').innerHTML =
       list
         .slice(0, shown)
         .map((s) => {
           const n = names.get(s.id);
-          return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}</div>${n ? `<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><button data-ok>${n.status === 'approved' ? 'احفظ التعديل' : 'تمام'}</button>` : '<p class="hint">لسه ماتترجمش.</p>'}</div>`;
+          const pill = f
+            ? n?.status === 'approved'
+              ? ' <span class="pill good">اتأكدت</span>'
+              : n
+                ? ' <span class="pill warn">محتاجة مراجعة</span>'
+                : ' <span class="pill bad">لسه ماتترجمتش</span>'
+            : '';
+          return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}${pill}</div>${n ? `<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><button data-ok>${n.status === 'approved' ? 'احفظ التعديل' : 'تمام'}</button>` : '<p class="hint">لسه ماتترجمش.</p>'}</div>`;
         })
         .join('') || '<p class="hint">مفيش.</p>';
     $('trMore').classList.toggle('hidden', list.length <= shown);
@@ -264,18 +273,17 @@
             if (ar.length < 2) return;
             b.disabled = true;
             const en = shortages.find((x) => x.id === id)?.product_name || '';
-            const { error } = await client
-              .from('ar_names')
-              .upsert(
-                {
-                  name_key: nk(en),
-                  english_name: en,
-                  arabic_name: ar,
-                  status: 'approved',
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: 'name_key' },
-              );
+            const before = names.get(id) ? { ...names.get(id) } : null;
+            const { error } = await client.from('ar_names').upsert(
+              {
+                name_key: nk(en),
+                english_name: en,
+                arabic_name: ar,
+                status: 'approved',
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'name_key' },
+            );
             if (error) {
               status('trStatus', 'ماتحفظش: ' + error.message, 'bad');
               b.disabled = false;
@@ -286,8 +294,45 @@
               .forEach((x) => names.set(x.id, { name_key: nk(en), arabic_name: ar, status: 'approved' }));
             status('trStatus', 'اتحفظ: ' + ar, 'good');
             drawTranslate();
+            savedBar(en, before);
           }),
       );
+  }
+  // after «تمام»: fix it right away («عدّل») or put the previous Arabic name back («تراجع»)
+  function savedBar(en, before) {
+    const bar = document.createElement('span');
+    bar.innerHTML =
+      ' <button class="secondary" data-tr-edit>عدّل</button> <button class="secondary" data-tr-undo>تراجع</button>';
+    $('trStatus').append(bar);
+    bar.querySelector('[data-tr-edit]').onclick = () => {
+      $('trFilter').value = en;
+      shown = 30;
+      drawTranslate();
+      $('trList').querySelector('[data-ar]')?.focus();
+    };
+    bar.querySelector('[data-tr-undo]').onclick = async () => {
+      const k = nk(en);
+      const { error } = before
+        ? await client
+            .from('ar_names')
+            .upsert(
+              {
+                name_key: k,
+                english_name: en,
+                arabic_name: before.arabic_name,
+                status: before.status,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'name_key' },
+            )
+        : await client.from('ar_names').delete().eq('name_key', k);
+      if (error) return status('trStatus', 'ماترجعتش: ' + error.message, 'bad');
+      shortages
+        .filter((x) => nk(x.product_name) === k)
+        .forEach((x) => (before ? names.set(x.id, { ...before, name_key: k }) : names.delete(x.id)));
+      status('trStatus', 'رجعت زي ما كانت: ' + (before ? before.arabic_name : en), 'good');
+      drawTranslate();
+    };
   }
   $('trFilter').oninput = () => {
     shown = 30;
