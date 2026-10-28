@@ -14,6 +14,7 @@ function fake({gem}={}){const calls=[],saved=[],files=[];const page=(u,a)=>new R
   if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
+  if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
   if(url.includes('/rest/v1/ar_inbox?select=id&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length}]),{status:201})}
   if(url.includes('/storage/v1/object/ar-inbox/')){files.push({url,headers:o.headers});return new Response('{}')}
@@ -34,7 +35,12 @@ assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.Au
 assert.equal(F.inboxSender('الفتح shreif (2 رسائل)'),'الفتح shreif');assert.equal(F.inboxSender('Al Fath (12 messages)'),'Al Fath');assert.equal(F.inboxSender('شركة (الفرع)'),'شركة (الفرع)');
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (٣ رسائل)')+'&say=1','فلاجيل شراب ١٢٥','text/plain'),env,f);assert.match(await r.text(),/^المتحدة للأدوية: وصل 1/);
 // mixed Arabic/English name: word order ignored, other names still refused
-assert.equal(F.sameCompany('Shreif الفتح','الفتح shreif'),true);assert.equal(F.sameCompany('Shreif الفتح','الفتح'),false);assert.equal(F.sameCompany('Shreif الفتح',''),false);
+assert.equal(F.sameCompany('Shreif الفتح','الفتح shreif'),true);assert.equal(F.sameCompany('Shreif الفتح','الفتح'),false);assert.equal(F.sameCompany('Shreif الفتح',''),false);assert.equal(F.sameCompany('','الفتح'),false);
+// a group message: the title holds the group's name and the sender
+assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور كفر الشيخ: Shreif الفتح'),true);assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور: احمد'),false);
+// the same text notification twice: kept once
+{const g=fake();const t='فلاجيل شراب ١٢٥\nبروفين';await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);
+ const r2=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);assert.equal((await r2.json()).duplicate,true);assert.equal(g.saved.length,1);}
 // new-style secret key (sb_secret_…) is not a JWT: sent only as apikey
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),'فلاجيل شراب ١٢٥','text/plain'),{...env,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x'},f);assert.equal(r.status,200);
 assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.apikey==='sb_secret_x'&&!c.o.headers.Authorization));
