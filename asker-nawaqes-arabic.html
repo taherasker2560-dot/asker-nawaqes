@@ -34,12 +34,12 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 
 <section id="shortPanel" class="card">
 <h2>نواقص بوت التجربة</h2>
-<p class="hint">قايمة خاصة ببوت التجربة، منفصلة عن V10. الأصناف الجديدة بتتضاف، واللي موجود بيفضل. الكمية مش مهمة: البوت بيشوف الصنف وصل ولا لأ بس.</p>
+<p class="hint">قايمة خاصة ببوت التجربة، منفصلة عن V10. ملف النواقص الجديد بيحل محل القايمة كلها: الأصناف اللي مش فيه بتطلع من النواقص. الترجمة العربي لكل صنف بتفضل محفوظة، ولو الصنف رجع تاني بيرجع بترجمته. الكمية مش مهمة: البوت بيشوف الصنف وصل ولا لأ بس.</p>
 <div class="grid" id="shStats"></div>
 <label for="shxFile">ملف النواقص (Excel أو CSV)</label><input id="shxFile" type="file" accept=".xlsx,.xls,.csv">
-<div id="shxPick" class="hidden"><label for="shxCol">عمود اسم الصنف</label><select id="shxCol" style="width:100%;padding:10px;font-size:16px"></select><p id="shxPreview" class="hint"></p><button id="shxBtn">أضف للنواقص</button></div>
-<details><summary>أو اكتب النواقص</summary><p class="hint">كل صنف في سطر. أي حاجة بعد علامة | بتتشال.</p><textarea id="shText" rows="6" dir="auto" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"></textarea><button id="shTextBtn">أضف للنواقص</button></details>
-<p id="shStatus" class="status"></p>
+<div id="shxPick" class="hidden"><label for="shxCol">عمود اسم الصنف</label><select id="shxCol" style="width:100%;padding:10px;font-size:16px"></select><p id="shxPreview" class="hint"></p><button id="shxBtn">استبدل النواقص بالملف ده</button></div>
+<details><summary>أو أضف أصناف بالكتابة</summary><p class="hint">كل صنف في سطر، وبيتضاف للقايمة من غير ما يشيل حاجة. أي حاجة بعد علامة | بتتشال.</p><textarea id="shText" rows="6" dir="auto" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"></textarea><button id="shTextBtn">أضف للنواقص</button></details>
+<p id="shStatus" class="status"></p><div id="shConfirm" class="hidden"></div>
 </section>
 
 <section id="translatePanel" class="card hidden">
@@ -98,17 +98,30 @@ async function loadAll(){try{await loadShortages();
 
 // ---------- shortages (this bot's own list) ----------
 function drawShort(){$('shStats').innerHTML=`<div class="stat"><strong>${shortages.length}</strong>صنف في النواقص</div><div class="stat"><strong>${shortages.filter(s=>names.has(s.id)).length}</strong>ليهم اسم عربي</div><div class="stat"><strong>${[...names.values()].filter(n=>n.status==='approved').length}</strong>اتأكدت منك</div>`}
-async function addShortages(list,btn){const byKey=new Map();for(const v of list){const n=String(v??'').split(/[|\t]/)[0].replace(/\s+/g,' ').trim().slice(0,250);if(n.length>=2&&/\p{L}/u.test(n)&&!byKey.has(nk(n)))byKey.set(nk(n),n)}
- if(!byKey.size){status('shStatus','مفيش أسماء أصناف.','bad');return}
- const have=new Set(shortages.map(s=>nk(s.product_name))),rows=[...byKey].map(([name_key,product_name])=>({name_key,product_name,is_active:true}));
- const fresh=rows.filter(r=>!have.has(r.name_key)).length;btn.disabled=true;
- try{for(let i=0;i<rows.length;i+=500){status('shStatus',`بيحفظ ${Math.min(i+500,rows.length)} من ${rows.length}…`);const {error}=await client.from('ar_shortages').upsert(rows.slice(i,i+500),{onConflict:'name_key'});if(error)throw Error(error.message)}
-  await loadShortages();await loadNames();drawShort();drawTranslate();
-  const noAr=shortages.filter(s=>!names.has(s.id)).length;
-  status('shStatus',`اتضاف ${fresh} صنف جديد، و${rows.length-fresh} كانوا موجودين. النواقص دلوقتي ${shortages.length} صنف.${noAr?` فيه ${noAr} صنف لسه ماليهمش اسم عربي: ترجمهم من «٢. ترجمة النواقص».`:''}`,'good')}
- catch(e){status('shStatus','ماتحفظش: '+e.message,'bad')}btn.disabled=false}
-excelPicker('shx','shStatus',(n,label,btn)=>addShortages(n,btn));
-$('shTextBtn').onclick=()=>addShortages($('shText').value.split(/\r?\n/),$('shTextBtn')).then(()=>{if(/اتضاف/.test($('shStatus').textContent))$('shText').value=''});
+const cleanNames=list=>{const byKey=new Map();for(const v of list){const n=String(v??'').split(/[|\t]/)[0].replace(/\s+/g,' ').trim().slice(0,250);if(n.length>=2&&/\p{L}/u.test(n)&&!byKey.has(nk(n)))byKey.set(nk(n),n)}return byKey};
+async function afterSave(msg){await loadShortages();await loadNames();drawShort();drawTranslate();const noAr=shortages.filter(s=>!names.has(s.id)).length;
+ status('shStatus',msg+` النواقص دلوقتي ${shortages.length} صنف، منهم ${shortages.length-noAr} ليهم ترجمة محفوظة.${noAr?` فيه ${noAr} صنف لسه ماليهمش اسم عربي: ترجمهم من «٢. ترجمة النواقص».`:''}`,'good')}
+async function upsertActive(byKey){const rows=[...byKey].map(([name_key,product_name])=>({name_key,product_name,is_active:true}));
+ for(let i=0;i<rows.length;i+=500){status('shStatus',`بيحفظ ${Math.min(i+500,rows.length)} من ${rows.length}…`);const {error}=await client.from('ar_shortages').upsert(rows.slice(i,i+500),{onConflict:'name_key'});if(error)throw Error(error.message)}}
+// typed lines: added to the list, nothing taken out
+async function addShortages(list,btn){const byKey=cleanNames(list);if(!byKey.size){status('shStatus','مفيش أسماء أصناف.','bad');return}
+ const have=new Set(shortages.map(s=>nk(s.product_name))),fresh=[...byKey.keys()].filter(k=>!have.has(k)).length;btn.disabled=true;
+ try{await upsertActive(byKey);await afterSave(`اتضاف ${fresh} صنف جديد، و${byKey.size-fresh} كانوا موجودين.`);$('shText').value=''}catch(e){status('shStatus','ماتحفظش: '+e.message,'bad')}btn.disabled=false}
+// the shop's file replaces the list: names not in it leave the list (is_active=false, nothing deleted); Arabic names
+// (ar_names) and answers are kept per product name, so a name that comes back later finds its translation again
+function replaceShortages(list,btn){const byKey=cleanNames(list);$('shConfirm').classList.add('hidden');if(!byKey.size){status('shStatus','مفيش أسماء أصناف في العمود ده.','bad');return}
+ const have=new Map(shortages.map(s=>[nk(s.product_name),s.id])),add=[...byKey.keys()].filter(k=>!have.has(k)).length,out=[...have].filter(([k])=>!byKey.has(k)).map(([,id])=>id),stay=byKey.size-add;
+ const few=shortages.length>=50&&byKey.size<shortages.length*0.3;
+ status('shStatus',`الملف فيه ${byKey.size} صنف: ${add} جديد، ${stay} موجودين وهيفضلوا، و${out.length} هيطلعوا من النواقص (ترجمتهم بتفضل محفوظة).`,few?'bad':'');
+ $('shConfirm').innerHTML=`${few?'<p class="status bad">الملف ده أصغر بكتير من القايمة الحالية. اتأكد إنه الملف الصح وإن العمود المختار هو اسم الصنف.</p>':''}<button id="shYes">أيوه، استبدل</button> <button id="shNo" class="secondary">إلغاء</button>`;$('shConfirm').classList.remove('hidden');
+ $('shNo').onclick=()=>{$('shConfirm').classList.add('hidden');status('shStatus','اتلغى، والقايمة زي ما هي.')};
+ $('shYes').onclick=async()=>{$('shConfirm').classList.add('hidden');btn.disabled=true;
+  try{await upsertActive(byKey);
+   for(let i=0;i<out.length;i+=200){const {error}=await client.from('ar_shortages').update({is_active:false}).in('id',out.slice(i,i+200));if(error)throw Error('الأصناف الجديدة اتحفظت، بس القديمة ماطلعتش: '+error.message)}
+   await afterSave(`اتبدلت النواقص: ${add} جديد، ${stay} فضلوا، ${out.length} طلعوا.`)}
+  catch(e){status('shStatus','ماتحفظش: '+e.message,'bad')}btn.disabled=false}}
+excelPicker('shx','shStatus',(n,label,btn)=>replaceShortages(n,btn));
+$('shTextBtn').onclick=()=>addShortages($('shText').value.split(/\r?\n/),$('shTextBtn'));
 
 // ---------- translate ----------
 function drawTranslate(){const appr=[...names.values()].filter(n=>n.status==='approved').length,act=shortages.filter(s=>names.has(s.id)).length;
