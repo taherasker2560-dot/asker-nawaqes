@@ -30,9 +30,19 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 <main>
 <section id="loginCard" class="card"><h2>تسجيل الدخول</h2><label for="email">الإيميل</label><input id="email" type="email" autocomplete="username"><label for="password">كلمة السر</label><input id="password" type="password" autocomplete="current-password"><button id="loginBtn">دخول</button><p id="loginStatus" class="status"></p></section>
 <div id="app" class="hidden">
-<div class="tabs"><button data-tab="translate">١. ترجمة النواقص</button><button data-tab="read" class="secondary">٢. قراءة وارد الشركة</button><button id="logoutBtn" class="secondary">خروج</button></div>
+<div class="tabs"><button data-tab="short">١. النواقص</button><button data-tab="translate" class="secondary">٢. ترجمة النواقص</button><button data-tab="read" class="secondary">٣. قراءة وارد الشركة</button><button id="logoutBtn" class="secondary">خروج</button></div>
 
-<section id="translatePanel" class="card">
+<section id="shortPanel" class="card">
+<h2>نواقص بوت التجربة</h2>
+<p class="hint">قايمة خاصة ببوت التجربة، منفصلة عن V10. ملف النواقص الجديد بيحل محل القايمة كلها: الأصناف اللي مش فيه بتطلع من النواقص. الترجمة العربي لكل صنف بتفضل محفوظة، ولو الصنف رجع تاني بيرجع بترجمته. الكمية مش مهمة: البوت بيشوف الصنف وصل ولا لأ بس.</p>
+<div class="grid" id="shStats"></div>
+<label for="shxFile">ملف النواقص (Excel أو CSV)</label><input id="shxFile" type="file" accept=".xlsx,.xls,.csv">
+<div id="shxPick" class="hidden"><label for="shxCol">عمود اسم الصنف</label><select id="shxCol" style="width:100%;padding:10px;font-size:16px"></select><p id="shxPreview" class="hint"></p><button id="shxBtn">استبدل النواقص بالملف ده</button></div>
+<details><summary>أو أضف أصناف بالكتابة</summary><p class="hint">كل صنف في سطر، وبيتضاف للقايمة من غير ما يشيل حاجة. أي حاجة بعد علامة | بتتشال.</p><textarea id="shText" rows="6" dir="auto" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"></textarea><button id="shTextBtn">أضف للنواقص</button></details>
+<p id="shStatus" class="status"></p><div id="shConfirm" class="hidden"></div>
+</section>
+
+<section id="translatePanel" class="card hidden">
 <h2>ترجمة النواقص للعربي</h2>
 <p class="hint">البوت بيقترح الاسم العربي لكل صنف ناقص زي ما الشركات بتكتبه. إنت تراجع: «تمام» لو صح، أو تعدّل وتحفظ. الترجمة المقترحة بتشتغل في المقارنة من أول يوم، والمراجعة بتخليها أدق.</p>
 <div class="grid" id="trStats"></div>
@@ -80,10 +90,38 @@ async function all(table,cols,q=x=>x){const out=[];for(let from=0;;from+=1000){c
 async function refresh(){const {data}=await client.auth.getSession();const on=!!data.session;$('loginCard').classList.toggle('hidden',on);$('app').classList.toggle('hidden',!on);if(on)await loadAll()}
 $('loginBtn').onclick=async()=>{status('loginStatus','بيدخل…');const {error}=await client.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){status('loginStatus','مادخلش: '+error.message,'bad');return}status('loginStatus','');refresh()};
 $('logoutBtn').onclick=async()=>{await client.auth.signOut();refresh()};
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('secondary',x!==b));$('translatePanel').classList.toggle('hidden',b.dataset.tab!=='translate');$('readPanel').classList.toggle('hidden',b.dataset.tab!=='read')});
+document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('secondary',x!==b));$('shortPanel').classList.toggle('hidden',b.dataset.tab!=='short');$('translatePanel').classList.toggle('hidden',b.dataset.tab!=='translate');$('readPanel').classList.toggle('hidden',b.dataset.tab!=='read')});
 
-async function loadAll(){try{shortages=(await all('shortage_items','id,product_name',q=>q.eq('is_active',true))).sort((a,b)=>a.product_name.localeCompare(b.product_name));
- await loadNames();drawTranslate()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
+async function loadShortages(){shortages=(await all('ar_shortages','id,product_name',q=>q.eq('is_active',true))).sort((a,b)=>a.product_name.localeCompare(b.product_name))}
+async function loadAll(){try{await loadShortages();
+ await loadNames();drawTranslate();drawShort()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
+
+// ---------- shortages (this bot's own list) ----------
+function drawShort(){$('shStats').innerHTML=`<div class="stat"><strong>${shortages.length}</strong>صنف في النواقص</div><div class="stat"><strong>${shortages.filter(s=>names.has(s.id)).length}</strong>ليهم اسم عربي</div><div class="stat"><strong>${[...names.values()].filter(n=>n.status==='approved').length}</strong>اتأكدت منك</div>`}
+const cleanNames=list=>{const byKey=new Map();for(const v of list){const n=String(v??'').split(/[|\t]/)[0].replace(/\s+/g,' ').trim().slice(0,250);if(n.length>=2&&/\p{L}/u.test(n)&&!byKey.has(nk(n)))byKey.set(nk(n),n)}return byKey};
+async function afterSave(msg){await loadShortages();await loadNames();drawShort();drawTranslate();const noAr=shortages.filter(s=>!names.has(s.id)).length;
+ status('shStatus',msg+` النواقص دلوقتي ${shortages.length} صنف، منهم ${shortages.length-noAr} ليهم ترجمة محفوظة.${noAr?` فيه ${noAr} صنف لسه ماليهمش اسم عربي: ترجمهم من «٢. ترجمة النواقص».`:''}`,'good')}
+async function upsertActive(byKey){const rows=[...byKey].map(([name_key,product_name])=>({name_key,product_name,is_active:true}));
+ for(let i=0;i<rows.length;i+=500){status('shStatus',`بيحفظ ${Math.min(i+500,rows.length)} من ${rows.length}…`);const {error}=await client.from('ar_shortages').upsert(rows.slice(i,i+500),{onConflict:'name_key'});if(error)throw Error(error.message)}}
+// typed lines: added to the list, nothing taken out
+async function addShortages(list,btn){const byKey=cleanNames(list);if(!byKey.size){status('shStatus','مفيش أسماء أصناف.','bad');return}
+ const have=new Set(shortages.map(s=>nk(s.product_name))),fresh=[...byKey.keys()].filter(k=>!have.has(k)).length;btn.disabled=true;
+ try{await upsertActive(byKey);await afterSave(`اتضاف ${fresh} صنف جديد، و${byKey.size-fresh} كانوا موجودين.`);$('shText').value=''}catch(e){status('shStatus','ماتحفظش: '+e.message,'bad')}btn.disabled=false}
+// the shop's file replaces the list: names not in it leave the list (is_active=false, nothing deleted); Arabic names
+// (ar_names) and answers are kept per product name, so a name that comes back later finds its translation again
+function replaceShortages(list,btn){const byKey=cleanNames(list);$('shConfirm').classList.add('hidden');if(!byKey.size){status('shStatus','مفيش أسماء أصناف في العمود ده.','bad');return}
+ const have=new Map(shortages.map(s=>[nk(s.product_name),s.id])),add=[...byKey.keys()].filter(k=>!have.has(k)).length,out=[...have].filter(([k])=>!byKey.has(k)).map(([,id])=>id),stay=byKey.size-add;
+ const few=shortages.length>=50&&byKey.size<shortages.length*0.3;
+ status('shStatus',`الملف فيه ${byKey.size} صنف: ${add} جديد، ${stay} موجودين وهيفضلوا، و${out.length} هيطلعوا من النواقص (ترجمتهم بتفضل محفوظة).`,few?'bad':'');
+ $('shConfirm').innerHTML=`${few?'<p class="status bad">الملف ده أصغر بكتير من القايمة الحالية. اتأكد إنه الملف الصح وإن العمود المختار هو اسم الصنف.</p>':''}<button id="shYes">أيوه، استبدل</button> <button id="shNo" class="secondary">إلغاء</button>`;$('shConfirm').classList.remove('hidden');
+ $('shNo').onclick=()=>{$('shConfirm').classList.add('hidden');status('shStatus','اتلغى، والقايمة زي ما هي.')};
+ $('shYes').onclick=async()=>{$('shConfirm').classList.add('hidden');btn.disabled=true;
+  try{await upsertActive(byKey);
+   for(let i=0;i<out.length;i+=200){const {error}=await client.from('ar_shortages').update({is_active:false}).in('id',out.slice(i,i+200));if(error)throw Error('الأصناف الجديدة اتحفظت، بس القديمة ماطلعتش: '+error.message)}
+   await afterSave(`اتبدلت النواقص: ${add} جديد، ${stay} فضلوا، ${out.length} طلعوا.`)}
+  catch(e){status('shStatus','ماتحفظش: '+e.message,'bad')}btn.disabled=false}}
+excelPicker('shx','shStatus',(n,label,btn)=>replaceShortages(n,btn));
+$('shTextBtn').onclick=()=>addShortages($('shText').value.split(/\r?\n/),$('shTextBtn'));
 
 // ---------- translate ----------
 function drawTranslate(){const appr=[...names.values()].filter(n=>n.status==='approved').length,act=shortages.filter(s=>names.has(s.id)).length;
@@ -129,7 +167,7 @@ async function matchLines(lines,label,btn){lines=lines.map(x=>String(x??'').trim
  try{for(let i=0;i<lines.length;i+=500){status('readStatus',`بيقارن ${Math.min(i+500,lines.length)} من ${lines.length}…`);const d=await invoke({action:'lines',lines:lines.slice(i,i+500)});results.push(...(d.rows||[]).map(r=>({...r,file:label})))}showDone()}
  catch(e){status('readStatus','تعذّرت المقارنة: '+e.message,'bad')}btn.disabled=false}
 $('textBtn').onclick=()=>matchLines($('pasteText').value.split(/\r?\n/),'مكتوب',$('textBtn'));
-let xls=null,xlsxLib=null;
+let xlsxLib=null;
 function loadXlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);return xlsxLib||(xlsxLib=new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='vendor/xlsx-0.20.3.full.min.js';sc.onload=()=>window.XLSX?ok(window.XLSX):no(Error('قارئ Excel مااشتغلش'));sc.onerror=()=>{xlsxLib=null;no(Error('قارئ Excel ماتحمّلش؛ حدّث الصفحة'))};document.head.append(sc)}))}
 const NAME_HEAD=/اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i,NOT_NAME=/سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // header row = the first of the top 20 rows with a name-like title; name column = that title, or else the column with the most text
@@ -137,18 +175,21 @@ function guessSheet(m){let head=-1,col=-1;for(let r=0;r<Math.min(20,m.length)&&h
  const width=Math.max(0,...m.slice(0,200).map(r=>(r||[]).length));
  if(col<0){let best=-1;for(let c=0;c<width;c++){const n=m.slice(0,200).filter(r=>/\p{L}{3,}/u.test(String((r||[])[c]??''))).length;if(n>best){best=n;col=c}}}
  return {head,col,width}}
-$('xlsFile').onchange=async()=>{const f=$('xlsFile').files[0];$('xlsPick').classList.add('hidden');xls=null;if(!f)return;
- try{if(f.size>10*1024*1024)throw Error('الملف أكبر من ١٠ ميجا');status('readStatus','بيفتح الملف…');const X=await loadXlsx();const wb=X.read(await f.arrayBuffer(),{type:'array'});
-  const m=[];for(const n of wb.SheetNames)m.push(...X.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false,blankrows:false}));
-  if(!m.length)throw Error('الملف فاضي');const g=guessSheet(m);xls={m,name:f.name,head:g.head};
-  const title=c=>g.head>=0?String(m[g.head][c]??'').trim():'';
-  $('xlsCol').innerHTML=Array.from({length:g.width},(_,c)=>`<option value="${c}"${c===g.col?' selected':''}>عمود ${c+1}${title(c)?' — '+esc(title(c)):''} · مثال: ${esc(String((m.find((r,i)=>i>g.head&&String((r||[])[c]??'').trim())||[])[c]??'').slice(0,40))}</option>`).join('');
-  drawXlsPreview();$('xlsPick').classList.remove('hidden');status('readStatus','اتأكد إن العمود المختار هو اسم الصنف، وبعدين اضغط «قارن».')}
- catch(e){status('readStatus','تعذّر فتح الملف: '+e.message,'bad')}};
-const xlsNames=()=>{const c=+$('xlsCol').value,title=xls.head>=0?String(xls.m[xls.head][c]??'').trim():'';return xls.m.slice(xls.head+1).map(r=>String((r||[])[c]??'').trim()).filter(v=>v.length>=2&&/\p{L}/u.test(v)&&v!==title)};
-function drawXlsPreview(){const n=xlsNames();$('xlsPreview').textContent=`${n.length} اسم. أول أسماء: ${n.slice(0,3).join(' / ')}`}
-$('xlsCol').onchange=drawXlsPreview;
-$('xlsBtn').onclick=()=>xls&&matchLines(xlsNames(),xls.name,$('xlsBtn'));
+// one Excel/CSV picker (file -> name column -> names), used for the shortage list (shx) and supplier files (xls)
+function excelPicker(p,statusId,onGo){let xls=null;
+ const names=()=>{const c=+$(p+'Col').value,title=xls.head>=0?String(xls.m[xls.head][c]??'').trim():'';return xls.m.slice(xls.head+1).map(r=>String((r||[])[c]??'').trim()).filter(v=>v.length>=2&&/\p{L}/u.test(v)&&v!==title)};
+ const preview=()=>{const n=names();$(p+'Preview').textContent=`${n.length} اسم. أول أسماء: ${n.slice(0,3).join(' / ')}`};
+ $(p+'File').onchange=async()=>{const f=$(p+'File').files[0];$(p+'Pick').classList.add('hidden');xls=null;if(!f)return;
+  try{if(f.size>10*1024*1024)throw Error('الملف أكبر من ١٠ ميجا');status(statusId,'بيفتح الملف…');const X=await loadXlsx();const wb=X.read(await f.arrayBuffer(),{type:'array'});
+   const m=[];for(const n of wb.SheetNames)m.push(...X.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false,blankrows:false}));
+   if(!m.length)throw Error('الملف فاضي');const g=guessSheet(m);xls={m,name:f.name,head:g.head};
+   const title=c=>g.head>=0?String(m[g.head][c]??'').trim():'';
+   $(p+'Col').innerHTML=Array.from({length:g.width},(_,c)=>`<option value="${c}"${c===g.col?' selected':''}>عمود ${c+1}${title(c)?' — '+esc(title(c)):''} · مثال: ${esc(String((m.find((r,i)=>i>g.head&&String((r||[])[c]??'').trim())||[])[c]??'').slice(0,40))}</option>`).join('');
+   preview();$(p+'Pick').classList.remove('hidden');status(statusId,'اتأكد إن العمود المختار هو اسم الصنف، وبعدين اضغط الزرار.')}
+  catch(e){status(statusId,'تعذّر فتح الملف: '+e.message,'bad')}};
+ $(p+'Col').onchange=preview;
+ $(p+'Btn').onclick=()=>xls&&onGo(names(),xls.name,$(p+'Btn'))}
+excelPicker('xls','readStatus',(n,label,btn)=>matchLines(n,label,btn));
 const sName=id=>shortages.find(s=>s.id===id)?.product_name||'',aName=id=>names.get(id)?.arabic_name||'';
 const isSure=r=>r.match&&(r.match.confidence==='high'||r.match.confidence==='confirmed');
 const options=r=>(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&(c.score??1)>=OFFER_MIN&&a.findIndex(x=>x.id===c.id)===i);

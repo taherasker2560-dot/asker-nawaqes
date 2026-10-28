@@ -6,7 +6,7 @@ const ORIGIN='https://taherasker2560-dot.github.io',env={GEMINI_API_KEY:'k',ALLO
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'},{id:'s3',product_name:'JANUVIA 50MG 28TAB'},{id:'s4',product_name:'JANUVIA 100MG 28TAB'}];
 function fake({names=[],decisions=[],gem,fixes=[],ignored=[],v10aliases=[],v10rej=[],v10fixes=[]}){const calls=[];const f=async(url,o={})=>{calls.push({url,o});
  if(url.endsWith('/auth/v1/user'))return new Response(JSON.stringify({email:'owner@example.com'}));
- if(url.includes('/rest/v1/shortage_items'))return new Response(JSON.stringify(url.includes('offset=0')?shortages:[]));
+ if(url.includes('/rest/v1/ar_shortages'))return new Response(JSON.stringify(url.includes('offset=0')?shortages:[]));
  if(url.includes('/rest/v1/ar_names')&&o.method==='POST'){f.saved=JSON.parse(o.body);return new Response('',{status:201})}
  if(url.includes('/rest/v1/ar_names'))return new Response(JSON.stringify(url.includes('offset=0')?names:[]));
  const page=a=>new Response(JSON.stringify(url.includes('offset=0')?a:[]));

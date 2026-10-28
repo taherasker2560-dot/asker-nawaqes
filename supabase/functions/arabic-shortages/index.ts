@@ -1,6 +1,7 @@
 // ASKER trial bot (asker-nawaqes-arabic.html) — separate from V10 and its function read-supplier-image.
 // Idea: translate the shortage list to Arabic once (the owner reviews it), then compare supplier lines
 // Arabic-to-Arabic against ~2000 shortages only, instead of 31,000 English catalogue items.
+// The shortage list is this bot's own (ar_shortages, filled from the page), separate from V10's shortage_items.
 // Actions (owner only, same secrets as V10: GEMINI_API_KEY, ALLOWED_EMAILS, GEMINI_MODEL, ALLOWED_ORIGINS):
 //   translate {limit}       -> Gemini suggests Arabic names for shortages that have none yet (ar_names)
 // Arabic names and the owner's answers are kept per product (name_key = the English name, upper case, single
@@ -16,7 +17,7 @@
 
 import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar4';
+export const VERSION = 'ar5';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -210,7 +211,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (body.action === 'translate') {
       const limit = Math.min(100, Math.max(1, Number(body.limit) || 60));
       const [shortages, names] = await Promise.all([
-        restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'),
+        restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'),
         restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
       ]);
       const have = new Set(names.map((n) => n.name_key)), seen = new Set<string>();
@@ -239,7 +240,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       if (Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) return reply(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا.' }, headers);
       const [text, shortages, k] = await Promise.all([
         gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: mimeType, data: image } }], READ_SCHEMA),
-        restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'),
+        restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'),
         knowledge(env, auth, fetchImpl),
       ]);
       let parsed: unknown;
@@ -256,7 +257,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (body.action === 'lines') {
       const rows: Row[] = (Array.isArray(body.lines) ? body.lines : []).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
       if (!rows.length) return reply(400, { error: 'lines', message: 'مفيش أسماء أصناف في اللي اتبعت.' }, headers);
-      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
       const out = matchRows(rows, shortageCatalog(shortages, k.names, k.answers), k, shortages);
       log('lines', t0, { rows: out.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
       return reply(200, { rows: out, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
@@ -265,7 +266,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (body.action === 'match') {
       const name = clean(body.name), english = clean(body.english).slice(0, 250), read = clean(body.read);
       if (name.length < 2 || name.length > 250) return reply(400, { error: 'name', message: 'الاسم قصير أو طويل جدًا.' }, headers);
-      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
       const row = matchRows([{ name, english, unclear: false }], shortageCatalog(shortages, k.names, k.answers), k, shortages, read ? aliasKey(read) : '')[0];
       return reply(200, { row, version: VERSION }, headers);
     }
