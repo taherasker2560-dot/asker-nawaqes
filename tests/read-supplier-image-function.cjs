@@ -85,6 +85,18 @@ assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
  const fx=async()=>new Response(JSON.stringify([{read_key:'نيوتون جل',corrected_text:'نيوروتون جل'}]),{status:200});
  x=await json(await handle(req({body:{action:'match',name:'نيوتون جل',english:'NEUROTONE GEL'}}),env,fakeFetch({catalogResponse:cat2,fixesResponse:fx})));
  assert.equal(x.body.row.corrected,'نيوروتون جل','reading fix applied in the review list');assert.equal(x.body.row.candidates[0].name,'NEUROTONE GEL 30GM');resetCatalogCache();}
+// a name written a little differently from one the owner confirmed is recognised; a different form or number is not
+{const {Catalog}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','match.ts'));
+ const c=new Catalog([['63858','GLUOKAN 5/500MG TABLETS'],['9','GLUCOPHAGE 500MG 50TAB']]);
+ const al=[{alias_key:'جلوجان 500/5 اقراص',target_name:'GLUOKAN 5/500MG TABLETS',target_code:'63858'}];
+ let x=annotate([{name:'جلوجان ٥/٥٠٠ قرص',english:'',unclear:false}],c,al);assert.equal(x[0].match.name,'GLUOKAN 5/500MG TABLETS');assert.equal(x[0].match.via,'alias');assert.equal(x[0].match.confidence,'high');
+ x=annotate([{name:'جلوجان ٥/٨٥٠ قرص',english:'',unclear:false}],c,al);assert.notEqual(x[0].match?.via,'alias','different strength');
+ x=annotate([{name:'جلوجان ٥٠٠/٥ شراب',english:'',unclear:false}],c,al);assert.notEqual(x[0].match?.via,'alias','different form');
+ x=annotate([{name:'جلوجان ٥/٥٠٠ قرص',english:'',unclear:false}],c,al,[],[{alias_key:'جلوجان 5/500 قرص',target_name:'GLUOKAN 5/500MG TABLETS'}]);assert.notEqual(x[0].match?.via,'alias','rejected stays rejected');
+ // learned: the confirmed Arabic name now finds the item from a close spelling
+ const c2=new Catalog([['1','NEUROTON 30TAB'],['2','OTHER 30TAB']]);annotate([],c2,[{alias_key:'نيوروتون اقراص',target_name:'NEUROTON 30TAB',target_code:'1'}]);assert.equal(c2.candidates('نيوروتونن اقراص','')[0]?.id,'1');}
+// reload action and version
+{resetCatalogCache();const cat3=async()=>new Response(JSON.stringify([['1','A ITEM'],['2','B ITEM']]),{status:200});let x=await json(await handle(req({body:{action:'reload'}}),env,fakeFetch({catalogResponse:cat3})));assert.equal(x.status,200);assert.equal(x.body.items,2);assert.match(x.body.version,/^v\d+$/);resetCatalogCache();}
 // two different confirmations for the same supplier name -> review, never a silent pick
 {const cat=null;const rows=annotate([{name:'اسم',english:'',unclear:false}],cat,[{alias_key:'اسم',target_name:'A',target_code:'1'},{alias_key:'اسم',target_name:'B',target_code:'2'}]);assert.equal(rows[0].match,null);}
 // a model that rejects optional settings with a bare 400 steps down: no thinking, then no schema

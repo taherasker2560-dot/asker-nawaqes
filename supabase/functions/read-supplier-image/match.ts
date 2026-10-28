@@ -6,7 +6,7 @@ export type CatalogItem = [id: string, name: string, alts?: string[]];
 export type Candidate = { id: string; name: string; score: number; numbersOk: boolean; formOk?: boolean; brandOk?: boolean };
 // Below this score an item is never offered to the owner as "this one?" (the editor still lists it).
 export const OFFER_MIN = 0.45;
-export type Match = { id: string; name: string; score: number; confidence: 'confirmed' | 'high' | 'review' };
+export type Match = { id: string; name: string; score: number; confidence: 'confirmed' | 'high' | 'review'; via?: 'alias' };
 
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
@@ -179,6 +179,14 @@ function brand(s: string, query = false): Set<string>[] {
   return out;
 }
 
+// Text similarity 0..1 (same rules as the item search): used to recognise a name the owner confirmed before
+// when the supplier writes it a little differently (جلوجان ٥٠٠/٥ اقراص = جلوجان ٥/٥٠٠ قرص).
+export function similarity(a: string, b: string): number { return dice(grams(a, true), grams(b, true)); }
+export function sameNumbers(a: string, b: string): boolean {
+  const x = numbers(a).sort(), y = numbers(b).sort();
+  return x.length === y.length && x.every((n, i) => n === y[i]);
+}
+
 function dice(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
   let n = 0; for (const g of a) if (b.has(g)) n++;
@@ -189,6 +197,8 @@ type Entry = { id: string; name: string; nums: string[]; g: Set<string>[]; b: Se
 export class Catalog {
   private entries: Entry[] = [];
   private index = new Map<string, number[]>();
+  private byId = new Map<string, number>();
+  private learned = new Set<string>();
   constructor(items: CatalogItem[]) {
     items.forEach((it, i) => {
       const forms = [it[1], ...(it[2] || [])];
@@ -196,7 +206,19 @@ export class Catalog {
       this.entries.push({ id: it[0], name: it[1], nums: numbers(it[1]), g, b: forms.flatMap((f) => brand(f)), sc: strengthAndCount(it[1]) });
       const seen = new Set<string>();
       for (const set of g) for (const t of set) if (!seen.has(t)) { seen.add(t); let l = this.index.get(t); if (!l) this.index.set(t, (l = [])); l.push(i); }
+      this.byId.set(it[0], i);
     });
+  }
+  // A supplier name the owner confirmed for an item becomes one more name of that item (while the worker is warm),
+  // so close spellings of it are found too.
+  learn(id: string, text: string): void {
+    const i = this.byId.get(id), k = id + '|' + text;
+    if (i === undefined || this.learned.has(k) || !text) return;
+    this.learned.add(k);
+    const e = this.entries[i], g = grams(text);
+    if (!g.size) return;
+    e.g.push(g); e.b.push(...brand(text));
+    for (const t of g) { let l = this.index.get(t); if (!l) this.index.set(t, (l = [])); if (l[l.length - 1] !== i) l.push(i); }
   }
   get size(): number { return this.entries.length; }
   byName(name: string): Entry | undefined { const k = normalize(name); return this.entries.find((e) => normalize(e.name) === k); }

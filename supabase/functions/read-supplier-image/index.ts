@@ -8,7 +8,10 @@
 // export by scripts/build-catalog.py) is private: it lives in the owner-only Storage bucket asker-private as
 // catalog.json, never in this public repository. Without it, reading still works, just without item matching.
 
-import { Catalog, aliasKey, decide, type CatalogItem, type Candidate, type Match } from './match.ts';
+import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
+
+// Shown in every answer so a deploy can be checked against the repository.
+export const VERSION = 'v18';
 
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
@@ -86,6 +89,8 @@ export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[], fix
   const fixByKey = new Map(fixes.map((f) => [f.read_key, f.corrected_text]));
   const rejected = new Map<string, Set<string>>();
   for (const x of rejections) { const l = rejected.get(x.alias_key) || new Set<string>(); l.add(x.target_name); rejected.set(x.alias_key, l); }
+  // confirmed names with an item code also become extra names of that item
+  if (cat) for (const a of aliases) if (a.target_code) cat.learn(a.target_code, a.alias_key);
   return rows.map((r) => {
     const key = aliasKey(r.name);
     const corrected = fixByKey.get(key) || null;
@@ -97,6 +102,16 @@ export function annotate(rows: Row[], cat: Catalog | null, aliases: Alias[], fix
     let match: Match | null = decide(candidates);
     if (confirmed.length === 1) match = { id: confirmed[0].target_code || '', name: confirmed[0].target_name, score: 1, confidence: 'confirmed' };
     else if (confirmed.length > 1 && match) match = { ...match, confidence: 'review' };
+    else if (!confirmed.length) {
+      // written a little differently from a name the owner confirmed: same numbers, same form, very close text
+      const near = new Map<string, Alias>();
+      const textForms = forms(text);
+      for (const a of aliases) {
+        if (no.has(a.target_name) || !sameNumbers(text, a.alias_key) || !formsAgree(textForms, forms(a.alias_key))) continue;
+        if (similarity(text, a.alias_key) >= 0.85) near.set(a.target_name, a);
+      }
+      if (near.size === 1) { const a = [...near.values()][0]; match = { id: a.target_code || '', name: a.target_name, score: 0.95, confidence: 'high', via: 'alias' }; }
+    }
     return { ...r, key, corrected, match, candidates };
   });
 }
@@ -205,6 +220,12 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   let body: { image?: unknown; mimeType?: unknown; action?: unknown; q?: unknown; name?: unknown; english?: unknown; read?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
 
+  // After the owner uploads a new item list from the page: forget the cached one.
+  if (body.action === 'reload') {
+    resetCatalogCache();
+    const cat = await getCatalog(env, auth, fetchImpl);
+    return reply(cat ? 200 : 503, { items: cat?.size || 0, version: VERSION }, headers);
+  }
   // Owner tools on the private item list: search box, and re-matching a line after an Arabic correction.
   if (body.action === 'search' || body.action === 'match') {
     const cat = await getCatalog(env, auth, fetchImpl);
@@ -212,7 +233,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (body.action === 'search') {
       const q = typeof body.q === 'string' ? body.q.trim() : '';
       if (q.length < 2 || q.length > 100) return reply(400, { error: 'q', message: 'اكتب حرفين على الأقل.' }, headers);
-      return reply(200, { items: cat.search(q) }, headers);
+      return reply(200, { items: cat.search(q), version: VERSION }, headers);
     }
     const name = typeof body.name === 'string' ? arabicLetters(body.name).replace(/\s+/g, ' ').trim() : '';
     if (name.length < 2 || name.length > 250) return reply(400, { error: 'name', message: 'الاسم قصير أو طويل جدًا.' }, headers);
@@ -223,7 +244,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const readKey = typeof body.read === 'string' ? aliasKey(arabicLetters(body.read)) : '';
     const nameKey = aliasKey(name);
     const extra = readKey && readKey !== nameKey ? rejections.filter((x) => x.alias_key === readKey).map((x) => ({ ...x, alias_key: nameKey })) : [];
-    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases, readKey && readKey !== nameKey ? [] : fixes, [...rejections, ...extra])[0] }, headers);
+    return reply(200, { row: annotate([{ name, english, unclear: false }], cat, aliases, readKey && readKey !== nameKey ? [] : fixes, [...rejections, ...extra])[0], version: VERSION }, headers);
   }
 
   const image = typeof body.image === 'string' ? body.image : '';
@@ -297,7 +318,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   const cat = await getCatalog(env, auth, fetchImpl);
   const annotated = annotate(rows, cat, aliases, fixes, rejections);
   log('match', t2, { rows: annotated.length, aliases: aliases.length, fixes: fixes.length, rejections: rejections.length, catalog: cat?.size || 0, high: annotated.filter((r) => r.match?.confidence === 'high').length, confirmed: annotated.filter((r) => r.match?.confidence === 'confirmed').length });
-  return reply(200, { rows: annotated, model, catalog: cat?.size || 0, truncated: candidate?.finishReason === 'MAX_TOKENS' }, headers);
+  return reply(200, { rows: annotated, model, catalog: cat?.size || 0, truncated: candidate?.finishReason === 'MAX_TOKENS', version: VERSION }, headers);
 }
 
 // Runs only inside Supabase (Deno); Node tests import handle() directly.
