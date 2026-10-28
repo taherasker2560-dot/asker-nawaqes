@@ -4,11 +4,13 @@ const assert=require('node:assert/strict'),path=require('node:path');
 const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
 const ORIGIN='https://taherasker2560-dot.github.io',env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon'};
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'},{id:'s3',product_name:'JANUVIA 50MG 28TAB'},{id:'s4',product_name:'JANUVIA 100MG 28TAB'}];
-function fake({names=[],decisions=[],gem}){const calls=[];const f=async(url,o={})=>{calls.push({url,o});
+function fake({names=[],decisions=[],gem,fixes=[],ignored=[],v10aliases=[],v10rej=[],v10fixes=[]}){const calls=[];const f=async(url,o={})=>{calls.push({url,o});
  if(url.endsWith('/auth/v1/user'))return new Response(JSON.stringify({email:'owner@example.com'}));
  if(url.includes('/rest/v1/shortage_items'))return new Response(JSON.stringify(url.includes('offset=0')?shortages:[]));
  if(url.includes('/rest/v1/ar_names')&&o.method==='POST'){f.saved=JSON.parse(o.body);return new Response('',{status:201})}
  if(url.includes('/rest/v1/ar_names'))return new Response(JSON.stringify(url.includes('offset=0')?names:[]));
+ const page=a=>new Response(JSON.stringify(url.includes('offset=0')?a:[]));
+ if(url.includes('/rest/v1/ar_fixes'))return page(fixes);if(url.includes('/rest/v1/ar_ignored'))return page(ignored);if(url.includes('/rest/v1/name_aliases'))return page(v10aliases);if(url.includes('/rest/v1/name_rejections'))return page(v10rej);if(url.includes('/rest/v1/reading_fixes'))return page(v10fixes);
  if(url.includes('/rest/v1/ar_answers'))return new Response(JSON.stringify(url.includes('offset=0')?decisions:[]));
  if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(gem(JSON.parse(o.body)))}]}}]}));
  throw Error('unexpected '+url)};f.calls=calls;return f}
@@ -27,6 +29,20 @@ assert.equal(r.status,200);assert.equal(b.rows[0].match.id,'s2');assert.equal(b.
 f=fake({names,decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'no'},{alias_key:'بانادول اكسترا',read_text:'بانادول اكسترا',name_key:'BRUFEN 400MG 30TAB',decision:'yes'}],gem:()=>gemRows});
 b=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();
 assert.ok(!b.rows[1].candidates.some(c=>c.id==='s3'),'rejected shortage not suggested again');assert.equal(b.rows[2].match.id,'s1');assert.equal(b.rows[2].match.confidence,'confirmed');
+// smart matching: reading fix, V10 knowledge, near answers, ignored names, re-match after a correction
+{const rows={rows:[{name:'فلاجيل شراب ١٢٥',english:''},{name:'جانوفيا ٥٠ مجم قرص ٢٨',english:''},{name:'بروفن ٤٠٠ اقراص',english:''},{name:'كريم مش مهم',english:''},{name:'جانوقيا ١٠٠',english:''}]};
+ const k=x=>x;f=fake({names,gem:()=>rows,
+  answers:[],decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'yes'}],
+  v10aliases:[{alias_key:'بروفن 400 اقراص',target_name:'BRUFEN 400MG 30TAB'}],ignored:[{alias_key:'كريم مش مهم'}],fixes:[{read_key:'جانوقيا 100',corrected_text:'جانوفيا ١٠٠ مجم ٢٨ قرص'}]});
+ const x=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();
+ assert.equal(x.rows[1].match.id,'s3');assert.equal(x.rows[1].match.via,'alias','near a line the owner confirmed (same numbers, words in another order)');
+ assert.equal(x.rows[2].match.id,'s1');assert.equal(x.rows[2].match.confidence,'confirmed','V10 confirmed name reused');
+ assert.equal(x.rows[3].ignored,true);assert.equal(x.rows[4].corrected,'جانوفيا ١٠٠ مجم ٢٨ قرص');assert.equal(x.rows[4].match?.id,'s4','matched on the corrected text');
+ f=fake({names,gem:()=>({}),decisions:[{alias_key:'جانوقيا',read_text:'جانوقيا',name_key:'JANUVIA 100MG 28TAB',decision:'no'}]});
+ const m=await (await F.handle(req({action:'match',name:'جانوفيا ١٠٠ مجم ٢٨ قرص',english:'',read:'جانوقيا'}),env,f)).json();
+ assert.ok(!m.row.candidates.some(c=>c.id==='s4'),'«مش ده» on the first reading still applies after the correction');
+ f=fake({names,gem:()=>rows,v10rej:[{alias_key:'فلاجيل شراب 125',target_name:'FLAGYL 125MG SYP'}]});
+ const v=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();assert.notEqual(v.rows[0].match?.id,'s2','V10 «مش ده» respected');}
 // security: other accounts refused before any Gemini call
 const g=fake({gem:()=>({})});const other=async(u,o)=>u.endsWith('/auth/v1/user')?new Response(JSON.stringify({email:'x@y.z'})):g(u,o);
 r=await F.handle(req({action:'translate'}),env,other);assert.equal(r.status,403);assert.ok(!g.calls.some(c=>c.url.includes('generativelanguage')));
