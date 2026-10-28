@@ -4,6 +4,9 @@
   const SUPABASE_URL = 'https://qwrzdjdgvanmhaicncuk.supabase.co',
     SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_af0XfsvB0Fwwo3HORqMN2g_iJNd9o0q',
     FN = 'arabic-shortages',
+    // The server version this page expects (VERSION in supabase/functions/arabic-shortages/index.ts).
+    // tests/shared-matcher.cjs fails when they differ; the page warns when the deployed function is older.
+    SERVER_VERSION = 'ar7',
     OFFER_MIN = 0.45;
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
   const $ = (id) => document.getElementById(id),
@@ -50,8 +53,15 @@
       } catch (e) {}
       throw Error(m);
     }
+    if (data?.version && data.version !== SERVER_VERSION && !warnedVersion) {
+      warnedVersion = true;
+      console.warn('arabic-shortages', data.version, 'expected', SERVER_VERSION);
+      $('versionWarn').textContent = `تنبيه: السيرفر شغال بنسخة ${data.version} والصفحة مستنية ${SERVER_VERSION}. النتايج ممكن تكون ناقصة؛ قول للمطوّر يرفع الدالة.`;
+      $('versionWarn').classList.remove('hidden');
+    }
     return data;
   }
+  let warnedVersion = false;
   async function all(table, cols, q = (x) => x) {
     const out = [];
     for (let from = 0; ; from += 1000) {
