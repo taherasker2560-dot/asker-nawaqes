@@ -30,7 +30,7 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 <main>
 <section id="loginCard" class="card"><h2>تسجيل الدخول</h2><label for="email">الإيميل</label><input id="email" type="email" autocomplete="username"><label for="password">كلمة السر</label><input id="password" type="password" autocomplete="current-password"><button id="loginBtn">دخول</button><p id="loginStatus" class="status"></p></section>
 <div id="app" class="hidden">
-<div class="tabs"><button data-tab="translate">١. ترجمة النواقص</button><button data-tab="read" class="secondary">٢. قراءة صور الشركة</button><button id="logoutBtn" class="secondary">خروج</button></div>
+<div class="tabs"><button data-tab="translate">١. ترجمة النواقص</button><button data-tab="read" class="secondary">٢. قراءة وارد الشركة</button><button id="logoutBtn" class="secondary">خروج</button></div>
 
 <section id="translatePanel" class="card">
 <h2>ترجمة النواقص للعربي</h2>
@@ -44,10 +44,15 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 </section>
 
 <section id="readPanel" class="card hidden">
-<h2>قراءة صور الشركة</h2>
+<h2>قراءة وارد الشركة</h2>
 <label for="supplier">اسم الشركة (اختياري)</label><input id="supplier" type="text">
-<label for="images">صور الشركة (لحد ٢٠ صورة)</label><input id="images" type="file" accept="image/jpeg,image/png,image/webp" multiple>
-<button id="readBtn" disabled>اقرا الصور وقارن بالنواقص</button>
+<div class="tabs" style="margin-top:10px"><button data-src="img">صور أو PDF</button><button data-src="text" class="secondary">مكتوب</button><button data-src="excel" class="secondary">ملف Excel</button></div>
+<div data-src-box="img"><label for="images">صور الشركة أو ملف PDF (لحد ٢٠ ملف، كل ملف أقل من ٨ ميجا)</label><input id="images" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple>
+<button id="readBtn" disabled>اقرا وقارن بالنواقص</button></div>
+<div data-src-box="text" class="hidden"><label for="pasteText">الصق أو اكتب الوارد: كل صنف في سطر</label><p class="hint">لو فيه كمية أو سعر اكتبهم بعد علامة | وهيتشالوا. ينفع عربي أو إنجليزي.</p><textarea id="pasteText" rows="8" dir="auto" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"></textarea>
+<button id="textBtn">قارن بالنواقص</button></div>
+<div data-src-box="excel" class="hidden"><label for="xlsFile">ملف Excel أو CSV من الشركة</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv">
+<div id="xlsPick" class="hidden"><label for="xlsCol">عمود اسم الصنف</label><select id="xlsCol" style="width:100%;padding:10px;font-size:16px"></select><p id="xlsPreview" class="hint"></p><button id="xlsBtn">قارن بالنواقص</button></div></div>
 <p id="readStatus" class="status"></p>
 <div id="undoBar" class="status hidden"></div>
 <div id="results"></div>
@@ -110,11 +115,40 @@ $('trStop').onclick=()=>{stopAll=true};
 // ---------- read ----------
 const toBase64=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]||'');r.onerror=()=>no(r.error);r.readAsDataURL(f)});
 $('images').onchange=()=>{$('readBtn').disabled=!$('images').files.length};
+document.querySelectorAll('[data-src]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-src]').forEach(x=>x.classList.toggle('secondary',x!==b));document.querySelectorAll('[data-src-box]').forEach(x=>x.classList.toggle('hidden',x.dataset.srcBox!==b.dataset.src))});
+const isPdf=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name);
 $('readBtn').onclick=async()=>{const files=[...$('images').files].slice(0,20);if(!files.length)return;$('readBtn').disabled=true;results=[];$('results').innerHTML='';
- try{for(let i=0;i<files.length;i++){if(files[i].size>8*1024*1024)throw Error(`الصورة ${i+1} أكبر من ٨ ميجا`);status('readStatus',`بيقرا الصورة ${i+1} من ${files.length}…`);
-   const d=await invoke({action:'read',image:await toBase64(files[i]),mimeType:files[i].type||'image/jpeg'});results.push(...(d.rows||[]).map(r=>({...r,file:files[i].name})))}
-  drawResults();const sure=results.filter(isSure).length;status('readStatus',`اتقرا ${results.length} سطر. وصل من النواقص: ${new Set(results.filter(isSure).map(r=>r.match.id)).size}.`,'good')}
+ try{for(let i=0;i<files.length;i++){if(files[i].size>8*1024*1024)throw Error(`الملف ${i+1} أكبر من ٨ ميجا`);status('readStatus',`بيقرا ${isPdf(files[i])?'ملف PDF':'الصورة'} ${i+1} من ${files.length}…`);
+   const d=await invoke({action:'read',image:await toBase64(files[i]),mimeType:isPdf(files[i])?'application/pdf':(files[i].type||'image/jpeg')});results.push(...(d.rows||[]).map(r=>({...r,file:files[i].name})))}
+  showDone()}
  catch(e){status('readStatus','تعذّرت القراءة: '+e.message,'bad')}$('readBtn').disabled=false};
+function showDone(){drawResults();status('readStatus',`اتقرا ${results.length} سطر. وصل من النواقص: ${new Set(results.filter(isSure).map(r=>r.match.id)).size}.`,'good')}
+// typed lines and Excel names: matched on the server with the same tools, no Gemini (no quota used)
+async function matchLines(lines,label,btn){lines=lines.map(x=>String(x??'').trim()).filter(x=>x.length>=2);if(!lines.length){status('readStatus','مفيش أسماء أصناف.','bad');return}
+ btn.disabled=true;results=[];$('results').innerHTML='';
+ try{for(let i=0;i<lines.length;i+=500){status('readStatus',`بيقارن ${Math.min(i+500,lines.length)} من ${lines.length}…`);const d=await invoke({action:'lines',lines:lines.slice(i,i+500)});results.push(...(d.rows||[]).map(r=>({...r,file:label})))}showDone()}
+ catch(e){status('readStatus','تعذّرت المقارنة: '+e.message,'bad')}btn.disabled=false}
+$('textBtn').onclick=()=>matchLines($('pasteText').value.split(/\r?\n/),'مكتوب',$('textBtn'));
+let xls=null,xlsxLib=null;
+function loadXlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);return xlsxLib||(xlsxLib=new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='vendor/xlsx-0.20.3.full.min.js';sc.onload=()=>window.XLSX?ok(window.XLSX):no(Error('قارئ Excel مااشتغلش'));sc.onerror=()=>{xlsxLib=null;no(Error('قارئ Excel ماتحمّلش؛ حدّث الصفحة'))};document.head.append(sc)}))}
+const NAME_HEAD=/اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i,NOT_NAME=/سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
+// header row = the first of the top 20 rows with a name-like title; name column = that title, or else the column with the most text
+function guessSheet(m){let head=-1,col=-1;for(let r=0;r<Math.min(20,m.length)&&head<0;r++){const c=(m[r]||[]).findIndex(v=>NAME_HEAD.test(String(v??''))&&!NOT_NAME.test(String(v??''))&&String(v).length<40);if(c>=0){head=r;col=c}}
+ const width=Math.max(0,...m.slice(0,200).map(r=>(r||[]).length));
+ if(col<0){let best=-1;for(let c=0;c<width;c++){const n=m.slice(0,200).filter(r=>/\p{L}{3,}/u.test(String((r||[])[c]??''))).length;if(n>best){best=n;col=c}}}
+ return {head,col,width}}
+$('xlsFile').onchange=async()=>{const f=$('xlsFile').files[0];$('xlsPick').classList.add('hidden');xls=null;if(!f)return;
+ try{if(f.size>10*1024*1024)throw Error('الملف أكبر من ١٠ ميجا');status('readStatus','بيفتح الملف…');const X=await loadXlsx();const wb=X.read(await f.arrayBuffer(),{type:'array'});
+  const m=[];for(const n of wb.SheetNames)m.push(...X.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false,blankrows:false}));
+  if(!m.length)throw Error('الملف فاضي');const g=guessSheet(m);xls={m,name:f.name,head:g.head};
+  const title=c=>g.head>=0?String(m[g.head][c]??'').trim():'';
+  $('xlsCol').innerHTML=Array.from({length:g.width},(_,c)=>`<option value="${c}"${c===g.col?' selected':''}>عمود ${c+1}${title(c)?' — '+esc(title(c)):''} · مثال: ${esc(String((m.find((r,i)=>i>g.head&&String((r||[])[c]??'').trim())||[])[c]??'').slice(0,40))}</option>`).join('');
+  drawXlsPreview();$('xlsPick').classList.remove('hidden');status('readStatus','اتأكد إن العمود المختار هو اسم الصنف، وبعدين اضغط «قارن».')}
+ catch(e){status('readStatus','تعذّر فتح الملف: '+e.message,'bad')}};
+const xlsNames=()=>{const c=+$('xlsCol').value,title=xls.head>=0?String(xls.m[xls.head][c]??'').trim():'';return xls.m.slice(xls.head+1).map(r=>String((r||[])[c]??'').trim()).filter(v=>v.length>=2&&/\p{L}/u.test(v)&&v!==title)};
+function drawXlsPreview(){const n=xlsNames();$('xlsPreview').textContent=`${n.length} اسم. أول أسماء: ${n.slice(0,3).join(' / ')}`}
+$('xlsCol').onchange=drawXlsPreview;
+$('xlsBtn').onclick=()=>xls&&matchLines(xlsNames(),xls.name,$('xlsBtn'));
 const sName=id=>shortages.find(s=>s.id===id)?.product_name||'',aName=id=>names.get(id)?.arabic_name||'';
 const isSure=r=>r.match&&(r.match.confidence==='high'||r.match.confidence==='confirmed');
 const options=r=>(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&(c.score??1)>=OFFER_MIN&&a.findIndex(x=>x.id===c.id)===i);
