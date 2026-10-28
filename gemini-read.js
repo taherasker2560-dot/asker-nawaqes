@@ -15,6 +15,7 @@ function init(deps){const host=document.querySelector('#incomingPanel .incoming-
  el('extract').parentElement.after(button,hint);
  const invoke=body=>deps.client.functions.invoke(FUNCTION_NAME,{body});
  const dictionary=root.AskerGeminiReport?.manager?root.AskerGeminiReport.manager(hint.parentElement,deps.client):null;
+ if(root.AskerCatalogUpdate)root.AskerCatalogUpdate.init(hint.parentElement,{client:deps.client,invoke});
  const reviewList=root.AskerGeminiReport?.reviewList?root.AskerGeminiReport.reviewList(hint.parentElement,{client:deps.client,invoke},m=>{el('status').textContent=m;dictionary?.reload()}):null;
  let run=0,busy=false;const status=(m,bad=false)=>{el('status').textContent=m;el('status').className='status'+(bad?' bad':'')};
  input.addEventListener('change',()=>{run++;busy=false;button.disabled=!input.files.length});
@@ -44,5 +45,13 @@ function init(deps){const host=document.querySelector('#incomingPanel .incoming-
   catch(e){if(ticket===run){root.AskerFileImport.cancelIncomingImages(token);status('تعذّرت قراءة Gemini: '+e.message+' — لم يتم تغيير النص أو حفظ بيانات.',true)}}
   finally{if(ticket===run){busy=false;button.disabled=!input.files.length}}});
 }
-const api={init,base64,summarize,errorMessage};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiRead=api;
+// Puts the Gemini button first and folds the older readers (Tesseract on the phone, the Sites reader) into
+// «طرق قراءة قديمة». Nothing is removed; they work as before when opened.
+function tidy(){const host=document.querySelector('#incomingPanel .incoming-images'),gem=document.getElementById('geminiReadImages');if(!host||!gem||document.getElementById('oldReaders'))return;
+ const old=document.createElement('details');old.className='file-import';old.id='oldReaders';old.innerHTML='<summary>طرق قراءة قديمة (Tesseract على الموبايل وقارئ Sites)</summary>';
+ const extractRow=host.querySelector('[data-image-role="extract"]')?.parentElement;
+ extractRow?.before(gem,gem.nextElementSibling&&gem.nextElementSibling.tagName==='P'?gem.nextElementSibling:document.createTextNode(''));
+ const move=[document.querySelector('label[for="incomingImageLanguage"]'),document.getElementById('incomingImageLanguage'),document.querySelector('label[for="incomingImageQuality"]'),document.getElementById('incomingImageQuality'),extractRow,extractRow?.parentElement===host?host.querySelector('[data-image-role="status"]')?.nextElementSibling:null,document.getElementById('openGeminiReader'),document.getElementById('openGeminiReader')?.nextElementSibling,document.getElementById('restoreBeforeGemini')].filter(x=>x&&x.tagName);
+ const status=host.querySelector('[data-image-role="status"]');move.forEach(x=>old.append(x));const q=document.getElementById('reviewQueue');if(status&&q)status.after(q);host.append(old)}
+const api={tidy,init,base64,summarize,errorMessage};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiRead=api;
 })(typeof window==='undefined'?globalThis:window);

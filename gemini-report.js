@@ -16,7 +16,7 @@ function buildReport(rows,shortages,ignored){
  rows.forEach((r,index)=>{
   // a clear item match, or the line already written exactly like a shortage (works even without the item list)
   const target=(sure(r.match)&&byName.get(key(r.match.name)))||byName.get(key(r.corrected||r.name))||null;
-  if(target){const a=arrived.get(target.id)||{shortage:target,sources:[]};a.sources.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,confidence:sure(r.match)&&byName.get(key(r.match.name))?r.match.confidence:'same-name'});arrived.set(target.id,a);return}
+  if(target){const a=arrived.get(target.id)||{shortage:target,sources:[]};a.sources.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,confidence:sure(r.match)&&byName.get(key(r.match.name))?(r.match.via==='alias'?'near':r.match.confidence):'same-name'});arrived.set(target.id,a);return}
   const options=(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&(c.score??1)>=OFFER_MIN&&byName.has(key(c.name))&&a.findIndex(x=>key(x.name)===key(c.name))===i).slice(0,3).map(c=>({id:c.id,name:c.name,score:c.score,shortage:byName.get(key(c.name))}));
   if(options.length){review.push({index,row:r,options});return}
   if(sure(r.match))other.push({index,name:r.name,corrected:r.corrected,item:r.match.name,fileName:r.fileName});else if(r.ignored||ignored?.has(r.key))hidden++;else unknown.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,unclear:!!r.unclear});
@@ -49,7 +49,7 @@ function renderFlat(container,rows,view){
 }
 function render(container,report,rows,view){
  if(view.flat)return renderFlat(container,rows,view);
- const conf={confirmed:'اسم مؤكد منك',high:'مطابقة واضحة','same-name':'نفس الاسم بالظبط'};
+ const conf={confirmed:'اسم مؤكد منك',near:'شبه اسم أكدته قبل كده',high:'مطابقة واضحة','same-name':'نفس الاسم بالظبط'};
  const ed=i=>view.editing&&view.editing.i===i?editorHtml(rows[i],view.editing):'';
  const arrived=report.arrived.map(a=>`<div class="item" data-arrived="${esc(a.shortage.id)}"><strong>${esc(a.shortage.product_name)}</strong>${a.sources.map(s=>`<div class="hint">في صورة الشركة: <span dir="auto">${esc(s.name)}</span> · ${esc(s.fileName)} · ${conf[s.confidence]||''} ${s.confidence==='same-name'?'':notThisButton(s.index)} ${editButton(s.index)}</div>${fixedLine(s.name,s.corrected)}${ed(s.index)}`).join('')}</div>`).join('');
  const review=report.review.map(r=>`<div class="item" data-review="${r.index}"><strong dir="auto">${esc(r.row.name)}</strong>${fixedLine(r.row.name,r.row.corrected)}<div class="hint">${esc(r.row.fileName)}${r.row.unclear?' · Gemini مش متأكد من القراءة':''} — هل ده واحد من النواقص دي؟ راجع التركيز والشكل مع الصورة.</div>${r.options.map((o,j)=>`<div><span dir="auto">${esc(o.shortage.product_name)}</span> <button type="button" class="secondary" data-confirm="${r.index}:${j}">أيوه، ده هو</button></div>`).join('')}<button type="button" class="secondary" data-reject="${r.index}">مش واحد منهم</button> ${editButton(r.index)}${ed(r.index)}</div>`).join('');
