@@ -9,15 +9,17 @@
 //   read {image, mimeType}  -> Gemini reads the supplier image; each line is matched to the shortages
 //   lines {lines: string[]}  -> typed lines or an Excel name column, matched without Gemini
 //   match {name, english, read} -> re-match one line after the owner corrects its Arabic text
+// Inbox (no login; header x-inbox-key, see the section «automatic incoming» below): the owner's phone forwards a
+//   supplier's WhatsApp text, image, PDF or Excel file; it is read, matched and kept in ar_inbox for the page.
 // Smart matching uses the same tools as V10: strength/pack/form/brand rules (match.ts), the owner's reading
 // corrections, «أيوه» / «مش ده» answers (exact and near: same numbers, same form, very close text), names marked
 // «مش مهم». Fully independent of V10: it never reads V10 tables. What the owner had taught V10 was copied once into
 // ar_answers / ar_fixes (migration 202610280013).
 // Tables are read and written with the caller's own session (owner-only RLS).
 
-import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
+import { Catalog, OFFER_MIN, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar8';
+export const VERSION = 'ar9';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -191,7 +193,128 @@ export function lineRow(v: unknown): Row | null {
   return { name, english: /[\u0600-\u06FF]/.test(name) ? '' : name.slice(0, 250), unclear: false };
 }
 
+// Gemini's reading of a supplier image/PDF -> rows (+ the company name if written on the list); null if not JSON.
+export function parseRead(text: string): { rows: Row[]; supplier: string } | null {
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { return null; }
+  const rows: Row[] = (((parsed as { rows?: unknown[] })?.rows) || []).slice(0, 600)
+    .map((r) => ({ name: clean((r as Row)?.name), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
+    .filter((r) => r.name.length >= 2 && r.name.length <= 250);
+  return { rows, supplier: clean((parsed as { supplier?: unknown })?.supplier).slice(0, 80) };
+}
+
+// ---------- automatic incoming (the owner's phone forwards supplier messages) ----------
+// POST <function>?from=<company name as saved in the bot>[&name=<file name>][&say=1], header x-inbox-key: <key>.
+// Body: the message text (text/plain) or the file itself (image/*, application/pdf, Excel/CSV).
+// The key is created in the page; only its sha256 is stored (ar_inbox_keys). Only companies saved in the bot
+// (ar_suppliers) are accepted, so other chats are never read. Runs with the service role (no login on the phone).
+const SHEET = /\.(xlsx|xls|csv)$/i;
+const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
+// Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
+export function sheetNames(m: unknown[][]): string[] {
+  let head = -1, col = -1;
+  for (let r = 0; r < Math.min(20, m.length) && head < 0; r++) {
+    const c = (m[r] || []).findIndex((v) => NAME_HEAD.test(String(v ?? '')) && !NOT_NAME.test(String(v ?? '')) && String(v).length < 40);
+    if (c >= 0) { head = r; col = c; }
+  }
+  if (col < 0) {
+    const width = Math.max(0, ...m.slice(0, 200).map((r) => (r || []).length));
+    let best = -1;
+    for (let c = 0; c < width; c++) { const n = m.slice(0, 200).filter((r) => /\p{L}{3,}/u.test(String((r || [])[c] ?? ''))).length; if (n > best) { best = n; col = c; } }
+  }
+  const title = head >= 0 ? String(m[head][col] ?? '').trim() : '';
+  return m.slice(head + 1).map((r) => String((r || [])[col] ?? '').trim()).filter((v) => v.length >= 2 && /\p{L}/u.test(v) && v !== title);
+}
+async function sha256Hex(s: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+function b64(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+export function inboxKind(contentType: string, fileName: string): 'text' | 'image' | 'pdf' | 'sheet' | '' {
+  const t = contentType.toLowerCase();
+  if (SHEET.test(fileName) || /spreadsheet|excel|csv/.test(t)) return 'sheet';
+  if (/pdf/.test(t) || /\.pdf$/i.test(fileName)) return 'pdf';
+  if (/^image\//.test(t) || /\.(jpe?g|png|webp)$/i.test(fileName)) return 'image';
+  if (/^text\/|json|^$/.test(t)) return 'text';
+  return '';
+}
+// what the phone says out loud
+export function inboxSay(company: string, sure: number, review: number): string {
+  if (!sure && !review) return `${company}: مفيش حاجة من النواقص`;
+  return `${company}: وصل ${sure} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
+}
+export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
+  const out = (status: number, body: Record<string, unknown>, say: boolean) => say
+    ? new Response(String(body.say || body.message || ''), { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    : reply(status, body, {});
+  const url = new URL(req.url), say = url.searchParams.get('say') === '1';
+  const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!service || !env.SUPABASE_URL || !env.GEMINI_API_KEY) return out(503, { error: 'not-configured', message: 'البوت مش جاهز يستقبل' }, say);
+  if (req.method !== 'POST') return out(405, { error: 'method' }, say);
+  const base = env.SUPABASE_URL.replace(/\/$/, ''), auth = 'Bearer ' + service, sh = { Authorization: auth, apikey: service };
+  const key = (req.headers.get('x-inbox-key') || '').trim();
+  if (!/^[0-9a-f]{32,128}$/.test(key)) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط' }, say);
+  const keys = await restAll<{ key_hash: string }>(env, auth, fetchImpl, 'ar_inbox_keys?select=key_hash&key_hash=eq.' + await sha256Hex(key));
+  if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
+  const from = clean(url.searchParams.get('from') || '').slice(0, 80), fileName = (url.searchParams.get('name') || '').slice(0, 120);
+  const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
+  const company = suppliers.find((x) => aliasKey(x.name) === aliasKey(from));
+  // not one of the saved companies: ignored before anything is read or stored
+  if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
+  const kind = inboxKind(req.headers.get('content-type') || '', fileName);
+  if (!kind) return out(415, { error: 'type', message: 'نوع الملف مش مدعوم' }, say);
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
+  if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
+  const t0 = Date.now();
+  let rows: Row[] = [], text: string | null = null, supplier = company.name, error: string | null = null, filePath: string | null = null;
+  try {
+    if (kind === 'text') {
+      text = new TextDecoder().decode(bytes).slice(0, 20000);
+      rows = text.split(/\r?\n/).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
+    } else if (kind === 'sheet') {
+      const XLSX = await import('npm:xlsx@0.18.5');
+      const wb = XLSX.read(bytes, { type: 'array' });
+      const m: unknown[][] = [];
+      for (const n of wb.SheetNames) m.push(...XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false, blankrows: false }) as unknown[][]);
+      rows = sheetNames(m).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
+    } else {
+      const mime = kind === 'pdf' ? 'application/pdf' : (req.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
+      const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
+      if (!read) throw new Error('رد Gemini مش مفهوم');
+      rows = read.rows;
+    }
+  } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
+  // keep the original file (private bucket) so the owner can look at it from the page
+  if (kind !== 'text') {
+    const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? (fileName.match(SHEET)?.[1] || 'xlsx').toLowerCase() : 'jpg';
+    filePath = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${ext}`;
+    const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': req.headers.get('content-type') || 'application/octet-stream' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!up.ok) filePath = null;
+  }
+  let out2: ReturnType<typeof matchRows> = [];
+  if (!error && rows.length) {
+    const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+    out2 = matchRows(rows, shortageCatalog(shortages, k.names, k.answers), k, shortages);
+  }
+  const sureIds = new Set(out2.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
+  const review = out2.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
+    r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
+  const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review };
+  const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (!ins.ok) return out(502, { error: 'save', message: 'الوارد ماتحفظش' }, say);
+  const [saved] = await ins.json() as { id: string }[];
+  log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error });
+  if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
+  return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: inboxSay(supplier, sureIds.size, review) }, say);
+}
+
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
+  if (req.headers.get('x-inbox-key') !== null) return handleInbox(req, env, fetchImpl);
   const headers = cors(req.headers.get('origin'), env, req.headers.get('access-control-request-headers'));
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
   if (req.method !== 'POST') return reply(405, { error: 'method' }, headers);
@@ -247,15 +370,13 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
         restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'),
         knowledge(env, auth, fetchImpl),
       ]);
-      let parsed: unknown;
-      try { parsed = JSON.parse(text); } catch { return reply(502, { error: 'parse', message: 'رد Gemini مش مفهوم؛ جرّب تاني.' }, headers); }
-      const rows: Row[] = (((parsed as { rows?: unknown[] })?.rows) || []).slice(0, 600)
-        .map((r) => ({ name: clean((r as Row)?.name), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
-        .filter((r) => r.name.length >= 2 && r.name.length <= 250);
+      const read = parseRead(text);
+      if (!read) return reply(502, { error: 'parse', message: 'رد Gemini مش مفهوم؛ جرّب تاني.' }, headers);
+      const { rows } = read;
       const cat = shortageCatalog(shortages, k.names, k.answers);
       const out = matchRows(rows, cat, k, shortages);
       log('read', t0, { rows: out.length, shortages: shortages.length, arabic: k.names.length, answers: k.answers.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
-      const supplier = clean((parsed as { supplier?: unknown })?.supplier).slice(0, 80);
+      const supplier = read.supplier;
       return reply(200, { rows: out, supplier, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
     }
 

@@ -407,3 +407,28 @@ label.check input {
   height: 20px;
   accent-color: var(--crimson);
 }
+.inbox {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.inbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.inbox-head h3 {
+  margin: 0;
+}
+button.small {
+  min-height: 34px;
+  padding: 4px 12px;
+  font-size: 13px;
+  margin: 0;
+}
+.inbox-item.fresh {
+  border-inline-start: 3px solid var(--crimson);
+  padding-inline-start: 10px;
+}

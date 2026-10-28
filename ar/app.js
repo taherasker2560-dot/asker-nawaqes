@@ -6,7 +6,7 @@
     FN = 'arabic-shortages',
     // The server version this page expects (VERSION in supabase/functions/arabic-shortages/index.ts).
     // tests/shared-matcher.cjs fails when they differ; the page warns when the deployed function is older.
-    SERVER_VERSION = 'ar8',
+    SERVER_VERSION = 'ar9',
     OFFER_MIN = 0.45,
     NOT_LISTED = '*'; // same as NOT_LISTED in the function: «مش واحد منهم» for a whole line
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -129,6 +129,12 @@
       drawTranslate();
       drawShort();
       await loadSuppliers();
+      await loadInbox();
+      // opened from the phone's notification (…html#inbox): go straight to the incoming list
+      if (location.hash === '#inbox') {
+        document.querySelector('[data-tab="read"]').click();
+        $('inboxBox').scrollIntoView({ block: 'start' });
+      }
       await takeShare();
     } catch (e) {
       status('trStatus', 'تعذّر التحميل: ' + e.message, 'bad');
@@ -1026,7 +1032,142 @@
       suppliers = [];
     }
     $('supplierList').innerHTML = suppliers.map((x) => `<option value="${esc(x.name)}">`).join('');
+    drawSupplierRows();
   }
+  // ---------- automatic incoming: companies, phone key, inbox ----------
+  function drawSupplierRows() {
+    $('supplierRows').innerHTML =
+      suppliers
+        .map(
+          (x) =>
+            `<div class="item"><strong dir="auto">${esc(x.name)}</strong> <span class="hint" dir="ltr">${esc(x.phone || '')}</span> <button class="secondary small" data-del-supplier="${esc(x.name)}">شيل</button></div>`,
+        )
+        .join('') || '<p class="hint">مفيش شركات لسه.</p>';
+    $('supplierRows')
+      .querySelectorAll('[data-del-supplier]')
+      .forEach(
+        (b) =>
+          (b.onclick = async () => {
+            const { error } = await client.from('ar_suppliers').delete().eq('name', b.dataset.delSupplier);
+            if (error) return status('supplierStatus', 'ماتشالتش: ' + error.message, 'bad');
+            status('supplierStatus', 'اتشالت: ' + b.dataset.delSupplier, 'good');
+            await loadSuppliers();
+          }),
+      );
+  }
+  $('addSupplier').onclick = async () => {
+    const name = $('newSupplier').value.replace(/\s+/g, ' ').trim().slice(0, 80),
+      phone = waPhone($('newSupplierPhone').value) || null;
+    if (name.length < 2) return status('supplierStatus', 'اكتب اسم الشركة.', 'bad');
+    const { error } = await client
+      .from('ar_suppliers')
+      .upsert({ name, phone, updated_at: new Date().toISOString() }, { onConflict: 'name' });
+    if (error) return status('supplierStatus', 'ماتحفظتش: ' + error.message, 'bad');
+    $('newSupplier').value = $('newSupplierPhone').value = '';
+    status('supplierStatus', 'اتضافت: ' + name, 'good');
+    await loadSuppliers();
+  };
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  $('newKey').onclick = async () => {
+    const key = hex(crypto.getRandomValues(new Uint8Array(32)));
+    const key_hash = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key)));
+    const del = await client.from('ar_inbox_keys').delete().neq('key_hash', '');
+    const { error } = del.error ? del : await client.from('ar_inbox_keys').insert({ key_hash });
+    if (error) return status('keyStatus', 'ماتعملش: ' + error.message, 'bad');
+    $('keyText').value = key;
+    $('inboxUrl').value = `${SUPABASE_URL}/functions/v1/${FN}`;
+    $('keyBox').classList.remove('hidden');
+    status('keyStatus', 'اتعمل مفتاح جديد. انسخه في Tasker دلوقتي، مش هيظهر تاني.', 'good');
+  };
+  const copy = async (id, label) => {
+    try {
+      await navigator.clipboard.writeText($(id).value);
+      status('keyStatus', `اتنسخ ${label}.`, 'good');
+    } catch (e) {
+      $(id).select();
+    }
+  };
+  $('copyKey').onclick = () => copy('keyText', 'المفتاح');
+  $('copyUrl').onclick = () => copy('inboxUrl', 'العنوان');
+  let inbox = [];
+  const localDay = (t) => new Date(t - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const daysAgo = (d) => {
+    const n = Math.round((Date.parse(localDay(Date.now())) - Date.parse(d)) / 864e5);
+    return n <= 0 ? 'النهارده' : n === 1 ? 'امبارح' : `من ${n} أيام`;
+  };
+  const KIND = { text: 'رسالة', image: 'صورة', pdf: 'PDF', sheet: 'Excel' };
+  // one group per company per day: everything it sent today opens together, with one message
+  function inboxGroups() {
+    const g = new Map();
+    for (const x of inbox) {
+      const day = localDay(Date.parse(x.received_at)),
+        k = (x.supplier || x.sender) + '|' + day;
+      if (!g.has(k)) g.set(k, { supplier: x.supplier || x.sender, day, items: [] });
+      g.get(k).items.push(x);
+    }
+    return [...g.values()];
+  }
+  async function loadInbox() {
+    try {
+      const since = new Date(Date.now() - 3 * 864e5).toISOString();
+      const { data, error } = await client
+        .from('ar_inbox')
+        .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review')
+        .gte('received_at', since)
+        .order('received_at', { ascending: false })
+        .limit(200);
+      if (error) throw Error(error.message);
+      inbox = data || [];
+    } catch (e) {
+      inbox = [];
+    }
+    drawInbox();
+  }
+  function drawInbox() {
+    const groups = inboxGroups();
+    const time = (t) => new Date(t).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' });
+    $('inboxList').innerHTML =
+      groups
+        .map((g, gi) => {
+          const fresh = g.items.some((x) => x.status === 'new'),
+            sure = g.items.reduce((a, x) => a + (x.sure || 0), 0),
+            review = g.items.reduce((a, x) => a + (x.review || 0), 0),
+            errors = g.items.filter((x) => x.status === 'error').length;
+          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div><button data-inbox-open="${gi}">افتح</button></div>`;
+        })
+        .join('') || '<p class="hint">مفيش وارد وصل لوحده لسه.</p>';
+    $('inboxList')
+      .querySelectorAll('[data-inbox-open]')
+      .forEach((b) => (b.onclick = () => openInbox(groups[+b.dataset.inboxOpen])));
+  }
+  async function openInbox(g) {
+    newRun();
+    results = [];
+    for (const x of [...g.items].reverse())
+      results.push(...(x.rows || []).map((r) => ({ ...r, file: `${KIND[x.kind] || x.kind} من الواتس` })));
+    $('supplier').value = g.supplier;
+    const s = suppliers.find((x) => x.name === g.supplier);
+    $('supplierPhone').value = s?.phone || '';
+    const errs = g.items.filter((x) => x.status === 'error');
+    showDone();
+    if (errs.length)
+      status(
+        'readStatus',
+        `${errs.length} من الوارد ماتقراش (${errs[0].error || ''}). افتح الواتس وشاركه يدوي.`,
+        'bad',
+      );
+    const ids = g.items.filter((x) => x.status === 'new').map((x) => x.id);
+    if (ids.length) {
+      await client.from('ar_inbox').update({ status: 'seen' }).in('id', ids);
+      g.items.forEach((x) => x.status === 'new' && (x.status = 'seen'));
+      drawInbox();
+    }
+    $('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('inboxRefresh').onclick = loadInbox;
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !$('app').classList.contains('hidden')) loadInbox();
+  });
   $('supplier').addEventListener('input', () => {
     const x = suppliers.find((s) => s.name === $('supplier').value.trim());
     if (x && x.phone) $('supplierPhone').value = x.phone;

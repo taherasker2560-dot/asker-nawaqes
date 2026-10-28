@@ -99,6 +99,39 @@
 
         <section id="readPanel" class="card hidden">
           <h2>قراءة وارد الشركة</h2>
+          <div id="inboxBox" class="inbox">
+            <div class="inbox-head">
+              <h3>وارد تلقائي</h3>
+              <button id="inboxRefresh" class="secondary small">تحديث</button>
+            </div>
+            <div id="inboxList"><p class="hint">مفيش وارد وصل لوحده لسه.</p></div>
+          </div>
+          <details id="autoSetup">
+            <summary>الوارد التلقائي من الواتس: الشركات وربط الموبايل</summary>
+            <p class="hint">
+              اكتب اسم كل شركة بالظبط زي ما هو متسجل عندك في جهات الاتصال على واتساب بيزنس. الموبايل بيبعت للبوت رسايل
+              الشركات دي بس، والبوت بيرفض أي حد تاني.
+            </p>
+            <div id="supplierRows"></div>
+            <label for="newSupplier">شركة جديدة</label><input id="newSupplier" type="text" placeholder="الاسم زي جهات الاتصال" />
+            <label for="newSupplierPhone">رقم واتسابها (اختياري)</label
+            ><input id="newSupplierPhone" type="text" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" />
+            <button id="addSupplier" class="secondary">أضف الشركة</button>
+            <p id="supplierStatus" class="status"></p>
+            <h3>ربط الموبايل</h3>
+            <p class="hint">
+              المفتاح ده بيخلي تطبيق Tasker على موبايلك يبعت الوارد للبوت. بيظهر مرة واحدة بس، ولو عملت مفتاح جديد القديم
+              بيبطل يشتغل.
+            </p>
+            <button id="newKey" class="secondary">اعمل مفتاح للموبايل</button>
+            <div id="keyBox" class="hidden">
+              <label>المفتاح</label><input id="keyText" type="text" readonly dir="ltr" />
+              <button id="copyKey" class="secondary">انسخ المفتاح</button>
+              <label>عنوان البوت</label><input id="inboxUrl" type="text" readonly dir="ltr" />
+              <button id="copyUrl" class="secondary">انسخ العنوان</button>
+            </div>
+            <p id="keyStatus" class="status"></p>
+          </details>
           <p class="hint">
             من الواتس: صورة واحدة أو ملف: «مشاركة» ← «نواقص عربي». كذا صورة: اختارهم كلهم مرة واحدة من «صور أو PDF» تحت
             (من فولدر صور الواتس في المعرض). رسايل مكتوبة: انسخها من الواتس واضغط «الصق» في «مكتوب».
