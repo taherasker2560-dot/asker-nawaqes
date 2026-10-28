@@ -255,10 +255,13 @@ export function inboxSay(company: string, sure: number, review: number): string 
 export function inboxSender(s: string): string {
   return clean(s).replace(/\s*\(\s*[0-9٠-٩]+\s*[^()]*\)\s*$/u, '').slice(0, 80);
 }
-// Saved name vs chat title, word order ignored: a mixed Arabic/English name («Shreif الفتح») shows reversed on the phone.
-const words = (s: string) => aliasKey(s).split(' ').filter(Boolean).sort().join(' ');
+// Saved name vs chat title: every word of the saved name is in the title, in any order. A mixed Arabic/English
+// name («Shreif الفتح») shows reversed on the phone, and a group message's title also holds the group's name
+// («وارد مخزن النور …: Shreif الفتح»).
+const words = (s: string) => aliasKey(s).split(' ').filter(Boolean);
 export function sameCompany(saved: string, title: string): boolean {
-  return aliasKey(saved) === aliasKey(title) || (!!aliasKey(title) && words(saved) === words(title));
+  const need = words(saved), have = new Set(words(title));
+  return need.length > 0 && need.every((w) => have.has(w));
 }
 export function serviceHeaders(service: string): Record<string, string> {
   return service.startsWith('sb_') ? { apikey: service } : { Authorization: 'Bearer ' + service, apikey: service };
@@ -294,6 +297,12 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (hash) {
     const dup = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&file_path=like.*' + hash + '*');
     if (dup.length) return out(200, { ok: false, duplicate: true, say: '' }, say);
+  }
+  // the same notification can fire twice: the same text from the same company within 10 minutes is kept once
+  if (kind === 'text') {
+    const since = new Date(Date.now() - 10 * 60 * 1000).toISOString(), body = new TextDecoder().decode(bytes).slice(0, 20000);
+    const recent = await restAll<{ body_text: string | null }>(env, auth, fetchImpl, 'ar_inbox?select=body_text&kind=eq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(since));
+    if (recent.some((r) => r.body_text === body)) return out(200, { ok: false, duplicate: true, say: '' }, say);
   }
   const t0 = Date.now();
   let rows: Row[] = [], text: string | null = null, supplier = company.name, error: string | null = null, filePath: string | null = null;
