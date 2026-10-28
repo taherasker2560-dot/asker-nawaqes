@@ -56,7 +56,7 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 
 <section id="readPanel" class="card hidden">
 <h2>قراءة وارد الشركة</h2>
-<p class="hint">من الواتس: اضغط «مشاركة» على صور الشركة أو ملفها أو رسالتها، واختار «نواقص عربي». البوت هيقراها على طول.</p>
+<p class="hint">من الواتس: صورة واحدة أو ملف: «مشاركة» ← «نواقص عربي». كذا صورة: اختارهم كلهم مرة واحدة من «صور أو PDF» تحت (من فولدر صور الواتس في المعرض). رسايل مكتوبة: انسخها من الواتس واضغط «الصق» في «مكتوب».</p>
 <label for="supplier">الشركة</label><input id="supplier" type="text" list="supplierList" autocomplete="off" placeholder="اختار أو اكتب اسم الشركة"><datalist id="supplierList"></datalist>
 <label for="supplierPhone">رقم واتساب الشركة (اختياري)</label><input id="supplierPhone" type="text" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx">
 <button id="notifyBtn" class="secondary hidden">فعّل الإشعارات</button>
@@ -64,7 +64,7 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 <div data-src-box="img"><label for="images">صور الشركة أو ملف PDF (لحد ٢٠ ملف، كل ملف أقل من ٨ ميجا)</label><input id="images" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple>
 <button id="readBtn" disabled>اقرا وقارن بالنواقص</button></div>
 <div data-src-box="text" class="hidden"><label for="pasteText">الصق أو اكتب الوارد: كل صنف في سطر</label><p class="hint">لو فيه كمية أو سعر اكتبهم بعد علامة | وهيتشالوا. ينفع عربي أو إنجليزي.</p><textarea id="pasteText" rows="8" dir="auto" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"></textarea>
-<button id="textBtn">قارن بالنواقص</button></div>
+<button id="pasteBtn">الصق اللي نسخته من الواتس وقارن</button> <button id="textBtn" class="secondary">قارن بالنواقص</button></div>
 <div data-src-box="excel" class="hidden"><label for="xlsFile">ملف Excel أو CSV من الشركة</label><input id="xlsFile" type="file" accept=".xlsx,.xls,.csv">
 <div id="xlsPick" class="hidden"><label for="xlsCol">عمود اسم الصنف</label><select id="xlsCol" style="width:100%;padding:10px;font-size:16px"></select><p id="xlsPreview" class="hint"></p><button id="xlsBtn">قارن بالنواقص</button></div></div>
 <p id="readStatus" class="status"></p>
@@ -174,7 +174,16 @@ async function matchLines(lines,label,btn){lines=lines.map(x=>String(x??'').trim
  btn.disabled=true;results=[];$('results').innerHTML='';newRun();
  try{for(let i=0;i<lines.length;i+=500){status('readStatus',`بيقارن ${Math.min(i+500,lines.length)} من ${lines.length}…`);const d=await invoke({action:'lines',lines:lines.slice(i,i+500)});results.push(...(d.rows||[]).map(r=>({...r,file:label})))}showDone()}
  catch(e){status('readStatus','تعذّرت المقارنة: '+e.message,'bad')}btn.disabled=false}
-$('textBtn').onclick=()=>matchLines($('pasteText').value.split(/\r?\n/),'مكتوب',$('textBtn'));
+// Text copied from WhatsApp (several messages) starts each message with "[28/10/2026, 1:15 م] Company name: ...":
+// drop that prefix from every line, and use the sender's name as the company when none is chosen.
+const WA_PREFIX=/^\s*\[[^\]]{4,40}\]\s*([^:\n]{1,60}):\s?/;
+function waLines(text){let sender='';const lines=String(text||'').split(/\r?\n/).map(l=>{const m=l.match(WA_PREFIX);if(m){if(!sender)sender=m[1].trim();return l.slice(m[0].length)}return l});return {lines,sender}}
+function runText(label,btn){const {lines,sender}=waLines($('pasteText').value);if(sender&&!/^\+?[\d\s-]+$/.test(sender))guessSupplier(sender);return matchLines(lines,label,btn)}
+// WhatsApp has no «مشاركة» for text messages, only «نسخ»: one tap pastes what was copied and compares it
+$('textBtn').onclick=()=>runText('مكتوب',$('textBtn'));
+$('pasteBtn').onclick=async()=>{let t='';try{t=await navigator.clipboard.readText()}catch(e){}
+ if(!t.trim()){status('readStatus','مالقيتش كلام منسوخ. انسخ الرسايل من الواتس الأول، أو الصقها في الخانة بإيدك (ضغطة طويلة ← لصق).','bad');$('pasteText').focus();return}
+ $('pasteText').value=t;await runText('من الواتس',$('pasteBtn'))};
 let xlsxLib=null;
 function loadXlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);return xlsxLib||(xlsxLib=new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='vendor/xlsx-0.20.3.full.min.js';sc.onload=()=>window.XLSX?ok(window.XLSX):no(Error('قارئ Excel مااشتغلش'));sc.onerror=()=>{xlsxLib=null;no(Error('قارئ Excel ماتحمّلش؛ حدّث الصفحة'))};document.head.append(sc)}))}
 const NAME_HEAD=/اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i,NOT_NAME=/سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
@@ -287,7 +296,7 @@ async function takeShare(){const id=pendingShare;if(!id)return;pendingShare=null
  const pick=src=>document.querySelector(`[data-src="${src}"]`).click();
  if(docs.length){pick('img');status('readStatus',`وصل من الواتس ${docs.length} ملف — بيقرا…`);await readFiles(docs);return}
  if(sheets.length){pick('excel');const dt=new DataTransfer();dt.items.add(sheets[0]);$('xlsFile').files=dt.files;$('xlsFile').onchange();return}
- if(meta.text){pick('text');$('pasteText').value=meta.text;await matchLines(meta.text.split(/\r?\n/),'من الواتس',$('textBtn'));return}
+ if(meta.text){pick('text');$('pasteText').value=meta.text;await runText('من الواتس',$('textBtn'));return}
  status('readStatus','اللي اتشارك مافيهوش صور ولا ملف ولا كلام.','bad')}
 client.auth.onAuthStateChange(()=>setTimeout(refresh,0));refresh();
 })();
