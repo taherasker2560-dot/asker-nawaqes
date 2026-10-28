@@ -2,13 +2,15 @@
 // Idea: translate the shortage list to Arabic once (the owner reviews it), then compare supplier lines
 // Arabic-to-Arabic against ~2000 shortages only, instead of 31,000 English catalogue items.
 // Actions (owner only, same secrets as V10: GEMINI_API_KEY, ALLOWED_EMAILS, GEMINI_MODEL, ALLOWED_ORIGINS):
-//   translate {limit}       -> Gemini suggests Arabic names for shortages that have none yet (ar_shortage_names)
+//   translate {limit}       -> Gemini suggests Arabic names for shortages that have none yet (ar_names)
+// Arabic names and the owner's answers are kept per product (name_key = the English name, upper case, single
+// spaces), not per shortage row: an item that leaves the shortage list and comes back later keeps them.
 //   read {image, mimeType}  -> Gemini reads the supplier image; each line is matched to the shortages
 // Tables are read and written with the caller's own session (owner-only RLS). V10 tables are only read.
 
 import { Catalog, aliasKey, decide, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar1';
+export const VERSION = 'ar2';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -17,8 +19,10 @@ const TIMEOUT_MS = 15000, GEMINI_TIMEOUT_MS = 55000;
 
 type Env = Record<string, string | undefined>;
 type Shortage = { id: string; product_name: string };
-type ArName = { shortage_item_id: string; arabic_name: string; status: string };
-type Decision = { alias_key: string; read_text: string; shortage_item_id: string; decision: 'yes' | 'no' };
+type ArName = { name_key: string; arabic_name: string; status: string };
+type Decision = { alias_key: string; read_text: string; name_key: string; decision: 'yes' | 'no' };
+// Same key in the page (asker-nawaqes-arabic.html) and in the database migration.
+export const nameKey = (s: string) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim().slice(0, 250);
 type Row = { name: string; english: string; unclear: boolean };
 
 function log(stage: string, started: number, extra: Record<string, unknown> = {}): void {
@@ -98,29 +102,32 @@ const READ_SCHEMA = { type: 'OBJECT', properties: { rows: { type: 'ARRAY', items
 // The shortage list as a small "catalogue": the English name, plus the Arabic name (owner-approved or suggested)
 // and every supplier text the owner said yes to as extra names.
 export function shortageCatalog(shortages: Shortage[], names: ArName[], decisions: Decision[]): Catalog {
-  const ar = new Map(names.map((n) => [n.shortage_item_id, n.arabic_name]));
+  const ar = new Map(names.map((n) => [n.name_key, n.arabic_name]));
   const yes = new Map<string, string[]>();
-  for (const d of decisions) if (d.decision === 'yes') { const l = yes.get(d.shortage_item_id) || []; l.push(d.read_text); yes.set(d.shortage_item_id, l); }
+  for (const d of decisions) if (d.decision === 'yes') { const l = yes.get(d.name_key) || []; l.push(d.read_text); yes.set(d.name_key, l); }
   const items: CatalogItem[] = shortages.map((s) => {
     // English (PharmaFly) name first: strength and pack are read from it; Arabic names only help find the item.
-    const alts = [ar.get(s.id), ...(yes.get(s.id) || [])].filter((x): x is string => !!x);
+    const k = nameKey(s.product_name);
+    const alts = [ar.get(k), ...(yes.get(k) || [])].filter((x): x is string => !!x);
     return alts.length ? [s.id, s.product_name, alts] : [s.id, s.product_name];
   });
   return new Catalog(items);
 }
 
-export function matchRows(rows: Row[], cat: Catalog, decisions: Decision[]) {
+export function matchRows(rows: Row[], cat: Catalog, decisions: Decision[], shortages: Shortage[]) {
+  const idOf = new Map<string, string>(), keyOf = new Map<string, string>();
+  for (const s of shortages) { const k = nameKey(s.product_name); keyOf.set(s.id, k); if (!idOf.has(k)) idOf.set(k, s.id); }
   const yes = new Map<string, string>(), no = new Map<string, Set<string>>();
   for (const d of decisions) {
-    if (d.decision === 'yes') yes.set(d.alias_key, d.shortage_item_id);
-    else { const s = no.get(d.alias_key) || new Set<string>(); s.add(d.shortage_item_id); no.set(d.alias_key, s); }
+    if (d.decision === 'yes') yes.set(d.alias_key, d.name_key);
+    else { const s = no.get(d.alias_key) || new Set<string>(); s.add(d.name_key); no.set(d.alias_key, s); }
   }
   return rows.map((r) => {
     const key = aliasKey(r.name), rejected = no.get(key) || new Set<string>();
-    const candidates: Candidate[] = cat.candidates(r.name, r.english, 3 + rejected.size).filter((c) => !rejected.has(c.id)).slice(0, 3);
+    const candidates: Candidate[] = cat.candidates(r.name, r.english, 3 + rejected.size).filter((c) => !rejected.has(keyOf.get(c.id) || '')).slice(0, 3);
     let match: Match | null = decide(candidates);
-    const y = yes.get(key);
-    if (y) match = { id: y, name: '', score: 1, confidence: 'confirmed' };
+    const y = yes.get(key), yid = y ? idOf.get(y) : undefined;
+    if (yid) match = { id: yid, name: '', score: 1, confidence: 'confirmed' };
     return { ...r, key, match, candidates };
   });
 }
@@ -150,25 +157,26 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const limit = Math.min(100, Math.max(1, Number(body.limit) || 60));
       const [shortages, names] = await Promise.all([
         restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'),
-        restAll<ArName>(env, auth, fetchImpl, 'ar_shortage_names?select=shortage_item_id,arabic_name,status&order=shortage_item_id'),
+        restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
       ]);
-      const have = new Set(names.map((n) => n.shortage_item_id));
-      const todo = shortages.filter((s) => !have.has(s.id)).slice(0, limit);
+      const have = new Set(names.map((n) => n.name_key)), seen = new Set<string>();
+      const missing = shortages.filter((s) => { const k = nameKey(s.product_name); if (have.has(k) || seen.has(k)) return false; seen.add(k); return true; });
+      const todo = missing.slice(0, limit);
       if (!todo.length) return reply(200, { translated: 0, remaining: 0, total: shortages.length, version: VERSION }, headers);
       const text = await gemini(env, fetchImpl, [{ text: TRANSLATE_PROMPT + '\n\n' + JSON.stringify(todo.map((s, i) => ({ i, name: s.product_name }))) }], TRANSLATE_SCHEMA);
       let items: { i: number; ar: string }[] = [];
       try { items = (JSON.parse(text) as { items?: { i: number; ar: string }[] }).items || []; } catch { return reply(502, { error: 'parse', message: 'رد Gemini مش مفهوم؛ جرّب تاني.' }, headers); }
       const rows = items.map((x) => ({ s: todo[x.i], ar: clean(x.ar) })).filter((x) => x.s && x.ar.length >= 2 && x.ar.length <= 250)
-        .map((x) => ({ shortage_item_id: x.s.id, arabic_name: x.ar, status: 'suggested' }));
+        .map((x) => ({ name_key: nameKey(x.s.product_name), english_name: x.s.product_name, arabic_name: x.ar, status: 'suggested' }));
       if (rows.length) {
-        const w = await fetchImpl(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/ar_shortage_names`, {
+        const w = await fetchImpl(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/ar_names`, {
           method: 'POST', body: JSON.stringify(rows), signal: AbortSignal.timeout(TIMEOUT_MS),
           headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '', 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
         });
         if (!w.ok) return reply(502, { error: 'save', message: 'ماتحفظتش الترجمة (' + w.status + ').' }, headers);
       }
       log('translate', t0, { asked: todo.length, saved: rows.length });
-      return reply(200, { translated: rows.length, remaining: shortages.length - have.size - rows.length, total: shortages.length, version: VERSION }, headers);
+      return reply(200, { translated: rows.length, remaining: missing.length - rows.length, total: shortages.length, version: VERSION }, headers);
     }
 
     if (body.action === 'read') {
@@ -178,8 +186,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const [text, shortages, names, decisions] = await Promise.all([
         gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: mimeType, data: image } }], READ_SCHEMA),
         restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'),
-        restAll<ArName>(env, auth, fetchImpl, 'ar_shortage_names?select=shortage_item_id,arabic_name,status&order=shortage_item_id'),
-        restAll<Decision>(env, auth, fetchImpl, 'ar_decisions?select=alias_key,read_text,shortage_item_id,decision&order=id'),
+        restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
+        restAll<Decision>(env, auth, fetchImpl, 'ar_answers?select=alias_key,read_text,name_key,decision&order=id'),
       ]);
       let parsed: unknown;
       try { parsed = JSON.parse(text); } catch { return reply(502, { error: 'parse', message: 'رد Gemini مش مفهوم؛ جرّب تاني.' }, headers); }
@@ -187,7 +195,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
         .map((r) => ({ name: clean((r as Row)?.name), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
         .filter((r) => r.name.length >= 2 && r.name.length <= 250);
       const cat = shortageCatalog(shortages, names, decisions);
-      const out = matchRows(rows, cat, decisions);
+      const out = matchRows(rows, cat, decisions, shortages);
       log('read', t0, { rows: out.length, shortages: shortages.length, arabic: names.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
       return reply(200, { rows: out, shortages: shortages.length, arabic: names.length, version: VERSION }, headers);
     }
