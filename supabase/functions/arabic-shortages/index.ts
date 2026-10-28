@@ -6,6 +6,7 @@
 // Arabic names and the owner's answers are kept per product (name_key = the English name, upper case, single
 // spaces), not per shortage row: an item that leaves the shortage list and comes back later keeps them.
 //   read {image, mimeType}  -> Gemini reads the supplier image; each line is matched to the shortages
+//   lines {lines: string[]}  -> typed lines or an Excel name column, matched without Gemini
 //   match {name, english, read} -> re-match one line after the owner corrects its Arabic text
 // Smart matching uses the same tools as V10: strength/pack/form/brand rules (match.ts), the owner's reading
 // corrections, «أيوه» / «مش ده» answers (exact and near: same numbers, same form, very close text), names marked
@@ -15,11 +16,12 @@
 
 import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar3';
+export const VERSION = 'ar4';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_LINES = 600;
 const TIMEOUT_MS = 15000, GEMINI_TIMEOUT_MS = 55000;
 
 type Env = Record<string, string | undefined>;
@@ -119,7 +121,7 @@ export const TRANSLATE_PROMPT = [
 const TRANSLATE_SCHEMA = { type: 'OBJECT', properties: { items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { i: { type: 'INTEGER' }, ar: { type: 'STRING' } }, required: ['i', 'ar'] } } }, required: ['items'] };
 
 export const READ_PROMPT = [
-  'This image is a supplier list of pharmacy products, usually a table with a product-name column (الصنف) and a quantity or price column.',
+  'This image (or PDF) is a supplier list of pharmacy products, usually a table with a product-name column (الصنف) and a quantity or price column.',
   'Return ONLY the product names, one entry per table row, from top to bottom, copied exactly as written (keep every number and word like اقراص / شراب / امبول).',
   'Do not translate, correct or guess. Skip the header, quantity and price columns. If a name is hard to read, give your best reading and set unclear to true.',
   'These lists use a font where the Arabic letter ك can look like ق, ج or گ: when a letter could be ك, prefer the spelling of the real medicine brand. Write only Arabic letters (no Persian letters).',
@@ -176,6 +178,14 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
   });
 }
 
+// One typed line (or Excel cell) -> a row. Anything after | or a tab is the quantity/price and is dropped.
+// A line with no Arabic letters is an English name, so it is also given as the "english" reading.
+export function lineRow(v: unknown): Row | null {
+  const name = clean(String(v ?? '').split(/[|\t]/)[0]).replace(/^[\s\-–•*\d٠-٩]{0,4}[.)\-–]\s+/, '').trim();
+  if (name.length < 2 || name.length > 250 || !/[\p{L}]/u.test(name)) return null;
+  return { name, english: /[\u0600-\u06FF]/.test(name) ? '' : name.slice(0, 250), unclear: false };
+}
+
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
   const headers = cors(req.headers.get('origin'), env, req.headers.get('access-control-request-headers'));
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
@@ -193,7 +203,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   } catch { return reply(504, { error: 'auth-timeout', message: 'التأكد من تسجيل الدخول اتأخر؛ جرّب تاني.' }, headers); }
   if (!user?.email || !allowedEmails.includes(user.email.toLowerCase())) return reply(403, { error: 'forbidden', message: 'الحساب ده مش مسموح له.' }, headers);
 
-  let body: { action?: unknown; limit?: unknown; image?: unknown; mimeType?: unknown; name?: unknown; english?: unknown; read?: unknown };
+  let body: { action?: unknown; lines?: unknown; limit?: unknown; image?: unknown; mimeType?: unknown; name?: unknown; english?: unknown; read?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
   const t0 = Date.now();
   try {
@@ -225,8 +235,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
 
     if (body.action === 'read') {
       const image = typeof body.image === 'string' ? body.image.replace(/\s+/g, '') : '', mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
-      if (!MIME_TYPES.includes(mimeType) || !image || !/^[A-Za-z0-9+/=]+$/.test(image)) return reply(400, { error: 'image', message: 'الصورة مش واصلة صح (JPG أو PNG أو WebP).' }, headers);
-      if (Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) return reply(413, { error: 'size', message: 'الصورة أكبر من ٨ ميجا.' }, headers);
+      if (!MIME_TYPES.includes(mimeType) || !image || !/^[A-Za-z0-9+/=]+$/.test(image)) return reply(400, { error: 'image', message: 'الملف مش واصل صح (صورة JPG أو PNG أو WebP، أو PDF).' }, headers);
+      if (Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) return reply(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا.' }, headers);
       const [text, shortages, k] = await Promise.all([
         gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: mimeType, data: image } }], READ_SCHEMA),
         restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'),
@@ -240,6 +250,15 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const cat = shortageCatalog(shortages, k.names, k.answers);
       const out = matchRows(rows, cat, k, shortages);
       log('read', t0, { rows: out.length, shortages: shortages.length, arabic: k.names.length, answers: k.answers.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
+      return reply(200, { rows: out, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
+    }
+
+    if (body.action === 'lines') {
+      const rows: Row[] = (Array.isArray(body.lines) ? body.lines : []).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
+      if (!rows.length) return reply(400, { error: 'lines', message: 'مفيش أسماء أصناف في اللي اتبعت.' }, headers);
+      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'shortage_items?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+      const out = matchRows(rows, shortageCatalog(shortages, k.names, k.answers), k, shortages);
+      log('lines', t0, { rows: out.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
       return reply(200, { rows: out, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
     }
 

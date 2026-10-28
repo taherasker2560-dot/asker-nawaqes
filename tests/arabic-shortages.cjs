@@ -43,6 +43,16 @@ assert.ok(!b.rows[1].candidates.some(c=>c.id==='s3'),'rejected shortage not sugg
  assert.ok(!m.row.candidates.some(c=>c.id==='s4'),'«مش ده» on the first reading still applies after the correction');
  f=fake({names,gem:()=>rows,v10rej:[{alias_key:'فلاجيل شراب 125',target_name:'FLAGYL 125MG SYP'}]});
  const v=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();assert.notEqual(v.rows[0].match?.id,'s2','V10 «مش ده» respected');}
+// typed lines / Excel names: no Gemini call, quantity after | dropped, numbering dropped, English lines matched too; PDF accepted by read
+{f=fake({names,gem:()=>{throw Error('gemini must not be called')},decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'yes'}]});
+ const t=await (await F.handle(req({action:'lines',lines:['1. جانوفيا ٥٠ مجم ٢٨ قرص | 5','BRUFEN 400MG 30TAB\t12','','٣٠','كلام']}),env,f)).json();
+ assert.equal(t.rows.length,3,'empty and number-only lines skipped');assert.equal(t.rows[0].name,'جانوفيا ٥٠ مجم ٢٨ قرص');assert.equal(t.rows[0].match.id,'s3');
+ assert.equal(t.rows[1].english,'BRUFEN 400MG 30TAB');assert.equal(t.rows[1].match?.id,'s1','English line matched');
+ assert.ok(!f.calls.some(c=>c.url.includes('generativelanguage')),'lines never call Gemini');
+ assert.equal((await F.handle(req({action:'lines',lines:['']}),env,f)).status,400);
+ f=fake({names,gem:()=>({rows:[{name:'بروفين ٤٠٠ ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ const p=await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'application/pdf'}),env,f);assert.equal(p.status,200,'PDF accepted');
+ }
 // security: other accounts refused before any Gemini call
 const g=fake({gem:()=>({})});const other=async(u,o)=>u.endsWith('/auth/v1/user')?new Response(JSON.stringify({email:'x@y.z'})):g(u,o);
 r=await F.handle(req({action:'translate'}),env,other);assert.equal(r.status,403);assert.ok(!g.calls.some(c=>c.url.includes('generativelanguage')));
