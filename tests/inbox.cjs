@@ -28,7 +28,13 @@ assert.equal(r.status,200);assert.equal((await r.json()).ignored,true);assert.eq
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحده للادويه')+'&say=1','فلاجيل شراب ١٢٥ | 3\nحاجة تانية','text/plain; charset=utf-8'),env,f);
 assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: وصل 1 صنف من النواقص');
 assert.equal(f.saved[0].kind,'text');assert.equal(f.saved[0].supplier,'المتحدة للأدوية');assert.equal(f.saved[0].sure,1);assert.equal(f.saved[0].rows.length,2);
-assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.Authorization==='Bearer service'),'service role, no login');
+assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.Authorization==='Bearer service'&&c.o.headers.apikey==='service'),'service role (as apikey too), no login');
+// WhatsApp count in the chat title is dropped: "(2 رسائل)" / "(3 messages)"
+assert.equal(F.inboxSender('الفتح shreif (2 رسائل)'),'الفتح shreif');assert.equal(F.inboxSender('Al Fath (12 messages)'),'Al Fath');assert.equal(F.inboxSender('شركة (الفرع)'),'شركة (الفرع)');
+f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (٣ رسائل)')+'&say=1','فلاجيل شراب ١٢٥','text/plain'),env,f);assert.match(await r.text(),/^المتحدة للأدوية: وصل 1/);
+// new-style secret key (sb_secret_…) is not a JWT: sent only as apikey
+f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),'فلاجيل شراب ١٢٥','text/plain'),{...env,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x'},f);assert.equal(r.status,200);
+assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.apikey==='sb_secret_x'&&!c.o.headers.Authorization));
 // image: read by Gemini, file kept in the private bucket
 f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
 r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&name=IMG-1.jpg',new Uint8Array([255,216,255,0]),'image/jpeg'),env,f);
