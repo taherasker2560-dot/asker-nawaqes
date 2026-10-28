@@ -60,12 +60,14 @@ export function arabicLetters(s: string): string {
 }
 const clean = (s: unknown) => typeof s === 'string' ? arabicLetters(s).replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
 
-// All rows of a table through PostgREST, 1000 at a time, with the caller's session.
-async function restAll<T>(env: Env, auth: string, fetchImpl: typeof fetch, path: string): Promise<T[]> {
+// All rows of a table through PostgREST, 1000 at a time, with the caller's session
+// (auth = 'Bearer <user token>') or with ready headers (the inbox's service-role headers).
+type Auth = string | Record<string, string>;
+async function restAll<T>(env: Env, auth: Auth, fetchImpl: typeof fetch, path: string): Promise<T[]> {
   const out: T[] = [];
   for (let offset = 0; offset < 50000; offset += 1000) {
     const r = await fetchImpl(`${env.SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/${path}&limit=1000&offset=${offset}`, {
-      headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' }, signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: typeof auth === 'string' ? { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' } : auth, signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!r.ok) throw new Error('rest ' + path.split('?')[0] + ' ' + r.status);
     const page = await r.json() as T[];
@@ -92,7 +94,7 @@ async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schem
   return data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
 }
 
-async function knowledge(env: Env, auth: string, fetchImpl: typeof fetch): Promise<Knowledge> {
+async function knowledge(env: Env, auth: Auth, fetchImpl: typeof fetch): Promise<Knowledge> {
   const soft = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]);
   const [names, answers, fixes, ignored] = await Promise.all([
     restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
@@ -247,6 +249,13 @@ export function inboxSay(company: string, sure: number, review: number): string 
   if (!sure && !review) return `${company}: مفيش حاجة من النواقص`;
   return `${company}: وصل ${sure} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
 }
+// WhatsApp adds a count to the title when several messages wait: "الفتح shreif (2 رسائل)" / "(3 messages)"
+export function inboxSender(s: string): string {
+  return clean(s).replace(/\s*\(\s*[0-9٠-٩]+\s*[^()]*\)\s*$/u, '').slice(0, 80);
+}
+export function serviceHeaders(service: string): Record<string, string> {
+  return service.startsWith('sb_') ? { apikey: service } : { Authorization: 'Bearer ' + service, apikey: service };
+}
 export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
   const out = (status: number, body: Record<string, unknown>, say: boolean) => say
     ? new Response(String(body.say || body.message || ''), { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
@@ -255,12 +264,13 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
   if (!service || !env.SUPABASE_URL || !env.GEMINI_API_KEY) return out(503, { error: 'not-configured', message: 'البوت مش جاهز يستقبل' }, say);
   if (req.method !== 'POST') return out(405, { error: 'method' }, say);
-  const base = env.SUPABASE_URL.replace(/\/$/, ''), auth = 'Bearer ' + service, sh = { Authorization: auth, apikey: service };
+  // the service key goes in apikey; a new-style key (sb_secret_…) is not a JWT, so it is not sent as Bearer
+  const base = env.SUPABASE_URL.replace(/\/$/, ''), sh = serviceHeaders(service), auth = sh;
   const key = (req.headers.get('x-inbox-key') || '').trim();
   if (!/^[0-9a-f]{32,128}$/.test(key)) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط' }, say);
   const keys = await restAll<{ key_hash: string }>(env, auth, fetchImpl, 'ar_inbox_keys?select=key_hash&key_hash=eq.' + await sha256Hex(key));
   if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
-  const from = clean(url.searchParams.get('from') || '').slice(0, 80), fileName = (url.searchParams.get('name') || '').slice(0, 120);
+  const from = inboxSender(url.searchParams.get('from') || ''), fileName = (url.searchParams.get('name') || '').slice(0, 120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
   const company = suppliers.find((x) => aliasKey(x.name) === aliasKey(from));
   // not one of the saved companies: ignored before anything is read or stored
