@@ -8,18 +8,20 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const sure=m=>m&&(m.confidence==='confirmed'||m.confidence==='high');
 
 // rows: [{fileName,name,english,unclear,key,corrected,match,candidates}] ; shortages: active rows {id,product_name}
-function buildReport(rows,shortages){
+const OFFER_MIN=0.45; // same as match.ts: weaker items are never offered as "this one?"
+// ignored: keys the owner marked «مش عندنا / مش مهم»; they are left out of the unsure list.
+function buildReport(rows,shortages,ignored){
  const byName=new Map(shortages.map(s=>[key(s.product_name),s]));
- const arrived=new Map(),review=[],other=[],unknown=[];
+ const arrived=new Map(),review=[],other=[],unknown=[];let hidden=0;
  rows.forEach((r,index)=>{
   // a clear item match, or the line already written exactly like a shortage (works even without the item list)
   const target=(sure(r.match)&&byName.get(key(r.match.name)))||byName.get(key(r.corrected||r.name))||null;
   if(target){const a=arrived.get(target.id)||{shortage:target,sources:[]};a.sources.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,confidence:sure(r.match)&&byName.get(key(r.match.name))?r.match.confidence:'same-name'});arrived.set(target.id,a);return}
-  const options=(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&byName.has(key(c.name))&&a.findIndex(x=>key(x.name)===key(c.name))===i).slice(0,3).map(c=>({id:c.id,name:c.name,score:c.score,shortage:byName.get(key(c.name))}));
+  const options=(r.candidates||[]).filter((c,i,a)=>c.numbersOk&&c.formOk!==false&&(c.score??1)>=OFFER_MIN&&byName.has(key(c.name))&&a.findIndex(x=>key(x.name)===key(c.name))===i).slice(0,3).map(c=>({id:c.id,name:c.name,score:c.score,shortage:byName.get(key(c.name))}));
   if(options.length){review.push({index,row:r,options});return}
-  if(sure(r.match))other.push({index,name:r.name,corrected:r.corrected,item:r.match.name,fileName:r.fileName});else unknown.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,unclear:!!r.unclear});
+  if(sure(r.match))other.push({index,name:r.name,corrected:r.corrected,item:r.match.name,fileName:r.fileName});else if(r.ignored||ignored?.has(r.key))hidden++;else unknown.push({index,name:r.name,corrected:r.corrected,fileName:r.fileName,unclear:!!r.unclear});
  });
- return {arrived:[...arrived.values()],review,other,unknown};
+ return {arrived:[...arrived.values()],review,other,unknown,hidden};
 }
 
 const fixedLine=(name,corrected)=>corrected&&corrected!==name?`<div class="hint">اتصحح لـ: <span dir="auto">${esc(corrected)}</span></div>`:'';
@@ -36,7 +38,7 @@ function editorHtml(r,ed){
 }
 
 // One line per name with its closest item: used by the review list («أسماء محتاجة مراجعة»).
-const flatTop=r=>r.match||(r.candidates||[]).find(c=>c.numbersOk!==false&&c.formOk!==false)||null;
+const flatTop=r=>r.match||(r.candidates||[]).find(c=>c.numbersOk!==false&&c.formOk!==false&&(c.score??1)>=OFFER_MIN)||null;
 function renderFlat(container,rows,view){
  const ed=i=>view.editing&&view.editing.i===i?editorHtml(rows[i],view.editing):'';
  container.innerHTML=(view.undo?`<div class="status" data-undo-bar>${esc(view.undo.label)} <button type="button" class="secondary" data-undo>تراجع عن الحفظ ده</button></div>`:'')+
@@ -56,7 +58,7 @@ function render(container,report,rows,view){
   `<h3>وصل من النواقص: ${report.arrived.length}</h3>${arrived||'<p>مفيش صنف من النواقص اتعرف بثقة في الصور دي.</p>'}`+
   `<section data-gemini-review><h3>محتاج تأكيدك: ${report.review.length}</h3>${review||'<p class="hint">مفيش.</p>'}</section>`+
   `<details ${view.openOther?'open':''} data-sec="other"><summary>أصناف اتعرفت ومش في النواقص: ${report.other.length}</summary>${report.other.map(o=>line(o,`${esc(o.item)} · ${esc(o.fileName)} ${notThisButton(o.index)}`)).join('')}</details>`+
-  `<details ${view.openUnknown?'open':''} data-sec="unknown"><summary>اتقرت ومش متأكد من صنفها: ${report.unknown.length}</summary><p class="hint">الأسماء دي اتقرت من الصورة، بس البوت مش متأكد هي أنهي صنف عندك، ومفيش واحد منها شبه النواقص. لو شايف فيها صنف من النواقص، استخدم «تصحيح».</p>${report.unknown.map(u=>line(u,`${esc(u.fileName)}${u.unclear?' · قراءة مش واضحة':''}`)).join('')}</details>`;
+  `<details ${view.openUnknown?'open':''} data-sec="unknown"><summary>اتقرت ومش متأكد من صنفها: ${report.unknown.length}</summary><p class="hint">الأسماء دي اتقرت من الصورة، بس البوت مش متأكد هي أنهي صنف عندك، ومفيش واحد منها شبه النواقص. لو شايف فيها صنف من النواقص، استخدم «تصحيح». ولو صنف مش عندك أو مش مهم، اضغط «مش مهم» ومش هيظهر تاني.</p>${report.unknown.map(u=>line(u,`${esc(u.fileName)}${u.unclear?' · قراءة مش واضحة':''} <button type="button" class="secondary" data-ignore="${u.index}">مش مهم</button>`)).join('')}${report.hidden?`<p class="hint">واتخبّى ${report.hidden} اسم قلت قبل كده إنهم مش مهمين.</p>`:''}</details>`;
 }
 
 // Saves an item choice for one line, replacing any earlier choice for the same name; returns what is needed to undo it.
@@ -111,6 +113,7 @@ async function saveFix(client,r,text){
  return {undo,corrected};
 }
 async function undoSave(client,u){
+ if(u.ignoredKey){const {error}=await client.from('name_review_queue').update({ignored:false}).eq('alias_key',u.ignoredKey);if(error)throw Error(error.message)}
  if(u.queueRows?.length)await client.from('name_review_queue').upsert(u.queueRows.map(({id,...x})=>x),{onConflict:'alias_key'});
  if(u.addedRejectionIds?.length){const {error}=await client.from('name_rejections').delete().in('id',u.addedRejectionIds);if(error)throw Error(error.message)}
  if(u.addedAliasIds.length){const {error}=await client.from('name_aliases').delete().in('id',u.addedAliasIds);if(error)throw Error(error.message)}
@@ -119,9 +122,15 @@ async function undoSave(client,u){
 }
 
 // Report with corrections. deps: {client, invoke(body) -> {data,error}}.
+// marks a name «مش عندنا / مش مهم»: kept in name_review_queue with ignored = true
+async function ignoreName(client,r){
+ const {error}=await client.from('name_review_queue').upsert({alias_key:r.key.slice(0,250),read_text:String(r.name).slice(0,250),english:r.english||null,file_name:r.fileName||null,ignored:true},{onConflict:'alias_key'});
+ if(error)throw Error('ماتحفظش: '+error.message);
+ return {removedAliases:[],addedAliasIds:[],addedRejectionIds:[],fixId:null,fixBefore:null,ignoredKey:r.key};
+}
 function show(container,rows,shortages,deps,setStatus){
  const state=rows.map(r=>({...r})),view={editing:null,undo:null,openOther:false,openUnknown:false,flat:!!deps.flat};
- const report=()=>buildReport(state,shortages);
+ const report=()=>buildReport(state,shortages,deps.ignored);
  const draw=()=>{render(container,report(),state,view);wire()};
  const edStatus=m=>{const p=container.querySelector('[data-ed-status]');if(p)p.textContent=m;if(view.editing)view.editing.status=m};
  async function commit(i,target,text,label){
@@ -141,6 +150,8 @@ function show(container,rows,shortages,deps,setStatus){
   container.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',async()=>{const [i,j]=b.dataset.confirm.split(':').map(Number);const opt=report().review.find(x=>x.index===i)?.options[j];if(!opt)return;b.disabled=true;await commit(i,{id:opt.id,name:opt.name},'',`اتحفظ: «${state[i].name}» = ${opt.name}.`)}));
   container.querySelectorAll('[data-flat-yes]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.flatYes),t=flatTop(state[i]);if(!t)return;b.disabled=true;await commit(i,{id:t.id||'',name:t.name},'',`اتحفظ: «${state[i].name}» = ${t.name}.`)}));
   container.querySelectorAll('[data-flat-no]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.flatNo),t=flatTop(state[i]);if(!t)return;b.disabled=true;await reject(i,[t.name],`اتسجّل إن «${state[i].name}» مش ${t.name}، ومش هيتقترح تاني.`)}));
+  container.querySelectorAll('[data-ignore]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.ignore),r=state[i];b.disabled=true;
+   try{const undo=await ignoreName(deps.client,r);const label=`«${r.name}» مش هيظهر تاني.`;view.undo={...undo,i,before:{ignored:false},label};r.ignored=true;draw();setStatus(label);deps.onChange?.()}catch(e){b.disabled=false;setStatus(e.message)}}));
   container.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.reject);const opt=report().review.find(x=>x.index===i);if(!opt)return;b.disabled=true;await reject(i,opt.options.map(o=>o.name),`اتسجّل إن «${state[i].name}» مش واحد من دول، ومش هيتقترحوا تاني.`)}));
   container.querySelectorAll('[data-notthis]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.notthis);const m=state[i].match;if(!m)return;b.disabled=true;await reject(i,[m.name],`اتسجّل إن «${state[i].name}» مش ${m.name}، ومش هيتقترح تاني. استخدم «تصحيح» لو عايز تختار الصح.`)}));
   container.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.edit),r=state[i];view.editing={i,text:r.corrected||r.name,q:'',manual:''};if(report().unknown.some(u=>u.index===i))view.openUnknown=true;if(report().other.some(o=>o.index===i))view.openOther=true;draw()}));
@@ -160,7 +171,7 @@ function show(container,rows,shortages,deps,setStatus){
  }
  draw();const rep=report();
  // Names read but not tied to an item go to the review list, to correct and confirm later.
- if(!view.flat&&deps.client){const now=new Date().toISOString(),seen=new Set();
+ if(!view.flat&&deps.client){const now=new Date().toISOString(),seen=new Set(deps.ignored||[]);
   const todo=[...rep.review.map(x=>x.row),...rep.unknown.map(u=>state[u.index])].filter(r=>r.key&&r.key.length>=2&&!seen.has(r.key)&&seen.add(r.key))
    .map(r=>({alias_key:r.key.slice(0,250),read_text:String(r.name).slice(0,250),english:r.english||null,file_name:r.fileName||null,last_seen:now}));
   if(todo.length)Promise.resolve(deps.client.from('name_review_queue').upsert(todo,{onConflict:'alias_key'})).then(()=>deps.onQueued?.(todo.length)).catch(()=>{})}
@@ -170,18 +181,18 @@ function show(container,rows,shortages,deps,setStatus){
 // «أسماء محتاجة مراجعة»: every name a reading could not tie to an item, kept until the owner settles it.
 function reviewList(host,deps,setStatus){
  const box=document.createElement('details');box.className='file-import';box.id='reviewQueue';
- box.innerHTML='<summary>أسماء محتاجة مراجعة</summary><p class="hint">أسماء البوت قراها ومش متأكد هي أنهي صنف. اضغط «راجع»: أكّد الصنف، أو قول «مش ده»، أو صحّح الاسم. اللي تأكده بيتحفظ ويتعرف لوحده بعد كده ويخرج من القايمة.</p><input type="search" data-q-filter placeholder="دوّر في الأسماء" dir="auto"><div data-q-list><p class="hint">افتح القسم عشان يتحمّل.</p></div>';
+ box.innerHTML='<summary>أسماء محتاجة مراجعة</summary><p class="hint">أسماء البوت قراها ومش متأكد هي أنهي صنف. اضغط «راجع»: أكّد الصنف، أو قول «مش ده»، أو صحّح الاسم. اللي تأكده بيتحفظ ويتعرف لوحده بعد كده ويخرج من القايمة. واللي مش عندك أو مش مهم اضغط عليه «مش عندنا / مش مهم» ومش هيرجع تاني (وتقدر ترجّعه من القاموس).</p><input type="search" data-q-filter placeholder="دوّر في الأسماء" dir="auto"><div data-q-list><p class="hint">افتح القسم عشان يتحمّل.</p></div>';
  host.append(box);let items=[],shown=30;const list=box.querySelector('[data-q-list]'),filter=box.querySelector('[data-q-filter]'),summary=box.querySelector('summary');
  const count=()=>{summary.textContent=`أسماء محتاجة مراجعة: ${items.length}`};
  const draw=()=>{const f=key(filter.value),vis=items.filter(q=>!f||key(q.read_text+' '+(q.english||'')).includes(f));count();
-  list.innerHTML=vis.slice(0,shown).map(q=>`<div class="item" data-q="${esc(q.id)}"><span dir="auto">${esc(q.read_text)}</span>${q.file_name?` <span class="hint">${esc(q.file_name)}</span>`:''} <button type="button" class="secondary" data-q-open="${esc(q.id)}">راجع</button> <button type="button" class="secondary" data-q-drop="${esc(q.id)}">شيلها من القايمة</button><div data-q-body></div></div>`).join('')+(vis.length>shown?`<button type="button" class="secondary" data-q-more>اعرض أكتر (${vis.length-shown})</button>`:'')+(vis.length?'':'<p class="hint">مفيش أسماء محتاجة مراجعة.</p>');
+  list.innerHTML=vis.slice(0,shown).map(q=>`<div class="item" data-q="${esc(q.id)}"><span dir="auto">${esc(q.read_text)}</span>${q.file_name?` <span class="hint">${esc(q.file_name)}</span>`:''} <button type="button" class="secondary" data-q-open="${esc(q.id)}">راجع</button> <button type="button" class="secondary" data-q-drop="${esc(q.id)}">مش عندنا / مش مهم</button><div data-q-body></div></div>`).join('')+(vis.length>shown?`<button type="button" class="secondary" data-q-more>اعرض أكتر (${vis.length-shown})</button>`:'')+(vis.length?'':'<p class="hint">مفيش أسماء محتاجة مراجعة.</p>');
   list.querySelector('[data-q-more]')?.addEventListener('click',()=>{shown+=30;draw()});
-  list.querySelectorAll('[data-q-drop]').forEach(b=>b.addEventListener('click',async()=>{const id=b.dataset.qDrop;b.disabled=true;const {error}=await deps.client.from('name_review_queue').delete().eq('id',id);if(error){setStatus('ماتشالتش: '+error.message);b.disabled=false;return}items=items.filter(q=>q.id!==id);draw()}));
+  list.querySelectorAll('[data-q-drop]').forEach(b=>b.addEventListener('click',async()=>{const id=b.dataset.qDrop;b.disabled=true;const {error}=await deps.client.from('name_review_queue').update({ignored:true}).eq('id',id);if(error){setStatus('ماتحفظش: '+error.message);b.disabled=false;return}items=items.filter(q=>q.id!==id);draw()}));
   list.querySelectorAll('[data-q-open]').forEach(b=>b.addEventListener('click',async()=>{const q=items.find(x=>x.id===b.dataset.qOpen);if(!q)return;const body=b.parentElement.querySelector('[data-q-body]');b.disabled=true;body.innerHTML='<p class="hint">بيدوّر…</p>';
    const {data,error}=await deps.invoke({action:'match',name:q.read_text,english:q.english||''});if(error||!data?.row){body.innerHTML='<p class="status bad">تعذّر البحث؛ جرّب تاني.</p>';b.disabled=false;return}
    show(body,[{...data.row,name:q.read_text,english:q.english||'',key:q.alias_key,fileName:q.file_name||''}],[],{...deps,flat:true,onChange:()=>load(true)},setStatus)}))};
  // keepOpen: refresh the count after a save without closing the line being reviewed
- const load=async(keepOpen)=>{const {data,error}=await deps.client.from('name_review_queue').select('id,alias_key,read_text,english,file_name,last_seen').order('last_seen',{ascending:false}).limit(2000);
+ const load=async(keepOpen)=>{const {data,error}=await deps.client.from('name_review_queue').select('id,alias_key,read_text,english,file_name,last_seen').eq('ignored',false).order('last_seen',{ascending:false}).limit(2000);
   if(error){if(box.open)list.innerHTML=`<p class="status bad">تعذّر تحميل القايمة: ${esc(error.message)}</p>`;return}items=data||[];if(keepOpen===true||!box.open)count();else draw()};
  box.addEventListener('toggle',()=>{if(box.open)load()});filter.addEventListener('input',draw);load();
  return {reload:()=>load()};
@@ -190,19 +201,21 @@ function reviewList(host,deps,setStatus){
 // Dictionary of everything the owner saved, with delete (two taps).
 function manager(host,client){
  const box=document.createElement('details');box.className='file-import';box.id='nameDictionary';box.innerHTML='<summary>قاموس الأسماء والتصحيحات اللي حفظتها</summary><p class="hint">كل اختيار أو تصحيح حفظته بيتطبق تلقائي في القراءات الجاية. لو فيه حاجة غلط، امسحها من هنا.</p><input type="search" data-dict-filter placeholder="دوّر في القاموس" dir="auto"><div data-dict-list><p class="hint">افتح القسم عشان يتحمّل.</p></div>';
- host.append(box);let data={aliases:[],fixes:[],rejections:[]},armed=null;
+ host.append(box);let data={aliases:[],fixes:[],rejections:[],ignored:[]},armed=null;
  const list=box.querySelector('[data-dict-list]'),filter=box.querySelector('[data-dict-filter]');
  const draw=()=>{const f=key(filter.value);const ok=s=>!f||key(s).includes(f);
   const a=data.aliases.filter(x=>ok(x.alias_text+' '+x.target_name)),x=data.fixes.filter(y=>ok(y.read_text+' '+y.corrected_text)),n=data.rejections.filter(y=>ok(y.alias_text+' '+y.target_name));
   list.innerHTML=`<h4>الأصناف المؤكدة: ${a.length}</h4>${a.map(r=>`<div class="item"><span dir="auto">${esc(r.alias_text)}</span> ← <strong>${esc(r.target_name)}</strong>${r.target_code?` <span class="hint">(${esc(r.target_code)})</span>`:' <span class="hint">(اسم يدوي)</span>'} <button type="button" class="secondary" data-del="a:${esc(r.id)}">${armed==='a:'+r.id?'اضغط تاني للتأكيد':'امسح'}</button></div>`).join('')||'<p class="hint">مفيش.</p>'}`+
    `<h4>تصحيحات القراءة: ${x.length}</h4>${x.map(r=>`<div class="item"><span dir="auto">${esc(r.read_text)}</span> ← <span dir="auto">${esc(r.corrected_text)}</span> <button type="button" class="secondary" data-del="f:${esc(r.id)}">${armed==='f:'+r.id?'اضغط تاني للتأكيد':'امسح'}</button></div>`).join('')||'<p class="hint">مفيش.</p>'}`+
-   `<h4>أصناف قلت إنها مش هي: ${n.length}</h4>${n.map(r=>`<div class="item"><span dir="auto">${esc(r.alias_text)}</span> ≠ <strong>${esc(r.target_name)}</strong> <button type="button" class="secondary" data-del="n:${esc(r.id)}">${armed==='n:'+r.id?'اضغط تاني للتأكيد':'امسح'}</button></div>`).join('')||'<p class="hint">مفيش.</p>'}<p class="status" data-dict-status></p>`;
+   `<h4>أصناف قلت إنها مش هي: ${n.length}</h4>${n.map(r=>`<div class="item"><span dir="auto">${esc(r.alias_text)}</span> ≠ <strong>${esc(r.target_name)}</strong> <button type="button" class="secondary" data-del="n:${esc(r.id)}">${armed==='n:'+r.id?'اضغط تاني للتأكيد':'امسح'}</button></div>`).join('')||'<p class="hint">مفيش.</p>'}`+
+   `<h4>أسماء قلت إنها مش مهمة: ${data.ignored.filter(y=>ok(y.read_text)).length}</h4>${data.ignored.filter(y=>ok(y.read_text)).map(r=>`<div class="item"><span dir="auto">${esc(r.read_text)}</span> <button type="button" class="secondary" data-unignore="${esc(r.id)}">رجّعها للمراجعة</button></div>`).join('')||'<p class="hint">مفيش.</p>'}<p class="status" data-dict-status></p>`;
+  list.querySelectorAll('[data-unignore]').forEach(b=>b.addEventListener('click',async()=>{const id=b.dataset.unignore;b.disabled=true;const {error}=await client.from('name_review_queue').update({ignored:false}).eq('id',id);if(error){list.querySelector('[data-dict-status]').textContent='ماترجعتش: '+error.message;b.disabled=false;return}data.ignored=data.ignored.filter(r=>r.id!==id);draw()}));
   list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{const id=b.dataset.del;if(armed!==id){armed=id;draw();return}armed=null;const [t,rid]=id.split(':');
    const table={a:'name_aliases',f:'reading_fixes',n:'name_rejections'}[t];const {error}=await client.from(table).delete().eq('id',rid);
    if(error){list.querySelector('[data-dict-status]').textContent='ماتمسحش: '+error.message;return}
    const k={a:'aliases',f:'fixes',n:'rejections'}[t];data[k]=data[k].filter(r=>r.id!==rid);draw()}))};
- const load=async()=>{list.innerHTML='<p class="hint">بيحمّل…</p>';const [a,f,n]=await Promise.all([client.from('name_aliases').select('id,alias_text,target_name,target_code,created_at').order('created_at',{ascending:false}).limit(2000),client.from('reading_fixes').select('id,read_text,corrected_text,created_at').order('created_at',{ascending:false}).limit(2000),client.from('name_rejections').select('id,alias_text,target_name,created_at').order('created_at',{ascending:false}).limit(2000)]);
-  if(a.error||f.error){list.innerHTML=`<p class="status bad">تعذّر تحميل القاموس: ${esc((a.error||f.error).message)}</p>`;return}data={aliases:a.data||[],fixes:f.data||[],rejections:n.error?[]:n.data||[]};draw()};
+ const load=async()=>{list.innerHTML='<p class="hint">بيحمّل…</p>';const [a,f,n,g]=await Promise.all([client.from('name_aliases').select('id,alias_text,target_name,target_code,created_at').order('created_at',{ascending:false}).limit(2000),client.from('reading_fixes').select('id,read_text,corrected_text,created_at').order('created_at',{ascending:false}).limit(2000),client.from('name_rejections').select('id,alias_text,target_name,created_at').order('created_at',{ascending:false}).limit(2000),client.from('name_review_queue').select('id,read_text').eq('ignored',true).limit(2000)]);
+  if(a.error||f.error){list.innerHTML=`<p class="status bad">تعذّر تحميل القاموس: ${esc((a.error||f.error).message)}</p>`;return}data={aliases:a.data||[],fixes:f.data||[],rejections:n.error?[]:n.data||[],ignored:g.error?[]:g.data||[]};draw()};
  box.addEventListener('toggle',()=>{if(box.open)load()});filter.addEventListener('input',draw);
  return {reload:()=>box.open&&load()};
 }
