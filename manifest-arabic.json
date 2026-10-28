@@ -6,8 +6,8 @@
   "start_url": "asker-nawaqes-arabic.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f6fb",
-  "theme_color": "#123d8c",
+  "background_color": "#fbf8f8",
+  "theme_color": "#7d1028",
   "icons": [
     {
       "src": "icons/arabic-192.png",

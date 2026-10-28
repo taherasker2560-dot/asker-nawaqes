@@ -4,16 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="manifest" href="manifest-arabic.json" />
-    <meta name="theme-color" content="#123d8c" />
+    <meta name="theme-color" content="#7d1028" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="icon" href="icons/arabic-192.png" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=split-20261028" />
+    <link rel="stylesheet" href="ar/app.css?v=crimson-20261028" />
   </head>
   <body>
-    <header>
-      <h1>بوت نواقص صيدلية عسكر</h1>
-      <p>بيقارن وارد الشركات بالنواقص عربي بعربي، ويجهزلك رسالة بالمتاح.</p>
+    <header class="appbar">
+      <img class="mark" src="icons/arabic-192.png" alt="" width="40" height="40" />
+      <div class="brand">
+        <h1>صيدلية عسكر</h1>
+        <p>نواقص ووارد الشركات</p>
+      </div>
+      <button id="logoutBtn" class="icon-btn hidden" aria-label="خروج" title="خروج">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </header>
     <main>
       <section id="loginCard" class="card">
@@ -24,13 +33,18 @@
         <p id="loginStatus" class="status"></p>
       </section>
       <div id="app" class="hidden">
-      <p id="versionWarn" class="status bad hidden"></p>
-        <div class="tabs">
-          <button data-tab="short">١. النواقص</button
-          ><button data-tab="translate" class="secondary">٢. ترجمة النواقص</button
-          ><button data-tab="read" class="secondary">٣. قراءة وارد الشركة</button
-          ><button id="logoutBtn" class="secondary">خروج</button>
-        </div>
+        <p id="versionWarn" class="status bad hidden"></p>
+        <nav class="bottomnav" aria-label="الأقسام">
+          <button data-tab="short">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>النواقص</span></button
+          ><button data-tab="translate" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c.5 3 2.5 6 6 8M11 5c-.8 3.5-3 6.5-7 8.5M13 20l4-9 4 9M14.5 17h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>الترجمة</span></button
+          ><button data-tab="read" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2.5-7h11L20 13M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5M4 13h4.5l1.5 2.5h4l1.5-2.5H20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            <span>الوارد</span></button>
+        </nav>
 
         <section id="shortPanel" class="card">
           <h2>النواقص</h2>
@@ -74,7 +88,7 @@
           ><button id="trStop" class="secondary hidden">وقّف</button>
           <p id="trStatus" class="status"></p>
           <label for="trFilter">دوّر</label><input id="trFilter" type="search" placeholder="اسم إنجليزي أو عربي — بيدوّر في كل القوايم" />
-          <div class="tabs" style="margin-top: 8px">
+          <div class="tabs seg">
             <button data-show="suggested">محتاجة مراجعة</button
             ><button data-show="approved" class="secondary">اتأكدت</button
             ><button data-show="none" class="secondary">لسه ماتترجمتش</button>
@@ -99,7 +113,7 @@
           /><datalist id="supplierList"></datalist> <label for="supplierPhone">رقم واتساب الشركة (اختياري)</label
           ><input id="supplierPhone" type="text" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" />
           <button id="notifyBtn" class="secondary hidden">فعّل الإشعارات</button>
-          <div class="tabs" style="margin-top: 10px">
+          <div class="tabs seg">
             <button data-src="img">صور أو PDF</button><button data-src="text" class="secondary">مكتوب</button
             ><button data-src="excel" class="secondary">ملف Excel</button>
           </div>
@@ -149,6 +163,6 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="ar/app.js?v=split-20261028"></script>
+    <script src="ar/app.js?v=crimson-20261028"></script>
   </body>
 </html>
