@@ -11,13 +11,13 @@
 //   match {name, english, read} -> re-match one line after the owner corrects its Arabic text
 // Smart matching uses the same tools as V10: strength/pack/form/brand rules (match.ts), the owner's reading
 // corrections, «أيوه» / «مش ده» answers (exact and near: same numbers, same form, very close text), names marked
-// «مش مهم» — and it also reads, without changing them, what the owner already taught V10 (name_aliases,
-// name_rejections, reading_fixes) when the item there is one of the shortages.
-// Tables are read and written with the caller's own session (owner-only RLS). V10 tables are only read.
+// «مش مهم». Fully independent of V10: it never reads V10 tables. What the owner had taught V10 was copied once into
+// ar_answers / ar_fixes (migration 202610280013).
+// Tables are read and written with the caller's own session (owner-only RLS).
 
 import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar5';
+export const VERSION = 'ar6';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -33,7 +33,7 @@ type Decision = { alias_key: string; read_text: string; name_key: string; decisi
 export const nameKey = (s: string) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim().slice(0, 250);
 type Row = { name: string; english: string; unclear: boolean };
 type Fix = { read_key: string; corrected_text: string };
-// Everything the owner taught (this bot and V10), loaded once per request.
+// Everything the owner taught this bot, loaded once per request.
 export type Knowledge = { names: ArName[]; answers: Decision[]; fixes: Fix[]; ignored: Set<string> };
 
 function log(stage: string, started: number, extra: Record<string, unknown> = {}): void {
@@ -91,24 +91,14 @@ async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schem
 }
 
 async function knowledge(env: Env, auth: string, fetchImpl: typeof fetch): Promise<Knowledge> {
-  const soft = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]); // a missing V10 table just means "nothing taught there"
-  const [names, answers, fixes, ignored, v10Aliases, v10Rejections, v10Fixes] = await Promise.all([
+  const soft = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]);
+  const [names, answers, fixes, ignored] = await Promise.all([
     restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
     restAll<Decision>(env, auth, fetchImpl, 'ar_answers?select=alias_key,read_text,name_key,decision&order=id'),
     soft(restAll<Fix>(env, auth, fetchImpl, 'ar_fixes?select=read_key,corrected_text&order=read_key')),
     soft(restAll<{ alias_key: string }>(env, auth, fetchImpl, 'ar_ignored?select=alias_key&order=alias_key')),
-    soft(restAll<{ alias_key: string; target_name: string }>(env, auth, fetchImpl, 'name_aliases?select=alias_key,target_name&order=id')),
-    soft(restAll<{ alias_key: string; target_name: string }>(env, auth, fetchImpl, 'name_rejections?select=alias_key,target_name&order=id')),
-    soft(restAll<Fix>(env, auth, fetchImpl, 'reading_fixes?select=read_key,corrected_text&order=id')),
   ]);
-  // V10 answers are written per English item name too, so they translate directly; this bot's own answers win.
-  const own = new Set(answers.map((a) => a.alias_key + '|' + a.name_key));
-  const fromV10 = [
-    ...v10Aliases.map((a) => ({ alias_key: a.alias_key, read_text: a.alias_key, name_key: nameKey(a.target_name), decision: 'yes' as const })),
-    ...v10Rejections.map((a) => ({ alias_key: a.alias_key, read_text: a.alias_key, name_key: nameKey(a.target_name), decision: 'no' as const })),
-  ].filter((a) => !own.has(a.alias_key + '|' + a.name_key));
-  const ownFix = new Set(fixes.map((f) => f.read_key));
-  return { names, answers: [...answers, ...fromV10], fixes: [...fixes, ...v10Fixes.filter((f) => !ownFix.has(f.read_key))], ignored: new Set(ignored.map((x) => x.alias_key)) };
+  return { names, answers, fixes, ignored: new Set(ignored.map((x) => x.alias_key)) };
 }
 
 export const TRANSLATE_PROMPT = [
@@ -167,7 +157,7 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
     const y = yes.get(key) || yes.get(textKey), yid = y && !rejected.has(y) ? idOf.get(y) : undefined;
     if (yid) match = { id: yid, name: '', score: 1, confidence: 'confirmed' };
     else {
-      // written a little differently from a line the owner (or V10) confirmed: same numbers, same form, very close text
+      // written a little differently from a line the owner confirmed: same numbers, same form, very close text
       const near = new Set<string>(), textForms = forms(text);
       for (const d of yesTexts) {
         if (rejected.has(d.name_key) || !sameNumbers(text, d.read_text) || !formsAgree(textForms, forms(d.read_text))) continue;

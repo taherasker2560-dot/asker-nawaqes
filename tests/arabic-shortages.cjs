@@ -32,17 +32,18 @@ assert.ok(!b.rows[1].candidates.some(c=>c.id==='s3'),'rejected shortage not sugg
 // smart matching: reading fix, V10 knowledge, near answers, ignored names, re-match after a correction
 {const rows={rows:[{name:'فلاجيل شراب ١٢٥',english:''},{name:'جانوفيا ٥٠ مجم قرص ٢٨',english:''},{name:'بروفن ٤٠٠ اقراص',english:''},{name:'كريم مش مهم',english:''},{name:'جانوقيا ١٠٠',english:''}]};
  const k=x=>x;f=fake({names,gem:()=>rows,
-  answers:[],decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'yes'}],
-  v10aliases:[{alias_key:'بروفن 400 اقراص',target_name:'BRUFEN 400MG 30TAB'}],ignored:[{alias_key:'كريم مش مهم'}],fixes:[{read_key:'جانوقيا 100',corrected_text:'جانوفيا ١٠٠ مجم ٢٨ قرص'}]});
+  answers:[],decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'yes'},{alias_key:'بروفن 400 اقراص',read_text:'بروفن ٤٠٠ اقراص',name_key:'BRUFEN 400MG 30TAB',decision:'yes'}],
+  v10aliases:[{alias_key:'فلاجيل شراب 125',target_name:'JANUVIA 100MG 28TAB'}],ignored:[{alias_key:'كريم مش مهم'}],fixes:[{read_key:'جانوقيا 100',corrected_text:'جانوفيا ١٠٠ مجم ٢٨ قرص'}]});
  const x=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();
  assert.equal(x.rows[1].match.id,'s3');assert.equal(x.rows[1].match.via,'alias','near a line the owner confirmed (same numbers, words in another order)');
- assert.equal(x.rows[2].match.id,'s1');assert.equal(x.rows[2].match.confidence,'confirmed','V10 confirmed name reused');
+ assert.equal(x.rows[2].match.id,'s1');assert.equal(x.rows[2].match.confidence,'confirmed','confirmed name (copied from V10) reused');
+ assert.notEqual(x.rows[0].match?.id,'s4','V10 tables are not read any more');assert.ok(!f.calls.some(c=>/name_aliases|name_rejections|reading_fixes|shortage_items/.test(c.url)),'never reads V10 tables');
  assert.equal(x.rows[3].ignored,true);assert.equal(x.rows[4].corrected,'جانوفيا ١٠٠ مجم ٢٨ قرص');assert.equal(x.rows[4].match?.id,'s4','matched on the corrected text');
  f=fake({names,gem:()=>({}),decisions:[{alias_key:'جانوقيا',read_text:'جانوقيا',name_key:'JANUVIA 100MG 28TAB',decision:'no'}]});
  const m=await (await F.handle(req({action:'match',name:'جانوفيا ١٠٠ مجم ٢٨ قرص',english:'',read:'جانوقيا'}),env,f)).json();
  assert.ok(!m.row.candidates.some(c=>c.id==='s4'),'«مش ده» on the first reading still applies after the correction');
- f=fake({names,gem:()=>rows,v10rej:[{alias_key:'فلاجيل شراب 125',target_name:'FLAGYL 125MG SYP'}]});
- const v=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();assert.notEqual(v.rows[0].match?.id,'s2','V10 «مش ده» respected');}
+ f=fake({names,gem:()=>rows,decisions:[{alias_key:'فلاجيل شراب 125',read_text:'فلاجيل شراب ١٢٥',name_key:'FLAGYL 125MG SYP',decision:'no'}]});
+ const v=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();assert.notEqual(v.rows[0].match?.id,'s2','«مش ده» (copied from V10) respected');}
 // typed lines / Excel names: no Gemini call, quantity after | dropped, numbering dropped, English lines matched too; PDF accepted by read
 {f=fake({names,gem:()=>{throw Error('gemini must not be called')},decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'yes'}]});
  const t=await (await F.handle(req({action:'lines',lines:['1. جانوفيا ٥٠ مجم ٢٨ قرص | 5','BRUFEN 400MG 30TAB\t12','','٣٠','كلام']}),env,f)).json();
