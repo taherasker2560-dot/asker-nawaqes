@@ -3,7 +3,9 @@
 // list (shortages) is compared in the page. Strength numbers read from the image must all appear in the item.
 
 export type CatalogItem = [id: string, name: string, alts?: string[]];
-export type Candidate = { id: string; name: string; score: number; numbersOk: boolean; formOk?: boolean };
+export type Candidate = { id: string; name: string; score: number; numbersOk: boolean; formOk?: boolean; brandOk?: boolean };
+// Below this score an item is never offered to the owner as "this one?" (the editor still lists it).
+export const OFFER_MIN = 0.45;
 export type Match = { id: string; name: string; score: number; confidence: 'confirmed' | 'high' | 'review' };
 
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
@@ -25,7 +27,7 @@ export function normalize(s: string): string {
   return String(s || '')
     .replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)))
     .replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d)))
-    .replace(/[گک]/g, 'ك').replace(/ی/g, 'ي').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
+    .replace(/[گک]/g, 'ك').replace(/ی/g, 'ي').replace(/پ/g, 'ب').replace(/ڤ/g, 'ف').replace(/چ/g, 'ج').replace(/ژ/g, 'ز').replace(/[أإآٱ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي')
     .replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/[ً-ْـ]/g, '')
     .toUpperCase()
     .replace(/(\d)[,٫](\d)/g, '$1.$2')
@@ -150,9 +152,30 @@ function words(s: string): string[] {
   return normalize(s).replace(/[\d.\/]+/g, ' ').split(' ').filter((w) => w.length >= 2 && !STOP.has(w));
 }
 
-function grams(s: string): Set<string> {
+// The suppliers' font makes ك look like ق, and a first ك like ج (ديقسافين, جويتابين): Arabic words also add the
+// ك spelling, so either reading finds the item. Item names keep their own spelling as well.
+function kafVariant(w: string): string {
+  return /[\u0600-\u06FF]/.test(w) ? w.replace(/ق/g, 'ك').replace(/^ج/, 'ك') : w;
+}
+function wordGrams(w: string, out: Set<string>): void {
+  const p = ` ${w} `; for (let i = 0; i + 3 <= p.length; i++) out.add(p.slice(i, i + 3));
+}
+// Item names: their own spelling only. Supplier text (query = true): also the ك spelling.
+function grams(s: string, query = false): Set<string> {
   const out = new Set<string>();
-  for (const w of words(s)) { const p = ` ${w} `; for (let i = 0; i + 3 <= p.length; i++) out.add(p.slice(i, i + 3)); }
+  for (const w of words(s)) { wordGrams(w, out); const k = query ? kafVariant(w) : w; if (k !== w) wordGrams(k, out); }
+  return out;
+}
+// The brand: first meaningful word. A suggestion whose brand is far from the supplier's brand is never trusted.
+// Two forms: the first word, and the first two words written together (OJO ELIVATO = OJOALIVATO).
+function brand(s: string, query = false): Set<string>[] {
+  const ws = words(s).filter((w) => !/^\d/.test(w));
+  const out: Set<string>[] = [];
+  for (const w of [ws[0], ws.length > 1 ? ws[0] + ws[1] : '']) {
+    if (!w) continue;
+    // letter pairs: kinder than triples to Gemini's spellings of a brand (CANZARTAN = KANSARTAN)
+    for (const v of new Set([w, query ? kafVariant(w) : w])) { const g = new Set<string>(); for (let i = 0; i + 2 <= v.length; i++) g.add(v.slice(i, i + 2)); out.push(g); }
+  }
   return out;
 }
 
@@ -162,15 +185,15 @@ function dice(a: Set<string>, b: Set<string>): number {
   return (2 * n) / (a.size + b.size);
 }
 
-type Entry = { id: string; name: string; nums: string[]; g: Set<string>[] };
+type Entry = { id: string; name: string; nums: string[]; g: Set<string>[]; b: Set<string>[]; sc: { strength: string[]; count: string[] } };
 export class Catalog {
   private entries: Entry[] = [];
   private index = new Map<string, number[]>();
   constructor(items: CatalogItem[]) {
     items.forEach((it, i) => {
       const forms = [it[1], ...(it[2] || [])];
-      const g = forms.map(grams);
-      this.entries.push({ id: it[0], name: it[1], nums: numbers(it[1]), g });
+      const g = forms.map((f) => grams(f));
+      this.entries.push({ id: it[0], name: it[1], nums: numbers(it[1]), g, b: forms.flatMap((f) => brand(f)), sc: strengthAndCount(it[1]) });
       const seen = new Set<string>();
       for (const set of g) for (const t of set) if (!seen.has(t)) { seen.add(t); let l = this.index.get(t); if (!l) this.index.set(t, (l = [])); l.push(i); }
     });
@@ -189,24 +212,32 @@ export class Catalog {
 
   // Best catalogue items for one supplier line. `arabic` is the name as read; `latin` is Gemini's guess.
   candidates(arabic: string, latin: string, limit = 3): Candidate[] {
-    const queries = [grams(arabic), grams(latin)].filter((q) => q.size);
+    const queries = [grams(arabic, true), grams(latin, true)].filter((q) => q.size);
     if (!queries.length) return [];
     const hits = new Map<number, number>();
     for (const q of queries) for (const t of q) { const l = this.index.get(t); if (l && l.length < 6000) for (const i of l) hits.set(i, (hits.get(i) || 0) + 1); }
     const shortlist = [...hits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 300).map(([i]) => i);
-    const src = strengthAndCount(numbers(arabic).length ? arabic : latin);
+    const srcText = numbers(arabic).length ? arabic : latin;
+    const src = strengthAndCount(srcText);
+    // a single number written as a pack count (بانادول ٢٤ قرص) may be the item's pack count, not its strength
+    const srcTokens = normalize(srcText).split(' '), srcNums = numbers(srcText);
+    const loneCount = srcNums.length === 1 && COUNT_UNITS.has(srcTokens[srcTokens.findIndex((t) => /\d/.test(t)) + 1] || '');
+    const brands = [...brand(arabic, true), ...brand(latin, true)];
     const arForms = forms(arabic), srcForms = arForms.size ? arForms : forms(latin);
     const routeSrc = /[\u0600-\u06FF]/.test(arabic) && routes(arabic).size ? arabic : latin;
     const scored = shortlist.map((i) => {
       const e = this.entries[i];
       let sim = 0; for (const q of queries) for (const g of e.g) sim = Math.max(sim, dice(q, g));
-      const numbersOk = src.strength.every((n) => e.nums.includes(n));
-      const itemCount = strengthAndCount(e.name).count;
+      // the supplier's strength must be the item's strength, not just any number in its name (٢٠ مجم ≠ 40MG 20TAB)
+      const numbersOk = src.strength.every((n) => e.sc.strength.includes(n) || (loneCount && e.sc.count.includes(n)));
+      const itemCount = e.sc.count;
       const countOff = src.count.length > 0 && itemCount.length > 0 && !src.count.some((n) => itemCount.includes(n));
+      let brandSim = 0; for (const x of brands) for (const y of e.b) brandSim = Math.max(brandSim, dice(x, y));
+      const brandOk = brandSim >= 0.45;
       const itemForms = srcForms.size ? forms(e.name) : new Set<string>();
       const formOk = formsAgree(srcForms, itemForms) && routesAgree(routeSrc, e.name);
-      const factor = (!src.strength.length ? (e.nums.length ? 0.95 : 1) : numbersOk ? 1.05 : 0.5) * (countOff ? 0.9 : 1) * (formOk ? 1 : 0.6);
-      return { id: e.id, name: e.name, score: Math.min(1, Math.round(sim * factor * 1000) / 1000), numbersOk, formOk };
+      const factor = (!src.strength.length ? (e.nums.length ? 0.95 : 1) : numbersOk ? 1.05 : 0.5) * (countOff ? 0.85 : 1) * (formOk ? 1 : 0.6) * (brandOk ? 1 : 0.75);
+      return { id: e.id, name: e.name, score: Math.min(1, Math.round(sim * factor * 1000) / 1000), numbersOk, formOk, brandOk };
     });
     return scored.sort((a, b) => b.score - a.score).slice(0, limit);
   }
@@ -216,7 +247,7 @@ export class Catalog {
 export function decide(c: Candidate[]): Match | null {
   const top = c[0];
   if (!top || top.score < 0.35) return null;
-  const next = c.find((x, i) => i > 0 && x.numbersOk && x.formOk !== false);
-  const clear = top.numbersOk && top.formOk !== false && top.score >= 0.6 && (!next || top.score - next.score >= 0.08);
+  const next = c.find((x, i) => i > 0 && x.numbersOk && x.formOk !== false && x.name !== top.name);
+  const clear = top.numbersOk && top.formOk !== false && top.brandOk !== false && top.score >= 0.6 && (!next || top.score - next.score >= 0.08);
   return { id: top.id, name: top.name, score: top.score, confidence: clear ? 'high' : 'review' };
 }

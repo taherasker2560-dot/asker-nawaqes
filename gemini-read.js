@@ -33,7 +33,8 @@ function init(deps){const host=document.querySelector('#incomingPanel .incoming-
    if(document.getElementById('incomingMode')?.value==='availability'&&root.AskerGeminiReport&&deps.readAllRows){
     root.AskerFileImport.cancelIncomingImages(token);status('جارٍ مقارنة الأصناف بالنواقص…');
     const {data:shortages,error}=await deps.readAllRows('shortage_items',q=>q.eq('is_active',true));if(ticket!==run)return;if(error)throw Error('تعذّر قراءة النواقص: '+(error.message||error));
-    const rep=root.AskerGeminiReport.show(document.getElementById('availabilityResults'),allRows,shortages||[],{client:deps.client,invoke,onQueued:()=>reviewList?.reload(),onChange:()=>reviewList?.reload()},m=>{status(m);dictionary?.reload()});
+    const {data:ign}=await deps.client.from('name_review_queue').select('alias_key').eq('ignored',true).limit(5000);if(ticket!==run)return;
+    const rep=root.AskerGeminiReport.show(document.getElementById('availabilityResults'),allRows,shortages||[],{client:deps.client,invoke,ignored:new Set((ign||[]).map(x=>x.alias_key)),onQueued:()=>reviewList?.reload(),onChange:()=>reviewList?.reload()},m=>{status(m);dictionary?.reload()});
     status(`اتقرى ${count} سطر من ${files.length} صور. وصل من النواقص: ${rep.arrived.length}، محتاج تأكيدك: ${rep.review.length}.${noCatalog} ${cut?`في ${cut} صورة النتيجة ممكن تكون ناقصة؛ قسّمها.`:''} مفيش حاجة اتحفظت غير الأسماء اللي هتأكدها.`.replace(/\s+/g,' '));return}
    const rows=root.AskerIncomingImages.draftRows(results);
    if(!root.AskerFileImport.reviewIncomingImages(token,rows,`قراءة Gemini لـ ${files.length} صور`)){status('تم تجاهل نتيجة Gemini لأنك بدأت استيرادًا آخر. النص السابق محفوظ.');return}

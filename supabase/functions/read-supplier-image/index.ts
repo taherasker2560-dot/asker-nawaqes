@@ -31,6 +31,7 @@ export const PROMPT = [
   'Do not translate, do not correct spelling, do not add or guess missing words.',
   'Do not include the header row, the quantity column or the price column.',
   'If any character of a name is hard to read, still return your best reading and set unclear to true.',
+  'These lists use a font where the Arabic letter ك can look like ق, ج or گ: when a letter could be ك, prefer the spelling of the real medicine brand. Write only Arabic letters (no Persian letters such as پ ڤ گ ی).',
   'For each row also give "english": the same product as an Egyptian pharmacy system would list it, in Latin capital letters: brand name, strength, pack (for example "JANUVIA 100MG 28TAB", "FLAGYL 125MG SYP"). If you are not sure of the brand, transliterate the Arabic letters; never replace it with a different product.',
   'Never invent rows. If the image has no product table, return an empty list.',
   'Answer only with JSON of this shape: {"rows":[{"name":"...","english":"...","unclear":false}]}',
@@ -143,7 +144,7 @@ function reply(status: number, body: unknown, headers: Record<string, string>): 
 // (گ ک ی). V10 matches names exactly, so they are mapped back to the Arabic letters the catalogue uses:
 // gaf/keheh -> ك, Persian yeh -> ي inside a word and ى at its end (how the lists write سى / بى).
 export function arabicLetters(s: string): string {
-  return s.replace(/[گک]/g, 'ك').replace(/ی(?=\p{L})/gu, 'ي').replace(/ی/g, 'ى');
+  return s.replace(/[گک]/g, 'ك').replace(/ی(?=\p{L})/gu, 'ي').replace(/ی/g, 'ى').replace(/پ/g, 'ب').replace(/ڤ/g, 'ف').replace(/چ/g, 'ج').replace(/ژ/g, 'ز');
 }
 
 // Checks the Gemini answer: only names, sane lengths, no invented structure.
