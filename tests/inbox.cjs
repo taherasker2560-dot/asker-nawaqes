@@ -1,0 +1,46 @@
+// Automatic incoming (phone → function): key check, only saved companies, text/image/PDF read and matched, file kept,
+// row saved in ar_inbox, spoken summary. Fake Supabase and Gemini; nothing real is called.
+const assert=require('node:assert/strict'),path=require('node:path'),crypto=require('node:crypto');
+(async()=>{
+const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
+const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service'};
+const KEY='a'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
+const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];
+const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠ مجم ٣٠ قرص',status:'approved'}];
+function fake({gem}={}){const calls=[],saved=[],files=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
+ const f=async(url,o={})=>{calls.push({url,o});
+  if(url.includes('/rest/v1/ar_inbox_keys'))return page(url,url.includes('key_hash=eq.'+HASH)?[{key_hash:HASH}]:[]);
+  if(url.includes('/rest/v1/ar_suppliers'))return page(url,[{name:'المتحدة للأدوية',phone:'201001234567'}]);
+  if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
+  if(url.includes('/rest/v1/ar_names'))return page(url,names);
+  if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
+  if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length}]),{status:201})}
+  if(url.includes('/storage/v1/object/ar-inbox/')){files.push({url,headers:o.headers});return new Response('{}')}
+  if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(gem())}]}}]}));
+  throw Error('unexpected '+url)};Object.assign(f,{calls,saved,files});return f}
+const post=(q,body,type,key=KEY)=>new Request('https://p.supabase.co/functions/v1/arabic-shortages?'+q,{method:'POST',headers:{'x-inbox-key':key,'content-type':type},body});
+// wrong key: refused, nothing read
+let f=fake();let r=await F.handle(post('from=x','hi','text/plain','b'.repeat(64)),env,f);assert.equal(r.status,401);
+// unknown sender (not a saved company): ignored before reading or storing
+f=fake({gem:()=>{throw Error('no')}});r=await F.handle(post('from='+encodeURIComponent('زبون'),'فلاجيل','text/plain'),env,f);
+assert.equal(r.status,200);assert.equal((await r.json()).ignored,true);assert.equal(f.saved.length,0);assert.ok(!f.calls.some(c=>c.url.includes('generativelanguage')));
+// text from a saved company (name written a little differently): matched, saved, spoken summary
+f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحده للادويه')+'&say=1','فلاجيل شراب ١٢٥ | 3\nحاجة تانية','text/plain; charset=utf-8'),env,f);
+assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: وصل 1 صنف من النواقص');
+assert.equal(f.saved[0].kind,'text');assert.equal(f.saved[0].supplier,'المتحدة للأدوية');assert.equal(f.saved[0].sure,1);assert.equal(f.saved[0].rows.length,2);
+assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.Authorization==='Bearer service'),'service role, no login');
+// image: read by Gemini, file kept in the private bucket
+f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&name=IMG-1.jpg',new Uint8Array([255,216,255,0]),'image/jpeg'),env,f);
+const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,1);assert.match(b.say,/وصل 1 صنف/);
+assert.equal(f.files.length,1);assert.match(f.files[0].url,/ar-inbox\/\d{4}-\d\d-\d\d\/[0-9a-f-]+\.jpg$/);assert.equal(f.saved[0].kind,'image');assert.ok(f.saved[0].file_path);
+// PDF and unknown type
+assert.equal(F.inboxKind('application/pdf',''),'pdf');assert.equal(F.inboxKind('application/octet-stream','list.xlsx'),'sheet');assert.equal(F.inboxKind('application/zip','a.zip'),'');
+// Gemini quota: the message is still kept (status error) so nothing is lost
+f=fake({gem:()=>{throw Error('x')}});const q=async(u,o)=>u.startsWith('https://generativelanguage')?new Response('',{status:429}):f(u,o);
+r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),new Uint8Array([1,2,3]),'image/png'),env,q);
+assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(f.saved[0].error,/حصة/);
+// Excel name column (same rule as the page)
+assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
+console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -11,7 +11,7 @@ function builder(table){let filters=[],op='select',payload=null,opts={},range=nu
   if(op==='delete'){const gone=t.filter(match);tables[table]=t.filter(r=>!match(r));window.__fakeWrites.push({table,k:'delete',v:gone.map(r=>r.id)});return {data:null,error:null}}
   if(op==='update'){const hit=t.filter(match);hit.forEach(r=>Object.assign(r,payload));window.__fakeWrites.push({table,k:'update',v:hit.map(r=>r.id)});return {data:null,error:null}}
   let data=t.filter(match);if(range)data=data.slice(range[0],range[1]+1);if(lim)data=data.slice(0,lim);data=JSON.parse(JSON.stringify(data));return {data:single?data[0]||null:data,error:null,count:data.length}};
- const b={select(){if(op!=='select')ret=true;return b},eq(c,v){filters.push(r=>r[c]===v);return b},in(c,vs){filters.push(r=>vs.includes(r[c]));return b},gte(c,v){filters.push(r=>r[c]>=v);return b},order(){return b},limit(n){lim=n;return b},range(a,z){range=[a,z];return b},single(){single=true;return b},maybeSingle(){single=true;return b},
+ const b={select(){if(op!=='select')ret=true;return b},eq(c,v){filters.push(r=>r[c]===v);return b},in(c,vs){filters.push(r=>vs.includes(r[c]));return b},gte(c,v){filters.push(r=>r[c]>=v);return b},neq(c,v){filters.push(r=>r[c]!==v);return b},order(){return b},limit(n){lim=n;return b},range(a,z){range=[a,z];return b},single(){single=true;return b},maybeSingle(){single=true;return b},
   insert(v){op='insert';payload=v;return b},upsert(v,o){op='upsert';payload=v;opts=o||{};return b},delete(){op='delete';return b},update(v){op='update';payload=v;return b},
   then(res,rej){return Promise.resolve(run()).then(res,rej)}};return b}
 const catalog=[{id:'1',name:'BRUFEN 400'},{id:'2',name:'سليسبت 500'},{id:'3',name:'JANUVIA 50MG 28TAB'},{id:'4',name:'JANUVIA 100MG 28TAB'}];
