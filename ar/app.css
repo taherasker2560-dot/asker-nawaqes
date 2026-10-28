@@ -394,3 +394,16 @@ details > summary {
 #msgBox button.secondary {
   background: var(--card);
 }
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 15px;
+  margin: 10px 0 2px;
+}
+label.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--crimson);
+}

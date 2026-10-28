@@ -1085,12 +1085,31 @@
   $('msgText').addEventListener('input', () => {
     msgEdited = true;
   });
+  const isAndroid = () => /Android/i.test(navigator.userAgent);
+  const openUrl = (u) => (window.__openUrl ? window.__openUrl(u) : (location.href = u));
+  function waIntent(phone, text, fallback) {
+    const q = (phone ? `phone=${phone}&` : '') + `text=${encodeURIComponent(text)}`;
+    return `intent://send/?${q}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=${encodeURIComponent(fallback)};end`;
+  }
+  // «واتساب بيزنس» choice, remembered on this phone (on by default)
+  try {
+    $('waBiz').checked = localStorage.getItem('ar-wa-biz') !== '0';
+  } catch (e) {}
+  $('waBiz').onchange = () => {
+    try {
+      localStorage.setItem('ar-wa-biz', $('waBiz').checked ? '1' : '0');
+    } catch (e) {}
+  };
   $('waBtn').onclick = async () => {
     const t = $('msgText').value.trim();
     if (!t) return;
     await saveSupplier();
     const ph = waPhone($('supplierPhone').value);
-    window.open(`https://wa.me/${ph}?text=${encodeURIComponent(t)}`, '_blank');
+    const web = `https://wa.me/${ph}?text=${encodeURIComponent(t)}`;
+    // On Android, open WhatsApp Business (com.whatsapp.w4b) directly when chosen, instead of whichever WhatsApp
+    // Android picks for wa.me links; if it is not installed, Chrome falls back to the wa.me link.
+    if (isAndroid() && $('waBiz').checked) openUrl(waIntent(ph, t, web));
+    else window.open(web, '_blank');
     status(
       'msgStatus',
       ph
