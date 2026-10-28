@@ -89,9 +89,17 @@ $('trFilter').oninput=()=>{shown=30;drawTranslate()};$('trMore').onclick=()=>{sh
 document.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>{show=b.dataset.show;shown=30;document.querySelectorAll('[data-show]').forEach(x=>x.classList.toggle('secondary',x!==b));drawTranslate()});
 async function translateOnce(){const r=await invoke({action:'translate',limit:60});names=new Map((await all('ar_shortage_names','shortage_item_id,arabic_name,status')).map(n=>[n.shortage_item_id,n]));drawTranslate();return r}
 $('trOne').onclick=async()=>{$('trOne').disabled=true;status('trStatus','بيترجم…');try{const r=await translateOnce();status('trStatus',`اتترجم ${r.translated} صنف. فاضل ${r.remaining}.`,'good')}catch(e){status('trStatus','تعذّر: '+e.message,'bad')}$('trOne').disabled=false};
-$('trAll').onclick=async()=>{stopAll=false;$('trAll').disabled=$('trOne').disabled=true;$('trStop').classList.remove('hidden');let done=0;
- try{for(;;){if(stopAll)break;status('trStatus',`بيترجم… (${done} لحد دلوقتي) — سيب الصفحة مفتوحة`);const r=await translateOnce();done+=r.translated;if(!r.remaining||!r.translated)break}status('trStatus',`خلص: اتترجم ${done} صنف.`,'good')}
- catch(e){status('trStatus',`وقف بعد ${done} صنف: ${e.message}`,'bad')}$('trAll').disabled=$('trOne').disabled=false;$('trStop').classList.add('hidden')};
+// Google's free plan also limits requests per minute: wait between batches, and after a "quota" answer wait a
+// minute and try once more; a second refusal is most likely the daily limit (back at midnight Pacific = 10 AM Cairo).
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function waitStoppable(sec,label){for(let i=sec;i>0;i--){if(stopAll)return;status('trStatus',`${label} (${i} ثانية)`);await sleep(1000)}}
+$('trAll').onclick=async()=>{stopAll=false;$('trAll').disabled=$('trOne').disabled=true;$('trStop').classList.remove('hidden');let done=0,retried=false;
+ for(;;){if(stopAll){status('trStatus',`وقفت. اتترجم ${done} صنف.`);break}
+  status('trStatus',`بيترجم… (${done} لحد دلوقتي) — سيب الصفحة مفتوحة`);
+  try{const r=await translateOnce();done+=r.translated;retried=false;if(!r.remaining||!r.translated){status('trStatus',`خلص: اتترجم ${done} صنف.`,'good');break}await waitStoppable(12,`استنى شوية عشان حد Google في الدقيقة — اتترجم ${done}`)}
+  catch(e){if(/حصة|quota/i.test(e.message)&&!retried){retried=true;await waitStoppable(65,`Google قال استنى — هيكمّل لوحده`);continue}
+   status('trStatus',`وقف بعد ${done} صنف: ${e.message}${/حصة|quota/i.test(e.message)?' غالبًا ده الحد اليومي، وبيتجدد الساعة ١٠ الصبح بتوقيت مصر.':''}`,'bad');break}}
+ $('trAll').disabled=$('trOne').disabled=false;$('trStop').classList.add('hidden')};
 $('trStop').onclick=()=>{stopAll=true};
 
 // ---------- read ----------
