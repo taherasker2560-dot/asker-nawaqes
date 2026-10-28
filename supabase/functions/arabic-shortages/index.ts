@@ -251,6 +251,20 @@ export function inboxSay(company: string, sure: number, review: number): string 
   if (!sure && !review) return `${company}: مفيش حاجة من النواقص`;
   return `${company}: وصل ${sure} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
 }
+// Start of today in Cairo (the pharmacy's day), as an ISO time.
+export function cairoDayStart(now = new Date()): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(now).map((x) => [x.type, Number(x.value)]));
+  return new Date(now.getTime() - (((p.hour % 24) * 60 + p.minute) * 60 + p.second) * 1000 - now.getMilliseconds()).toISOString();
+}
+// A list of 10+ pages comes as many photos: after the first one, the phone says the company's total for today.
+type Saved = { rows: { match?: { id: string; confidence: string } | null }[] | null; review: number | null };
+export function daySay(company: string, today: Saved[]): string {
+  const ids = new Set<string>();
+  for (const r of today) for (const x of r.rows || []) if (x.match && (x.match.confidence === 'high' || x.match.confidence === 'confirmed')) ids.add(x.match.id);
+  const review = today.reduce((n, r) => n + (r.review || 0), 0);
+  return `${company}: النهارده لحد دلوقتي ${ids.size} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
+}
 // WhatsApp adds a count to the title when several messages wait: "الفتح shreif (2 رسائل)" / "(3 messages)"
 export function inboxSender(s: string): string {
   return clean(s).replace(/\s*\(\s*[0-9٠-٩]+\s*[^()]*\)\s*$/u, '').slice(0, 80);
@@ -346,7 +360,12 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const [saved] = await ins.json() as { id: string }[];
   log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error });
   if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
-  return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: inboxSay(supplier, sureIds.size, review) }, say);
+  let spoken = inboxSay(supplier, sureIds.size, review);
+  try {
+    const today = await restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=gte.' + encodeURIComponent(cairoDayStart()));
+    if (today.length > 1) spoken = daySay(supplier, today);
+  } catch { /* the message is saved; only the spoken total is skipped */ }
+  return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: spoken }, say);
 }
 
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {

@@ -14,6 +14,7 @@ function fake({gem}={}){const calls=[],saved=[],files=[];const page=(u,a)=>new R
   if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
+  if(url.includes('/rest/v1/ar_inbox?select=rows,review'))return page(url,saved.filter(r=>r.status!=='error').map(r=>({rows:r.rows,review:r.review})));
   if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
   if(url.includes('/rest/v1/ar_inbox?select=id&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length}]),{status:201})}
@@ -41,6 +42,12 @@ assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور ك�
 // the same text notification twice: kept once
 {const g=fake();const t='فلاجيل شراب ١٢٥\nبروفين';await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);
  const r2=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);assert.equal((await r2.json()).duplicate,true);assert.equal(g.saved.length,1);}
+// several photos of one list: after the first, the phone says the company's total for today
+{const g=fake({gem:(()=>{let i=0;return()=>({supplier:'',rows:[i++?{name:'فلاجيل ١٢٥ مجم شراب',english:'FLAGYL 125MG SYP'}:{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})})()});
+ const img=(b)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,b]),'image/jpeg'),env,g);
+ assert.equal(await (await img(1)).text(),'المتحدة للأدوية: وصل 1 صنف من النواقص');
+ assert.equal(await (await img(2)).text(),'المتحدة للأدوية: النهارده لحد دلوقتي 2 صنف من النواقص');}
+assert.match(F.cairoDayStart(new Date('2026-10-29T10:00:00Z')),/^2026-10-2[89]T2[12]:00:00\.000Z$/);
 // new-style secret key (sb_secret_…) is not a JWT: sent only as apikey
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),'فلاجيل شراب ١٢٥','text/plain'),{...env,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x'},f);assert.equal(r.status,200);
 assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.apikey==='sb_secret_x'&&!c.o.headers.Authorization));
