@@ -56,7 +56,10 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 
 <section id="readPanel" class="card hidden">
 <h2>قراءة وارد الشركة</h2>
-<label for="supplier">اسم الشركة (اختياري)</label><input id="supplier" type="text">
+<p class="hint">من الواتس: اضغط «مشاركة» على صور الشركة أو ملفها أو رسالتها، واختار «نواقص عربي». البوت هيقراها على طول.</p>
+<label for="supplier">الشركة</label><input id="supplier" type="text" list="supplierList" autocomplete="off" placeholder="اختار أو اكتب اسم الشركة"><datalist id="supplierList"></datalist>
+<label for="supplierPhone">رقم واتساب الشركة (اختياري)</label><input id="supplierPhone" type="text" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx">
+<button id="notifyBtn" class="secondary hidden">فعّل الإشعارات</button>
 <div class="tabs" style="margin-top:10px"><button data-src="img">صور أو PDF</button><button data-src="text" class="secondary">مكتوب</button><button data-src="excel" class="secondary">ملف Excel</button></div>
 <div data-src-box="img"><label for="images">صور الشركة أو ملف PDF (لحد ٢٠ ملف، كل ملف أقل من ٨ ميجا)</label><input id="images" type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" multiple>
 <button id="readBtn" disabled>اقرا وقارن بالنواقص</button></div>
@@ -67,6 +70,9 @@ details>summary{font-weight:700;color:var(--blue);cursor:pointer;padding:6px 0}
 <p id="readStatus" class="status"></p>
 <div id="undoBar" class="status hidden"></div>
 <div id="results"></div>
+<div id="msgBox" class="hidden"><h3>رسالة للشركة بالمتاح</h3><p class="hint">راجعها وعدّل فيها لو حابب (الكميات مثلًا)، وبعدين ابعتها. البوت مابيبعتش حاجة لوحده.</p>
+<textarea id="msgText" rows="8" dir="auto" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"></textarea>
+<button id="waBtn">افتح الواتس وابعت</button> <button id="copyBtn" class="secondary">انسخ الرسالة</button><p id="msgStatus" class="status"></p></div>
 </section>
 </div>
 </main>
@@ -95,7 +101,7 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{document.query
 
 async function loadShortages(){shortages=(await all('ar_shortages','id,product_name',q=>q.eq('is_active',true))).sort((a,b)=>a.product_name.localeCompare(b.product_name))}
 async function loadAll(){try{await loadShortages();
- await loadNames();drawTranslate();drawShort()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
+ await loadNames();drawTranslate();drawShort();await loadSuppliers();await takeShare()}catch(e){status('trStatus','تعذّر التحميل: '+e.message,'bad')}}
 
 // ---------- shortages (this bot's own list) ----------
 function drawShort(){$('shStats').innerHTML=`<div class="stat"><strong>${shortages.length}</strong>صنف في النواقص</div><div class="stat"><strong>${shortages.filter(s=>names.has(s.id)).length}</strong>ليهم اسم عربي</div><div class="stat"><strong>${[...names.values()].filter(n=>n.status==='approved').length}</strong>اتأكدت منك</div>`}
@@ -156,15 +162,16 @@ const toBase64=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok
 $('images').onchange=()=>{$('readBtn').disabled=!$('images').files.length};
 document.querySelectorAll('[data-src]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-src]').forEach(x=>x.classList.toggle('secondary',x!==b));document.querySelectorAll('[data-src-box]').forEach(x=>x.classList.toggle('hidden',x.dataset.srcBox!==b.dataset.src))});
 const isPdf=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name);
-$('readBtn').onclick=async()=>{const files=[...$('images').files].slice(0,20);if(!files.length)return;$('readBtn').disabled=true;results=[];$('results').innerHTML='';
+$('readBtn').onclick=()=>readFiles([...$('images').files]);
+async function readFiles(files){files=files.slice(0,20);if(!files.length)return;$('readBtn').disabled=true;results=[];$('results').innerHTML='';newRun();
  try{for(let i=0;i<files.length;i++){if(files[i].size>8*1024*1024)throw Error(`الملف ${i+1} أكبر من ٨ ميجا`);status('readStatus',`بيقرا ${isPdf(files[i])?'ملف PDF':'الصورة'} ${i+1} من ${files.length}…`);
-   const d=await invoke({action:'read',image:await toBase64(files[i]),mimeType:isPdf(files[i])?'application/pdf':(files[i].type||'image/jpeg')});results.push(...(d.rows||[]).map(r=>({...r,file:files[i].name})))}
+   const d=await invoke({action:'read',image:await toBase64(files[i]),mimeType:isPdf(files[i])?'application/pdf':(files[i].type||'image/jpeg')});results.push(...(d.rows||[]).map(r=>({...r,file:files[i].name})));if(d.supplier)guessSupplier(d.supplier)}
   showDone()}
- catch(e){status('readStatus','تعذّرت القراءة: '+e.message,'bad')}$('readBtn').disabled=false};
-function showDone(){drawResults();status('readStatus',`اتقرا ${results.length} سطر. وصل من النواقص: ${new Set(results.filter(isSure).map(r=>r.match.id)).size}.`,'good')}
+ catch(e){status('readStatus','تعذّرت القراءة: '+e.message,'bad')}$('readBtn').disabled=false}
+function showDone(){drawResults();const n=new Set(results.filter(isSure).map(r=>r.match.id)).size,co=$('supplier').value.trim();status('readStatus',`${co?co+': ':''}اتقرا ${results.length} سطر. وصل من النواقص: ${n}.${co?'':' اختار اسم الشركة فوق.'}`,'good');notifyDone(co,n)}
 // typed lines and Excel names: matched on the server with the same tools, no Gemini (no quota used)
 async function matchLines(lines,label,btn){lines=lines.map(x=>String(x??'').trim()).filter(x=>x.length>=2);if(!lines.length){status('readStatus','مفيش أسماء أصناف.','bad');return}
- btn.disabled=true;results=[];$('results').innerHTML='';
+ btn.disabled=true;results=[];$('results').innerHTML='';newRun();
  try{for(let i=0;i<lines.length;i+=500){status('readStatus',`بيقارن ${Math.min(i+500,lines.length)} من ${lines.length}…`);const d=await invoke({action:'lines',lines:lines.slice(i,i+500)});results.push(...(d.rows||[]).map(r=>({...r,file:label})))}showDone()}
  catch(e){status('readStatus','تعذّرت المقارنة: '+e.message,'bad')}btn.disabled=false}
 $('textBtn').onclick=()=>matchLines($('pasteText').value.split(/\r?\n/),'مكتوب',$('textBtn'));
@@ -204,7 +211,7 @@ function drawResults(){const arrived=new Map(),review=[],unknown=[];let hidden=0
  $('results').innerHTML=`<h3>وصل من النواقص: ${arrived.size}</h3>`+([...arrived].map(([id,ix])=>`<div class="item"><div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>${ix.map(i=>{const r=results[i];return `<div class="hint">في الصورة: <span dir="auto">${esc(r.name)}</span> · ${conf[r.match.via==='alias'?'near':r.match.confidence]||''} <button class="secondary" data-no="${i}:${esc(id)}">مش ده</button></div>${fixedLine(r)}`}).join('')}</div>`).join('')||'<p class="hint">مفيش.</p>')+
   `<h3>محتاج تأكيدك: ${review.length}</h3>`+(review.map(i=>{const r=results[i];return `<div class="item"><strong dir="auto">${esc(r.name)}</strong>${r.unclear?' <span class="pill warn">قراءة مش واضحة</span>':''}${fixedLine(r)}<div class="hint">${esc(r.file)}</div>${options(r).map(c=>`<div><span class="en">${esc(sName(c.id))}</span> <span class="hint">${esc(aName(c.id))}</span> <button data-yes="${i}:${esc(c.id)}">أيوه، ده هو</button></div>`).join('')}<button class="secondary" data-noall="${i}">مش واحد منهم</button>${editBox(i)}</div>`}).join('')||'<p class="hint">مفيش.</p>')+
   `<details><summary>مش من النواقص أو مااتعرفتش: ${unknown.length}</summary><p class="hint">لو فيه صنف من النواقص اختاره من «تصحيح». ولو اسم مش مهم اضغط «مش مهم» ومش هيظهر تاني.</p>${unknown.map(i=>`<div class="item"><span dir="auto">${esc(results[i].name)}</span>${fixedLine(results[i])} <button class="secondary" data-ignore="${i}">مش مهم</button>${editBox(i)}</div>`).join('')}${hidden?`<p class="hint">واتخبّى ${hidden} اسم قلت قبل كده إنهم مش مهمين.</p>`:''}</details>`;
- wire()}
+ wire();drawMessage()}
 async function decide(i,id,decision){const r=results[i],k=nk(sName(id));const row={alias_key:r.key,read_text:r.name.slice(0,250),name_key:k,decision};
  let removed=[];if(decision==='yes'){const {data}=await client.from('ar_answers').select('id,alias_key,read_text,name_key,decision').eq('alias_key',r.key).eq('decision','yes');removed=(data||[]).filter(x=>x.name_key!==k);if(removed.length)await client.from('ar_answers').delete().in('id',removed.map(x=>x.id))}
  const {data,error}=await client.from('ar_answers').upsert(row,{onConflict:'alias_key,name_key'}).select('id');if(error)throw Error(error.message);return {ids:(data||[]).map(x=>x.id),removed}}
@@ -237,6 +244,51 @@ function wire(){const box=$('results');
   out.querySelectorAll('[data-yes]').forEach(b=>b.onclick=async()=>{const [i2,id]=b.dataset.yes.split(':');const r=results[i2],before={match:r.match,done:r.done};b.disabled=true;
    try{const u=await decide(i2,id,'yes');r.match={id,confidence:'confirmed',score:1};r.done=null;drawResults();setUndo(`اتحفظ: «${r.name}» = ${sName(id)}`,[u],before,i2)}catch(e){status('readStatus','ماتحفظش: '+e.message,'bad');b.disabled=false}})})}
 
+// ---------- WhatsApp: companies, ready message, share target ----------
+let suppliers=[],msgEdited=false;
+const digitsOnly=s=>String(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g,'');
+// Egyptian mobile written 01xxxxxxxxx -> 201xxxxxxxxx (WhatsApp needs the country code)
+const waPhone=s=>{let d=digitsOnly(s);if(/^01\d{9}$/.test(d))d='2'+d;else if(/^00\d+/.test(d))d=d.slice(2);return /^\d{8,15}$/.test(d)?d:''};
+async function loadSuppliers(){try{const {data}=await client.from('ar_suppliers').select('name,phone').order('name');suppliers=data||[]}catch(e){suppliers=[]}
+ $('supplierList').innerHTML=suppliers.map(x=>`<option value="${esc(x.name)}">`).join('')}
+$('supplier').addEventListener('input',()=>{const x=suppliers.find(s=>s.name===$('supplier').value.trim());if(x&&x.phone)$('supplierPhone').value=x.phone;if(!msgEdited)drawMessage()});
+// Gemini may read the company name off the list: use it only when the owner has not chosen one, preferring a saved company
+function guessSupplier(name){if($('supplier').value.trim())return;const k=nk(name);const x=suppliers.find(s=>nk(s.name)===k||k.includes(nk(s.name))||nk(s.name).includes(k));$('supplier').value=x?x.name:name.slice(0,80);if(x&&x.phone)$('supplierPhone').value=x.phone}
+async function saveSupplier(){const name=$('supplier').value.replace(/\s+/g,' ').trim().slice(0,80),phone=waPhone($('supplierPhone').value)||null;if(name.length<2)return;
+ const old=suppliers.find(s=>s.name===name);if(old&&(old.phone||null)===phone)return;
+ const {error}=await client.from('ar_suppliers').upsert({name,phone:phone||old?.phone||null,updated_at:new Date().toISOString()},{onConflict:'name'});if(!error)await loadSuppliers()}
+function newRun(){msgEdited=false;$('msgBox').classList.add('hidden')}
+// the message: every shortage found in this company's list, written the way the company wrote it
+function buildMessage(){const seen=new Set(),lines=[];for(const r of results){if(!isSure(r)||seen.has(r.match.id))continue;seen.add(r.match.id);lines.push(r.corrected||r.name)}
+ if(!lines.length)return '';return ['السلام عليكم،','محتاجين من المتاح عندكم:',...lines.map((l,i)=>`${i+1}- ${l}`),'','صيدلية عسكر'].join('\n')}
+function drawMessage(){if(msgEdited)return;const t=buildMessage();$('msgText').value=t;$('msgBox').classList.toggle('hidden',!t)}
+$('msgText').addEventListener('input',()=>{msgEdited=true});
+$('waBtn').onclick=async()=>{const t=$('msgText').value.trim();if(!t)return;await saveSupplier();const ph=waPhone($('supplierPhone').value);
+ window.open(`https://wa.me/${ph}?text=${encodeURIComponent(t)}`,'_blank');status('msgStatus',ph?'اتفتحت محادثة الشركة في الواتس، اضغط إرسال هناك.':'اختار محادثة الشركة في الواتس واضغط إرسال. (لو كتبت رقم الشركة فوق، المرة الجاية هتتفتح محادثتها على طول.)','good')};
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('msgText').value);status('msgStatus','اتنسخت.','good')}catch(e){$('msgText').select();status('msgStatus','حدّد الرسالة وانسخها.')}};
+// notification when a shared list finishes while the bot is in the background
+let swReg=null;
+if('serviceWorker' in navigator)navigator.serviceWorker.register('ar/sw.js',{scope:'ar/'}).then(r=>{swReg=r}).catch(()=>{});
+function drawNotify(){$('notifyBtn').classList.toggle('hidden',!('Notification' in window)||Notification.permission!=='default')}
+$('notifyBtn').onclick=async()=>{try{await Notification.requestPermission()}catch(e){}drawNotify()};drawNotify();
+function notifyDone(co,n){try{if(!document.hidden||!('Notification' in window)||Notification.permission!=='granted'||!swReg)return;
+ swReg.showNotification('نواقص عربي',{body:`${co||'الشركة'}: وصل ${n} صنف من النواقص. الرسالة جاهزة.`,icon:'icons/arabic-192.png',tag:'ar-read'})}catch(e){}}
+// shared from WhatsApp: ?share=<id> -> files and text the service worker kept in the cache
+let pendingShare=new URLSearchParams(location.search).get('share');
+async function takeShare(){const id=pendingShare;if(!id)return;pendingShare=null;history.replaceState(null,'',location.pathname);
+ document.querySelector('[data-tab="read"]').click();
+ if(id==='error'||!('caches' in window)){status('readStatus','الملفات اللي اتشاركت ماوصلتش؛ شاركها تاني أو اختارها من هنا.','bad');return}
+ const c=await caches.open('ar-share'),base=new URL('ar-share/'+id+'/',location.href).href,metaRes=await c.match(base+'meta');
+ if(!metaRes){status('readStatus','الملفات اللي اتشاركت ماوصلتش؛ شاركها تاني.','bad');return}
+ const meta=await metaRes.json(),files=[];for(const f of meta.files){const r=await c.match(new URL(f.key,location.href).href);if(r)files.push(new File([await r.blob()],f.name,{type:f.type||r.headers.get('content-type')||''}))}
+ for(const k of await c.keys())if(k.url.startsWith(base))await c.delete(k);
+ $('supplier').value='';$('supplierPhone').value='';
+ const sheets=files.filter(f=>/\.(xlsx|xls|csv)$/i.test(f.name)||/sheet|excel|csv/i.test(f.type)),docs=files.filter(f=>!sheets.includes(f)&&(/^image\//.test(f.type)||isPdf(f)));
+ const pick=src=>document.querySelector(`[data-src="${src}"]`).click();
+ if(docs.length){pick('img');status('readStatus',`وصل من الواتس ${docs.length} ملف — بيقرا…`);await readFiles(docs);return}
+ if(sheets.length){pick('excel');const dt=new DataTransfer();dt.items.add(sheets[0]);$('xlsFile').files=dt.files;$('xlsFile').onchange();return}
+ if(meta.text){pick('text');$('pasteText').value=meta.text;await matchLines(meta.text.split(/\r?\n/),'من الواتس',$('textBtn'));return}
+ status('readStatus','اللي اتشارك مافيهوش صور ولا ملف ولا كلام.','bad')}
 client.auth.onAuthStateChange(()=>setTimeout(refresh,0));refresh();
 })();
 </script>
