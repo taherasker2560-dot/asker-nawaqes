@@ -1,0 +1,15 @@
+{
+  "name": "asker-nawaqes",
+  "private": true,
+  "description": "ASKER shortages bots: test tooling only (the site itself has no build step).",
+  "scripts": {
+    "test": "node scripts/run-tests.cjs",
+    "test:unit": "node scripts/run-tests.cjs unit",
+    "test:e2e": "node scripts/run-tests.cjs e2e"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.2.17",
+    "jsdom": "25.0.1",
+    "playwright": "1.48.2"
+  }
+}
