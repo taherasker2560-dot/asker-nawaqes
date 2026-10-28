@@ -55,7 +55,7 @@ function render(container,report,rows,view){
  const review=report.review.map(r=>`<div class="item" data-review="${r.index}"><strong dir="auto">${esc(r.row.name)}</strong>${fixedLine(r.row.name,r.row.corrected)}<div class="hint">${esc(r.row.fileName)}${r.row.unclear?' · Gemini مش متأكد من القراءة':''} — هل ده واحد من النواقص دي؟ راجع التركيز والشكل مع الصورة.</div>${r.options.map((o,j)=>`<div><span dir="auto">${esc(o.shortage.product_name)}</span> <button type="button" class="secondary" data-confirm="${r.index}:${j}">أيوه، ده هو</button></div>`).join('')}<button type="button" class="secondary" data-reject="${r.index}">مش واحد منهم</button> ${editButton(r.index)}${ed(r.index)}</div>`).join('');
  const line=(x,extra)=>`<div class="item"><span dir="auto">${esc(x.name)}</span>${fixedLine(x.name,x.corrected)}<div class="hint">${extra} ${editButton(x.index)}</div>${ed(x.index)}</div>`;
  container.innerHTML=(view.undo?`<div class="status" data-undo-bar>${esc(view.undo.label)} <button type="button" class="secondary" data-undo>تراجع عن الحفظ ده</button></div>`:'')+
-  `<h3>وصل من النواقص: ${report.arrived.length}</h3>${arrived||'<p>مفيش صنف من النواقص اتعرف بثقة في الصور دي.</p>'}`+
+  `<h3>وصل من النواقص: ${report.arrived.length}</h3>${report.arrived.length&&view.canSave?`<div class="row"><button type="button" data-save-arrivals>سجّل اللي وصل (${report.arrived.length})</button></div><p class="hint">بيتسجّل إن الأصناف دي متاحة عند الشركة اللي مكتوبة فوق، بتاريخ الوارد، وبتظهر في قايمة النواقص «متاح عند شركة». راجع اللي فوق الأول.</p>`:''}${arrived||'<p>مفيش صنف من النواقص اتعرف بثقة في الصور دي.</p>'}`+
   `<section data-gemini-review><h3>محتاج تأكيدك: ${report.review.length}</h3>${review||'<p class="hint">مفيش.</p>'}</section>`+
   `<details ${view.openOther?'open':''} data-sec="other"><summary>أصناف اتعرفت ومش في النواقص: ${report.other.length}</summary>${report.other.map(o=>line(o,`${esc(o.item)} · ${esc(o.fileName)} ${notThisButton(o.index)}`)).join('')}</details>`+
   `<details ${view.openUnknown?'open':''} data-sec="unknown"><summary>اتقرت ومش متأكد من صنفها: ${report.unknown.length}</summary><p class="hint">الأسماء دي اتقرت من الصورة، بس البوت مش متأكد هي أنهي صنف عندك، ومفيش واحد منها شبه النواقص. لو شايف فيها صنف من النواقص، استخدم «تصحيح». ولو صنف مش عندك أو مش مهم، اضغط «مش مهم» ومش هيظهر تاني.</p>${report.unknown.map(u=>line(u,`${esc(u.fileName)}${u.unclear?' · قراءة مش واضحة':''} <button type="button" class="secondary" data-ignore="${u.index}">مش مهم</button>`)).join('')}${report.hidden?`<p class="hint">واتخبّى ${report.hidden} اسم قلت قبل كده إنهم مش مهمين.</p>`:''}</details>`;
@@ -113,6 +113,7 @@ async function saveFix(client,r,text){
  return {undo,corrected};
 }
 async function undoSave(client,u){
+ if(u.availabilityIds?.length){const {error}=await client.from('shortage_availability').delete().in('id',u.availabilityIds);if(error)throw Error(error.message)}
  if(u.ignoredKey){const {error}=await client.from('name_review_queue').update({ignored:false}).eq('alias_key',u.ignoredKey);if(error)throw Error(error.message)}
  if(u.queueRows?.length)await client.from('name_review_queue').upsert(u.queueRows.map(({id,...x})=>x),{onConflict:'alias_key'});
  if(u.addedRejectionIds?.length){const {error}=await client.from('name_rejections').delete().in('id',u.addedRejectionIds);if(error)throw Error(error.message)}
@@ -122,6 +123,18 @@ async function undoSave(client,u){
 }
 
 // Report with corrections. deps: {client, invoke(body) -> {data,error}}.
+// «سجّل اللي وصل»: one row per shortage for this supplier and day; rows that already exist are kept as they are.
+async function saveArrivals(client,arrived,ctx){
+ const ids=arrived.map(a=>a.shortage.id);
+ const {data:had,error:e1}=await client.from('shortage_availability').select('shortage_item_id').in('shortage_item_id',ids).eq('supplier',ctx.supplier).eq('seen_on',ctx.date);
+ if(e1)throw Error('تعذّر الحفظ: '+e1.message);
+ const old=new Set((had||[]).map(x=>x.shortage_item_id));
+ const rows=arrived.filter(a=>!old.has(a.shortage.id)).map(a=>({shortage_item_id:a.shortage.id,supplier:ctx.supplier,seen_on:ctx.date,source_text:[...new Set(a.sources.map(s=>s.corrected||s.name))].join(' | ').slice(0,500)}));
+ if(!rows.length)return {removedAliases:[],addedAliasIds:[],addedRejectionIds:[],fixId:null,fixBefore:null,availabilityIds:[],count:0,already:old.size};
+ const {data,error}=await client.from('shortage_availability').insert(rows).select('id');
+ if(error)throw Error('تعذّر الحفظ: '+error.message);
+ return {removedAliases:[],addedAliasIds:[],addedRejectionIds:[],fixId:null,fixBefore:null,availabilityIds:(data||[]).map(x=>x.id),count:rows.length,already:old.size};
+}
 // marks a name «مش عندنا / مش مهم»: kept in name_review_queue with ignored = true
 async function ignoreName(client,r){
  const {error}=await client.from('name_review_queue').upsert({alias_key:r.key.slice(0,250),read_text:String(r.name).slice(0,250),english:r.english||null,file_name:r.fileName||null,ignored:true},{onConflict:'alias_key'});
@@ -129,7 +142,7 @@ async function ignoreName(client,r){
  return {removedAliases:[],addedAliasIds:[],addedRejectionIds:[],fixId:null,fixBefore:null,ignoredKey:r.key};
 }
 function show(container,rows,shortages,deps,setStatus){
- const state=rows.map(r=>({...r})),view={editing:null,undo:null,openOther:false,openUnknown:false,flat:!!deps.flat};
+ const state=rows.map(r=>({...r})),view={editing:null,undo:null,openOther:false,openUnknown:false,flat:!!deps.flat,canSave:!deps.flat&&!!deps.getContext};
  const report=()=>buildReport(state,shortages,deps.ignored);
  const draw=()=>{render(container,report(),state,view);wire()};
  const edStatus=m=>{const p=container.querySelector('[data-ed-status]');if(p)p.textContent=m;if(view.editing)view.editing.status=m};
@@ -150,12 +163,15 @@ function show(container,rows,shortages,deps,setStatus){
   container.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',async()=>{const [i,j]=b.dataset.confirm.split(':').map(Number);const opt=report().review.find(x=>x.index===i)?.options[j];if(!opt)return;b.disabled=true;await commit(i,{id:opt.id,name:opt.name},'',`اتحفظ: «${state[i].name}» = ${opt.name}.`)}));
   container.querySelectorAll('[data-flat-yes]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.flatYes),t=flatTop(state[i]);if(!t)return;b.disabled=true;await commit(i,{id:t.id||'',name:t.name},'',`اتحفظ: «${state[i].name}» = ${t.name}.`)}));
   container.querySelectorAll('[data-flat-no]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.flatNo),t=flatTop(state[i]);if(!t)return;b.disabled=true;await reject(i,[t.name],`اتسجّل إن «${state[i].name}» مش ${t.name}، ومش هيتقترح تاني.`)}));
+  container.querySelector('[data-save-arrivals]')?.addEventListener('click',async e=>{const ctx=deps.getContext();if(!ctx.supplier){setStatus('اكتب اسم الشركة في خانة «اسم الشركة / المورد» فوق، وبعدين اضغط «سجّل اللي وصل».');deps.focusSupplier?.();return}
+   e.target.disabled=true;try{const undo=await saveArrivals(deps.client,report().arrived,ctx);const label=undo.count?`اتسجّل ${undo.count} صنف متاح عند ${ctx.supplier} يوم ${ctx.date}.${undo.already?` و${undo.already} كانوا متسجلين قبل كده.`:''}`:`كل الأصناف دي متسجلة قبل كده لـ ${ctx.supplier} يوم ${ctx.date}.`;
+    view.undo={...undo,i:0,before:{},label};draw();setStatus(label);deps.onArrivals?.()}catch(err){e.target.disabled=false;setStatus(err.message)}});
   container.querySelectorAll('[data-ignore]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.ignore),r=state[i];b.disabled=true;
    try{const undo=await ignoreName(deps.client,r);const label=`«${r.name}» مش هيظهر تاني.`;view.undo={...undo,i,before:{ignored:false},label};r.ignored=true;draw();setStatus(label);deps.onChange?.()}catch(e){b.disabled=false;setStatus(e.message)}}));
   container.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.reject);const opt=report().review.find(x=>x.index===i);if(!opt)return;b.disabled=true;await reject(i,opt.options.map(o=>o.name),`اتسجّل إن «${state[i].name}» مش واحد من دول، ومش هيتقترحوا تاني.`)}));
   container.querySelectorAll('[data-notthis]').forEach(b=>b.addEventListener('click',async()=>{const i=Number(b.dataset.notthis);const m=state[i].match;if(!m)return;b.disabled=true;await reject(i,[m.name],`اتسجّل إن «${state[i].name}» مش ${m.name}، ومش هيتقترح تاني. استخدم «تصحيح» لو عايز تختار الصح.`)}));
   container.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.edit),r=state[i];view.editing={i,text:r.corrected||r.name,q:'',manual:''};if(report().unknown.some(u=>u.index===i))view.openUnknown=true;if(report().other.some(o=>o.index===i))view.openOther=true;draw()}));
-  container.querySelector('[data-undo]')?.addEventListener('click',async e=>{const u=view.undo;if(!u)return;e.target.disabled=true;try{await undoSave(deps.client,u);Object.assign(state[u.i],u.before);view.undo=null;draw();deps.onChange?.();setStatus('اتلغى الحفظ، ورجع زي ما كان.')}catch(err){e.target.disabled=false;setStatus('تعذّر التراجع: '+err.message)}});
+  container.querySelector('[data-undo]')?.addEventListener('click',async e=>{const u=view.undo;if(!u)return;e.target.disabled=true;try{await undoSave(deps.client,u);Object.assign(state[u.i],u.before);view.undo=null;draw();deps.onChange?.();if(u.availabilityIds?.length)deps.onArrivals?.();setStatus('اتلغى الحفظ، ورجع زي ما كان.')}catch(err){e.target.disabled=false;setStatus('تعذّر التراجع: '+err.message)}});
   const box=container.querySelector('[data-editor]');if(!box)return;const ed=view.editing,r=state[ed.i];
   const val=s=>box.querySelector(s).value;
   box.querySelector('[data-ed-cancel]').addEventListener('click',()=>{view.editing=null;draw()});
@@ -220,5 +236,5 @@ function manager(host,client){
  return {reload:()=>box.open&&load()};
 }
 
-const api={buildReport,render,show,manager,reviewList,saveChoice,saveFix,rejectChoice,undoSave};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiReport=api;
+const api={buildReport,render,show,manager,reviewList,saveChoice,saveFix,rejectChoice,saveArrivals,undoSave};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.AskerGeminiReport=api;
 })(typeof window==='undefined'?globalThis:window);
