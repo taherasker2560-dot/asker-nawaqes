@@ -51,8 +51,8 @@ assert.ok(!b.rows[1].candidates.some(c=>c.id==='s3'),'rejected shortage not sugg
  assert.equal(t.rows[1].english,'BRUFEN 400MG 30TAB');assert.equal(t.rows[1].match?.id,'s1','English line matched');
  assert.ok(!f.calls.some(c=>c.url.includes('generativelanguage')),'lines never call Gemini');
  assert.equal((await F.handle(req({action:'lines',lines:['']}),env,f)).status,400);
- f=fake({names,gem:()=>({rows:[{name:'بروفين ٤٠٠ ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
- const p=await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'application/pdf'}),env,f);assert.equal(p.status,200,'PDF accepted');
+ f=fake({names,gem:()=>({supplier:'شركة المتحدة\n',rows:[{name:'بروفين ٤٠٠ ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ const p=await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'application/pdf'}),env,f);assert.equal(p.status,200,'PDF accepted');assert.equal((await p.json()).supplier,'شركة المتحدة','company name read off the list');
  }
 // security: other accounts refused before any Gemini call
 const g=fake({gem:()=>({})});const other=async(u,o)=>u.endsWith('/auth/v1/user')?new Response(JSON.stringify({email:'x@y.z'})):g(u,o);

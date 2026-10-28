@@ -17,7 +17,7 @@
 
 import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar6';
+export const VERSION = 'ar7';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -117,9 +117,10 @@ export const READ_PROMPT = [
   'Do not translate, correct or guess. Skip the header, quantity and price columns. If a name is hard to read, give your best reading and set unclear to true.',
   'These lists use a font where the Arabic letter ك can look like ق, ج or گ: when a letter could be ك, prefer the spelling of the real medicine brand. Write only Arabic letters (no Persian letters).',
   'For each row also give "english": the product in Latin capitals as an Egyptian pharmacy system would list it (brand, strength, pack).',
-  'Answer only JSON: {"rows":[{"name":"...","english":"...","unclear":false}]}',
+  'Also give "supplier": the company or distributor name if it is written on the list (title, logo, stamp), otherwise "".',
+  'Answer only JSON: {"supplier":"...","rows":[{"name":"...","english":"...","unclear":false}]}',
 ].join('\n');
-const READ_SCHEMA = { type: 'OBJECT', properties: { rows: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, unclear: { type: 'BOOLEAN' } }, required: ['name'] } } }, required: ['rows'] };
+const READ_SCHEMA = { type: 'OBJECT', properties: { supplier: { type: 'STRING' }, rows: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, unclear: { type: 'BOOLEAN' } }, required: ['name'] } } }, required: ['rows'] };
 
 // The shortage list as a small "catalogue": the English name, plus the Arabic name (owner-approved or suggested)
 // and every supplier text the owner said yes to as extra names.
@@ -241,7 +242,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const cat = shortageCatalog(shortages, k.names, k.answers);
       const out = matchRows(rows, cat, k, shortages);
       log('read', t0, { rows: out.length, shortages: shortages.length, arabic: k.names.length, answers: k.answers.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
-      return reply(200, { rows: out, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
+      const supplier = clean((parsed as { supplier?: unknown })?.supplier).slice(0, 80);
+      return reply(200, { rows: out, supplier, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
     }
 
     if (body.action === 'lines') {
