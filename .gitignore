@@ -1,2 +1,3 @@
 supabase/functions/read-supplier-image/catalog.json
 *.catalog.json
+node_modules/
