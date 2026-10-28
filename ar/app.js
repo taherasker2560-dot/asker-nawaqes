@@ -81,6 +81,7 @@
     const on = !!data.session;
     $('loginCard').classList.toggle('hidden', on);
     $('app').classList.toggle('hidden', !on);
+    $('logoutBtn').classList.toggle('hidden', !on);
     if (on) await loadAll();
   }
   $('loginBtn').onclick = async () => {
