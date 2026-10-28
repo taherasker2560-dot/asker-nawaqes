@@ -24,7 +24,10 @@
   // back later keeps its approved translation. Same key as the function and the database.
   const nk = (s) => key(s).slice(0, 250);
   async function loadNames() {
-    const byKey = new Map((await all('ar_names', 'name_key,arabic_name,status')).map((n) => [n.name_key, n]));
+    const byKey = new Map(
+      (await all('ar_names', 'name_key,english_name,arabic_name,status')).map((n) => [n.name_key, n]),
+    );
+    knownNames = byKey;
     names = new Map();
     shortages.forEach((x) => {
       const n = byKey.get(nk(x.product_name));
@@ -35,6 +38,8 @@
     $(id).textContent = m;
     $(id).className = 'status ' + cls;
   };
+  // every product name this bot ever translated (also those not in the list now): used to restore cut names
+  let knownNames = new Map();
   let shortages = [],
     names = new Map(),
     show = 'suggested',
@@ -134,15 +139,37 @@
     $('shStats').innerHTML =
       `<div class="stat"><strong>${shortages.length}</strong>صنف في النواقص</div><div class="stat"><strong>${shortages.filter((s) => names.has(s.id)).length}</strong>ليهم اسم عربي</div><div class="stat"><strong>${[...names.values()].filter((n) => n.status === 'approved').length}</strong>اتأكدت منك</div>`;
   }
+  // PharmaFly's shortage report cuts names at 25 letters (MOVIPREP POWDER ORAL SOLU). A cut name that is the start of
+  // exactly one product this bot already knows (translated before, or in the list now) gets that product's full name
+  // back, so it keeps its Arabic name and matches as well as before.
+  const CUT_AT = 25;
+  function fullName(n) {
+    const k = nk(n);
+    if (k.length < CUT_AT || knownNames.has(k)) return n;
+    const hits = new Map();
+    for (const [key, x] of knownNames)
+      if (key.length > k.length && key.startsWith(k)) hits.set(key, x.english_name || key);
+    for (const x of shortages) {
+      const key = nk(x.product_name);
+      if (key.length > k.length && key.startsWith(k)) hits.set(key, x.product_name);
+    }
+    return hits.size === 1 ? [...hits.values()][0] : n;
+  }
+  let restored = 0;
   const cleanNames = (list) => {
     const byKey = new Map();
+    restored = 0;
     for (const v of list) {
-      const n = String(v ?? '')
+      let n = String(v ?? '')
         .split(/[|\t]/)[0]
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, 250);
-      if (n.length >= 2 && /\p{L}/u.test(n) && !byKey.has(nk(n))) byKey.set(nk(n), n);
+      if (n.length < 2 || !/\p{L}/u.test(n)) continue;
+      const full = fullName(n);
+      if (full !== n) restored++;
+      n = full;
+      if (!byKey.has(nk(n))) byKey.set(nk(n), n);
     }
     return byKey;
   };
@@ -202,7 +229,7 @@
     const few = shortages.length >= 50 && byKey.size < shortages.length * 0.3;
     status(
       'shStatus',
-      `الملف فيه ${byKey.size} صنف: ${add} جديد، ${stay} موجودين وهيفضلوا، و${out.length} هيطلعوا من النواقص (ترجمتهم بتفضل محفوظة).`,
+      `الملف فيه ${byKey.size} صنف: ${add} جديد، ${stay} موجودين وهيفضلوا، و${out.length} هيطلعوا من النواقص (ترجمتهم بتفضل محفوظة).${restored ? ` و${restored} اسم كان مقطوع في الملف رجّعته لاسمه الكامل.` : ''}`,
       few ? 'bad' : '',
     );
     $('shConfirm').innerHTML =
@@ -314,18 +341,16 @@
     bar.querySelector('[data-tr-undo]').onclick = async () => {
       const k = nk(en);
       const { error } = before
-        ? await client
-            .from('ar_names')
-            .upsert(
-              {
-                name_key: k,
-                english_name: en,
-                arabic_name: before.arabic_name,
-                status: before.status,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'name_key' },
-            )
+        ? await client.from('ar_names').upsert(
+            {
+              name_key: k,
+              english_name: en,
+              arabic_name: before.arabic_name,
+              status: before.status,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'name_key' },
+          )
         : await client.from('ar_names').delete().eq('name_key', k);
       if (error) return status('trStatus', 'ماترجعتش: ' + error.message, 'bad');
       shortages
