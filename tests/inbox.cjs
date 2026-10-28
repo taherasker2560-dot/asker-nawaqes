@@ -14,6 +14,7 @@ function fake({gem}={}){const calls=[],saved=[],files=[];const page=(u,a)=>new R
   if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
+  if(url.includes('/rest/v1/ar_inbox?select=id&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length}]),{status:201})}
   if(url.includes('/storage/v1/object/ar-inbox/')){files.push({url,headers:o.headers});return new Response('{}')}
   if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(gem())}]}}]}));
@@ -42,6 +43,16 @@ f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قر�
 r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&name=IMG-1.jpg',new Uint8Array([255,216,255,0]),'image/jpeg'),env,f);
 const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,1);assert.match(b.say,/وصل 1 صنف/);
 assert.equal(f.files.length,1);assert.match(f.files[0].url,/ar-inbox\/\d{4}-\d\d-\d\d\/[0-9a-f-]+\.jpg$/);assert.equal(f.saved[0].kind,'image');assert.ok(f.saved[0].file_path);
+// the photo's notification text is ignored (the photo comes by itself); the same photo sent again is kept once
+f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,f);assert.equal(await r.text(),'');assert.equal(f.saved.length,0);
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});const seen=[];
+ const h=async(u,o)=>{if(u.includes('/rest/v1/ar_inbox?select=id&file_path=like.')){return new Response(JSON.stringify(seen.some(p=>u.includes(p.split('/')[1].split('.')[0]))?[{id:'x'}]:[]))}const res=await g(u,o);if(u.includes('/rest/v1/ar_inbox')&&o.method==='POST')seen.push(g.saved.at(-1).file_path);return res};
+ const path='/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Images/IMG-20261029-WA0001.jpg';
+ const send=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&name='+encodeURIComponent(path),new Uint8Array([255,216,255,9]),'application/octet-stream'),env,h);
+ assert.equal((await (await send()).json()).ok,true);assert.equal((await (await send()).json()).duplicate,true);assert.equal(g.saved.length,1);
+ assert.match(g.saved[0].file_path,/^\d{4}-\d\d-\d\d\/[0-9a-f]{32}\.jpg$/);assert.equal(g.files[0].headers['Content-Type'],'image/jpeg');}
+// a PDF or Excel file by its (long) path name
+assert.equal(F.inboxKind('application/octet-stream','x'.repeat(200)+'.pdf'.slice(-120)),'pdf');
 // PDF and unknown type
 assert.equal(F.inboxKind('application/pdf',''),'pdf');assert.equal(F.inboxKind('application/octet-stream','list.xlsx'),'sheet');assert.equal(F.inboxKind('application/zip','a.zip'),'');
 // Gemini quota: the message is still kept (status error) so nothing is lost

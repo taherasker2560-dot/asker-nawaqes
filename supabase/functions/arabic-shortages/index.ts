@@ -211,6 +211,8 @@ export function parseRead(text: string): { rows: Row[]; supplier: string } | nul
 // The key is created in the page; only its sha256 is stored (ar_inbox_keys). Only companies saved in the bot
 // (ar_suppliers) are accepted, so other chats are never read. Runs with the service role (no login on the phone).
 const SHEET = /\.(xlsx|xls|csv)$/i;
+// WhatsApp's notification text for a photo, file, video or voice note (no list in it)
+const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
 export function sheetNames(m: unknown[][]): string[] {
@@ -275,7 +277,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (!/^[0-9a-f]{32,128}$/.test(key)) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط' }, say);
   const keys = await restAll<{ key_hash: string }>(env, auth, fetchImpl, 'ar_inbox_keys?select=key_hash&key_hash=eq.' + await sha256Hex(key));
   if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
-  const from = inboxSender(url.searchParams.get('from') || ''), fileName = (url.searchParams.get('name') || '').slice(0, 120);
+  const from = inboxSender(url.searchParams.get('from') || ''), fileName = (url.searchParams.get('name') || '').split(/[\\/]/).pop()!.slice(-120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
   const company = suppliers.find((x) => sameCompany(x.name, from));
   // not one of the saved companies: ignored before anything is read or stored
@@ -285,6 +287,14 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const bytes = new Uint8Array(await req.arrayBuffer());
   if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
   if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
+  // the notification of a photo/file («📷 صورة», «📄 list.pdf»): the file itself comes in its own request
+  if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) return out(200, { ok: false, ignored: true, say: '' }, say);
+  // the phone may send the same photo/file again (it sends the newest ones each time): kept once, by its hash
+  const hash = kind === 'text' ? '' : [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  if (hash) {
+    const dup = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&file_path=like.*' + hash + '*');
+    if (dup.length) return out(200, { ok: false, duplicate: true, say: '' }, say);
+  }
   const t0 = Date.now();
   let rows: Row[] = [], text: string | null = null, supplier = company.name, error: string | null = null, filePath: string | null = null;
   try {
@@ -298,7 +308,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       for (const n of wb.SheetNames) m.push(...XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false, blankrows: false }) as unknown[][]);
       rows = sheetNames(m).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
     } else {
-      const mime = kind === 'pdf' ? 'application/pdf' : (req.headers.get('content-type') || 'image/jpeg').split(';')[0].trim();
+      const ct = (req.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      const mime = kind === 'pdf' ? 'application/pdf' : /\.png$/i.test(fileName) ? 'image/png' : /\.webp$/i.test(fileName) ? 'image/webp' : ct.startsWith('image/') ? ct : 'image/jpeg';
       const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
       if (!read) throw new Error('رد Gemini مش مفهوم');
       rows = read.rows;
@@ -307,8 +318,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // keep the original file (private bucket) so the owner can look at it from the page
   if (kind !== 'text') {
     const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? (fileName.match(SHEET)?.[1] || 'xlsx').toLowerCase() : 'jpg';
-    filePath = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${ext}`;
-    const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': req.headers.get('content-type') || 'application/octet-stream' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
+    const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
+    const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': type }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!up.ok) filePath = null;
   }
   let out2: ReturnType<typeof matchRows> = [];
