@@ -32,6 +32,8 @@ assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.Au
 // WhatsApp count in the chat title is dropped: "(2 رسائل)" / "(3 messages)"
 assert.equal(F.inboxSender('الفتح shreif (2 رسائل)'),'الفتح shreif');assert.equal(F.inboxSender('Al Fath (12 messages)'),'Al Fath');assert.equal(F.inboxSender('شركة (الفرع)'),'شركة (الفرع)');
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (٣ رسائل)')+'&say=1','فلاجيل شراب ١٢٥','text/plain'),env,f);assert.match(await r.text(),/^المتحدة للأدوية: وصل 1/);
+// mixed Arabic/English name: word order ignored, other names still refused
+assert.equal(F.sameCompany('Shreif الفتح','الفتح shreif'),true);assert.equal(F.sameCompany('Shreif الفتح','الفتح'),false);assert.equal(F.sameCompany('Shreif الفتح',''),false);
 // new-style secret key (sb_secret_…) is not a JWT: sent only as apikey
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),'فلاجيل شراب ١٢٥','text/plain'),{...env,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x'},f);assert.equal(r.status,200);
 assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.apikey==='sb_secret_x'&&!c.o.headers.Authorization));
