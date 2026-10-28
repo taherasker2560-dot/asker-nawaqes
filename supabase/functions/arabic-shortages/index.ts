@@ -253,6 +253,11 @@ export function inboxSay(company: string, sure: number, review: number): string 
 export function inboxSender(s: string): string {
   return clean(s).replace(/\s*\(\s*[0-9٠-٩]+\s*[^()]*\)\s*$/u, '').slice(0, 80);
 }
+// Saved name vs chat title, word order ignored: a mixed Arabic/English name («Shreif الفتح») shows reversed on the phone.
+const words = (s: string) => aliasKey(s).split(' ').filter(Boolean).sort().join(' ');
+export function sameCompany(saved: string, title: string): boolean {
+  return aliasKey(saved) === aliasKey(title) || (!!aliasKey(title) && words(saved) === words(title));
+}
 export function serviceHeaders(service: string): Record<string, string> {
   return service.startsWith('sb_') ? { apikey: service } : { Authorization: 'Bearer ' + service, apikey: service };
 }
@@ -272,7 +277,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
   const from = inboxSender(url.searchParams.get('from') || ''), fileName = (url.searchParams.get('name') || '').slice(0, 120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
-  const company = suppliers.find((x) => aliasKey(x.name) === aliasKey(from));
+  const company = suppliers.find((x) => sameCompany(x.name, from));
   // not one of the saved companies: ignored before anything is read or stored
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
   const kind = inboxKind(req.headers.get('content-type') || '', fileName);
