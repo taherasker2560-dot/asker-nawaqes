@@ -6,8 +6,9 @@
     FN = 'arabic-shortages',
     // The server version this page expects (VERSION in supabase/functions/arabic-shortages/index.ts).
     // tests/shared-matcher.cjs fails when they differ; the page warns when the deployed function is older.
-    SERVER_VERSION = 'ar7',
-    OFFER_MIN = 0.45;
+    SERVER_VERSION = 'ar8',
+    OFFER_MIN = 0.45,
+    NOT_LISTED = '*'; // same as NOT_LISTED in the function: «مش واحد منهم» for a whole line
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
   const $ = (id) => document.getElementById(id),
     esc = (s) =>
@@ -942,6 +943,16 @@
           try {
             const us = [];
             for (const c of options(r)) us.push(await decide(i, c.id, 'no'));
+            // and the line itself: «none of the shortages», so it is not offered other items next time
+            const { data, error } = await client
+              .from('ar_answers')
+              .upsert(
+                { alias_key: r.key, read_text: r.name.slice(0, 250), name_key: NOT_LISTED, decision: 'no' },
+                { onConflict: 'alias_key,name_key' },
+              )
+              .select('id');
+            if (error) throw Error(error.message);
+            us.push({ ids: (data || []).map((x) => x.id), removed: [] });
             r.done = 'no-all';
             drawResults();
             setUndo(`اتسجّل إن «${r.name}» مش واحد منهم`, us, before, i);
