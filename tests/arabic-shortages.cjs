@@ -54,6 +54,17 @@ assert.ok(!b.rows[1].candidates.some(c=>c.id==='s3'),'rejected shortage not sugg
  f=fake({names,gem:()=>({supplier:'شركة المتحدة\n',rows:[{name:'بروفين ٤٠٠ ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
  const p=await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'application/pdf'}),env,f);assert.equal(p.status,200,'PDF accepted');assert.equal((await p.json()).supplier,'شركة المتحدة','company name read off the list');
  }
+// «مش واحد منهم» is remembered for the line: no new suggestions next time, also when it is read a little differently;
+// a later «أيوه» still wins.
+{const rows={rows:[{name:'جانوفيا ٥٠ مجم ٢٨ قرص',english:''},{name:'جانوفيا ٥٠ مجم قرص ٢٨',english:''},{name:'فلاجيل شراب ١٢٥',english:''}]};
+ f=fake({names,gem:()=>rows,decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'*',decision:'no'},{alias_key:'فلاجيل شراب 125',read_text:'فلاجيل شراب ١٢٥',name_key:'*',decision:'no'},{alias_key:'فلاجيل شراب 125',read_text:'فلاجيل شراب ١٢٥',name_key:'FLAGYL 125MG SYP',decision:'yes'}]});
+ const x=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();
+ assert.deepEqual(x.rows[0].candidates,[]);assert.equal(x.rows[0].match,null,'refused line is not offered again');
+ assert.deepEqual(x.rows[1].candidates,[],'same line read in another order is refused too');assert.equal(x.rows[1].match,null);
+ assert.equal(x.rows[2].match?.id,'s2','a later «أيوه» wins');
+ f=fake({names,gem:()=>({rows:[{name:'جانوفيا ٥٠ مجم قرص ٢٨',english:''}]}),decisions:[{alias_key:'جانوفيا 50 مجم 28 قرص',read_text:'جانوفيا ٥٠ مجم ٢٨ قرص',name_key:'JANUVIA 50MG 28TAB',decision:'no'}]});
+ const y=await (await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),env,f)).json();
+ assert.ok(!y.rows[0].candidates.some(c=>c.id==='s3'),'«مش ده» holds for the same line read a little differently');}
 // security: other accounts refused before any Gemini call
 const g=fake({gem:()=>({})});const other=async(u,o)=>u.endsWith('/auth/v1/user')?new Response(JSON.stringify({email:'x@y.z'})):g(u,o);
 r=await F.handle(req({action:'translate'}),env,other);assert.equal(r.status,403);assert.ok(!g.calls.some(c=>c.url.includes('generativelanguage')));

@@ -17,7 +17,7 @@
 
 import { Catalog, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar7';
+export const VERSION = 'ar8';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -137,6 +137,8 @@ export function shortageCatalog(shortages: Shortage[], names: ArName[], decision
   return new Catalog(items);
 }
 
+// name_key stored with decision 'no' when the owner answers «مش واحد منهم» for a line.
+export const NOT_LISTED = '*';
 // readKey: the key of the text as first read, when `rows` hold the owner's correction (its «مش ده» still applies).
 export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Shortage[], readKey = '') {
   const idOf = new Map<string, string>(), keyOf = new Map<string, string>();
@@ -148,23 +150,34 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
   }
   const fixOf = new Map(k.fixes.map((f) => [f.read_key, f.corrected_text]));
   const yesTexts = k.answers.filter((d) => d.decision === 'yes' && idOf.has(d.name_key));
+  const noTexts = k.answers.filter((d) => d.decision === 'no');
   return rows.map((r) => {
     const key = aliasKey(r.name);
     const corrected = readKey ? null : fixOf.get(key) || null;
     const text = corrected || r.name, textKey = aliasKey(text);
     const rejected = new Set([...(no.get(key) || []), ...(no.get(textKey) || []), ...(readKey ? no.get(readKey) || [] : [])]);
-    const candidates: Candidate[] = cat.candidates(text, r.english, 3 + rejected.size).filter((c) => !rejected.has(keyOf.get(c.id) || '')).slice(0, 3);
+    // «مش ده» / «مش واحد منهم» also hold when the same line is read a little differently next time
+    // (same numbers, same form, very close text), like confirmed lines do.
+    const textForms = forms(text);
+    for (const d of noTexts) {
+      if (rejected.has(d.name_key) || !sameNumbers(text, d.read_text) || !formsAgree(textForms, forms(d.read_text))) continue;
+      if (similarity(text, d.read_text) >= 0.85) rejected.add(d.name_key);
+    }
+    // NOT_LISTED: the owner said this line is none of the shortages offered; it is not offered again (no new
+    // suggestions after the first ones were refused) and shows with the unknown lines, where «تصحيح» can still pick.
+    const notListed = rejected.has(NOT_LISTED);
+    const candidates: Candidate[] = notListed ? [] : cat.candidates(text, r.english, 3 + rejected.size).filter((c) => !rejected.has(keyOf.get(c.id) || '')).slice(0, 3);
     let match: Match | null = decide(candidates);
     const y = yes.get(key) || yes.get(textKey), yid = y && !rejected.has(y) ? idOf.get(y) : undefined;
     if (yid) match = { id: yid, name: '', score: 1, confidence: 'confirmed' };
     else {
       // written a little differently from a line the owner confirmed: same numbers, same form, very close text
-      const near = new Set<string>(), textForms = forms(text);
+      const near = new Set<string>();
       for (const d of yesTexts) {
         if (rejected.has(d.name_key) || !sameNumbers(text, d.read_text) || !formsAgree(textForms, forms(d.read_text))) continue;
         if (similarity(text, d.read_text) >= 0.85) near.add(d.name_key);
       }
-      if (near.size === 1) match = { id: idOf.get([...near][0])!, name: '', score: 0.95, confidence: 'high', via: 'alias' };
+      if (near.size === 1 && !notListed) match = { id: idOf.get([...near][0])!, name: '', score: 0.95, confidence: 'high', via: 'alias' };
     }
     return { ...r, key, corrected, match, candidates, ignored: k.ignored.has(key) };
   });
