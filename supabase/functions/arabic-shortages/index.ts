@@ -451,7 +451,11 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
           const done = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id,received_at&file_path=like.*' + hash + '*').catch(() => []);
           if (done.length) return out(200, { ok: false, duplicate: true, say: '' }, say);
         }
-        // still no row: an old copy (the owner cleared the list, or a save failed), so it is read now
+        // still no row. Stored minutes ago: the owner deleted it from the page while the phone still re-sends the
+        // newest photos, so it stays deleted (silent). Older: an old copy (the list was cleared long ago), read now.
+        const at = await fetchImpl(`${base}/rest/v1/rpc/ar_inbox_file_at`, { method: 'POST', body: JSON.stringify({ p: filePath }), headers: { ...sh, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+          .then((r) => r.ok ? r.json() : null).catch(() => null);
+        if (typeof at === 'string' && Date.parse(at) > Date.now() - DUP_SILENT_MS) return out(200, { ok: false, duplicate: true, deleted: true, say: '' }, say);
       } else filePath = null;
     }
   }
