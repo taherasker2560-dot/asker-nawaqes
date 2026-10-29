@@ -7,11 +7,12 @@ const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'h
 const KEY='a'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];
 const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠ مجم ٣٠ قرص',status:'approved'}];
-function fake({gem,fileAt='2026-01-01T00:00:00Z'}={}){const calls=[],saved=[],files=[],media=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
+function fake({gem,fileAt='2026-01-01T00:00:00Z',orders=[]}={}){const calls=[],saved=[],files=[],media=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
  const f=async(url,o={})=>{calls.push({url,o});
   if(url.includes('/rest/v1/ar_inbox_keys'))return page(url,url.includes('key_hash=eq.'+HASH)?[{key_hash:HASH}]:[]);
   if(url.includes('/rest/v1/ar_suppliers'))return page(url,[{name:'المتحدة للأدوية',phone:'201001234567'}]);
   if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
+  if(url.includes('/rest/v1/ar_orders'))return page(url,orders);
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
   if(url.includes('/rest/v1/ar_inbox_media')){const q=k=>decodeURIComponent((url.match(new RegExp(k+'=eq\\.([^&]+)'))||[])[1]||'');
@@ -247,6 +248,16 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
  assert.equal(g.saved.length,1);
  assert.equal((await note()).status,200,'repeat after the photo came');
  assert.equal((await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (2 رسائل)')+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g)).status,202,'a new notification');}
+// items ordered today («اتطلب»): not said and not counted again when a company sends them
+{const ordered=[{name_key:'FLAGYL 125MG SYP'}];
+ let g=fake({orders:ordered});const t=(x,h=g)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,h).then(r=>r.text());
+ assert.equal(await t('فلاجيل شراب ١٢٥\nبروفين ٤٠٠ مجم ٣٠ قرص'),'المتحدة للأدوية: وصل بروفين ٤٠٠ مجم ٣٠ قرص','the ordered one is left out');
+ const q=g.calls.map(c=>c.url).find(u=>u.includes('/rest/v1/ar_orders'));assert.match(decodeURIComponent(q),/ordered_at=gte\.\d{4}-\d\d-\d\dT/);
+ g=fake({orders:ordered});assert.equal(await t('فلاجيل شراب ١٢٥\nحاجة تانية\nكمان حاجة',g),'المتحدة للأدوية: اللي وصل من النواقص اتطلب النهارده');
+ g=fake({orders:ordered});assert.equal(await t('فلاجيل شراب ١٢٥',g),'','a short message with only an ordered item: silent');assert.equal(g.saved.length,1,'still kept');
+ g=fake();assert.equal(await t('فلاجيل شراب ١٢٥',g),'المتحدة للأدوية: وصل فلاجيل ١٢٥ مجم شراب','nothing ordered: said');
+ assert.equal(F.dayTotals([{rows:[{match:{id:'a',confidence:'high'}},{match:{id:'b',confidence:'confirmed'}}],review:0}],id=>id==='a'),'النهارده لحد دلوقتي 1 صنف من النواقص');
+ assert.equal(F.dayTotals([{rows:[{match:{id:'a',confidence:'high'}}],review:1}]),'النهارده لحد دلوقتي 1 صنف من النواقص و1 محتاجين تأكيدك');}
 // Excel name column (same rule as the page)
 assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
 console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');
