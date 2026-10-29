@@ -23,13 +23,15 @@ run('companies, phone key, inbox',async({page,table})=>{
  // delete: asked first; «لأ» keeps it, «أيوه» removes this company's messages only; «امسح الكل» empties the list
  await page.evaluate(now=>window.__tables.ar_inbox.push({id:'i3',received_at:now,sender:'الفتح',supplier:'الفتح',kind:'text',status:'new',sure:0,review:0,rows:[]}),now);
  await page.click('#inboxRefresh');await page.waitForFunction(()=>document.querySelectorAll('[data-inbox-del]').length===2);
- page.once('dialog',d=>d.dismiss());await page.click('[data-inbox-del="1"]');assert.equal((await table('ar_inbox')).length,3);
+ const shown=async()=>(await table('ar_inbox')).filter(x=>!x.hidden_at);
+ page.once('dialog',d=>d.dismiss());await page.click('[data-inbox-del="1"]');assert.equal((await shown()).length,3);
  const asked=[];page.once('dialog',d=>{asked.push(d.message());d.accept()});
  const del=await page.evaluate(()=>[...document.querySelectorAll('[data-inbox-del]')].findIndex(b=>b.closest('.item').textContent.includes('الفتح')));
  await page.click(`[data-inbox-del="${del}"]`);await page.waitForFunction(()=>document.querySelectorAll('[data-inbox-del]').length===1);
- assert.match(asked[0],/الفتح/);assert.deepEqual((await table('ar_inbox')).map(x=>x.id),['i1','i2']);
+ assert.match(asked[0],/الفتح/);assert.deepEqual((await shown()).map(x=>x.id),['i1','i2']);
+ assert.ok((await table('ar_inbox')).find(x=>x.id==='i3').hidden_at,'hidden, kept so a repeat is still known');
  page.once('dialog',d=>d.accept());await page.click('#inboxClear');await page.waitForFunction(()=>!document.querySelector('[data-inbox-del]'));
- assert.deepEqual(await table('ar_inbox'),[]);assert.match(await text(page,'#inboxList'),/مفيش وارد/);
+ assert.deepEqual(await shown(),[]);assert.equal((await table('ar_inbox')).length,3);assert.match(await text(page,'#inboxList'),/مفيش وارد/);
  assert.ok((await table('ar_suppliers')).length===1,'companies are kept');
  // photos that came while two companies sent photos: shown apart with each photo, until the owner picks its company
  await page.evaluate(now=>{window.__tables.ar_inbox.push(
