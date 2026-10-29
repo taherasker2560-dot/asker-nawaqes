@@ -354,7 +354,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
   if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
   // the notification of a photo/file («📷 صورة», «📄 list.pdf»): the file itself comes in its own request
-  if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) return out(200, { ok: false, ignored: true, say: '' }, say);
+  // 202 (not 200) tells the phone «this chat is a saved company: send its photos/files now»; other chats get 200,
+  // so the phone never sends photos from chats that are not suppliers.
+  if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) return out(202, { ok: false, media: true, say: '' }, say);
   // the phone may send the same photo/file again (it sends the newest ones each time): kept once, by its hash
   const hash = kind === 'text' ? '' : [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
   if (hash) {
