@@ -42,12 +42,12 @@ f=fake({gem:()=>{throw Error('no')}});r=await F.handle(post('from='+encodeURICom
 assert.equal(r.status,200);assert.equal((await r.json()).ignored,true);assert.equal(f.saved.length,0);assert.ok(!f.calls.some(c=>c.url.includes('generativelanguage')));
 // text from a saved company (name written a little differently): matched, saved, spoken summary
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحده للادويه')+'&say=1','فلاجيل شراب ١٢٥ | 3\nحاجة تانية','text/plain; charset=utf-8'),env,f);
-assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: وصل 1 صنف من النواقص');
+assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: وصل فلاجيل ١٢٥ مجم شراب','one item: said by its Arabic name');
 assert.equal(f.saved[0].kind,'text');assert.equal(f.saved[0].supplier,'المتحدة للأدوية');assert.equal(f.saved[0].sure,1);assert.equal(f.saved[0].rows.length,2);
 assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.Authorization==='Bearer service'&&c.o.headers.apikey==='service'),'service role (as apikey too), no login');
 // WhatsApp count in the chat title is dropped: "(2 رسائل)" / "(3 messages)"
 assert.equal(F.inboxSender('الفتح shreif (2 رسائل)'),'الفتح shreif');assert.equal(F.inboxSender('Al Fath (12 messages)'),'Al Fath');assert.equal(F.inboxSender('شركة (الفرع)'),'شركة (الفرع)');
-f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (٣ رسائل)')+'&say=1','فلاجيل شراب ١٢٥','text/plain'),env,f);assert.match(await r.text(),/^المتحدة للأدوية: وصل 1/);
+f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (٣ رسائل)')+'&say=1','فلاجيل شراب ١٢٥','text/plain'),env,f);assert.match(await r.text(),/^المتحدة للأدوية: وصل فلاجيل/);
 // mixed Arabic/English name: word order ignored, other names still refused
 assert.equal(F.sameCompany('Shreif الفتح','الفتح shreif'),true);assert.equal(F.sameCompany('Shreif الفتح','الفتح'),false);assert.equal(F.sameCompany('Shreif الفتح',''),false);assert.equal(F.sameCompany('','الفتح'),false);
 // a group message: the title holds the group's name and the sender
@@ -58,11 +58,23 @@ assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور ك�
  // the check looks back to the start of today in Cairo (not only 10 minutes): an old unread notification shown again is not read twice
  const q=g.calls.map(c=>c.url).filter(u=>u.includes('ar_inbox?select=body_text')).pop();const since=decodeURIComponent(q.match(/received_at=gte\.([^&]+)/)[1]);
  assert.equal(since,F.cairoDayStart(new Date(since)));assert.ok(Date.parse(since)<=Date.now()&&Date.now()-Date.parse(since)<=25*3600e3);}
-// several photos of one list: after the first, the phone says the company's total for today
+// several photos of one list: each photo with 1 to 3 items says their names
 {const g=fake({gem:(()=>{let i=0;return()=>({supplier:'',rows:[i++?{name:'فلاجيل ١٢٥ مجم شراب',english:'FLAGYL 125MG SYP'}:{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})})()});
  const img=(b)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,b]),'image/jpeg'),env,g);
- assert.equal(await (await img(1)).text(),'المتحدة للأدوية: وصل 1 صنف من النواقص');
- assert.equal(await (await img(2)).text(),'المتحدة للأدوية: النهارده لحد دلوقتي 2 صنف من النواقص');}
+ assert.equal(await (await img(1)).text(),'المتحدة للأدوية: وصل بروفين ٤٠٠ مجم ٣٠ قرص');
+ assert.equal(await (await img(2)).text(),'المتحدة للأدوية: وصل فلاجيل ١٢٥ مجم شراب');}
+// more than 3 items: the count; after the first photo of the day, the company's total for today
+{const extra=[{id:'s3',product_name:'JANUVIA 50MG 28TAB'},{id:'s4',product_name:'CONCOR 5MG 30TAB'}];
+ shortages.push(...extra);names.push({name_key:'JANUVIA 50MG 28TAB',arabic_name:'جانوفيا ٥٠ مجم ٢٨ قرص',status:'approved'},{name_key:'CONCOR 5MG 30TAB',arabic_name:'كونكور ٥ مجم ٣٠ قرص',status:'approved'});
+ try{const four=[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'},{name:'فلاجيل ١٢٥ مجم شراب',english:'FLAGYL 125MG SYP'},{name:'جانوفيا ٥٠ مجم ٢٨ قرص',english:'JANUVIA 50MG 28TAB'},{name:'كونكور ٥ مجم ٣٠ قرص',english:'CONCOR 5MG 30TAB'}];
+  const g=fake({gem:()=>({supplier:'',rows:four})});
+  const img=(b)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,b]),'image/jpeg'),env,g);
+  assert.equal(await (await img(61)).text(),'المتحدة للأدوية: وصل 4 صنف من النواقص');
+  assert.equal(await (await img(62)).text(),'المتحدة للأدوية: النهارده لحد دلوقتي 4 صنف من النواقص');
+  // the same name twice is said once; a line with no Arabic name: the supplier's text without notes after «//»
+  assert.equal(F.namesSay('س',['أ','ب','أ'],0),'س: وصل أ وب');assert.equal(F.namesSay('س',['أ'],2),'س: وصل أ، و2 محتاجين تأكيدك');
+  assert.equal(F.spokenName(undefined,'دوليبران ١٠٠٠مجم اقراص //٢شريط'),'دوليبران ١٠٠٠مجم اقراص');assert.equal(F.spokenName(' كونكور ',''),'كونكور');}
+ finally{shortages.splice(2);names.splice(2)}}
 assert.match(F.cairoDayStart(new Date('2026-10-29T10:00:00Z')),/^2026-10-2[89]T2[12]:00:00\.000Z$/);
 // Tasker sends the file with its own Content-Type and no name: the first bytes decide
 assert.equal(F.sniffKind(new Uint8Array([0xff,0xd8,0xff,0xe0])),'image');assert.equal(F.sniffKind(new TextEncoder().encode('%PDF-1.4')),'pdf');
@@ -84,7 +96,7 @@ assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.ap
 // image: read by Gemini, file kept in the private bucket
 f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
 r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&name=IMG-1.jpg',new Uint8Array([255,216,255,0]),'image/jpeg'),env,f);
-const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,1);assert.match(b.say,/وصل 1 صنف/);
+const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,1);assert.equal(b.say,'المتحدة للأدوية: وصل بروفين ٤٠٠ مجم ٣٠ قرص');
 assert.equal(f.files.length,1);assert.match(f.files[0].url,/ar-inbox\/\d{4}-\d\d-\d\d\/[0-9a-f-]+\.jpg$/);assert.equal(f.saved[0].kind,'image');assert.ok(f.saved[0].file_path);
 // the photo's notification text is ignored (the photo comes by itself); the same photo sent again is kept once
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,f);assert.equal(await r.text(),'');assert.equal(f.saved.length,0);
@@ -154,7 +166,7 @@ assert.equal(F.missingSay('الفتح',['📷 صورة']),'الفتح: بعت ص
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
  const h=async(u,o={})=>u.includes('/storage/v1/object/ar-inbox/')?new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400}):g(u,o);
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,4]),'application/octet-stream'),env,h);
- assert.equal(r.status,200);assert.match(await r.text(),/وصل 1 صنف/);assert.equal(g.saved.length,1);assert.match(g.saved[0].file_path,/\.jpg$/);}
+ assert.equal(r.status,200);assert.match(await r.text(),/وصل بروفين/);assert.equal(g.saved.length,1);assert.match(g.saved[0].file_path,/\.jpg$/);}
 // stored minutes ago with no row: the owner deleted it from the page; the phone re-sends it: not read again, silent
 {const g=fake({gem:()=>{throw Error('read again')},fileAt:new Date(Date.now()-60e3).toISOString()});
  const h=async(u,o={})=>u.includes('/storage/v1/object/ar-inbox/')?new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400}):g(u,o);
@@ -165,7 +177,7 @@ assert.equal(F.missingSay('الفتح',['📷 صورة']),'الفتح: بعت ص
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
  let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,g);assert.equal(r.status,202);assert.deepEqual(g.media.map(m=>m.supplier),['المتحدة للأدوية']);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,20]),'application/octet-stream'),env,g);
- assert.match(await r.text(),/وصل 1 صنف/);assert.equal(g.saved[0].maybe,null,'one company: sure');
+ assert.match(await r.text(),/وصل بروفين/);assert.equal(g.saved[0].maybe,null,'one company: sure');
  g.media.push({supplier:'شركة النور',fresh:true,done:false});
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,21]),'application/octet-stream'),env,g);
  assert.equal(await r.text(),'وصلت صور من أكتر من مورد في نفس الوقت: المتحدة للأدوية وشركة النور. اختار كل صورة من مين من البوت');
@@ -179,7 +191,7 @@ assert.equal(F.missingSay('الفتح',['📷 صورة']),'الفتح: بعت ص
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
  g.media.push({supplier:'المتحدة للأدوية',chat:'المتحدة للأدوية',note:'x',fresh:false,done:false},{supplier:'شركة النور',chat:'شركة النور',note:'y',fresh:true,done:false});
  let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,30]),'application/octet-stream'),env,g);
- assert.equal(await r.text(),'شركة النور: وصل 1 صنف من النواقص');assert.equal(g.saved[0].supplier,'شركة النور');assert.equal(g.saved[0].maybe,null);
+ assert.equal(await r.text(),'شركة النور: وصل بروفين ٤٠٠ مجم ٣٠ قرص');assert.equal(g.saved[0].supplier,'شركة النور');assert.equal(g.saved[0].maybe,null);
  assert.equal(g.saved[0].sender,'المتحدة للأدوية','the chat that sent it is kept');assert.ok(g.media[1].done,'its notification is handled: no «seen» for it');
  // no new notification at all: any company with one in that time may be the one
  g.media.length=0;g.media.push({supplier:'شركة النور',chat:'شركة النور',note:'y',fresh:false,done:false});
@@ -214,7 +226,7 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake();const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g).then(r=>r.text());
  assert.equal(await t('توبرادكس مرهم'),'','one line, nothing from the shortages: kept, not spoken');
  assert.equal(await t('دوليبران'),'','nothing from the shortages: silent');
- assert.match(await t('فلاجيل شراب ١٢٥'),/النهارده لحد دلوقتي 1 صنف/);
+ assert.equal(await t('فلاجيل شراب ١٢٥'),'المتحدة للأدوية: وصل فلاجيل ١٢٥ مجم شراب','brings a shortage item: said by name');
  assert.equal(await t('كلوباترا كريم'),'');assert.equal(g.saved.length,4,'all kept');}
 // reactions (they quote the owner's own message) and voice notes / videos: ignored, not kept, nothing said, no folder check
 {const g=fake({gem:()=>{throw Error('not read')}});const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g);
