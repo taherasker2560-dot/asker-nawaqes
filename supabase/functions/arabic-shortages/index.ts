@@ -218,6 +218,9 @@ const DUP_SILENT_MS = 10 * 60 * 1000;
 const SEEN_QUIET_MS = 2 * 60 * 1000;
 // a second run that finds the same file already stored waits for the first run's row (checks every 2 s, 6 times)
 const CLAIM_POLLS = 6;
+// the phone sends the photos saved in the last 3 minutes: if two companies announced photos in that time, nobody
+// can tell whose photo is whose (one folder on the phone), so the photo keeps both names until the owner picks one
+const MEDIA_WINDOW_MS = 3 * 60 * 1000;
 // WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
@@ -353,12 +356,15 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const company = suppliers.find((x) => sameCompany(x.name, from));
   // not one of the saved companies: ignored before anything is read or stored
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
-  const today = () => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
+  const since = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
+  // today's totals count only this company's sure rows (a photo still waiting for the owner to pick its company is not)
+  const today = () => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&maybe=is.null&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
   // seen=1: the phone got a photo notification but found no new photo (WhatsApp keeps one copy of a photo it
   // already has, so a photo sent again is not saved again): nothing is read or stored, only told.
   if (url.searchParams.get('seen') === '1') {
-    const justRead = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(new Date(Date.now() - SEEN_QUIET_MS).toISOString())).catch(() => []);
-    if (justRead.length) return out(200, { ok: true, seen: true, say: '' }, say);
+    const justRead = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []);
+    const unsure = await restAll<{ maybe: string[] | null }>(env, auth, fetchImpl, 'ar_inbox?select=maybe&maybe=not.is.null&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []);
+    if (justRead.length || unsure.some((r) => (r.maybe || []).includes(company.name))) return out(200, { ok: true, seen: true, say: '' }, say);
     return out(200, { ok: true, seen: true, say: seenSay(company.name, 'الصورة دي وصلت', await today()) }, say);
   }
   // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
@@ -376,7 +382,13 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // the notification of a photo/file («📷 صورة», «📄 list.pdf»): the file itself comes in its own request
   // 202 (not 200) tells the phone «this chat is a saved company: send its photos/files now»; other chats get 200,
   // so the phone never sends photos from chats that are not suppliers.
-  if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) return out(202, { ok: false, media: true, say: '' }, say);
+  if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) {
+    // remembered for MEDIA_WINDOW_MS (older notes are cleared now and then): see `maybe` below
+    const w = { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal = AbortSignal.timeout(TIMEOUT_MS);
+    await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: company.name }), headers: w, signal }).catch(() => null);
+    await fetchImpl(`${base}/rest/v1/ar_inbox_media?at=lt.${since(864e5)}`, { method: 'DELETE', headers: w, signal }).catch(() => null);
+    return out(202, { ok: false, media: true, say: '' }, say);
+  }
   // the phone may send the same photo/file again (it sends the newest ones each time): kept once, by its hash
   const hash = kind === 'text' ? '' : [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
   if (hash) {
@@ -444,14 +456,26 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const sureIds = new Set(out2.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
   const review = out2.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
     r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
-  const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review };
+  // a photo/file while another company also announced photos: it may be either one's
+  let maybe: string[] | null = null;
+  if (kind !== 'text') {
+    const notes = await restAll<{ supplier: string }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
+    const names = [...new Set([company.name, ...notes.map((n) => n.supplier)])];
+    if (names.length > 1) maybe = names.sort();
+  }
+  const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review, maybe };
   const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
   // 409: another run saved the same photo/text a moment ago (unique indexes): a repeat, said once by that run
   if (ins.status === 409) return out(200, { ok: false, duplicate: true, say: '' }, say);
   if (!ins.ok) return out(502, { error: 'save', message: 'الوارد ماتحفظش' }, say);
-  const [saved] = await ins.json() as { id: string }[];
+  const [saved] = await ins.json() as { id: string; received_at?: string }[];
   log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error });
   if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
+  if (maybe) {
+    // said once for the photos of that moment: only the first unsure photo says it
+    const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
+    return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
+  }
   let spoken = inboxSay(supplier, sureIds.size, review);
   // the message is saved; if today's rows cannot be read only the spoken total is skipped
   const rowsToday = await today();

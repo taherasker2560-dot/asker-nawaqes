@@ -31,4 +31,14 @@ run('companies, phone key, inbox',async({page,table})=>{
  page.once('dialog',d=>d.accept());await page.click('#inboxClear');await page.waitForFunction(()=>!document.querySelector('[data-inbox-del]'));
  assert.deepEqual(await table('ar_inbox'),[]);assert.match(await text(page,'#inboxList'),/مفيش وارد/);
  assert.ok((await table('ar_suppliers')).length===1,'companies are kept');
+ // photos that came while two companies sent photos: shown apart with each photo, until the owner picks its company
+ await page.evaluate(now=>{window.__tables.ar_inbox.push(
+  {id:'u1',received_at:now,sender:'المتحدة للأدوية',supplier:'المتحدة للأدوية',kind:'image',file_path:'2026-10-29/aaa.jpg',status:'new',sure:1,review:0,maybe:['المتحدة للأدوية','شركة النور'],rows:[]},
+  {id:'u2',received_at:now,sender:'المتحدة للأدوية',supplier:'المتحدة للأدوية',kind:'image',file_path:'2026-10-29/bbb.jpg',status:'new',sure:0,review:2,maybe:['المتحدة للأدوية','شركة النور'],rows:[]})},now);
+ await page.click('#inboxRefresh');await page.waitForSelector('[data-assign]');
+ assert.match(await text(page,'#inboxList'),/صور من المتحدة للأدوية أو شركة النور/);assert.equal(await page.locator('[data-inbox-open]').count(),0,'no «افتح» before picking');
+ await page.waitForFunction(()=>[...document.querySelectorAll('img[data-photo]')].every(i=>i.src.startsWith('data:image')));
+ await page.click('[data-assign="u2"][data-to="شركة النور"]');await page.waitForFunction(()=>document.querySelectorAll('[data-assign]').length===2);
+ const u2=(await table('ar_inbox')).find(x=>x.id==='u2');assert.equal(u2.supplier,'شركة النور');assert.equal(u2.maybe,null);
+ assert.match(await text(page,'#inboxList'),/شركة النور.*وصل 0/);assert.equal(await page.locator('[data-inbox-open]').count(),1);
 });
