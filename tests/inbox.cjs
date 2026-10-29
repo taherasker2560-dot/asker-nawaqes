@@ -107,22 +107,27 @@ for(const [ago,expect] of [[60e3,''],[3*3600e3,'المتحدة للأدوية: �
  assert.equal(await r.text(),'','no notification: nothing to tell');
  assert.equal((await note('المتحدة للأدوية')).status,202);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);
- assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده');assert.equal(g.saved.length,0);
+ assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: بعت صورة مالقيتهاش على الموبايل، لو جديدة افتح الشات بتاعه');assert.equal(g.saved.length,0);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'','said once');
  g.saved.push({kind:'text',status:'new',rows:[{match:{id:'s1',confidence:'high'}}],review:2});
  // a new message in that chat changes its notification (WhatsApp adds the count): told again
  assert.equal((await note('المتحدة للأدوية (2 رسائل)')).status,202);assert.equal(g.media.at(-1).fresh,true);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','📷 صورة','text/plain'),env,g);
- assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده، والنهارده لحد دلوقتي 1 صنف من النواقص و2 محتاجين تأكيدك');assert.equal(g.saved.length,1);
+ assert.equal(await r.text(),'المتحدة للأدوية: بعت صورة مالقيتهاش على الموبايل، لو جديدة افتح الشات بتاعه');assert.equal(g.saved.length,1);
  r=await F.handle(post('from='+encodeURIComponent('زبون')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');
  assert.ok(!g.calls.some(c=>c.url.startsWith('https://generativelanguage')));}
 assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف ده اتقرا قبل كده');
+// several photos not on the phone: not downloaded yet (they are almost never all old ones)
+assert.equal(F.missingSay('الفتح',['الفتح 📷 \u200fتم إرسال ٥ صور']),'الفتح: بعت صور ولسه ما اتحملتش على الموبايل، افتح الشات بتاعه');
+assert.equal(F.missingSay('الفتح',['x','الفتح 📷 4 photos']),'الفتح: بعت صور ولسه ما اتحملتش على الموبايل، افتح الشات بتاعه');
+assert.equal(F.missingSay('الفتح',['الفتح 📷 \u200fتم إرسال صورة']),'الفتح: بعت صورة مالقيتهاش على الموبايل، لو جديدة افتح الشات بتاعه');
+assert.equal(F.missingSay('الفتح',['📷 صورة']),'الفتح: بعت صورة مالقيتهاش على الموبايل، لو جديدة افتح الشات بتاعه');
 // WhatsApp shows the same notification again (after the phone speaks, or when another message comes): a repeat, not
 // fresh. The phone still checks the folder, but «seen» stays silent, so the same sentence is not said over and over
 {const g=fake({gem:()=>{throw Error('not read')}});
  const note=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,g);
  const seen=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g).then(r=>r.text());
- assert.equal((await note()).status,202);assert.match(await seen(),/وصلت قبل كده/);
+ assert.equal((await note()).status,202);assert.match(await seen(),/مالقيتهاش/);
  for(let i=0;i<3;i++){assert.equal((await note()).status,202,'still checks the folder');assert.equal(await seen(),'')}
  assert.deepEqual(g.media.map(m=>m.fresh),[true,false,false,false]);assert.equal(g.media[1].chat,'المتحدة للأدوية');
  // another chat of the same company has its own last notification
