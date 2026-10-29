@@ -212,6 +212,8 @@ export function parseRead(text: string): { rows: Row[]; supplier: string } | nul
 // (ar_suppliers) are accepted, so other chats are never read. Runs with the service role (no login on the phone).
 const SHEET = /\.(xlsx|xls|csv)$/i;
 // WhatsApp's notification text for a photo, file, video or voice note (no list in it)
+// a photo/file the phone sent again within this time is a re-send of the newest ones (silent); older = really sent again
+const DUP_SILENT_MS = 10 * 60 * 1000;
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
@@ -360,8 +362,14 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // the phone may send the same photo/file again (it sends the newest ones each time): kept once, by its hash
   const hash = kind === 'text' ? '' : [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
   if (hash) {
-    const dup = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&file_path=like.*' + hash + '*');
-    if (dup.length) return out(200, { ok: false, duplicate: true, say: '' }, say);
+    const dup = await restAll<{ id: string; received_at?: string }>(env, auth, fetchImpl, 'ar_inbox?select=id,received_at&file_path=like.*' + hash + '*');
+    if (dup.length) {
+      // the phone re-sends the newest photos on every notification: those (read minutes ago) stay silent;
+      // an old photo sent again is told so the owner knows it was not lost
+      const old = dup.every((d) => !d.received_at || Date.parse(d.received_at) < Date.now() - DUP_SILENT_MS);
+      const what = kind === 'image' ? 'الصورة دي اتقرت' : 'الملف ده اتقرا';
+      return out(200, { ok: false, duplicate: true, say: old ? `${company.name}: ${what} قبل كده` : '' }, say);
+    }
   }
   // the same notification can fire twice: the same text from the same company within 10 minutes is kept once
   if (kind === 'text') {
