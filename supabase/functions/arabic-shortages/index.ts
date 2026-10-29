@@ -231,6 +231,9 @@ const SEEN_NOTE_MS = 5 * 60 * 1000;
 // Gemini busy (5xx): the photo is saved as not read and the phone is told; it is read again in the background
 // (after 15 s, then 30 s) and its row filled in. The phone is not told again (it already has its answer).
 const RETRY_WAITS_MS = [15000, 30000];
+// some suppliers send a list as one message per item: after the first text, the next ones from the same company within
+// this time are spoken only when they bring something from the shortages (then with today's totals)
+const TEXT_BURST_MS = 3 * 60 * 1000;
 // WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
@@ -540,6 +543,10 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     // said once for the photos of that moment: only the first unsure photo says it
     const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
     return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
+  }
+  if (kind === 'text' && !sureIds.size && !review && saved?.received_at) {
+    const before = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=eq.text&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(TEXT_BURST_MS)).catch(() => []);
+    if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: 0, review: 0, quiet: true, say: '' }, say);
   }
   let spoken = inboxSay(supplier, sureIds.size, review);
   // the message is saved; if today's rows cannot be read only the spoken total is skipped

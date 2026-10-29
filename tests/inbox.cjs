@@ -23,6 +23,7 @@ function fake({gem,fileAt='2026-01-01T00:00:00Z'}={}){const calls=[],saved=[],fi
   if(url.includes('/rest/v1/ar_inbox?select=maybe&maybe=not.is.null'))return page(url,saved.filter(r=>r.maybe).map(r=>({maybe:r.maybe})));
   if(url.includes('/rest/v1/ar_inbox?select=id&maybe=not.is.null')){const lt=decodeURIComponent((url.match(/received_at=lt\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.maybe&&r.received_at<lt).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text')){const sup=decodeURIComponent((url.match(/supplier=eq\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind!=='text'&&r.supplier===sup).map(()=>({id:'x'})))}
+  if(url.includes('/rest/v1/ar_inbox?select=id&kind=eq.text')){const lt=decodeURIComponent((url.match(/received_at=lt\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind==='text'&&r.received_at<lt).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
   if(url.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox?id=eq.')&&o.method==='PATCH'){const id=decodeURIComponent(url.match(/id=eq\.([^&]+)/)[1]);const r=saved.find(x=>x.id===id&&x.status==='error');if(r)Object.assign(r,JSON.parse(o.body));return new Response('',{status:204})}
@@ -201,6 +202,13 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake();let calls=0;const h=async(u,o)=>u.startsWith('https://generativelanguage')?(calls++,new Response('',{status:500})):g(u,o);
  await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
  assert.equal(g.saved[0].status,'error');assert.equal(calls,3,'first try + 2 retries, then it stays not read');}
+// a list sent as one message per item: the first is spoken, the next ones within 3 minutes only when they bring
+// something from the shortages (then with today's totals)
+{const g=fake();const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g).then(r=>r.text());
+ assert.equal(await t('توبرادكس مرهم'),'المتحدة للأدوية: مفيش حاجة من النواقص');
+ assert.equal(await t('دوليبران'),'','nothing from the shortages: silent');
+ assert.match(await t('فلاجيل شراب ١٢٥'),/النهارده لحد دلوقتي 1 صنف/);
+ assert.equal(await t('كلوباترا كريم'),'');assert.equal(g.saved.length,4,'all kept');}
 // Excel name column (same rule as the page)
 assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
 console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');
