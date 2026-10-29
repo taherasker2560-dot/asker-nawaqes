@@ -41,7 +41,10 @@ assert.equal(F.sameCompany('Shreif الفتح','الفتح shreif'),true);assert
 assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور كفر الشيخ: Shreif الفتح'),true);assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور: احمد'),false);
 // the same text notification twice: kept once
 {const g=fake();const t='فلاجيل شراب ١٢٥\nبروفين';await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);
- const r2=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);assert.equal((await r2.json()).duplicate,true);assert.equal(g.saved.length,1);}
+ const r2=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);assert.equal((await r2.json()).duplicate,true);assert.equal(g.saved.length,1);
+ // the check looks back to the start of today in Cairo (not only 10 minutes): an old unread notification shown again is not read twice
+ const q=g.calls.map(c=>c.url).filter(u=>u.includes('ar_inbox?select=body_text')).pop();const since=decodeURIComponent(q.match(/received_at=gte\.([^&]+)/)[1]);
+ assert.equal(since,F.cairoDayStart(new Date(since)));assert.ok(Date.parse(since)<=Date.now()&&Date.now()-Date.parse(since)<=24*3600e3);}
 // several photos of one list: after the first, the phone says the company's total for today
 {const g=fake({gem:(()=>{let i=0;return()=>({supplier:'',rows:[i++?{name:'فلاجيل ١٢٥ مجم شراب',english:'FLAGYL 125MG SYP'}:{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})})()});
  const img=(b)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,b]),'image/jpeg'),env,g);
