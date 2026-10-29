@@ -25,7 +25,8 @@ function fake({gem}={}){const calls=[],saved=[],files=[],media=[];const page=(u,
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text')){const sup=decodeURIComponent((url.match(/supplier=eq\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind!=='text'&&r.supplier===sup).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
   if(url.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
-  if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);row.received_at=new Date(Date.now()+saved.length).toISOString();saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length,received_at:row.received_at}]),{status:201})}
+  if(url.includes('/rest/v1/ar_inbox?id=eq.')&&o.method==='PATCH'){const id=decodeURIComponent(url.match(/id=eq\.([^&]+)/)[1]);const r=saved.find(x=>x.id===id&&x.status==='error');if(r)Object.assign(r,JSON.parse(o.body));return new Response('',{status:204})}
+  if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);row.received_at=new Date(Date.now()+saved.length).toISOString();row.id='in'+(saved.length+1);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length,received_at:row.received_at}]),{status:201})}
   if(url.includes('/storage/v1/object/ar-inbox/')){files.push({url,headers:o.headers});return new Response('{}')}
   if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(gem())}]}}]}));
   throw Error('unexpected '+url)};Object.assign(f,{calls,saved,files,media});return f}
@@ -184,6 +185,16 @@ assert.equal(F.inboxKind('application/pdf',''),'pdf');assert.equal(F.inboxKind('
 f=fake({gem:()=>{throw Error('x')}});const q=async(u,o)=>u.startsWith('https://generativelanguage')?new Response('',{status:429}):f(u,o);
 r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),new Uint8Array([1,2,3]),'image/png'),env,q);
 assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(f.saved[0].error,/حصة/);
+// Gemini busy (503): the photo is kept as not read, the phone is told it will be read again, and it is read again
+// in the background; the row is filled in. Another error (not 5xx) is not tried again.
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
+ const h=async(u,o)=>u.startsWith('https://generativelanguage')&&calls++<1?new Response('',{status:503}):g(u,o);
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,40]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
+ assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده');
+ assert.equal(g.saved[0].status,'new');assert.equal(g.saved[0].error,null);assert.equal(g.saved[0].sure,1);assert.equal(calls,2);}
+{const g=fake();let calls=0;const h=async(u,o)=>u.startsWith('https://generativelanguage')?(calls++,new Response('',{status:500})):g(u,o);
+ await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
+ assert.equal(g.saved[0].status,'error');assert.equal(calls,3,'first try + 2 retries, then it stays not read');}
 // Excel name column (same rule as the page)
 assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
 console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');

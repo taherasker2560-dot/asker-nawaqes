@@ -228,6 +228,9 @@ const MEDIA_WINDOW_MS = 3 * 60 * 1000;
 const REPEAT_MS = 30 * 60 * 1000;
 // «seen» comes about a minute and a half after its notification (the phone checks the folder twice)
 const SEEN_NOTE_MS = 5 * 60 * 1000;
+// Gemini busy (5xx): the photo is saved as not read and the phone is told; it is read again in the background
+// (after 15 s, then 30 s) and its row filled in. The phone is not told again (it already has its answer).
+const RETRY_WAITS_MS = [15000, 30000];
 // WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
@@ -452,6 +455,24 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       } else filePath = null;
     }
   }
+  const readImage = async (): Promise<Row[]> => {
+    const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
+    const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
+    const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
+    if (!read) throw new Error('رد Gemini مش مفهوم');
+    return read.rows;
+  };
+  const scoreRows = async (rs: Row[]) => {
+    let list: ReturnType<typeof matchRows> = [];
+    if (rs.length) {
+      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+      list = matchRows(rs, shortageCatalog(shortages, k.names, k.answers), k, shortages);
+    }
+    const sureIds = new Set(list.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
+    const review = list.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
+      r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
+    return { list, sureIds, review };
+  };
   try {
     if (kind === 'text') {
       text = new TextDecoder().decode(bytes).slice(0, 20000);
@@ -462,22 +483,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       const m: unknown[][] = [];
       for (const n of wb.SheetNames) m.push(...XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false, blankrows: false }) as unknown[][]);
       rows = sheetNames(m).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
-    } else {
-      const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
-      const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
-      const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
-      if (!read) throw new Error('رد Gemini مش مفهوم');
-      rows = read.rows;
-    }
+    } else rows = await readImage();
   } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
-  let out2: ReturnType<typeof matchRows> = [];
-  if (!error && rows.length) {
-    const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
-    out2 = matchRows(rows, shortageCatalog(shortages, k.names, k.answers), k, shortages);
-  }
-  const sureIds = new Set(out2.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
-  const review = out2.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
-    r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
+  const scored = await scoreRows(error ? [] : rows), out2 = scored.list, sureIds = scored.sureIds, review = scored.review;
   // whose photo: the phone sends every new photo in the folder, whichever chat it came from, so the companies that
   // announced photos just now decide (WhatsApp's repeats of an old notification do not count). One company: the photo
   // is its own, even when another chat's run sent it. More: it keeps their names (maybe) until the owner picks one.
@@ -498,6 +506,31 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error, moved: supplier !== company.name, maybe: !!maybe });
   // the photo/file arrived: its company's notifications need no «seen» anymore
   if (kind !== 'text') for (const n of maybe || [supplier]) await handled(n, false);
+  if (error && /^gemini 5\d\d$/.test(error) && saved?.id && (kind === 'image' || kind === 'pdf')) {
+    // Gemini busy: read again in the background; the row is filled in when it works
+    const id = saved.id, waits = env.INBOX_RETRY_WAIT_MS ? RETRY_WAITS_MS.map(() => Number(env.INBOX_RETRY_WAIT_MS)) : RETRY_WAITS_MS;
+    const retry = (async () => {
+      for (const ms of waits) {
+        await new Promise((r) => setTimeout(r, ms));
+        try {
+          const s2 = await scoreRows(await readImage());
+          const r = await fetchImpl(`${base}/rest/v1/ar_inbox?id=eq.${encodeURIComponent(id)}&status=eq.error`, {
+            method: 'PATCH', body: JSON.stringify({ status: 'new', error: null, rows: s2.list, sure: s2.sureIds.size, review: s2.review }),
+            headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS),
+          });
+          log('inbox-retry', t0, { ok: r.ok, rows: s2.list.length });
+          return;
+        } catch (e) {
+          const m = String((e as Error).message || e);
+          log('inbox-retry', t0, { ok: false, m: m.slice(0, 60) });
+          if (!/^gemini 5\d\d$/.test(m)) return;
+        }
+      }
+    })();
+    const rt = (globalThis as unknown as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(retry); else await retry;
+    return out(200, { ok: false, id, retry: true, say: `${supplier}: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده` }, say);
+  }
   if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
   if (maybe) {
     // said once for the photos of that moment: only the first unsure photo says it
