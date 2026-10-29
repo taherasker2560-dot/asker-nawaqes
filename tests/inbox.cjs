@@ -56,7 +56,12 @@ assert.equal(F.sniffKind(new Uint8Array([0x50,0x4b,3,4])),'sheet');assert.equal(
  const fd=new FormData();fd.append('file',new Blob([new Uint8Array([0xff,0xd8,0xff,8])],{type:'application/octet-stream'}),'IMG-1.jpg');
  r=await F.handle(new Request('https://p.supabase.co/functions/v1/arabic-shortages?from='+encodeURIComponent('المتحدة للأدوية'),{method:'POST',headers:{'x-inbox-key':KEY},body:fd}),env,g);
  assert.equal((await r.json()).ok,true);assert.equal(g.saved[1].kind,'image');
- r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),new Uint8Array([1,2,3]),'application/zip'),env,g);assert.equal(r.status,415);}
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),new Uint8Array([1,2,3]),'application/zip'),env,g);assert.equal(r.status,415);
+ // Tasker's real upload: multipart/related, an empty text part, then the photo
+ const B='joaomgcdTasker',enc=new TextEncoder(),img=new Uint8Array([0xff,0xd8,0xff,9,0x0d,0x0a,0x2d,0x2d,5]);
+ const body=new Uint8Array([...enc.encode('--'+B+'\r\nContent-Type: text/plain\r\n\r\n\r\n--'+B+'\r\nContent-Type: application/octet-stream\r\n\r\n'),...img,...enc.encode('\r\n--'+B+'--\r\n')]);
+ assert.deepEqual([...F.filePart(body,B).bytes],[...img]);
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),body,'multipart/related; boundary='+B),env,g);assert.equal((await r.json()).ok,true);assert.equal(g.saved.at(-1).kind,'image');}
 // new-style secret key (sb_secret_…) is not a JWT: sent only as apikey
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),'فلاجيل شراب ١٢٥','text/plain'),{...env,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x'},f);assert.equal(r.status,200);
 assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.apikey==='sb_secret_x'&&!c.o.headers.Authorization));
