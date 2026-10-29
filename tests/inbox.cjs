@@ -72,6 +72,8 @@ const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,1);assert.mat
 assert.equal(f.files.length,1);assert.match(f.files[0].url,/ar-inbox\/\d{4}-\d\d-\d\d\/[0-9a-f-]+\.jpg$/);assert.equal(f.saved[0].kind,'image');assert.ok(f.saved[0].file_path);
 // the photo's notification text is ignored (the photo comes by itself); the same photo sent again is kept once
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,f);assert.equal(await r.text(),'');assert.equal(f.saved.length,0);
+assert.equal(r.status,202,'a saved company: the phone sends the photo');
+f=fake();r=await F.handle(post('from='+encodeURIComponent('زبون')+'&say=1','📷 صورة','text/plain'),env,f);assert.equal(r.status,200,'not a company: no photo is sent');
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});const seen=[];
  const h=async(u,o)=>{if(u.includes('/rest/v1/ar_inbox?select=id&file_path=like.')){return new Response(JSON.stringify(seen.some(p=>u.includes(p.split('/')[1].split('.')[0]))?[{id:'x'}]:[]))}const res=await g(u,o);if(u.includes('/rest/v1/ar_inbox')&&o.method==='POST')seen.push(g.saved.at(-1).file_path);return res};
  const path='/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Images/IMG-20261029-WA0001.jpg';
