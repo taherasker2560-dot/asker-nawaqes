@@ -129,6 +129,7 @@
       drawTranslate();
       drawShort();
       await loadSuppliers();
+      await loadOrders();
       await loadInbox();
       // opened from the phone's notification (…html#inbox): go straight to the incoming list
       if (location.hash === '#inbox') {
@@ -714,7 +715,7 @@
       ([...arrived]
         .map(
           ([id, ix]) =>
-            `<div class="item"><div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>${ix
+            `<div class="item"><div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>${orderedFrom(id).length ? `<div><span class="pill good">اتطلب النهارده${esc(who(orderedFrom(id)))}</span> <button class="secondary small" data-unorder="${esc(id)}">لغي «اتطلب»</button></div>` : ''}${ix
               .map((i) => {
                 const r = results[i];
                 return `<div class="hint">في الصورة: <span dir="auto">${esc(r.name)}</span> · ${conf[r.match.via === 'alias' ? 'near' : r.match.confidence] || ''} <button class="secondary" data-no="${i}:${esc(id)}">مش ده</button></div>${fixedLine(r)}`;
@@ -793,6 +794,20 @@
   }
   function wire() {
     const box = $('results');
+    // «لغي «اتطلب»»: the item is not ordered after all; it goes back into the message
+    box.querySelectorAll('[data-unorder]').forEach(
+      (b) =>
+        (b.onclick = async () => {
+          b.disabled = true;
+          try {
+            await unmarkOrdered(b.dataset.unorder);
+          } catch (e) {
+            return status('readStatus', 'مااتلغاش: ' + e.message, 'bad');
+          }
+          msgEdited = false;
+          drawResults();
+        }),
+    );
     box.querySelectorAll('[data-ignore]').forEach(
       (b) =>
         (b.onclick = async () => {
@@ -1089,6 +1104,55 @@
   };
   $('copyKey').onclick = () => copy('keyText', 'المفتاح');
   $('copyUrl').onclick = () => copy('inboxUrl', 'العنوان');
+  // ---------- items ordered today («اتطلب») ----------
+  // Opening a company's message in WhatsApp marks its items ordered today: they are left out of the next company's
+  // message, shown as «اتطلب», and the phone does not say them again. The owner can undo a mark («لغي»).
+  let orders = [];
+  const dayStart = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString();
+  };
+  async function loadOrders() {
+    try {
+      const { data, error } = await client
+        .from('ar_orders')
+        .select('id,name_key,product_name,supplier,ordered_at')
+        .gte('ordered_at', dayStart())
+        .order('ordered_at', { ascending: true })
+        .limit(2000);
+      if (error) throw Error(error.message);
+      orders = data || [];
+    } catch (e) {
+      orders = [];
+    }
+  }
+  // the companies an item was ordered from today ('' when marked without a company)
+  const orderedFrom = (id) => {
+    const k = nk(sName(id));
+    return orders.filter((o) => o.name_key === k).map((o) => o.supplier || '');
+  };
+  const who = (from) => {
+    const n = [...new Set(from.filter(Boolean))];
+    return n.length ? ' من ' + n.join(' و') : '';
+  };
+  // marks items ordered today (from this company, or none); an item already marked for that company is not added again
+  async function markOrdered(ids, supplier) {
+    const co = supplier || null,
+      rows = [...new Set(ids)]
+        .filter((id) => sName(id) && !orders.some((o) => o.name_key === nk(sName(id)) && (o.supplier || null) === co))
+        .map((id) => ({ name_key: nk(sName(id)), product_name: sName(id), supplier: co, ordered_at: new Date().toISOString() }));
+    if (!rows.length) return 0;
+    const { error } = await client.from('ar_orders').insert(rows);
+    if (error) throw Error(error.message);
+    await loadOrders();
+    return rows.length;
+  }
+  async function unmarkOrdered(id) {
+    const { error } = await client.from('ar_orders').delete().eq('name_key', nk(sName(id))).gte('ordered_at', dayStart());
+    if (error) throw Error(error.message);
+    await loadOrders();
+  }
   let inbox = [];
   const localDay = (t) => new Date(t - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const daysAgo = (d) => {
@@ -1222,7 +1286,7 @@
   }
   $('inboxRefresh').onclick = loadInbox;
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && !$('app').classList.contains('hidden')) loadInbox();
+    if (!document.hidden && !$('app').classList.contains('hidden')) loadOrders().then(loadInbox);
   });
   $('supplier').addEventListener('input', () => {
     const x = suppliers.find((s) => s.name === $('supplier').value.trim());
@@ -1255,15 +1319,22 @@
     msgEdited = false;
     $('msgBox').classList.add('hidden');
   }
-  // the message: every shortage found in this company's list, written the way the company wrote it
-  function buildMessage() {
+  // the message: every shortage found in this company's list, written the way the company wrote it, except the items
+  // already ordered today (from any company), which are listed under it
+  function msgItems() {
     const seen = new Set(),
-      lines = [];
+      out = [];
     for (const r of results) {
       if (!isSure(r) || seen.has(r.match.id)) continue;
       seen.add(r.match.id);
-      lines.push(r.corrected || r.name);
+      out.push({ id: r.match.id, line: r.corrected || r.name, from: orderedFrom(r.match.id) });
     }
+    return out;
+  }
+  function buildMessage() {
+    const lines = msgItems()
+      .filter((x) => !x.from.length)
+      .map((x) => x.line);
     if (!lines.length) return '';
     return [
       'السلام عليكم،',
@@ -1275,8 +1346,12 @@
   }
   function drawMessage() {
     if (msgEdited) return;
-    const t = buildMessage();
+    const t = buildMessage(),
+      skipped = msgItems().filter((x) => x.from.length);
     $('msgText').value = t;
+    $('msgSkip').textContent = skipped.length
+      ? `مش في الرسالة لأنهم اتطلبوا النهارده: ${skipped.map((x) => x.line + who(x.from)).join('، ')}. لو عاوز تطلبهم تاني دوس «لغي «اتطلب»» عند الصنف فوق.`
+      : '';
     $('msgBox').classList.toggle('hidden', !t);
   }
   $('msgText').addEventListener('input', () => {
@@ -1301,6 +1376,16 @@
     const t = $('msgText').value.trim();
     if (!t) return;
     await saveSupplier();
+    // the items in the message (as it is now, after the owner's edits) are marked ordered today from this company
+    let marked = 0;
+    try {
+      marked = await markOrdered(
+        msgItems()
+          .filter((x) => t.includes(x.line))
+          .map((x) => x.id),
+        $('supplier').value.replace(/\s+/g, ' ').trim().slice(0, 80),
+      );
+    } catch (e) {}
     const ph = waPhone($('supplierPhone').value);
     const web = `https://wa.me/${ph}?text=${encodeURIComponent(t)}`;
     // On Android, open WhatsApp Business (com.whatsapp.w4b) directly when chosen, instead of whichever WhatsApp
@@ -1309,11 +1394,17 @@
     else window.open(web, '_blank');
     status(
       'msgStatus',
-      ph
+      (ph
         ? 'اتفتحت محادثة الشركة في الواتس، اضغط إرسال هناك.'
-        : 'اختار محادثة الشركة في الواتس واضغط إرسال. (لو كتبت رقم الشركة فوق، المرة الجاية هتتفتح محادثتها على طول.)',
+        : 'اختار محادثة الشركة في الواتس واضغط إرسال. (لو كتبت رقم الشركة فوق، المرة الجاية هتتفتح محادثتها على طول.)') +
+        (marked ? ` واتعلّم ${marked} صنف «اتطلب» النهارده، فمش هيدخلوا في رسالة شركة تانية.` : ''),
       'good',
     );
+    if (marked) {
+      // the message stays as it was sent; the items show «اتطلب»
+      msgEdited = true;
+      drawResults();
+    }
   };
   $('copyBtn').onclick = async () => {
     try {

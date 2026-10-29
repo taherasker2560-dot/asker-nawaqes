@@ -347,13 +347,14 @@ export function cairoDayStart(now = new Date()): string {
 }
 // A list of 10+ pages comes as many photos: after the first one, the phone says the company's total for today.
 type Saved = { rows: { match?: { id: string; confidence: string } | null }[] | null; review: number | null };
-export function dayTotals(today: Saved[]): string {
+// skip: items not counted (ordered today, «اتطلب»)
+export function dayTotals(today: Saved[], skip: (id: string) => boolean = () => false): string {
   const ids = new Set<string>();
-  for (const r of today) for (const x of r.rows || []) if (x.match && (x.match.confidence === 'high' || x.match.confidence === 'confirmed')) ids.add(x.match.id);
+  for (const r of today) for (const x of r.rows || []) if (x.match && (x.match.confidence === 'high' || x.match.confidence === 'confirmed') && !skip(x.match.id)) ids.add(x.match.id);
   const review = today.reduce((n, r) => n + (r.review || 0), 0);
   return `النهارده لحد دلوقتي ${ids.size} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
 }
-export function daySay(company: string, today: Saved[]): string { return `${company}: ${dayTotals(today)}`; }
+export function daySay(company: string, today: Saved[], skip?: (id: string) => boolean): string { return `${company}: ${dayTotals(today, skip)}`; }
 // A photo/file that was read before: said with today's totals (when something came today).
 export function seenSay(company: string, what: string, today: Saved[] | null): string {
   return `${company}: ${what} قبل كده` + (today && today.length ? `، و${dayTotals(today)}` : '');
@@ -517,17 +518,17 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const scoreRows = async (rs: Row[]) => {
     let list: ReturnType<typeof matchRows> = [];
     // each shortage's Arabic name in the bot (said when 1 to 3 items came)
-    const arOf = new Map<string, string>();
+    const arOf = new Map<string, string>(), keyOf = new Map<string, string>();
     if (rs.length) {
       const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
       list = matchRows(rs, shortageCatalog(shortages, k.names, k.answers), k, shortages);
       const ar = new Map(k.names.map((n) => [n.name_key, n.arabic_name]));
-      for (const s of shortages) { const a = ar.get(nameKey(s.product_name)); if (a) arOf.set(s.id, a); }
+      for (const s of shortages) { const a = ar.get(nameKey(s.product_name)); if (a) arOf.set(s.id, a); keyOf.set(s.id, nameKey(s.product_name)); }
     }
     const sureIds = new Set(list.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
     const review = list.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
       r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
-    return { list, sureIds, review, arOf };
+    return { list, sureIds, review, arOf, keyOf };
   };
   try {
     if (kind === 'text') {
@@ -593,19 +594,24 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
     return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
   }
-  if (kind === 'text' && !sureIds.size && !review && out2.length <= QUIET_LINES) return out(200, { ok: true, id: saved?.id, supplier, sure: 0, review: 0, quiet: true, say: '' }, say);
-  if (kind === 'text' && !sureIds.size && !review && saved?.received_at) {
+  // items the owner ordered today («اتطلب», ar_orders) are not news: not said and not counted again
+  const ordered = sureIds.size ? new Set((await restAll<{ name_key: string }>(env, auth, fetchImpl, 'ar_orders?select=name_key&ordered_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => [])).map((o) => o.name_key)) : new Set<string>();
+  const wasOrdered = (id: string) => ordered.has(scored.keyOf.get(id) || '');
+  const news = new Set([...sureIds].filter((id) => !wasOrdered(id)));
+  if (kind === 'text' && !news.size && !review && out2.length <= QUIET_LINES) return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review: 0, quiet: true, say: '' }, say);
+  if (kind === 'text' && !news.size && !review && saved?.received_at) {
     const before = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=eq.text&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(TEXT_BURST_MS)).catch(() => []);
-    if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: 0, review: 0, quiet: true, say: '' }, say);
+    if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: sureIds.size, review: 0, quiet: true, say: '' }, say);
   }
-  if (sureIds.size >= 1 && sureIds.size <= SAY_NAMES) {
-    const said = [...sureIds].map((id) => { const r = out2.find((x) => x.match?.id === id); return spokenName(scored.arOf.get(id), r ? r.corrected || r.name : ''); });
+  if (news.size >= 1 && news.size <= SAY_NAMES) {
+    const said = [...news].map((id) => { const r = out2.find((x) => x.match?.id === id); return spokenName(scored.arOf.get(id), r ? r.corrected || r.name : ''); });
     return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: namesSay(supplier, said, review) }, say);
   }
-  let spoken = inboxSay(supplier, sureIds.size, review);
+  if (!news.size && sureIds.size) return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: `${supplier}: اللي وصل من النواقص اتطلب النهارده` + (review ? `، و${review} محتاجين تأكيدك` : '') }, say);
+  let spoken = inboxSay(supplier, news.size, review);
   // the message is saved; if today's rows cannot be read only the spoken total is skipped
   const rowsToday = await today(supplier);
-  if (rowsToday && rowsToday.length > 1) spoken = daySay(supplier, rowsToday);
+  if (rowsToday && rowsToday.length > 1) spoken = daySay(supplier, rowsToday, wasOrdered);
   return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: spoken }, say);
 }
 
