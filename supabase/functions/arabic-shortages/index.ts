@@ -246,6 +246,33 @@ export function sniffMime(b: Uint8Array): string {
   if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return 'application/pdf';
   return '';
 }
+function indexOfBytes(hay: Uint8Array, needle: Uint8Array, from = 0): number {
+  outer: for (let i = from; i <= hay.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer;
+    return i;
+  }
+  return -1;
+}
+// The file inside a multipart body: the part that is a known file (by its first bytes), else the largest part.
+export function filePart(body: Uint8Array, boundary: string): { bytes: Uint8Array; type: string; name: string } {
+  const none = { bytes: new Uint8Array(), type: '', name: '' };
+  if (!boundary) return none;
+  const enc = new TextEncoder(), sep = enc.encode('--' + boundary), gap = enc.encode('\r\n\r\n');
+  const parts: { bytes: Uint8Array; type: string; name: string }[] = [];
+  let at = indexOfBytes(body, sep);
+  while (at >= 0) {
+    const start = at + sep.length, next = indexOfBytes(body, sep, start);
+    if (next < 0 || body[start] === 0x2d) break; // "--" after the boundary: the end
+    const headEnd = indexOfBytes(body, gap, start);
+    if (headEnd > 0 && headEnd < next) {
+      const head = new TextDecoder().decode(body.subarray(start, headEnd));
+      let end = next; if (body[end - 2] === 0x0d && body[end - 1] === 0x0a) end -= 2;
+      parts.push({ bytes: body.subarray(headEnd + 4, end), type: (head.match(/content-type:\s*([^\r\n;]+)/i) || [])[1] || '', name: ((head.match(/filename="?([^"\r\n;]+)/i) || [])[1] || '').split(/[\\/]/).pop()!.slice(-120) });
+    }
+    at = next;
+  }
+  return parts.find((x) => sniffKind(x.bytes)) || parts.sort((a, b) => b.bytes.length - a.bytes.length)[0] || none;
+}
 export function sniffKind(b: Uint8Array): 'image' | 'pdf' | 'sheet' | '' {
   const m = sniffMime(b);
   if (m === 'application/pdf') return 'pdf';
@@ -317,10 +344,10 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
   // the file's first bytes decide what it is.
   let ct = req.headers.get('content-type') || '', name = fileName, bytes: Uint8Array;
-  if (/^multipart\/form-data/i.test(ct)) {
-    const file = [...(await req.formData()).values()].find((v): v is File => typeof v !== 'string');
-    bytes = file ? new Uint8Array(await file.arrayBuffer()) : new Uint8Array();
-    ct = file?.type || ''; name = name || (file?.name || '').slice(-120);
+  if (/^multipart\//i.test(ct)) {
+    // Tasker: multipart/related with the file as one part (sometimes after an empty text part)
+    const part = filePart(new Uint8Array(await req.arrayBuffer()), (ct.match(/boundary="?([^";]+)"?/i) || [])[1] || '');
+    bytes = part.bytes; ct = part.type; name = name || part.name;
   } else bytes = new Uint8Array(await req.arrayBuffer());
   const kind = sniffKind(bytes) || inboxKind(ct, name);
   if (!kind) { log('inbox-type', Date.now(), { ct: ct.slice(0, 60), name }); return out(415, { error: 'type', message: 'نوع الملف مش مدعوم' }, say); }
