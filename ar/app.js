@@ -1133,13 +1133,29 @@
             sure = g.items.reduce((a, x) => a + (x.sure || 0), 0),
             review = g.items.reduce((a, x) => a + (x.review || 0), 0),
             errors = g.items.filter((x) => x.status === 'error').length;
-          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div><button data-inbox-open="${gi}">افتح</button></div>`;
+          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div><button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
         })
         .join('') || '<p class="hint">مفيش وارد وصل لوحده لسه.</p>';
     $('inboxList')
       .querySelectorAll('[data-inbox-open]')
       .forEach((b) => (b.onclick = () => openInbox(groups[+b.dataset.inboxOpen])));
+    $('inboxList')
+      .querySelectorAll('[data-inbox-del]')
+      .forEach((b) => (b.onclick = () => deleteInbox(groups[+b.dataset.inboxDel])));
   }
+  // the owner removes incoming messages from the list (the phone's WhatsApp is not touched); asked first
+  async function deleteInbox(g) {
+    if (!confirm(`تمسح وارد ${g.supplier} (${g.items.length})؟`)) return;
+    const { error } = await client.from('ar_inbox').delete().in('id', g.items.map((x) => x.id));
+    if (error) return alert('ماتمسحش: ' + error.message);
+    await loadInbox();
+  }
+  $('inboxClear').onclick = async () => {
+    if (!inbox.length || !confirm('تمسح كل الوارد؟ الموردين وإجاباتك مش هيتمسحوا.')) return;
+    const { error } = await client.from('ar_inbox').delete().gte('received_at', '2000-01-01T00:00:00Z');
+    if (error) return alert('ماتمسحش: ' + error.message);
+    await loadInbox();
+  };
   async function openInbox(g) {
     newRun();
     results = [];
