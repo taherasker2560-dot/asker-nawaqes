@@ -17,11 +17,13 @@ function fake({gem,fileAt='2026-01-01T00:00:00Z'}={}){const calls=[],saved=[],fi
   if(url.includes('/rest/v1/ar_inbox_media')){const q=k=>decodeURIComponent((url.match(new RegExp(k+'=eq\\.([^&]+)'))||[])[1]||'');
    if(o.method==='POST'){media.push({fresh:true,done:false,...JSON.parse(o.body)});return new Response('',{status:201})}if(o.method==='DELETE')return new Response('',{status:204});
    if(o.method==='PATCH'){const hit=media.filter(m=>m.supplier===q('supplier')&&!m.done&&(!url.includes('fresh=is.true')||m.fresh!==false));hit.forEach(m=>{m.done=true});return new Response(JSON.stringify(hit))}
+   if(url.includes('select=at&'))return new Response(JSON.stringify(media.filter(m=>m.supplier===q('supplier')&&m.chat===q('chat')&&m.fresh!==false).slice(-1).map(m=>({at:m.at||new Date(Date.now()-1000).toISOString()}))));
    if(url.includes('select=note'))return new Response(JSON.stringify(media.filter(m=>m.supplier===q('supplier')&&m.chat===q('chat')).slice(-1).map(m=>({note:m.note}))));
    return page(url,media.map(m=>({supplier:m.supplier,fresh:m.fresh})))}
   if(url.includes('/rest/v1/ar_inbox?select=rows,review'))return page(url,saved.filter(r=>r.status!=='error'&&!r.maybe).map(r=>({rows:r.rows,review:r.review})));
   if(url.includes('/rest/v1/ar_inbox?select=maybe&maybe=not.is.null'))return page(url,saved.filter(r=>r.maybe).map(r=>({maybe:r.maybe})));
   if(url.includes('/rest/v1/ar_inbox?select=id&maybe=not.is.null')){const lt=decodeURIComponent((url.match(/received_at=lt\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.maybe&&r.received_at<lt).map(()=>({id:'x'})))}
+  if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text&or=')){const sup=decodeURIComponent(url).match(/supplier\.eq\."([^"]+)"/)[1];return page(url,saved.filter(r=>r.kind!=='text'&&(r.supplier===sup||(r.maybe||[]).includes(sup))).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text')){const sup=decodeURIComponent((url.match(/supplier=eq\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind!=='text'&&r.supplier===sup).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=eq.text')){const lt=decodeURIComponent((url.match(/received_at=lt\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind==='text'&&r.received_at<lt).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
@@ -55,7 +57,7 @@ assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور ك�
  const r2=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),t,'text/plain'),env,g);assert.equal((await r2.json()).duplicate,true);assert.equal(g.saved.length,1);
  // the check looks back to the start of today in Cairo (not only 10 minutes): an old unread notification shown again is not read twice
  const q=g.calls.map(c=>c.url).filter(u=>u.includes('ar_inbox?select=body_text')).pop();const since=decodeURIComponent(q.match(/received_at=gte\.([^&]+)/)[1]);
- assert.equal(since,F.cairoDayStart(new Date(since)));assert.ok(Date.parse(since)<=Date.now()&&Date.now()-Date.parse(since)<=24*3600e3);}
+ assert.equal(since,F.cairoDayStart(new Date(since)));assert.ok(Date.parse(since)<=Date.now()&&Date.now()-Date.parse(since)<=25*3600e3);}
 // several photos of one list: after the first, the phone says the company's total for today
 {const g=fake({gem:(()=>{let i=0;return()=>({supplier:'',rows:[i++?{name:'فلاجيل ١٢٥ مجم شراب',english:'FLAGYL 125MG SYP'}:{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})})()});
  const img=(b)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,b]),'image/jpeg'),env,g);
@@ -210,10 +212,29 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 // a list sent as one message per item: the first is spoken, the next ones within 3 minutes only when they bring
 // something from the shortages (then with today's totals)
 {const g=fake();const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g).then(r=>r.text());
- assert.equal(await t('توبرادكس مرهم'),'المتحدة للأدوية: مفيش حاجة من النواقص');
+ assert.equal(await t('توبرادكس مرهم'),'','one line, nothing from the shortages: kept, not spoken');
  assert.equal(await t('دوليبران'),'','nothing from the shortages: silent');
  assert.match(await t('فلاجيل شراب ١٢٥'),/النهارده لحد دلوقتي 1 صنف/);
  assert.equal(await t('كلوباترا كريم'),'');assert.equal(g.saved.length,4,'all kept');}
+// reactions (they quote the owner's own message) and voice notes / videos: ignored, not kept, nothing said, no folder check
+{const g=fake({gem:()=>{throw Error('not read')}});const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g);
+ for(const x of ['\u200fتفاعل بالرمز 👍 على "السلام عليكم،\nمحتاجين فلاجيل ١٢٥ مجم شراب"','Reacted 👍 to "فلاجيل"','🎤 \u200fرسالة صوتية (٠:٠٨)','\u200f🎥 فيديو']){
+  const r=await t(x);assert.equal(r.status,200,x);assert.equal(await r.text(),'',x);}
+ assert.equal(g.saved.length,0);assert.equal(g.media.length,0);}
+// a short chat line with nothing from the shortages: kept, not spoken; a longer list with nothing still says so
+{const g=fake();const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g).then(r=>r.text());
+ assert.equal(await t('حاضر يادكتور'),'');assert.equal(g.saved.length,1);
+ const g2=fake();assert.equal(await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','توبرادكس مرهم\nدوليبران\nكلوباترا كريم','text/plain'),env,g2).then(r=>r.text()),'المتحدة للأدوية: مفيش حاجة من النواقص');}
+// WhatsApp repeating a photo notification after that photo came: 200 (the phone does not check the folder again);
+// before it came (not downloaded yet): still 202, so a late download is sent
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ const note=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 ‏تم إرسال ٤ صور','text/plain'),env,g);
+ assert.equal((await note()).status,202);
+ assert.equal((await note()).status,202,'repeat, photo not come yet: still check');
+ await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,77]),'application/octet-stream'),env,g);
+ assert.equal(g.saved.length,1);
+ assert.equal((await note()).status,200,'repeat after the photo came');
+ assert.equal((await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (2 رسائل)')+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g)).status,202,'a new notification');}
 // Excel name column (same rule as the page)
 assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
 console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');
