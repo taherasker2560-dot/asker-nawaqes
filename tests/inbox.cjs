@@ -7,7 +7,7 @@ const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'h
 const KEY='a'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];
 const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠ مجم ٣٠ قرص',status:'approved'}];
-function fake({gem}={}){const calls=[],saved=[],files=[],media=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
+function fake({gem,fileAt='2026-01-01T00:00:00Z'}={}){const calls=[],saved=[],files=[],media=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
  const f=async(url,o={})=>{calls.push({url,o});
   if(url.includes('/rest/v1/ar_inbox_keys'))return page(url,url.includes('key_hash=eq.'+HASH)?[{key_hash:HASH}]:[]);
   if(url.includes('/rest/v1/ar_suppliers'))return page(url,[{name:'المتحدة للأدوية',phone:'201001234567'}]);
@@ -27,6 +27,7 @@ function fake({gem}={}){const calls=[],saved=[],files=[],media=[];const page=(u,
   if(url.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox?id=eq.')&&o.method==='PATCH'){const id=decodeURIComponent(url.match(/id=eq\.([^&]+)/)[1]);const r=saved.find(x=>x.id===id&&x.status==='error');if(r)Object.assign(r,JSON.parse(o.body));return new Response('',{status:204})}
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);row.received_at=new Date(Date.now()+saved.length).toISOString();row.id='in'+(saved.length+1);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length,received_at:row.received_at}]),{status:201})}
+  if(url.includes('/rest/v1/rpc/ar_inbox_file_at'))return new Response(JSON.stringify(fileAt));
   if(url.includes('/storage/v1/object/ar-inbox/')){files.push({url,headers:o.headers});return new Response('{}')}
   if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(gem())}]}}]}));
   throw Error('unexpected '+url)};Object.assign(f,{calls,saved,files,media});return f}
@@ -146,6 +147,11 @@ assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف �
  const h=async(u,o={})=>u.includes('/storage/v1/object/ar-inbox/')?new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400}):g(u,o);
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,4]),'application/octet-stream'),env,h);
  assert.equal(r.status,200);assert.match(await r.text(),/وصل 1 صنف/);assert.equal(g.saved.length,1);assert.match(g.saved[0].file_path,/\.jpg$/);}
+// stored minutes ago with no row: the owner deleted it from the page; the phone re-sends it: not read again, silent
+{const g=fake({gem:()=>{throw Error('read again')},fileAt:new Date(Date.now()-60e3).toISOString()});
+ const h=async(u,o={})=>u.includes('/storage/v1/object/ar-inbox/')?new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400}):g(u,o);
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,50]),'application/octet-stream'),env,h);
+ assert.equal(r.status,200);assert.equal(await r.text(),'');assert.equal(g.saved.length,0);assert.ok(!g.calls.some(c=>c.url.startsWith('https://generativelanguage')));}
 // photos from two companies at the same time: the phone cannot tell whose photo is whose (one folder), so each
 // photo keeps both names (maybe) until the owner picks one; said once; not counted in a company's totals meanwhile
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
