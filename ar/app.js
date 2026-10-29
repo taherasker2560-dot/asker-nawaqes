@@ -1146,12 +1146,14 @@
     const { error } = await client.from('ar_orders').insert(rows);
     if (error) throw Error(error.message);
     await loadOrders();
+    drawToday();
     return rows.length;
   }
   async function unmarkOrdered(id) {
     const { error } = await client.from('ar_orders').delete().eq('name_key', nk(sName(id))).gte('ordered_at', dayStart());
     if (error) throw Error(error.message);
     await loadOrders();
+    drawToday();
   }
   let inbox = [];
   const localDay = (t) => new Date(t - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -1222,6 +1224,84 @@
       .querySelectorAll('[data-assign]')
       .forEach((b) => (b.onclick = () => assignInbox(b.dataset.assign, b.dataset.to)));
     showPhotos();
+    drawToday();
+  }
+  // ---------- «متاح النهارده»: each shortage that came today in the automatic inbox, and from which companies ----------
+  // Photos still waiting for their company and messages that were not read are left out. Items ordered today go last.
+  function todayItems() {
+    const today = localDay(Date.now()),
+      by = new Map();
+    for (const x of inbox) {
+      if (localDay(Date.parse(x.received_at)) !== today || (x.maybe && x.maybe.length > 1) || x.status === 'error') continue;
+      const co = x.supplier || x.sender;
+      for (const r of x.rows || []) {
+        if (!isSure(r) || !sName(r.match.id)) continue;
+        const it = by.get(r.match.id) || { id: r.match.id, cos: [] };
+        if (!it.cos.includes(co)) it.cos.push(co);
+        by.set(r.match.id, it);
+      }
+    }
+    return [...by.values()];
+  }
+  function drawToday() {
+    const items = todayItems().map((x) => ({ ...x, from: orderedFrom(x.id), label: aName(x.id) || sName(x.id) }));
+    items.sort(
+      (a, b) =>
+        (a.from.length ? 1 : 0) - (b.from.length ? 1 : 0) ||
+        b.cos.length - a.cos.length ||
+        a.label.localeCompare(b.label, 'ar'),
+    );
+    const done = items.filter((x) => x.from.length).length;
+    $('todaySum').textContent = `متاح النهارده: ${items.length} صنف` + (done ? ` · اتطلب ${done}` : '');
+    $('todayList').innerHTML =
+      items
+        .map(
+          (x) =>
+            `<div class="item${x.from.length ? ' ordered' : ''}"><strong dir="auto">${esc(x.label)}</strong>${x.label !== sName(x.id) ? `<div class="en hint">${esc(sName(x.id))}</div>` : ''}<div class="chips"><span class="hint">عند:</span> ${x.cos.map((c) => `<button class="secondary small" data-today-co="${esc(c)}">${esc(c)}</button>`).join('')}</div><div>${x.from.length ? `<span class="pill good">اتطلب${esc(who(x.from))}</span> <button class="secondary small" data-today-unorder="${esc(x.id)}">لغي «اتطلب»</button>` : `<button class="secondary small" data-today-order="${esc(x.id)}">علّم «اتطلب»</button>`}</div></div>`,
+        )
+        .join('') || '<p class="hint">لسه ماوصلش حاجة من النواقص النهارده.</p>';
+    const box = $('todayList');
+    // a company's name opens what it sent today, with its message
+    box.querySelectorAll('[data-today-co]').forEach(
+      (b) =>
+        (b.onclick = () => {
+          const g = inboxGroups().find(
+            (g) => !g.maybe && g.supplier === b.dataset.todayCo && g.day === localDay(Date.now()),
+          );
+          if (g) openInbox(g);
+        }),
+    );
+    // marked by hand: from the company when only one has it, else without a company
+    box.querySelectorAll('[data-today-order]').forEach(
+      (b) =>
+        (b.onclick = async () => {
+          const x = items.find((i) => i.id === b.dataset.todayOrder);
+          b.disabled = true;
+          try {
+            await markOrdered([x.id], x.cos.length === 1 ? x.cos[0] : '');
+          } catch (e) {
+            b.disabled = false;
+            return alert('ماتعلّمش: ' + e.message);
+          }
+          if (results.length) drawResults();
+        }),
+    );
+    box.querySelectorAll('[data-today-unorder]').forEach(
+      (b) =>
+        (b.onclick = async () => {
+          b.disabled = true;
+          try {
+            await unmarkOrdered(b.dataset.todayUnorder);
+          } catch (e) {
+            b.disabled = false;
+            return alert('مااتلغاش: ' + e.message);
+          }
+          if (results.length) {
+            msgEdited = false;
+            drawResults();
+          }
+        }),
+    );
   }
   // the photos waiting for their company are shown (private bucket: short signed links, owner only)
   async function showPhotos() {

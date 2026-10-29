@@ -447,3 +447,16 @@ button.small {
 .unsure-photo button.small {
   margin: 4px 0 0;
 }
+/* «متاح النهارده»: company buttons under each item; ordered items are faded */
+.today > summary {
+  padding: 0;
+}
+.today .chips button.small {
+  margin: 6px 0 0 6px;
+}
+.today .item.ordered strong {
+  color: var(--muted);
+}
+.today .item > div:last-child .pill {
+  margin-top: 6px;
+}

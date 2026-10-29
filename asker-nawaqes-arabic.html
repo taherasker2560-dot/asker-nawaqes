@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=orders-20261030a" />
+    <link rel="stylesheet" href="ar/app.css?v=today-20261030a" />
   </head>
   <body>
     <header class="appbar">
@@ -99,6 +99,13 @@
 
         <section id="readPanel" class="card hidden">
           <h2>قراءة وارد الشركة</h2>
+          <details id="todayBox" class="inbox today">
+            <summary id="todaySum">متاح النهارده</summary>
+            <p class="hint">
+              كل صنف من النواقص وصل النهارده في الوارد التلقائي، وعند أنهي شركة. دوس على اسم الشركة يفتح واردها ورسالتها.
+            </p>
+            <div id="todayList"></div>
+          </details>
           <div id="inboxBox" class="inbox">
             <div class="inbox-head">
               <h3>وارد تلقائي</h3>
@@ -199,6 +206,6 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="ar/app.js?v=orders-20261030a"></script>
+    <script src="ar/app.js?v=today-20261030a"></script>
   </body>
 </html>
