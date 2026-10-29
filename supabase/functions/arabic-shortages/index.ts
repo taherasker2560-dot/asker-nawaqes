@@ -217,6 +217,8 @@ const DUP_SILENT_MS = 10 * 60 * 1000;
 // several notifications can run at once: if this company's photo/file was read this recently, another run is
 // already saying the totals, so «seen» stays silent
 const SEEN_QUIET_MS = 2 * 60 * 1000;
+// a second run that finds the same file already stored waits for the first run's row (checks every 2 s, 6 times)
+const CLAIM_POLLS = 6;
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
@@ -396,6 +398,26 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   }
   const t0 = Date.now();
   let rows: Row[] = [], text: string | null = null, supplier = company.name, error: string | null = null, filePath: string | null = null;
+  // a photo/file is stored first (private bucket: the owner can look at it from the page). Its name is its content
+  // hash, so storing it also claims the reading: a second run sending the same file at the same moment (several
+  // notifications run together) finds it there and waits for the first run's row instead of reading it again.
+  if (kind !== 'text') {
+    const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? (name.match(SHEET)?.[1] || (bytes[0] === 0xd0 ? 'xls' : 'xlsx')).toLowerCase() : 'jpg';
+    filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
+    const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
+    const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': type }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!up.ok) {
+      if (/duplicate|exists/i.test(await up.text().catch(() => ''))) {
+        const wait = Number(env.INBOX_CLAIM_WAIT_MS) || 2000;
+        for (let i = 0; i < CLAIM_POLLS; i++) {
+          await new Promise((r) => setTimeout(r, wait));
+          const done = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id,received_at&file_path=like.*' + hash + '*').catch(() => []);
+          if (done.length) return out(200, { ok: false, duplicate: true, say: '' }, say);
+        }
+        // still no row: an old copy (the owner cleared the list, or a save failed), so it is read now
+      } else filePath = null;
+    }
+  }
   try {
     if (kind === 'text') {
       text = new TextDecoder().decode(bytes).slice(0, 20000);
@@ -414,15 +436,6 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       rows = read.rows;
     }
   } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
-  // keep the original file (private bucket) so the owner can look at it from the page
-  if (kind !== 'text') {
-    const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? (name.match(SHEET)?.[1] || (bytes[0] === 0xd0 ? 'xls' : 'xlsx')).toLowerCase() : 'jpg';
-    filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
-    const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
-    const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': type }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-    // the same file sent at the same moment by another run is already there: same content (the name is its hash)
-    if (!up.ok && !/duplicate|exists/i.test(await up.text().catch(() => ''))) filePath = null;
-  }
   let out2: ReturnType<typeof matchRows> = [];
   if (!error && rows.length) {
     const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
