@@ -234,8 +234,15 @@ const RETRY_WAITS_MS = [15000, 30000];
 // some suppliers send a list as one message per item: after the first text, the next ones from the same company within
 // this time are spoken only when they bring something from the shortages (then with today's totals)
 const TEXT_BURST_MS = 3 * 60 * 1000;
-// WhatsApp's notification text for a photo, file, video or voice note (no list in it)
-const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
+// WhatsApp's notification text for a photo or file (no list in it): the phone then checks its folder
+const MEDIA_NOTE = /^[\s\u200e\u200f]*(\u{1F4F7}|\u{1F4C4}|\u{1F5BC}|\u{1F4CE})/u;
+// a voice note, music or video: no list, nothing saved in the photo folder; ignored (not kept, nothing said)
+const AV_NOTE = /^[\s\u200e\u200f]*(\u{1F3A4}|\u{1F3B5}|\u{1F3A5}|\u{1F4F9})/u;
+// a reaction («تفاعل بالرمز 👍 على "…"»): its text quotes the message reacted to (often the owner's own request, with
+// shortage names), so it is ignored, never read as a list
+const REACTION = /^[\s\u200e\u200f]*(تفاعل(ت)?\s+بالرمز|reacted\s)/iu;
+// a short chat line («حاضر يادكتور», «يلا») with nothing from the shortages is kept but not spoken
+const QUIET_LINES = 2;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
 export function sheetNames(m: unknown[][]): string[] {
@@ -317,10 +324,15 @@ export function inboxSay(company: string, sure: number, review: number): string 
   return `${company}: وصل ${sure} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
 }
 // Start of today in Cairo (the pharmacy's day), as an ISO time.
+// Midnight of Cairo's date, found from the clock in Cairo (right also on the day the clock moves for summer time).
 export function cairoDayStart(now = new Date()): string {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    .formatToParts(now).map((x) => [x.type, Number(x.value)]));
-  return new Date(now.getTime() - (((p.hour % 24) * 60 + p.minute) * 60 + p.second) * 1000 - now.getMilliseconds()).toISOString();
+  const wall = (t: number) => Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(new Date(t)).filter((x) => x.type !== 'literal').map((x) => [x.type, Number(x.value)]));
+  const asUtc = (p: Record<string, number>) => Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second);
+  const d = wall(now.getTime()), midnight = Date.UTC(d.year, d.month - 1, d.day);
+  let t = midnight - 2 * 3600e3;
+  for (let i = 0; i < 3; i++) t += midnight - asUtc(wall(t));
+  return new Date(t).toISOString();
 }
 // A list of 10+ pages comes as many photos: after the first one, the phone says the company's total for today.
 type Saved = { rows: { match?: { id: string; confidence: string } | null }[] | null; review: number | null };
@@ -416,7 +428,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // the notification of a photo/file («📷 صورة», «📄 list.pdf»): the file itself comes in its own request
   // 202 (not 200) tells the phone «this chat is a saved company: send its photos/files now»; other chats get 200,
   // so the phone never sends photos from chats that are not suppliers.
-  if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) {
+  const head = kind === 'text' ? new TextDecoder().decode(bytes.subarray(0, 64)) : '';
+  if (kind === 'text' && (AV_NOTE.test(head) || REACTION.test(head))) return out(200, { ok: false, ignored: true, say: '' }, say);
+  if (kind === 'text' && MEDIA_NOTE.test(head)) {
     // remembered for MEDIA_WINDOW_MS (older notes are cleared now and then): see `maybe` below. The same title and text
     // as this chat's last note is WhatsApp showing it again (REPEAT_MS); the phone still checks the folder.
     const raw = String(url.searchParams.get('from') || ''), note = (raw + ' ' + new TextDecoder().decode(bytes.subarray(0, 600))).replace(/\s+/g, ' ').trim().slice(0, 300);
@@ -426,6 +440,15 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     const fresh = !Array.isArray(last) || last[0]?.note !== note;
     await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: company.name, chat: from, note, fresh }), headers: w, signal }).catch(() => null);
     await fetchImpl(`${base}/rest/v1/ar_inbox_media?at=lt.${since(864e5)}`, { method: 'DELETE', headers: w, signal }).catch(() => null);
+    // WhatsApp showing it again after this company's photo/file already came: the phone need not check the folder
+    // (200). Not come yet (not downloaded when it was announced): 202, so a late download is still sent.
+    if (!fresh) {
+      const first = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=at&supplier=eq.${encodeURIComponent(company.name)}&chat=eq.${encodeURIComponent(from)}&fresh=is.true&at=gte.${since(REPEAT_MS)}&order=at.desc&limit=1`, { headers: sh, signal })
+        .then((r) => r.ok ? r.json() : []).catch(() => []) as { at: string }[];
+      const at = Array.isArray(first) && first[0]?.at;
+      const got = at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&or=' + encodeURIComponent(`(supplier.eq."${company.name}",maybe.cs.{"${company.name}"})`) + '&received_at=gte.' + encodeURIComponent(at)).catch(() => []) : [];
+      if (got.length) return out(200, { ok: false, media: true, fresh, came: true, say: '' }, say);
+    }
     return out(202, { ok: false, media: true, fresh, say: '' }, say);
   }
   // the phone may send the same photo/file again (it sends the newest ones each time): kept once, by its hash
@@ -555,6 +578,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
     return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
   }
+  if (kind === 'text' && !sureIds.size && !review && out2.length <= QUIET_LINES) return out(200, { ok: true, id: saved?.id, supplier, sure: 0, review: 0, quiet: true, say: '' }, say);
   if (kind === 'text' && !sureIds.size && !review && saved?.received_at) {
     const before = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=eq.text&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(TEXT_BURST_MS)).catch(() => []);
     if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: 0, review: 0, quiet: true, say: '' }, say);
