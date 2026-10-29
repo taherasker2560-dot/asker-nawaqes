@@ -88,6 +88,17 @@ for(const [ago,expect] of [[60e3,''],[3*3600e3,'المتحدة للأدوية: �
  const h=async(u,o)=>u.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.')?new Response(JSON.stringify(u.includes('offset=0')?[{id:'x',received_at:new Date(Date.now()-ago).toISOString()}]:[])):g(u,o);
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,7]),'application/octet-stream'),env,h);
  assert.equal(r.status,200);assert.equal(await r.text(),expect);assert.equal(g.saved.length,0);}
+// seen=1: a photo notification with no new photo on the phone (WhatsApp does not save a photo it already has):
+// told, with today's totals when something came today; nothing read or stored; other chats still ignored
+{const g=fake({gem:()=>{throw Error('not read')}});
+ let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);
+ assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده');assert.equal(g.saved.length,0);
+ g.saved.push({kind:'image',status:'new',rows:[{match:{id:'s1',confidence:'high'}}],review:2});
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','📷 صورة','text/plain'),env,g);
+ assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده، والنهارده لحد دلوقتي 1 صنف من النواقص و2 محتاجين تأكيدك');assert.equal(g.saved.length,1);
+ r=await F.handle(post('from='+encodeURIComponent('زبون')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');
+ assert.ok(!g.calls.some(c=>c.url.startsWith('https://generativelanguage')));}
+assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف ده اتقرا قبل كده');
 // a PDF or Excel file by its (long) path name
 assert.equal(F.inboxKind('application/octet-stream','x'.repeat(200)+'.pdf'.slice(-120)),'pdf');
 // PDF and unknown type
