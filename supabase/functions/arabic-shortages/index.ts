@@ -303,11 +303,16 @@ export function cairoDayStart(now = new Date()): string {
 }
 // A list of 10+ pages comes as many photos: after the first one, the phone says the company's total for today.
 type Saved = { rows: { match?: { id: string; confidence: string } | null }[] | null; review: number | null };
-export function daySay(company: string, today: Saved[]): string {
+export function dayTotals(today: Saved[]): string {
   const ids = new Set<string>();
   for (const r of today) for (const x of r.rows || []) if (x.match && (x.match.confidence === 'high' || x.match.confidence === 'confirmed')) ids.add(x.match.id);
   const review = today.reduce((n, r) => n + (r.review || 0), 0);
-  return `${company}: النهارده لحد دلوقتي ${ids.size} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
+  return `النهارده لحد دلوقتي ${ids.size} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
+}
+export function daySay(company: string, today: Saved[]): string { return `${company}: ${dayTotals(today)}`; }
+// A photo/file that was read before: said with today's totals (when something came today).
+export function seenSay(company: string, what: string, today: Saved[] | null): string {
+  return `${company}: ${what} قبل كده` + (today && today.length ? `، و${dayTotals(today)}` : '');
 }
 // WhatsApp adds a count to the title when several messages wait: "الفتح shreif (2 رسائل)" / "(3 messages)"
 export function inboxSender(s: string): string {
@@ -343,6 +348,10 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const company = suppliers.find((x) => sameCompany(x.name, from));
   // not one of the saved companies: ignored before anything is read or stored
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
+  const today = () => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
+  // seen=1: the phone got a photo notification but found no new photo (WhatsApp keeps one copy of a photo it
+  // already has, so a photo sent again is not saved again): nothing is read or stored, only told.
+  if (url.searchParams.get('seen') === '1') return out(200, { ok: true, seen: true, say: seenSay(company.name, 'الصورة دي وصلت', await today()) }, say);
   // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
   // the file's first bytes decide what it is.
   let ct = req.headers.get('content-type') || '', name = fileName, bytes: Uint8Array;
@@ -368,7 +377,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       // an old photo sent again is told so the owner knows it was not lost
       const old = dup.every((d) => !d.received_at || Date.parse(d.received_at) < Date.now() - DUP_SILENT_MS);
       const what = kind === 'image' ? 'الصورة دي اتقرت' : 'الملف ده اتقرا';
-      return out(200, { ok: false, duplicate: true, say: old ? `${company.name}: ${what} قبل كده` : '' }, say);
+      return out(200, { ok: false, duplicate: true, say: old ? seenSay(company.name, what, await today()) : '' }, say);
     }
   }
   // the same notification can fire again (twice at once, or WhatsApp shows unread chats again later):
@@ -421,10 +430,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error });
   if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
   let spoken = inboxSay(supplier, sureIds.size, review);
-  try {
-    const today = await restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=gte.' + encodeURIComponent(cairoDayStart()));
-    if (today.length > 1) spoken = daySay(supplier, today);
-  } catch { /* the message is saved; only the spoken total is skipped */ }
+  // the message is saved; if today's rows cannot be read only the spoken total is skipped
+  const rowsToday = await today();
+  if (rowsToday && rowsToday.length > 1) spoken = daySay(supplier, rowsToday);
   return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: spoken }, say);
 }
 
