@@ -1116,10 +1116,13 @@
         .from('ar_inbox')
         .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review,maybe')
         .gte('received_at', since)
+        .is('hidden_at', null)
         .order('received_at', { ascending: false })
         .limit(200);
       if (error) throw Error(error.message);
       inbox = data || [];
+      // messages hidden more than 2 days ago are not needed to recognise WhatsApp's repeats anymore
+      client.from('ar_inbox').delete().lt('hidden_at', new Date(Date.now() - 2 * 864e5).toISOString()).then(() => {}, () => {});
     } catch (e) {
       inbox = [];
     }
@@ -1179,16 +1182,17 @@
     if (error) return alert('ماتحفظش: ' + error.message);
     await loadInbox();
   }
-  // the owner removes incoming messages from the list (the phone's WhatsApp is not touched); asked first
+  // the owner removes incoming messages from the list (the phone's WhatsApp is not touched); asked first. They are
+  // hidden, not deleted, so the same message shown again by WhatsApp is still known and not read again
   async function deleteInbox(g) {
     if (!confirm(`تمسح وارد ${g.supplier} (${g.items.length})؟`)) return;
-    const { error } = await client.from('ar_inbox').delete().in('id', g.items.map((x) => x.id));
+    const { error } = await client.from('ar_inbox').update({ hidden_at: new Date().toISOString() }).in('id', g.items.map((x) => x.id));
     if (error) return alert('ماتمسحش: ' + error.message);
     await loadInbox();
   }
   $('inboxClear').onclick = async () => {
     if (!inbox.length || !confirm('تمسح كل الوارد؟ الموردين وإجاباتك مش هيتمسحوا.')) return;
-    const { error } = await client.from('ar_inbox').delete().gte('received_at', '2000-01-01T00:00:00Z');
+    const { error } = await client.from('ar_inbox').update({ hidden_at: new Date().toISOString() }).is('hidden_at', null);
     if (error) return alert('ماتمسحش: ' + error.message);
     await loadInbox();
   };

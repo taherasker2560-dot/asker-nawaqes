@@ -368,7 +368,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
   const since = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
   // today's totals count only this company's sure rows (a photo still waiting for the owner to pick its company is not)
-  const today = (name = company.name) => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&maybe=is.null&supplier=eq.' + encodeURIComponent(name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
+  const today = (name = company.name) => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&maybe=is.null&hidden_at=is.null&supplier=eq.' + encodeURIComponent(name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
   // marks a company's recent photo notifications as handled (its photo was read, or «seen» was said); freshOnly: only
   // new ones, not WhatsApp's repeats. The count tells whether this run marked any (two runs at once: one wins).
   const handled = async (name: string, freshOnly: boolean): Promise<number> => {
