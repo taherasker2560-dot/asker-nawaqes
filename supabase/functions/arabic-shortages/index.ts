@@ -238,6 +238,21 @@ function b64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
+// What a file is, from its first bytes (JPEG, PNG, WebP, PDF, xlsx = zip, old xls); '' when unknown.
+export function sniffMime(b: Uint8Array): string {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45) return 'image/webp';
+  if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return 'application/pdf';
+  return '';
+}
+export function sniffKind(b: Uint8Array): 'image' | 'pdf' | 'sheet' | '' {
+  const m = sniffMime(b);
+  if (m === 'application/pdf') return 'pdf';
+  if (m) return 'image';
+  if ((b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04) || (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0)) return 'sheet';
+  return '';
+}
 export function inboxKind(contentType: string, fileName: string): 'text' | 'image' | 'pdf' | 'sheet' | '' {
   const t = contentType.toLowerCase();
   if (SHEET.test(fileName) || /spreadsheet|excel|csv/.test(t)) return 'sheet';
@@ -299,9 +314,16 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const company = suppliers.find((x) => sameCompany(x.name, from));
   // not one of the saved companies: ignored before anything is read or stored
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
-  const kind = inboxKind(req.headers.get('content-type') || '', fileName);
-  if (!kind) return out(415, { error: 'type', message: 'نوع الملف مش مدعوم' }, say);
-  const bytes = new Uint8Array(await req.arrayBuffer());
+  // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
+  // the file's first bytes decide what it is.
+  let ct = req.headers.get('content-type') || '', name = fileName, bytes: Uint8Array;
+  if (/^multipart\/form-data/i.test(ct)) {
+    const file = [...(await req.formData()).values()].find((v): v is File => typeof v !== 'string');
+    bytes = file ? new Uint8Array(await file.arrayBuffer()) : new Uint8Array();
+    ct = file?.type || ''; name = name || (file?.name || '').slice(-120);
+  } else bytes = new Uint8Array(await req.arrayBuffer());
+  const kind = sniffKind(bytes) || inboxKind(ct, name);
+  if (!kind) { log('inbox-type', Date.now(), { ct: ct.slice(0, 60), name }); return out(415, { error: 'type', message: 'نوع الملف مش مدعوم' }, say); }
   if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
   if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
   // the notification of a photo/file («📷 صورة», «📄 list.pdf»): the file itself comes in its own request
@@ -331,8 +353,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       for (const n of wb.SheetNames) m.push(...XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false, blankrows: false }) as unknown[][]);
       rows = sheetNames(m).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
     } else {
-      const ct = (req.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-      const mime = kind === 'pdf' ? 'application/pdf' : /\.png$/i.test(fileName) ? 'image/png' : /\.webp$/i.test(fileName) ? 'image/webp' : ct.startsWith('image/') ? ct : 'image/jpeg';
+      const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
+      const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
       const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
       if (!read) throw new Error('رد Gemini مش مفهوم');
       rows = read.rows;
@@ -340,7 +362,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
   // keep the original file (private bucket) so the owner can look at it from the page
   if (kind !== 'text') {
-    const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? (fileName.match(SHEET)?.[1] || 'xlsx').toLowerCase() : 'jpg';
+    const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? (name.match(SHEET)?.[1] || (bytes[0] === 0xd0 ? 'xls' : 'xlsx')).toLowerCase() : 'jpg';
     filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
     const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
     const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': type }, signal: AbortSignal.timeout(TIMEOUT_MS) });

@@ -48,6 +48,15 @@ assert.equal(F.sameCompany('Shreif الفتح','وارد مخزن النور ك�
  assert.equal(await (await img(1)).text(),'المتحدة للأدوية: وصل 1 صنف من النواقص');
  assert.equal(await (await img(2)).text(),'المتحدة للأدوية: النهارده لحد دلوقتي 2 صنف من النواقص');}
 assert.match(F.cairoDayStart(new Date('2026-10-29T10:00:00Z')),/^2026-10-2[89]T2[12]:00:00\.000Z$/);
+// Tasker sends the file with its own Content-Type and no name: the first bytes decide
+assert.equal(F.sniffKind(new Uint8Array([0xff,0xd8,0xff,0xe0])),'image');assert.equal(F.sniffKind(new TextEncoder().encode('%PDF-1.4')),'pdf');
+assert.equal(F.sniffKind(new Uint8Array([0x50,0x4b,3,4])),'sheet');assert.equal(F.sniffKind(new TextEncoder().encode('فلاجيل')),'');
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),new Uint8Array([0xff,0xd8,0xff,7]),'application/octet-stream'),env,g);assert.equal((await r.json()).ok,true);assert.equal(g.saved[0].kind,'image');
+ const fd=new FormData();fd.append('file',new Blob([new Uint8Array([0xff,0xd8,0xff,8])],{type:'application/octet-stream'}),'IMG-1.jpg');
+ r=await F.handle(new Request('https://p.supabase.co/functions/v1/arabic-shortages?from='+encodeURIComponent('المتحدة للأدوية'),{method:'POST',headers:{'x-inbox-key':KEY},body:fd}),env,g);
+ assert.equal((await r.json()).ok,true);assert.equal(g.saved[1].kind,'image');
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),new Uint8Array([1,2,3]),'application/zip'),env,g);assert.equal(r.status,415);}
 // new-style secret key (sb_secret_…) is not a JWT: sent only as apikey
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية'),'فلاجيل شراب ١٢٥','text/plain'),{...env,SUPABASE_SERVICE_ROLE_KEY:'sb_secret_x'},f);assert.equal(r.status,200);
 assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.apikey==='sb_secret_x'&&!c.o.headers.Authorization));
