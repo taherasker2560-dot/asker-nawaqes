@@ -1101,8 +1101,10 @@
     const g = new Map();
     for (const x of inbox) {
       const day = localDay(Date.parse(x.received_at)),
-        k = (x.supplier || x.sender) + '|' + day;
-      if (!g.has(k)) g.set(k, { supplier: x.supplier || x.sender, day, items: [] });
+        maybe = x.maybe && x.maybe.length > 1 ? x.maybe : null,
+        k = (maybe ? '?' + maybe.join('|') : x.supplier || x.sender) + '|' + day;
+      // photos that came while two companies sent photos: grouped apart until the owner picks each one's company
+      if (!g.has(k)) g.set(k, { supplier: maybe ? 'صور مش معروف صاحبها' : x.supplier || x.sender, maybe, day, items: [] });
       g.get(k).items.push(x);
     }
     return [...g.values()];
@@ -1112,7 +1114,7 @@
       const since = new Date(Date.now() - 3 * 864e5).toISOString();
       const { data, error } = await client
         .from('ar_inbox')
-        .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review')
+        .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review,maybe')
         .gte('received_at', since)
         .order('received_at', { ascending: false })
         .limit(200);
@@ -1133,6 +1135,13 @@
             sure = g.items.reduce((a, x) => a + (x.sure || 0), 0),
             review = g.items.reduce((a, x) => a + (x.review || 0), 0),
             errors = g.items.filter((x) => x.status === 'error').length;
+          if (g.maybe)
+            return `<div class="item inbox-item fresh unsure"><div><strong>⚠️ صور من ${esc(g.maybe.join(' أو '))}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span></div><div class="hint">وصلوا في نفس الوقت، فمش معروف كل صورة من مين. اختار صاحب كل صورة:</div>${g.items
+              .map(
+                (x) =>
+                  `<div class="unsure-photo"><a data-photo="${esc(x.file_path || '')}" target="_blank" rel="noopener"><img data-photo="${esc(x.file_path || '')}" alt="الصورة" /></a><div class="hint">وصل ${x.sure || 0}${x.review ? ` · محتاج تأكيدك ${x.review}` : ''}${x.status === 'error' ? ' · ماتقراش' : ''}</div><div>${g.maybe.map((n) => `<button class="secondary small" data-assign="${esc(x.id)}" data-to="${esc(n)}">${esc(n)}</button>`).join(' ')}</div></div>`,
+              )
+              .join('')}<button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
           return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div><button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
         })
         .join('') || '<p class="hint">مفيش وارد وصل لوحده لسه.</p>';
@@ -1142,6 +1151,33 @@
     $('inboxList')
       .querySelectorAll('[data-inbox-del]')
       .forEach((b) => (b.onclick = () => deleteInbox(groups[+b.dataset.inboxDel])));
+    $('inboxList')
+      .querySelectorAll('[data-assign]')
+      .forEach((b) => (b.onclick = () => assignInbox(b.dataset.assign, b.dataset.to)));
+    showPhotos();
+  }
+  // the photos waiting for their company are shown (private bucket: short signed links, owner only)
+  async function showPhotos() {
+    const els = [...$('inboxList').querySelectorAll('[data-photo]')].filter((e) => e.dataset.photo);
+    if (!els.length) return;
+    try {
+      const paths = [...new Set(els.map((e) => e.dataset.photo))];
+      const { data, error } = await client.storage.from('ar-inbox').createSignedUrls(paths, 3600);
+      if (error) throw Error(error.message);
+      const url = new Map((data || []).map((d) => [d.path, d.signedUrl]));
+      for (const e of els) {
+        const u = url.get(e.dataset.photo);
+        if (u) e.tagName === 'IMG' ? (e.src = u) : (e.href = u);
+      }
+    } catch (e) {
+      for (const e2 of els) if (e2.tagName === 'IMG') e2.alt = 'الصورة مش ظاهرة';
+    }
+  }
+  // the owner picks the company of a photo that came while two companies sent photos
+  async function assignInbox(id, supplier) {
+    const { error } = await client.from('ar_inbox').update({ supplier, maybe: null }).eq('id', id);
+    if (error) return alert('ماتحفظش: ' + error.message);
+    await loadInbox();
   }
   // the owner removes incoming messages from the list (the phone's WhatsApp is not touched); asked first
   async function deleteInbox(g) {
