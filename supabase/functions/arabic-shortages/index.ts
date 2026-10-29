@@ -243,6 +243,8 @@ const AV_NOTE = /^[\s\u200e\u200f]*(\u{1F3A4}|\u{1F3B5}|\u{1F3A5}|\u{1F4F9})/u;
 const REACTION = /^[\s\u200e\u200f]*(تفاعل(ت)?\s+بالرمز|reacted\s)/iu;
 // a short chat line («حاضر يادكتور», «يلا») with nothing from the shortages is kept but not spoken
 const QUIET_LINES = 2;
+// a message bringing 1 to 3 shortage items says their names («رضا عطيه: وصل سيلفربيرن كريم»), not a count
+const SAY_NAMES = 3;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
 export function sheetNames(m: unknown[][]): string[] {
@@ -322,6 +324,15 @@ export function inboxKind(contentType: string, fileName: string): 'text' | 'imag
 export function inboxSay(company: string, sure: number, review: number): string {
   if (!sure && !review) return `${company}: مفيش حاجة من النواقص`;
   return `${company}: وصل ${sure} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
+}
+// 1 to 3 items: said by name, so the owner knows what came without opening the bot
+export function namesSay(company: string, names: string[], review: number): string {
+  return `${company}: وصل ${[...new Set(names)].join(' و')}` + (review ? `، و${review} محتاجين تأكيدك` : '');
+}
+// The name said for an item: its Arabic name in the bot, else the supplier's line without notes after «//» or symbols.
+export function spokenName(arabic: string | undefined, line: string): string {
+  if (arabic && arabic.trim()) return arabic.trim();
+  return line.split('//')[0].replace(/[^\p{L}\p{N}\s.%\/-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 }
 // Start of today in Cairo (the pharmacy's day), as an ISO time.
 // Midnight of Cairo's date, found from the clock in Cairo (right also on the day the clock moves for summer time).
@@ -505,14 +516,18 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   };
   const scoreRows = async (rs: Row[]) => {
     let list: ReturnType<typeof matchRows> = [];
+    // each shortage's Arabic name in the bot (said when 1 to 3 items came)
+    const arOf = new Map<string, string>();
     if (rs.length) {
       const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
       list = matchRows(rs, shortageCatalog(shortages, k.names, k.answers), k, shortages);
+      const ar = new Map(k.names.map((n) => [n.name_key, n.arabic_name]));
+      for (const s of shortages) { const a = ar.get(nameKey(s.product_name)); if (a) arOf.set(s.id, a); }
     }
     const sureIds = new Set(list.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
     const review = list.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
       r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
-    return { list, sureIds, review };
+    return { list, sureIds, review, arOf };
   };
   try {
     if (kind === 'text') {
@@ -582,6 +597,10 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (kind === 'text' && !sureIds.size && !review && saved?.received_at) {
     const before = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=eq.text&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(TEXT_BURST_MS)).catch(() => []);
     if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: 0, review: 0, quiet: true, say: '' }, say);
+  }
+  if (sureIds.size >= 1 && sureIds.size <= SAY_NAMES) {
+    const said = [...sureIds].map((id) => { const r = out2.find((x) => x.match?.id === id); return spokenName(scored.arOf.get(id), r ? r.corrected || r.name : ''); });
+    return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: namesSay(supplier, said, review) }, say);
   }
   let spoken = inboxSay(supplier, sureIds.size, review);
   // the message is saved; if today's rows cannot be read only the spoken total is skipped
