@@ -335,6 +335,15 @@ export function daySay(company: string, today: Saved[]): string { return `${comp
 export function seenSay(company: string, what: string, today: Saved[] | null): string {
   return `${company}: ${what} قبل كده` + (today && today.length ? `، و${dayTotals(today)}` : '');
 }
+// seen=1: the phone got a photo notification but found no new photo. Either WhatsApp has not downloaded it yet
+// (Android held WhatsApp back to save battery, or the chat's photos wait to be opened) or it is a photo WhatsApp already
+// has (it does not save the same photo twice). Several photos («تم إرسال ٤ صور») are almost never all old ones.
+export function missingSay(company: string, notes: string[]): string {
+  const many = notes.some((n) => /(^|\s)صور(\s|$)|[0-9٠-٩]+\s*(photos|images)/iu.test(n));
+  return many
+    ? `${company}: بعت صور ولسه ما اتحملتش على الموبايل، افتح الشات بتاعه`
+    : `${company}: بعت صورة مالقيتهاش على الموبايل، لو جديدة افتح الشات بتاعه`;
+}
 // WhatsApp adds a count to the title when several messages wait: "الفتح shreif (2 رسائل)" / "(3 messages)"
 export function inboxSender(s: string): string {
   return clean(s).replace(/\s*\(\s*[0-9٠-٩]+\s*[^()]*\)\s*$/u, '').slice(0, 80);
@@ -374,21 +383,23 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const today = (name = company.name) => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&maybe=is.null&hidden_at=is.null&supplier=eq.' + encodeURIComponent(name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
   // marks a company's recent photo notifications as handled (its photo was read, or «seen» was said); freshOnly: only
   // new ones, not WhatsApp's repeats. The count tells whether this run marked any (two runs at once: one wins).
-  const handled = async (name: string, freshOnly: boolean): Promise<number> => {
+  const handled = async (name: string, freshOnly: boolean): Promise<{ note?: string | null }[]> => {
     const r = await fetchImpl(`${base}/rest/v1/ar_inbox_media?supplier=eq.${encodeURIComponent(name)}${freshOnly ? '&fresh=is.true' : ''}&done=is.false&at=gte.${since(SEEN_NOTE_MS)}`, {
       method: 'PATCH', body: JSON.stringify({ done: true }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS),
     }).catch(() => null);
-    return r?.ok ? ((await r.json().catch(() => [])) as unknown[]).length : 0;
+    const got = r?.ok ? await r.json().catch(() => []) : [];
+    return Array.isArray(got) ? got : [];
   };
-  // seen=1: the phone got a photo notification but found no new photo (WhatsApp keeps one copy of a photo it
-  // already has, so a photo sent again is not saved again): nothing is read or stored, only told.
+  // seen=1: the phone got a photo notification but found no new photo (not downloaded yet, or a photo WhatsApp already
+  // has): nothing is read or stored, only told (missingSay).
   if (url.searchParams.get('seen') === '1') {
     const justRead = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []);
     const unsure = await restAll<{ maybe: string[] | null }>(env, auth, fetchImpl, 'ar_inbox?select=maybe&maybe=not.is.null&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []);
     if (justRead.length || unsure.some((r) => (r.maybe || []).includes(company.name))) return out(200, { ok: true, seen: true, say: '' }, say);
     // told once for a new photo notification: WhatsApp's repeats of an old one stay silent (no loop of the same sentence)
-    if (!await handled(company.name, true)) return out(200, { ok: true, seen: true, say: '' }, say);
-    return out(200, { ok: true, seen: true, say: seenSay(company.name, 'الصورة دي وصلت', await today()) }, say);
+    const notes = await handled(company.name, true);
+    if (!notes.length) return out(200, { ok: true, seen: true, say: '' }, say);
+    return out(200, { ok: true, seen: true, say: missingSay(company.name, notes.map((n) => n.note || '')) }, say);
   }
   // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
   // the file's first bytes decide what it is.
