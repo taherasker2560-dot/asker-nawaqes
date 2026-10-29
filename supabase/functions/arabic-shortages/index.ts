@@ -214,6 +214,9 @@ const SHEET = /\.(xlsx|xls|csv)$/i;
 // WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 // a photo/file the phone sent again within this time is a re-send of the newest ones (silent); older = really sent again
 const DUP_SILENT_MS = 10 * 60 * 1000;
+// several notifications can run at once: if this company's photo/file was read this recently, another run is
+// already saying the totals, so «seen» stays silent
+const SEEN_QUIET_MS = 2 * 60 * 1000;
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
@@ -351,7 +354,11 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const today = () => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
   // seen=1: the phone got a photo notification but found no new photo (WhatsApp keeps one copy of a photo it
   // already has, so a photo sent again is not saved again): nothing is read or stored, only told.
-  if (url.searchParams.get('seen') === '1') return out(200, { ok: true, seen: true, say: seenSay(company.name, 'الصورة دي وصلت', await today()) }, say);
+  if (url.searchParams.get('seen') === '1') {
+    const justRead = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(new Date(Date.now() - SEEN_QUIET_MS).toISOString())).catch(() => []);
+    if (justRead.length) return out(200, { ok: true, seen: true, say: '' }, say);
+    return out(200, { ok: true, seen: true, say: seenSay(company.name, 'الصورة دي وصلت', await today()) }, say);
+  }
   // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
   // the file's first bytes decide what it is.
   let ct = req.headers.get('content-type') || '', name = fileName, bytes: Uint8Array;
@@ -413,7 +420,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
     const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
     const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': type }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (!up.ok) filePath = null;
+    // the same file sent at the same moment by another run is already there: same content (the name is its hash)
+    if (!up.ok && !/duplicate|exists/i.test(await up.text().catch(() => ''))) filePath = null;
   }
   let out2: ReturnType<typeof matchRows> = [];
   if (!error && rows.length) {
@@ -425,6 +433,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
   const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review };
   const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  // 409: another run saved the same photo/text a moment ago (unique indexes): a repeat, said once by that run
+  if (ins.status === 409) return out(200, { ok: false, duplicate: true, say: '' }, say);
   if (!ins.ok) return out(502, { error: 'save', message: 'الوارد ماتحفظش' }, say);
   const [saved] = await ins.json() as { id: string }[];
   log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error });

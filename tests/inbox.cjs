@@ -15,6 +15,7 @@ function fake({gem}={}){const calls=[],saved=[],files=[];const page=(u,a)=>new R
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
   if(url.includes('/rest/v1/ar_inbox?select=rows,review'))return page(url,saved.filter(r=>r.status!=='error').map(r=>({rows:r.rows,review:r.review})));
+  if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text'))return page(url,saved.filter(r=>r.kind!=='text').map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
   if(url.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length}]),{status:201})}
@@ -93,12 +94,21 @@ for(const [ago,expect] of [[60e3,''],[3*3600e3,'المتحدة للأدوية: �
 {const g=fake({gem:()=>{throw Error('not read')}});
  let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);
  assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده');assert.equal(g.saved.length,0);
- g.saved.push({kind:'image',status:'new',rows:[{match:{id:'s1',confidence:'high'}}],review:2});
+ g.saved.push({kind:'text',status:'new',rows:[{match:{id:'s1',confidence:'high'}}],review:2});
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','📷 صورة','text/plain'),env,g);
  assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده، والنهارده لحد دلوقتي 1 صنف من النواقص و2 محتاجين تأكيدك');assert.equal(g.saved.length,1);
  r=await F.handle(post('from='+encodeURIComponent('زبون')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');
  assert.ok(!g.calls.some(c=>c.url.startsWith('https://generativelanguage')));}
 assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف ده اتقرا قبل كده');
+// several runs at once: «seen» is silent when this company's photo was read a moment ago (another run says the totals)
+{const g=fake();g.saved.push({kind:'image',status:'new',rows:[],review:0});
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');}
+// two runs save the same photo/text at the same moment: the database refuses the second (409): a silent repeat
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ const h=async(u,o={})=>u.includes('/rest/v1/ar_inbox')&&o.method==='POST'?new Response('{"code":"23505"}',{status:409}):u.includes('/storage/v1/object/ar-inbox/')?new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400}):g(u,o);
+ let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,5]),'application/octet-stream'),env,h);
+ assert.equal(r.status,200);assert.equal(await r.text(),'');
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','بروفين ٤٠٠','text/plain'),env,h);assert.equal(r.status,200);assert.equal(await r.text(),'');}
 // a PDF or Excel file by its (long) path name
 assert.equal(F.inboxKind('application/octet-stream','x'.repeat(200)+'.pdf'.slice(-120)),'pdf');
 // PDF and unknown type
