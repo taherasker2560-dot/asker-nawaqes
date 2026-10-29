@@ -371,9 +371,10 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       return out(200, { ok: false, duplicate: true, say: old ? `${company.name}: ${what} قبل كده` : '' }, say);
     }
   }
-  // the same notification can fire twice: the same text from the same company within 10 minutes is kept once
+  // the same notification can fire again (twice at once, or WhatsApp shows unread chats again later):
+  // the same text from the same company is kept once a day (Cairo day)
   if (kind === 'text') {
-    const since = new Date(Date.now() - 10 * 60 * 1000).toISOString(), body = new TextDecoder().decode(bytes).slice(0, 20000);
+    const since = cairoDayStart(), body = new TextDecoder().decode(bytes).slice(0, 20000);
     const recent = await restAll<{ body_text: string | null }>(env, auth, fetchImpl, 'ar_inbox?select=body_text&kind=eq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(since));
     if (recent.some((r) => r.body_text === body)) return out(200, { ok: false, duplicate: true, say: '' }, say);
   }
