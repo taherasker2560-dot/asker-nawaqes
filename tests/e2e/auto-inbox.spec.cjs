@@ -20,4 +20,15 @@ run('companies, phone key, inbox',async({page,table})=>{
  assert.equal(await page.inputValue('#supplier'),'المتحدة للأدوية');assert.equal(await page.inputValue('#supplierPhone'),'201001234567');
  {const m=await page.inputValue('#msgText');assert.match(m,/فلاجيل شراب ١٢٥/);assert.match(m,/جانوفيا ٥٠ مجم/);}
  assert.deepEqual((await table('ar_inbox')).map(x=>x.status),['seen','seen']);assert.doesNotMatch(await text(page,'#inboxList'),/جديد/);
+ // delete: asked first; «لأ» keeps it, «أيوه» removes this company's messages only; «امسح الكل» empties the list
+ await page.evaluate(now=>window.__tables.ar_inbox.push({id:'i3',received_at:now,sender:'الفتح',supplier:'الفتح',kind:'text',status:'new',sure:0,review:0,rows:[]}),now);
+ await page.click('#inboxRefresh');await page.waitForFunction(()=>document.querySelectorAll('[data-inbox-del]').length===2);
+ page.once('dialog',d=>d.dismiss());await page.click('[data-inbox-del="1"]');assert.equal((await table('ar_inbox')).length,3);
+ const asked=[];page.once('dialog',d=>{asked.push(d.message());d.accept()});
+ const del=await page.evaluate(()=>[...document.querySelectorAll('[data-inbox-del]')].findIndex(b=>b.closest('.item').textContent.includes('الفتح')));
+ await page.click(`[data-inbox-del="${del}"]`);await page.waitForFunction(()=>document.querySelectorAll('[data-inbox-del]').length===1);
+ assert.match(asked[0],/الفتح/);assert.deepEqual((await table('ar_inbox')).map(x=>x.id),['i1','i2']);
+ page.once('dialog',d=>d.accept());await page.click('#inboxClear');await page.waitForFunction(()=>!document.querySelector('[data-inbox-del]'));
+ assert.deepEqual(await table('ar_inbox'),[]);assert.match(await text(page,'#inboxList'),/مفيش وارد/);
+ assert.ok((await table('ar_suppliers')).length===1,'companies are kept');
 });
