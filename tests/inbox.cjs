@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),path=require('node:path'),crypto=require('node:crypto');
 (async()=>{
 const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
-const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service'};
+const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service',INBOX_CLAIM_WAIT_MS:'1'};
 const KEY='a'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];
 const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠ مجم ٣٠ قرص',status:'approved'}];
@@ -109,6 +109,18 @@ assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف �
  let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,5]),'application/octet-stream'),env,h);
  assert.equal(r.status,200);assert.equal(await r.text(),'');
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','بروفين ٤٠٠','text/plain'),env,h);assert.equal(r.status,200);assert.equal(await r.text(),'');}
+// several runs send the same new photo at once: the first stores it (the claim) and reads it; a run that finds it
+// already stored waits for that run's row and stays silent, without reading it again (one Gemini call)
+{const g=fake({gem:()=>{throw Error('read twice')}});let checks=0;
+ const h=async(u,o={})=>{if(u.includes('/storage/v1/object/ar-inbox/'))return new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400});
+  if(u.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.'))return new Response(JSON.stringify(u.includes('offset=0')&&checks++>=2?[{id:'x'}]:[]));return g(u,o)};
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,3]),'application/octet-stream'),env,h);
+ assert.equal(r.status,200);assert.equal(await r.text(),'');assert.ok(!g.calls.some(c=>c.url.startsWith('https://generativelanguage')),'not read again');assert.equal(g.saved.length,0);}
+// an old stored copy with no row (the owner cleared the list): after waiting, it is read and saved
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ const h=async(u,o={})=>u.includes('/storage/v1/object/ar-inbox/')?new Response('{"error":"Duplicate","message":"The resource already exists"}',{status:400}):g(u,o);
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,4]),'application/octet-stream'),env,h);
+ assert.equal(r.status,200);assert.match(await r.text(),/وصل 1 صنف/);assert.equal(g.saved.length,1);assert.match(g.saved[0].file_path,/\.jpg$/);}
 // a PDF or Excel file by its (long) path name
 assert.equal(F.inboxKind('application/octet-stream','x'.repeat(200)+'.pdf'.slice(-120)),'pdf');
 // PDF and unknown type
