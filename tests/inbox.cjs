@@ -14,7 +14,11 @@ function fake({gem}={}){const calls=[],saved=[],files=[],media=[];const page=(u,
   if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
-  if(url.includes('/rest/v1/ar_inbox_media')){if(o.method==='POST'){media.push(JSON.parse(o.body).supplier);return new Response('',{status:201})}if(o.method==='DELETE')return new Response('',{status:204});return page(url,media.map(supplier=>({supplier})))}
+  if(url.includes('/rest/v1/ar_inbox_media')){const q=k=>decodeURIComponent((url.match(new RegExp(k+'=eq\\.([^&]+)'))||[])[1]||'');
+   if(o.method==='POST'){media.push({fresh:true,done:false,...JSON.parse(o.body)});return new Response('',{status:201})}if(o.method==='DELETE')return new Response('',{status:204});
+   if(o.method==='PATCH'){const hit=media.filter(m=>m.supplier===q('supplier')&&!m.done&&(!url.includes('fresh=is.true')||m.fresh!==false));hit.forEach(m=>{m.done=true});return new Response(JSON.stringify(hit))}
+   if(url.includes('select=note'))return new Response(JSON.stringify(media.filter(m=>m.supplier===q('supplier')&&m.chat===q('chat')).slice(-1).map(m=>({note:m.note}))));
+   return page(url,media.map(m=>({supplier:m.supplier,fresh:m.fresh})))}
   if(url.includes('/rest/v1/ar_inbox?select=rows,review'))return page(url,saved.filter(r=>r.status!=='error'&&!r.maybe).map(r=>({rows:r.rows,review:r.review})));
   if(url.includes('/rest/v1/ar_inbox?select=maybe&maybe=not.is.null'))return page(url,saved.filter(r=>r.maybe).map(r=>({maybe:r.maybe})));
   if(url.includes('/rest/v1/ar_inbox?select=id&maybe=not.is.null')){const lt=decodeURIComponent((url.match(/received_at=lt\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.maybe&&r.received_at<lt).map(()=>({id:'x'})))}
@@ -93,16 +97,33 @@ for(const [ago,expect] of [[60e3,''],[3*3600e3,'المتحدة للأدوية: �
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,7]),'application/octet-stream'),env,h);
  assert.equal(r.status,200);assert.equal(await r.text(),expect);assert.equal(g.saved.length,0);}
 // seen=1: a photo notification with no new photo on the phone (WhatsApp does not save a photo it already has):
-// told, with today's totals when something came today; nothing read or stored; other chats still ignored
+// told once per new notification, with today's totals when something came today; nothing read or stored; other chats still ignored
 {const g=fake({gem:()=>{throw Error('not read')}});
+ const note=(t)=>F.handle(post('from='+encodeURIComponent(t)+'&say=1','📷 صورة','text/plain'),env,g);
  let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);
+ assert.equal(await r.text(),'','no notification: nothing to tell');
+ assert.equal((await note('المتحدة للأدوية')).status,202);
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);
  assert.equal(r.status,200);assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده');assert.equal(g.saved.length,0);
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'','said once');
  g.saved.push({kind:'text',status:'new',rows:[{match:{id:'s1',confidence:'high'}}],review:2});
+ // a new message in that chat changes its notification (WhatsApp adds the count): told again
+ assert.equal((await note('المتحدة للأدوية (2 رسائل)')).status,202);assert.equal(g.media.at(-1).fresh,true);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','📷 صورة','text/plain'),env,g);
  assert.equal(await r.text(),'المتحدة للأدوية: الصورة دي وصلت قبل كده، والنهارده لحد دلوقتي 1 صنف من النواقص و2 محتاجين تأكيدك');assert.equal(g.saved.length,1);
  r=await F.handle(post('from='+encodeURIComponent('زبون')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');
  assert.ok(!g.calls.some(c=>c.url.startsWith('https://generativelanguage')));}
 assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف ده اتقرا قبل كده');
+// WhatsApp shows the same notification again (after the phone speaks, or when another message comes): a repeat, not
+// fresh. The phone still checks the folder, but «seen» stays silent, so the same sentence is not said over and over
+{const g=fake({gem:()=>{throw Error('not read')}});
+ const note=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,g);
+ const seen=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g).then(r=>r.text());
+ assert.equal((await note()).status,202);assert.match(await seen(),/وصلت قبل كده/);
+ for(let i=0;i<3;i++){assert.equal((await note()).status,202,'still checks the folder');assert.equal(await seen(),'')}
+ assert.deepEqual(g.media.map(m=>m.fresh),[true,false,false,false]);assert.equal(g.media[1].chat,'المتحدة للأدوية');
+ // another chat of the same company has its own last notification
+ await F.handle(post('from='+encodeURIComponent('جروب المتحدة للأدوية: احمد')+'&say=1','📷 صورة','text/plain'),env,g);assert.equal(g.media.at(-1).fresh,true);}
 // several runs at once: «seen» is silent when this company's photo was read a moment ago (another run says the totals)
 {const g=fake();g.saved.push({kind:'image',supplier:'المتحدة للأدوية',status:'new',rows:[],review:0});
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');}
@@ -127,10 +148,10 @@ assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف �
 // photos from two companies at the same time: the phone cannot tell whose photo is whose (one folder), so each
 // photo keeps both names (maybe) until the owner picks one; said once; not counted in a company's totals meanwhile
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
- let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,g);assert.equal(r.status,202);assert.deepEqual(g.media,['المتحدة للأدوية']);
+ let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,g);assert.equal(r.status,202);assert.deepEqual(g.media.map(m=>m.supplier),['المتحدة للأدوية']);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,20]),'application/octet-stream'),env,g);
  assert.match(await r.text(),/وصل 1 صنف/);assert.equal(g.saved[0].maybe,null,'one company: sure');
- g.media.push('شركة النور');
+ g.media.push({supplier:'شركة النور',fresh:true,done:false});
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,21]),'application/octet-stream'),env,g);
  assert.equal(await r.text(),'وصلت صور من أكتر من مورد في نفس الوقت: المتحدة للأدوية وشركة النور. اختار كل صورة من مين من البوت');
  assert.deepEqual(g.saved[1].maybe,['المتحدة للأدوية','شركة النور']);
@@ -138,6 +159,20 @@ assert.equal(F.seenSay('س','الملف ده اتقرا',null),'س: الملف �
  assert.equal(await r.text(),'','said once');assert.ok(g.saved[2].maybe);
  // the owner has not picked yet: today's total counts the sure photo only, and «seen» stays silent
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');}
+// a repeat of an old notification from one chat and a new one from another company at the same moment: the new
+// photo is the other company's, even when the repeat's run sends it first
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
+ g.media.push({supplier:'المتحدة للأدوية',chat:'المتحدة للأدوية',note:'x',fresh:false,done:false},{supplier:'شركة النور',chat:'شركة النور',note:'y',fresh:true,done:false});
+ let r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,30]),'application/octet-stream'),env,g);
+ assert.equal(await r.text(),'شركة النور: وصل 1 صنف من النواقص');assert.equal(g.saved[0].supplier,'شركة النور');assert.equal(g.saved[0].maybe,null);
+ assert.equal(g.saved[0].sender,'المتحدة للأدوية','the chat that sent it is kept');assert.ok(g.media[1].done,'its notification is handled: no «seen» for it');
+ // no new notification at all: any company with one in that time may be the one
+ g.media.length=0;g.media.push({supplier:'شركة النور',chat:'شركة النور',note:'y',fresh:false,done:false});
+ r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,31]),'application/octet-stream'),env,g);
+ assert.match(await r.text(),/أكتر من مورد/);assert.deepEqual(g.saved[1].maybe,['المتحدة للأدوية','شركة النور']);
+ // nobody else: the run's own company
+ g.media.length=0;r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,32]),'application/octet-stream'),env,g);
+ await r.text();assert.equal(g.saved[2].supplier,'المتحدة للأدوية');assert.equal(g.saved[2].maybe,null);}
 // «seen» is also silent for a company named on an unsure photo saved under the other company's run
 {const g=fake();g.saved.push({kind:'image',supplier:'شركة النور',maybe:['المتحدة للأدوية','شركة النور'],status:'new',rows:[],review:0});
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g);assert.equal(await r.text(),'');}

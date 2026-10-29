@@ -221,6 +221,13 @@ const CLAIM_POLLS = 6;
 // the phone sends the photos saved in the last 3 minutes: if two companies announced photos in that time, nobody
 // can tell whose photo is whose (one folder on the phone), so the photo keeps both names until the owner picks one
 const MEDIA_WINDOW_MS = 3 * 60 * 1000;
+// WhatsApp shows a chat's notification again, unchanged, when another notification comes and after the phone speaks.
+// A photo notification just like that chat's last one (same title and text) within this time is that repeat (not
+// fresh): it does not count as the company sending photos now, and «seen» stays silent for it. A new message changes
+// the notification (WhatsApp adds the count to the title: «(2 رسائل)»).
+const REPEAT_MS = 30 * 60 * 1000;
+// «seen» comes about a minute and a half after its notification (the phone checks the folder twice)
+const SEEN_NOTE_MS = 5 * 60 * 1000;
 // WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
@@ -358,13 +365,23 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
   const since = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
   // today's totals count only this company's sure rows (a photo still waiting for the owner to pick its company is not)
-  const today = () => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&maybe=is.null&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
+  const today = (name = company.name) => restAll<Saved>(env, auth, fetchImpl, 'ar_inbox?select=rows,review&status=neq.error&maybe=is.null&supplier=eq.' + encodeURIComponent(name) + '&received_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => null);
+  // marks a company's recent photo notifications as handled (its photo was read, or «seen» was said); freshOnly: only
+  // new ones, not WhatsApp's repeats. The count tells whether this run marked any (two runs at once: one wins).
+  const handled = async (name: string, freshOnly: boolean): Promise<number> => {
+    const r = await fetchImpl(`${base}/rest/v1/ar_inbox_media?supplier=eq.${encodeURIComponent(name)}${freshOnly ? '&fresh=is.true' : ''}&done=is.false&at=gte.${since(SEEN_NOTE_MS)}`, {
+      method: 'PATCH', body: JSON.stringify({ done: true }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS),
+    }).catch(() => null);
+    return r?.ok ? ((await r.json().catch(() => [])) as unknown[]).length : 0;
+  };
   // seen=1: the phone got a photo notification but found no new photo (WhatsApp keeps one copy of a photo it
   // already has, so a photo sent again is not saved again): nothing is read or stored, only told.
   if (url.searchParams.get('seen') === '1') {
     const justRead = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []);
     const unsure = await restAll<{ maybe: string[] | null }>(env, auth, fetchImpl, 'ar_inbox?select=maybe&maybe=not.is.null&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []);
     if (justRead.length || unsure.some((r) => (r.maybe || []).includes(company.name))) return out(200, { ok: true, seen: true, say: '' }, say);
+    // told once for a new photo notification: WhatsApp's repeats of an old one stay silent (no loop of the same sentence)
+    if (!await handled(company.name, true)) return out(200, { ok: true, seen: true, say: '' }, say);
     return out(200, { ok: true, seen: true, say: seenSay(company.name, 'الصورة دي وصلت', await today()) }, say);
   }
   // Tasker sends a file with its own Content-Type (not the one in the headers), sometimes as a form:
@@ -383,11 +400,16 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // 202 (not 200) tells the phone «this chat is a saved company: send its photos/files now»; other chats get 200,
   // so the phone never sends photos from chats that are not suppliers.
   if (kind === 'text' && MEDIA_NOTE.test(new TextDecoder().decode(bytes.subarray(0, 64)))) {
-    // remembered for MEDIA_WINDOW_MS (older notes are cleared now and then): see `maybe` below
+    // remembered for MEDIA_WINDOW_MS (older notes are cleared now and then): see `maybe` below. The same title and text
+    // as this chat's last note is WhatsApp showing it again (REPEAT_MS); the phone still checks the folder.
+    const raw = String(url.searchParams.get('from') || ''), note = (raw + ' ' + new TextDecoder().decode(bytes.subarray(0, 600))).replace(/\s+/g, ' ').trim().slice(0, 300);
     const w = { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal = AbortSignal.timeout(TIMEOUT_MS);
-    await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: company.name }), headers: w, signal }).catch(() => null);
+    const last = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=note&supplier=eq.${encodeURIComponent(company.name)}&chat=eq.${encodeURIComponent(from)}&at=gte.${since(REPEAT_MS)}&order=at.desc&limit=1`, { headers: sh, signal })
+      .then((r) => r.ok ? r.json() : []).catch(() => []) as { note: string | null }[];
+    const fresh = !Array.isArray(last) || last[0]?.note !== note;
+    await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: company.name, chat: from, note, fresh }), headers: w, signal }).catch(() => null);
     await fetchImpl(`${base}/rest/v1/ar_inbox_media?at=lt.${since(864e5)}`, { method: 'DELETE', headers: w, signal }).catch(() => null);
-    return out(202, { ok: false, media: true, say: '' }, say);
+    return out(202, { ok: false, media: true, fresh, say: '' }, say);
   }
   // the phone may send the same photo/file again (it sends the newest ones each time): kept once, by its hash
   const hash = kind === 'text' ? '' : [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
@@ -456,12 +478,16 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const sureIds = new Set(out2.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
   const review = out2.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
     r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
-  // a photo/file while another company also announced photos: it may be either one's
+  // whose photo: the phone sends every new photo in the folder, whichever chat it came from, so the companies that
+  // announced photos just now decide (WhatsApp's repeats of an old notification do not count). One company: the photo
+  // is its own, even when another chat's run sent it. More: it keeps their names (maybe) until the owner picks one.
+  // None new: any company with a notification in that time may be the one.
   let maybe: string[] | null = null;
   if (kind !== 'text') {
-    const notes = await restAll<{ supplier: string }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
-    const names = [...new Set([company.name, ...notes.map((n) => n.supplier)])];
-    if (names.length > 1) maybe = names.sort();
+    const notes = await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
+    const fresh = [...new Set(notes.filter((n) => n.fresh !== false).map((n) => n.supplier))];
+    const names = fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])];
+    if (names.length > 1) maybe = names.sort(); else supplier = names[0];
   }
   const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review, maybe };
   const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -469,7 +495,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (ins.status === 409) return out(200, { ok: false, duplicate: true, say: '' }, say);
   if (!ins.ok) return out(502, { error: 'save', message: 'الوارد ماتحفظش' }, say);
   const [saved] = await ins.json() as { id: string; received_at?: string }[];
-  log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error });
+  log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error, moved: supplier !== company.name, maybe: !!maybe });
+  // the photo/file arrived: its company's notifications need no «seen» anymore
+  if (kind !== 'text') for (const n of maybe || [supplier]) await handled(n, false);
   if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
   if (maybe) {
     // said once for the photos of that moment: only the first unsure photo says it
@@ -478,7 +506,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   }
   let spoken = inboxSay(supplier, sureIds.size, review);
   // the message is saved; if today's rows cannot be read only the spoken total is skipped
-  const rowsToday = await today();
+  const rowsToday = await today(supplier);
   if (rowsToday && rowsToday.length > 1) spoken = daySay(supplier, rowsToday);
   return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: spoken }, say);
 }
