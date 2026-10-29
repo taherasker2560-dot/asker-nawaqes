@@ -206,12 +206,11 @@ export function parseRead(text: string): { rows: Row[]; supplier: string } | nul
 }
 
 // ---------- automatic incoming (the owner's phone forwards supplier messages) ----------
-// POST <function>?from=<company name as saved in the bot>[&name=<file name>][&say=1], header x-inbox-key: <key>.
+// POST <function>?from=<company name as saved in the bot>[&name=<file name>][&say=1][&seen=1], header x-inbox-key: <key>.
 // Body: the message text (text/plain) or the file itself (image/*, application/pdf, Excel/CSV).
 // The key is created in the page; only its sha256 is stored (ar_inbox_keys). Only companies saved in the bot
 // (ar_suppliers) are accepted, so other chats are never read. Runs with the service role (no login on the phone).
 const SHEET = /\.(xlsx|xls|csv)$/i;
-// WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 // a photo/file the phone sent again within this time is a re-send of the newest ones (silent); older = really sent again
 const DUP_SILENT_MS = 10 * 60 * 1000;
 // several notifications can run at once: if this company's photo/file was read this recently, another run is
@@ -219,6 +218,7 @@ const DUP_SILENT_MS = 10 * 60 * 1000;
 const SEEN_QUIET_MS = 2 * 60 * 1000;
 // a second run that finds the same file already stored waits for the first run's row (checks every 2 s, 6 times)
 const CLAIM_POLLS = 6;
+// WhatsApp's notification text for a photo, file, video or voice note (no list in it)
 const MEDIA_NOTE = /^\s*(\u{1F4F7}|\u{1F4C4}|\u{1F3A5}|\u{1F3A4}|\u{1F3B5}|\u{1F5BC}|\u{1F4CE}|\u{1F4F9})/u;
 const NAME_HEAD = /اسم|صنف|منتج|دواء|بيان|name|item|product|description|desc/i, NOT_NAME = /سعر|خصم|كمي|عدد|رصيد|قيم|اجمال|تاريخ|كود|باركود|price|qty|quantity|disc|total|amount|code|barcode|date|expiry/i;
 // Same rule as the page: header row = first of the top 20 rows with a name-like title; else the column with most text.
