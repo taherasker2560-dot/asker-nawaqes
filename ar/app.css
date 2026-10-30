@@ -460,3 +460,6 @@ button.small {
 .today .item > div:last-child .pill {
   margin-top: 6px;
 }
+#supplierPick button.small {
+  margin: 6px 0 0 6px;
+}

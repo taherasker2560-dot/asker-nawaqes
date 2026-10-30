@@ -1048,6 +1048,28 @@
     }
     $('supplierList').innerHTML = suppliers.map((x) => `<option value="${esc(x.name)}">`).join('');
     drawSupplierRows();
+    drawSupplierPick();
+  }
+  // «غيّر الشركة (المندوب)»: every saved company, whatever is written in the box now (the list under the box only
+  // shows names like the one already written). Picking one writes its name and its number (or empties the number).
+  function drawSupplierPick() {
+    $('supplierPick').innerHTML =
+      suppliers
+        .map((x) => `<button class="secondary small" data-pick-supplier="${esc(x.name)}">${esc(x.name)}</button>`)
+        .join(' ') || '<p class="hint">مفيش شركات محفوظة لسه.</p>';
+    $('supplierPick')
+      .querySelectorAll('[data-pick-supplier]')
+      .forEach(
+        (b) =>
+          (b.onclick = () => {
+            const x = suppliers.find((s) => s.name === b.dataset.pickSupplier);
+            if (!x) return;
+            $('supplier').value = x.name;
+            $('supplierPhone').value = x.phone || '';
+            $('supplierPickBox').open = false;
+            status('msgStatus', `الرسالة هتتبعت لـ ${x.name}.`, 'good');
+          }),
+      );
   }
   // ---------- automatic incoming: companies, phone key, inbox ----------
   function drawSupplierRows() {
