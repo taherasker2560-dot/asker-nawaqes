@@ -264,6 +264,13 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
  assert.equal((await note()).status,202,'14 minutes: still checks');
  g.media[0].at=new Date(Date.now()-16*60e3).toISOString();
  const r=await note();assert.equal(r.status,200,'16 minutes: stops');assert.equal(await r.text(),'');}
+// a one-line chat whose word only looks like a shortage (needs the owner's check, nothing sure): silent, kept
+{shortages.push({id:'s5',product_name:'FLAGYL 500MG 20TAB'});names.push({name_key:'FLAGYL 500MG 20TAB',arabic_name:'فلاجيل ٥٠٠ مجم اقراص',status:'approved'});
+ try{const g=fake();const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','فلاجيل','text/plain'),env,g);
+  const said=await r.text();assert.equal(g.saved.length,1);assert.equal(g.saved[0].sure,0);assert.ok(g.saved[0].review>0,'two FLAGYL items: needs the owner');assert.equal(said,'','review only, short: silent');
+  const g2=fake();const r2=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','فلاجيل\nحاجة\nحاجة تانية','text/plain'),env,g2);
+  assert.match(await r2.text(),/محتاجين تأكيدك/,'a longer list still says it');}
+ finally{shortages.splice(2);names.splice(2)}}
 // Excel name column (same rule as the page)
 assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
 console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');
