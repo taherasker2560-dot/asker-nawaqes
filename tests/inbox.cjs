@@ -258,6 +258,12 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
  g=fake();assert.equal(await t('فلاجيل شراب ١٢٥',g),'المتحدة للأدوية: وصل فلاجيل ١٢٥ مجم شراب','nothing ordered: said');
  assert.equal(F.dayTotals([{rows:[{match:{id:'a',confidence:'high'}},{match:{id:'b',confidence:'confirmed'}}],review:0}],id=>id==='a'),'النهارده لحد دلوقتي 1 صنف من النواقص');
  assert.equal(F.dayTotals([{rows:[{match:{id:'a',confidence:'high'}}],review:1}]),'النهارده لحد دلوقتي 1 صنف من النواقص و1 محتاجين تأكيدك');}
+// a photo still not come 15 minutes after its notification: WhatsApp's repeats no longer make the phone check
+{const g=fake();const note=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g);
+ assert.equal((await note()).status,202);g.media[0].at=new Date(Date.now()-14*60e3).toISOString();
+ assert.equal((await note()).status,202,'14 minutes: still checks');
+ g.media[0].at=new Date(Date.now()-16*60e3).toISOString();
+ const r=await note();assert.equal(r.status,200,'16 minutes: stops');assert.equal(await r.text(),'');}
 // Excel name column (same rule as the page)
 assert.deepEqual(F.sheetNames([['قائمة'],['م','اسم الصنف','الكمية'],[1,'فلاجيل شراب',2],[2,'بروفين',1]]),['فلاجيل شراب','بروفين']);
 console.log('PASS: inbox: key, saved companies only, text/image matched and kept, spoken summary, quota kept as error');

@@ -228,6 +228,9 @@ const MEDIA_WINDOW_MS = 3 * 60 * 1000;
 const REPEAT_MS = 30 * 60 * 1000;
 // «seen» comes about a minute and a half after its notification (the phone checks the folder twice)
 const SEEN_NOTE_MS = 5 * 60 * 1000;
+// a photo not downloaded this long after its notification: WhatsApp's repeats stop making the phone check the folder
+// (it checked every minute and a half for over an hour once); the owner shares it by hand
+const STOP_LOOKING_MS = 15 * 60 * 1000;
 // Gemini busy (5xx): the photo is saved as not read and the phone is told; it is read again in the background
 // (after 15 s, then 30 s) and its row filled in. The phone is not told again (it already has its answer).
 const RETRY_WAITS_MS = [15000, 30000];
@@ -458,6 +461,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       const first = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=at&supplier=eq.${encodeURIComponent(company.name)}&chat=eq.${encodeURIComponent(from)}&fresh=is.true&at=gte.${since(REPEAT_MS)}&order=at.desc&limit=1`, { headers: sh, signal })
         .then((r) => r.ok ? r.json() : []).catch(() => []) as { at: string }[];
       const at = Array.isArray(first) && first[0]?.at;
+      if (at && Date.parse(at) < Date.now() - STOP_LOOKING_MS) return out(200, { ok: false, media: true, fresh, late: true, say: '' }, say);
       const got = at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&or=' + encodeURIComponent(`(supplier.eq."${company.name}",maybe.cs.{"${company.name}"})`) + '&received_at=gte.' + encodeURIComponent(at)).catch(() => []) : [];
       if (got.length) return out(200, { ok: false, media: true, fresh, came: true, say: '' }, say);
     }
