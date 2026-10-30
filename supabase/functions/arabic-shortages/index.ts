@@ -602,7 +602,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const ordered = sureIds.size ? new Set((await restAll<{ name_key: string }>(env, auth, fetchImpl, 'ar_orders?select=name_key&ordered_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => [])).map((o) => o.name_key)) : new Set<string>();
   const wasOrdered = (id: string) => ordered.has(scored.keyOf.get(id) || '');
   const news = new Set([...sureIds].filter((id) => !wasOrdered(id)));
-  if (kind === 'text' && !news.size && !review && out2.length <= QUIET_LINES) return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review: 0, quiet: true, say: '' }, say);
+  // a short chat line is silent even when a word in it looks like a shortage («كام وكام»): kept for the page
+  if (kind === 'text' && !news.size && out2.length <= QUIET_LINES) return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, quiet: true, say: '' }, say);
   if (kind === 'text' && !news.size && !review && saved?.received_at) {
     const before = await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=eq.text&supplier=eq.' + encodeURIComponent(supplier) + '&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(TEXT_BURST_MS)).catch(() => []);
     if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: sureIds.size, review: 0, quiet: true, say: '' }, say);
