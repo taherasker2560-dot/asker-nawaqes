@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=today-20261030a" />
+    <link rel="stylesheet" href="ar/app.css?v=pick-20261030a" />
   </head>
   <body>
     <header class="appbar">
@@ -153,6 +153,11 @@
             placeholder="اختار أو اكتب اسم الشركة"
           /><datalist id="supplierList"></datalist> <label for="supplierPhone">رقم واتساب الشركة (اختياري)</label
           ><input id="supplierPhone" type="text" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" />
+          <details id="supplierPickBox" class="pick">
+            <summary>غيّر الشركة (المندوب)</summary>
+            <p class="hint">اختار الشركة اللي عاوز تبعتلها الرسالة، ورقمها هيتكتب لوحده.</p>
+            <div id="supplierPick"></div>
+          </details>
           <button id="notifyBtn" class="secondary hidden">فعّل الإشعارات</button>
           <div class="tabs seg">
             <button data-src="img">صور أو PDF</button><button data-src="text" class="secondary">مكتوب</button
@@ -206,6 +211,6 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="ar/app.js?v=today-20261030a"></script>
+    <script src="ar/app.js?v=pick-20261030a"></script>
   </body>
 </html>
