@@ -1189,7 +1189,7 @@
     const g = new Map();
     for (const x of inbox) {
       const day = localDay(Date.parse(x.received_at)),
-        maybe = x.maybe && x.maybe.length > 1 ? x.maybe : null,
+        maybe = x.maybe && x.maybe.length ? x.maybe : null,
         k = (maybe ? '?' + maybe.join('|') : x.supplier || x.sender) + '|' + day;
       // photos that came while two companies sent photos: grouped apart until the owner picks each one's company
       if (!g.has(k)) g.set(k, { supplier: maybe ? 'صور مش معروف صاحبها' : x.supplier || x.sender, maybe, day, items: [] });
@@ -1227,10 +1227,10 @@
             review = g.items.reduce((a, x) => a + (x.review || 0), 0),
             errors = g.items.filter((x) => x.status === 'error').length;
           if (g.maybe)
-            return `<div class="item inbox-item fresh unsure"><div><strong>⚠️ صور من ${esc(g.maybe.join(' أو '))}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span></div><div class="hint">وصلوا في نفس الوقت، فمش معروف كل صورة من مين. اختار صاحب كل صورة:</div>${g.items
+            return `<div class="item inbox-item fresh unsure"><div><strong>⚠️ صور غير مؤكدة المصدر (احتمال: ${esc(g.maybe.join(' أو '))})</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span></div><div class="hint">الصور من فولدر واتساب المشترك، فلازم تتأكد من المصدر. اختار المورد أو «مش صورة مورد»:</div>${g.items
               .map(
                 (x) =>
-                  `<div class="unsure-photo"><a data-photo="${esc(x.file_path || '')}" target="_blank" rel="noopener"><img data-photo="${esc(x.file_path || '')}" alt="الصورة" /></a><div class="hint">وصل ${x.sure || 0}${x.review ? ` · محتاج تأكيدك ${x.review}` : ''}${x.status === 'error' ? ' · ماتقراش' : ''}</div><div>${g.maybe.map((n) => `<button class="secondary small" data-assign="${esc(x.id)}" data-to="${esc(n)}">${esc(n)}</button>`).join(' ')}</div></div>`,
+                  `<div class="unsure-photo"><a data-photo="${esc(x.file_path || '')}" target="_blank" rel="noopener"><img data-photo="${esc(x.file_path || '')}" alt="الصورة" /></a><div class="hint">وصل ${x.sure || 0}${x.review ? ` · محتاج تأكيدك ${x.review}` : ''}${x.status === 'error' ? ' · ماتقراش' : ''}</div><div>${g.maybe.map((n) => `<button class="secondary small" data-assign="${esc(x.id)}" data-to="${esc(n)}">${esc(n)}</button>`).join(' ')} <button class="secondary small" data-not-supplier="${esc(x.id)}">مش صورة مورد</button></div></div>`,
               )
               .join('')}<button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
           return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div><button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
@@ -1245,6 +1245,9 @@
     $('inboxList')
       .querySelectorAll('[data-assign]')
       .forEach((b) => (b.onclick = () => assignInbox(b.dataset.assign, b.dataset.to)));
+    $('inboxList')
+      .querySelectorAll('[data-not-supplier]')
+      .forEach((b) => (b.onclick = () => notSupplierInbox(b.dataset.notSupplier)));
     showPhotos();
     drawToday();
   }
@@ -1254,7 +1257,7 @@
     const today = localDay(Date.now()),
       by = new Map();
     for (const x of inbox) {
-      if (localDay(Date.parse(x.received_at)) !== today || (x.maybe && x.maybe.length > 1) || x.status === 'error') continue;
+      if (localDay(Date.parse(x.received_at)) !== today || (x.maybe && x.maybe.length) || x.status === 'error') continue;
       const co = x.supplier || x.sender;
       for (const r of x.rows || []) {
         if (!isSure(r) || !sName(r.match.id)) continue;
@@ -1342,7 +1345,13 @@
       for (const e2 of els) if (e2.tagName === 'IMG') e2.alt = 'الصورة مش ظاهرة';
     }
   }
-  // the owner picks the company of a photo that came while two companies sent photos
+  // Mark a shared-folder photo as unrelated to suppliers, keeping the stored file and its dedupe record.
+  async function notSupplierInbox(id) {
+    const { error } = await client.from('ar_inbox').update({ hidden_at: new Date().toISOString() }).eq('id', id);
+    if (error) return alert('ماتحفظش: ' + error.message);
+    await loadInbox();
+  }
+  // The owner explicitly confirms the supplier of a shared-folder photo.
   async function assignInbox(id, supplier) {
     const { error } = await client.from('ar_inbox').update({ supplier, maybe: null }).eq('id', id);
     if (error) return alert('ماتحفظش: ' + error.message);
