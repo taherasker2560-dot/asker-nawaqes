@@ -107,7 +107,7 @@ const crypto = require('node:crypto');
     assert.equal(verifiedFor(row, COMPANY_A), false);
   });
 
-  await check('RED: customer photo in shared folder must not be verified as the sole notifying supplier', async () => {
+  await check('SAFETY: customer photo in shared folder must not be verified as the sole notifying supplier', async () => {
     const mock = fakeServices();
     await notify(mock, COMPANY_A);
     // Tasker scans the shared WhatsApp Business Images folder. The actual sender is a CUSTOMER,
@@ -118,7 +118,7 @@ const crypto = require('node:crypto');
       'Unsafe: a shared-folder customer photo was counted as a verified supplier photo');
   });
 
-  await check('RED: image without a source notification must remain unverified', async () => {
+  await check('SAFETY: image without a source notification must remain unverified', async () => {
     const mock = fakeServices();
     // A delayed/replayed folder scan uploads a photo; no supplier media notification exists.
     const row = await upload(mock, COMPANY_A, 23);
