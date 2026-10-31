@@ -248,6 +248,19 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
  assert.equal(g.saved.length,1);
  assert.equal((await note()).status,200,'repeat after the photo came');
  assert.equal((await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية (2 رسائل)')+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g)).status,202,'a new notification');}
+// AutoNotification: the chat's name plus the notification's time («~w<ms>»). The same time again is WhatsApp showing the
+// notification again (not fresh); a new time is a new photo; an old time (15 min+) never makes the phone check the folder
+{const g=fake();const t0=Date.now();
+ const note=(w)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+w)+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g);
+ assert.equal((await note(t0)).status,202);assert.equal(g.media.at(-1).fresh,true);assert.equal(g.media.at(-1).chat,'المتحدة للأدوية');
+ assert.equal((await note(t0)).status,202,'same time again, photo not come yet: still check');assert.equal(g.media.at(-1).fresh,false);
+ assert.equal((await note(t0+60000)).status,202);assert.equal(g.media.at(-1).fresh,true,'a new message: new time');
+ const old=t0-20*60000;assert.equal((await note(old)).status,200,'an old notification shown again');assert.equal(g.media.at(-1).fresh,false);
+ assert.equal((await note(Math.floor(old/1000))).status,200,'time in seconds too');
+ const g2=fake();g2.media.push({supplier:'المتحدة للأدوية',chat:'المتحدة للأدوية',note:'المتحدة للأدوية ~w'+old+' 📷 ‏تم إرسال صورة',fresh:false,done:false});
+ assert.equal((await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+old)+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g2)).status,200,'repeats all day: no folder check');
+ const g3=fake();assert.equal(await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+t0)+'&say=1','حاضر يادكتور','text/plain'),env,g3).then(r=>r.text()),'');assert.equal(g3.saved[0].supplier,'المتحدة للأدوية');assert.equal(g3.saved[0].sender,'المتحدة للأدوية','the time is not part of the name');
+ const g4=fake();assert.equal((await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w%anwhentime')+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g4)).status,202,'no time from the phone: as before');}
 // items ordered today («اتطلب»): not said and not counted again when a company sends them
 {const ordered=[{name_key:'FLAGYL 125MG SYP'}];
  let g=fake({orders:ordered});const t=(x,h=g)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,h).then(r=>r.text());
