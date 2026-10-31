@@ -97,7 +97,7 @@ assert.ok(f.calls.filter(c=>c.url.includes('/rest/v1/')).every(c=>c.o.headers.ap
 // image: read by Gemini, file kept in the private bucket
 f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
 r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&name=IMG-1.jpg',new Uint8Array([255,216,255,0]),'image/jpeg'),env,f);
-const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,1);assert.equal(b.say,'وصلت صورة من واتساب، ومصدرها مش مؤكد. راجعها في البوت واختار المورد أو مش صورة مورد');assert.deepEqual(f.saved[0].maybe,['المتحدة للأدوية']);
+const b=await r.json();assert.equal(b.ok,true);assert.equal(b.sure,undefined,'no supplier-specific sure count before owner confirmation');assert.equal(f.saved[0].sure,1,'parsed match kept for later review');assert.equal(b.say,'وصلت صورة من واتساب، ومصدرها مش مؤكد. راجعها في البوت واختار المورد أو مش صورة مورد');assert.deepEqual(f.saved[0].maybe,['المتحدة للأدوية']);
 assert.equal(f.files.length,1);assert.match(f.files[0].url,/ar-inbox\/\d{4}-\d\d-\d\d\/[0-9a-f-]+\.jpg$/);assert.equal(f.saved[0].kind,'image');assert.ok(f.saved[0].file_path);
 // the photo's notification text is ignored (the photo comes by itself); the same photo sent again is kept once
 f=fake();r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,f);assert.equal(await r.text(),'');assert.equal(f.saved.length,0);
