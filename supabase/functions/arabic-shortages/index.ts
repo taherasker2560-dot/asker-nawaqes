@@ -521,11 +521,13 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       } else filePath = null;
     }
   }
+  let printedSupplier = '';
   const readImage = async (): Promise<Row[]> => {
     const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
     const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
     const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
     if (!read) throw new Error('رد Gemini مش مفهوم');
+    printedSupplier = read.supplier;
     return read.rows;
   };
   const scoreRows = async (rs: Row[]) => {
@@ -556,16 +558,21 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     } else rows = await readImage();
   } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
   const scored = await scoreRows(error ? [] : rows), out2 = scored.list, sureIds = scored.sureIds, review = scored.review;
-  // whose photo: the phone sends every new photo in the folder, whichever chat it came from, so the companies that
-  // announced photos just now decide (WhatsApp's repeats of an old notification do not count). One company: the photo
-  // is its own, even when another chat's run sent it. More: it keeps their names (maybe) until the owner picks one.
-  // None new: any company with a notification in that time may be the one.
+  // A shared WhatsApp folder does NOT carry the image's original chat. Prefer automatic
+  // attribution only when two independent *clues* agree: exactly one fresh supplier
+  // notification and an exact supplier heading detected on the image itself by Gemini.
+  // This is a high-confidence heuristic, NOT proof of the WhatsApp sender: a customer
+  // can forward a branded supplier list. In every other case keep the image unverified
+  // and excluded from supplier totals until the owner picks a supplier (maybe -> null).
   let maybe: string[] | null = null;
   if (kind !== 'text') {
     const notes = await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
-    const fresh = [...new Set(notes.filter((n) => n.fresh !== false).map((n) => n.supplier))];
-    const names = fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])];
-    if (names.length > 1) maybe = names.sort(); else supplier = names[0];
+    const fresh = [...new Set(notes.filter((n) => n.fresh === true).map((n) => n.supplier))];
+    const heading = aliasKey(printedSupplier);
+    const exactHeading = kind === 'image' && !error && heading.length > 0 && fresh.length === 1 &&
+      heading === aliasKey(fresh[0]);
+    if (exactHeading) supplier = fresh[0];
+    else maybe = (fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])]).sort();
   }
   const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review, maybe };
   const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -603,9 +610,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   }
   if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
   if (maybe) {
-    // said once for the photos of that moment: only the first unsure photo says it
+    // One spoken prompt per short batch, without attributing availability to any supplier.
     const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
-    return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
+    return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : 'وصلت صورة من واتساب، ومصدرها مش مؤكد. راجعها في البوت واختار المورد أو مش صورة مورد' }, say);
   }
   // items the owner ordered today («اتطلب», ar_orders) are not news: not said and not counted again
   const ordered = sureIds.size ? new Set((await restAll<{ name_key: string }>(env, auth, fetchImpl, 'ar_orders?select=name_key&ordered_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => [])).map((o) => o.name_key)) : new Set<string>();
