@@ -521,11 +521,13 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       } else filePath = null;
     }
   }
+  let printedSupplier = '';
   const readImage = async (): Promise<Row[]> => {
     const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
     const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
     const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
     if (!read) throw new Error('رد Gemini مش مفهوم');
+    printedSupplier = read.supplier;
     return read.rows;
   };
   const scoreRows = async (rs: Row[]) => {
@@ -556,16 +558,21 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     } else rows = await readImage();
   } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
   const scored = await scoreRows(error ? [] : rows), out2 = scored.list, sureIds = scored.sureIds, review = scored.review;
-  // Images/files are scanned from a SHARED WhatsApp Business folder. The triggering chat name and
-  // recent supplier notifications are only hints, never proof of who sent a particular file.
-  // Even a single recent supplier notification can coincide with an unrelated customer's photo.
-  // Keep every file and its parsed rows for manual attribution; exclude it from supplier totals
-  // and spoken availability until the owner assigns a supplier in the inbox UI (maybe -> null).
+  // A shared WhatsApp folder does NOT carry the image's original chat. Prefer automatic
+  // attribution only when two independent *clues* agree: exactly one fresh supplier
+  // notification and an exact supplier heading detected on the image itself by Gemini.
+  // This is a high-confidence heuristic, NOT proof of the WhatsApp sender: a customer
+  // can forward a branded supplier list. In every other case keep the image unverified
+  // and excluded from supplier totals until the owner picks a supplier (maybe -> null).
   let maybe: string[] | null = null;
   if (kind !== 'text') {
     const notes = await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
-    const fresh = [...new Set(notes.filter((n) => n.fresh !== false).map((n) => n.supplier))];
-    maybe = (fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])]).sort();
+    const fresh = [...new Set(notes.filter((n) => n.fresh === true).map((n) => n.supplier))];
+    const heading = aliasKey(printedSupplier);
+    const exactHeading = kind === 'image' && !error && heading.length > 0 && fresh.length === 1 &&
+      heading === aliasKey(fresh[0]);
+    if (exactHeading) supplier = fresh[0];
+    else maybe = (fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])]).sort();
   }
   const row = { sender: from, supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: out2, sure: sureIds.size, review, maybe };
   const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
