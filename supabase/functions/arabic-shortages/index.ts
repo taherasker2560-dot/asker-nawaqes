@@ -400,7 +400,12 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (!/^[0-9a-f]{32,128}$/.test(key)) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط' }, say);
   const keys = await restAll<{ key_hash: string }>(env, auth, fetchImpl, 'ar_inbox_keys?select=key_hash&key_hash=eq.' + await sha256Hex(key));
   if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
-  const from = inboxSender(url.searchParams.get('from') || ''), fileName = (url.searchParams.get('name') || '').split(/[\\/]/).pop()!.slice(-120);
+  // AutoNotification gives only the chat's name (no «(2 رسائل)»), so the phone adds the notification's time: «… ~w<ms>».
+  // It changes with every new message and stays the same when WhatsApp shows the notification again.
+  const rawFrom = String(url.searchParams.get('from') || ''), wm = rawFrom.match(/\s*~w(\S*)\s*$/);
+  const fromParam = wm ? rawFrom.slice(0, wm.index) : rawFrom;
+  const whenNum = wm && /^\d{9,14}$/.test(wm[1]) ? Number(wm[1]) : 0, whenMs = whenNum && whenNum < 1e12 ? whenNum * 1000 : whenNum;
+  const from = inboxSender(fromParam), fileName = (url.searchParams.get('name') || '').split(/[\\/]/).pop()!.slice(-120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
   const company = suppliers.find((x) => sameCompany(x.name, from));
   // not one of the saved companies: ignored before anything is read or stored
@@ -448,19 +453,23 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (kind === 'text' && MEDIA_NOTE.test(head)) {
     // remembered for MEDIA_WINDOW_MS (older notes are cleared now and then): see `maybe` below. The same title and text
     // as this chat's last note is WhatsApp showing it again (REPEAT_MS); the phone still checks the folder.
-    const raw = String(url.searchParams.get('from') || ''), note = (raw + ' ' + new TextDecoder().decode(bytes.subarray(0, 600))).replace(/\s+/g, ' ').trim().slice(0, 300);
+    const raw = fromParam + (whenMs ? ' ~w' + whenMs : ''), note = (raw + ' ' + new TextDecoder().decode(bytes.subarray(0, 600))).replace(/\s+/g, ' ').trim().slice(0, 300);
     const w = { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal = AbortSignal.timeout(TIMEOUT_MS);
     const last = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=note&supplier=eq.${encodeURIComponent(company.name)}&chat=eq.${encodeURIComponent(from)}&at=gte.${since(REPEAT_MS)}&order=at.desc&limit=1`, { headers: sh, signal })
       .then((r) => r.ok ? r.json() : []).catch(() => []) as { note: string | null }[];
-    const fresh = !Array.isArray(last) || last[0]?.note !== note;
+    // with the notification's time: a message older than STOP_LOOKING_MS is WhatsApp showing an old one again (never fresh)
+    const stale = !!whenMs && whenMs < Date.now() - STOP_LOOKING_MS;
+    const fresh = !stale && (!Array.isArray(last) || last[0]?.note !== note);
     await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: company.name, chat: from, note, fresh }), headers: w, signal }).catch(() => null);
     await fetchImpl(`${base}/rest/v1/ar_inbox_media?at=lt.${since(864e5)}`, { method: 'DELETE', headers: w, signal }).catch(() => null);
+    // an old notification shown again: the phone does not check the folder (a customer's new photo there is not this company's)
+    if (stale) return out(200, { ok: false, media: true, fresh, late: true, say: '' }, say);
     // WhatsApp showing it again after this company's photo/file already came: the phone need not check the folder
     // (200). Not come yet (not downloaded when it was announced): 202, so a late download is still sent.
     if (!fresh) {
       const first = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=at&supplier=eq.${encodeURIComponent(company.name)}&chat=eq.${encodeURIComponent(from)}&fresh=is.true&at=gte.${since(REPEAT_MS)}&order=at.desc&limit=1`, { headers: sh, signal })
         .then((r) => r.ok ? r.json() : []).catch(() => []) as { at: string }[];
-      const at = Array.isArray(first) && first[0]?.at;
+      const at = (Array.isArray(first) && first[0]?.at) || (whenMs ? new Date(whenMs).toISOString() : '');
       if (at && Date.parse(at) < Date.now() - STOP_LOOKING_MS) return out(200, { ok: false, media: true, fresh, late: true, say: '' }, say);
       const got = at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&or=' + encodeURIComponent(`(supplier.eq."${company.name}",maybe.cs.{"${company.name}"})`) + '&received_at=gte.' + encodeURIComponent(at)).catch(() => []) : [];
       if (got.length) return out(200, { ok: false, media: true, fresh, came: true, say: '' }, say);
