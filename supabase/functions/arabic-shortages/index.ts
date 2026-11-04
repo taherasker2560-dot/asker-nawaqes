@@ -247,6 +247,8 @@ const AV_NOTE = /^[\s\u200e\u200f]*(\u{1F3A4}|\u{1F3B5}|\u{1F3A5}|\u{1F4F9})/u;
 // a reaction («تفاعل بالرمز 👍 على "…"»): its text quotes the message reacted to (often the owner's own request, with
 // shortage names), so it is ignored, never read as a list
 const REACTION = /^[\s\u200e\u200f]*(تفاعل(ت)?\s+بالرمز|reacted\s)/iu;
+// a call notification («مكالمة صوتية واردة», «مكالمة فيديو فائتة», «Missed voice call»): no list, ignored
+const CALL = /^[\s\u200e\u200f]*(مكالم[ةه]\s+(صوتي[ةه]|فيديو|جماعي[ةه])|(incoming|missed|ongoing)\s+(voice|video|group)\s+call)/iu;
 // a short chat line («حاضر يادكتور», «يلا») with nothing from the shortages is kept but not spoken
 const QUIET_LINES = 2;
 // a message bringing 1 to 3 shortage items says their names («رضا عطيه: وصل سيلفربيرن كريم»), not a count
@@ -466,7 +468,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // 202 (not 200) tells the phone «this chat is a saved company: send its photos/files now»; other chats get 200,
   // so the phone never sends photos from chats that are not suppliers.
   const head = kind === 'text' ? new TextDecoder().decode(bytes.subarray(0, 64)) : '';
-  if (kind === 'text' && (AV_NOTE.test(head) || REACTION.test(head))) return out(200, { ok: false, ignored: true, say: '' }, say);
+  if (kind === 'text' && (AV_NOTE.test(head) || REACTION.test(head) || CALL.test(head))) return out(200, { ok: false, ignored: true, say: '' }, say);
   if (kind === 'text' && MEDIA_NOTE.test(head)) {
     // remembered for MEDIA_WINDOW_MS (older notes are cleared now and then): see `maybe` below. The same title and text
     // as this chat's last note is WhatsApp showing it again (REPEAT_MS); the phone still checks the folder.
@@ -506,9 +508,11 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     }
   }
   // the same notification can fire again (twice at once, or WhatsApp shows unread chats again later):
-  // the same text from the same company is kept once a day (Cairo day)
+  // the same text from the same company is kept once a day (Cairo day). An old notification shown again after midnight
+  // (its time is older than STOP_LOOKING_MS) is also checked against the last 24 hours, so it is not saved again.
   if (kind === 'text') {
-    const since = cairoDayStart(), body = new TextDecoder().decode(bytes).slice(0, 20000);
+    const day = cairoDayStart(), stale = !!whenMs && whenMs < Date.now() - STOP_LOOKING_MS;
+    const since = stale ? new Date(Math.min(Date.parse(day), Date.now() - 864e5)).toISOString() : day, body = new TextDecoder().decode(bytes).slice(0, 20000);
     const recent = await restAll<{ body_text: string | null }>(env, auth, fetchImpl, 'ar_inbox?select=body_text&kind=eq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(since));
     if (recent.some((r) => r.body_text === body)) return out(200, { ok: false, duplicate: true, say: '' }, say);
   }
