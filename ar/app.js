@@ -6,7 +6,7 @@
     FN = 'arabic-shortages',
     // The server version this page expects (VERSION in supabase/functions/arabic-shortages/index.ts).
     // tests/shared-matcher.cjs fails when they differ; the page warns when the deployed function is older.
-    SERVER_VERSION = 'ar9',
+    SERVER_VERSION = 'ar10',
     OFFER_MIN = 0.45,
     NOT_LISTED = '*'; // same as NOT_LISTED in the function: «مش واحد منهم» for a whole line
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -1230,10 +1230,10 @@
             return `<div class="item inbox-item fresh unsure"><div><strong>⚠️ صور من ${esc(g.maybe.join(' أو '))}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span></div><div class="hint">وصلوا في نفس الوقت، فمش معروف كل صورة من مين. اختار صاحب كل صورة:</div>${g.items
               .map(
                 (x) =>
-                  `<div class="unsure-photo"><a data-photo="${esc(x.file_path || '')}" target="_blank" rel="noopener"><img data-photo="${esc(x.file_path || '')}" alt="الصورة" /></a><div class="hint">وصل ${x.sure || 0}${x.review ? ` · محتاج تأكيدك ${x.review}` : ''}${x.status === 'error' ? ' · ماتقراش' : ''}</div><div>${g.maybe.map((n) => `<button class="secondary small" data-assign="${esc(x.id)}" data-to="${esc(n)}">${esc(n)}</button>`).join(' ')}</div></div>`,
+                  `<div class="unsure-photo"><a data-photo="${esc(x.file_path || '')}" target="_blank" rel="noopener"><img data-photo="${esc(x.file_path || '')}" alt="الصورة" /></a><div class="hint">وصل ${x.sure || 0}${x.review ? ` · محتاج تأكيدك ${x.review}` : ''}${x.status === 'error' ? ` · ماتقراش <button class="secondary small" data-reread="${esc(x.id)}">اقرا تاني</button>` : ''}</div><div>${g.maybe.map((n) => `<button class="secondary small" data-assign="${esc(x.id)}" data-to="${esc(n)}">${esc(n)}</button>`).join(' ')}</div></div>`,
               )
               .join('')}<button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
-          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div><button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
+          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div>${errors ? `<button class="secondary small" data-reread="${esc(g.items.filter((x) => x.status === 'error').map((x) => x.id).join(','))}">اقرا تاني</button> ` : ''}<button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
         })
         .join('') || '<p class="hint">مفيش وارد وصل لوحده لسه.</p>';
     $('inboxList')
@@ -1242,6 +1242,9 @@
     $('inboxList')
       .querySelectorAll('[data-inbox-del]')
       .forEach((b) => (b.onclick = () => deleteInbox(groups[+b.dataset.inboxDel])));
+    $('inboxList')
+      .querySelectorAll('[data-reread]')
+      .forEach((b) => (b.onclick = () => rereadInbox(b.dataset.reread.split(','), b)));
     $('inboxList')
       .querySelectorAll('[data-assign]')
       .forEach((b) => (b.onclick = () => assignInbox(b.dataset.assign, b.dataset.to)));
@@ -1347,6 +1350,24 @@
     const { error } = await client.from('ar_inbox').update({ supplier, maybe: null }).eq('id', id);
     if (error) return alert('ماتحفظش: ' + error.message);
     await loadInbox();
+  }
+  // «اقرا تاني»: a photo/PDF that was not read (Google busy or too slow) is read again from its saved copy on the server;
+  // its row is filled in only if it is still not read, so nothing is saved twice and the phone says nothing again
+  async function rereadInbox(ids, btn) {
+    btn.disabled = true;
+    btn.textContent = 'بيقرا… (لحد دقيقتين)';
+    let done = 0,
+      fail = '';
+    for (const id of ids) {
+      try {
+        await invoke({ action: 'reread', id });
+        done++;
+      } catch (e) {
+        fail = e.message;
+      }
+    }
+    await loadInbox();
+    if (fail) alert((done ? `اتقرا ${done}، و` : '') + 'ماتقراش: ' + fail);
   }
   // the owner removes incoming messages from the list (the phone's WhatsApp is not touched); asked first. They are
   // hidden, not deleted, so the same message shown again by WhatsApp is still known and not read again
