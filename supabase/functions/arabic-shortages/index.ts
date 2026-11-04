@@ -19,13 +19,15 @@
 
 import { Catalog, OFFER_MIN, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar9';
+export const VERSION = 'ar10';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const MAX_LINES = 600;
 const TIMEOUT_MS = 15000, GEMINI_TIMEOUT_MS = 55000;
+// «اقرا تاني» from the page is its own request, so a long list (50 rows took up to 56 s) gets more time
+const REREAD_TIMEOUT_MS = 120000;
 
 type Env = Record<string, string | undefined>;
 type Shortage = { id: string; product_name: string };
@@ -77,9 +79,9 @@ async function restAll<T>(env: Env, auth: Auth, fetchImpl: typeof fetch, path: s
   return out;
 }
 
-async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schema: unknown): Promise<string> {
+async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schema: unknown, timeoutMs = GEMINI_TIMEOUT_MS): Promise<string> {
   const model = (env.GEMINI_MODEL || DEFAULT_MODEL).trim();
-  const deadline = AbortSignal.timeout(GEMINI_TIMEOUT_MS);
+  const deadline = AbortSignal.timeout(timeoutMs);
   let res: Response | null = null;
   for (const config of [{ responseSchema: schema, thinkingConfig: { thinkingBudget: 0 } }, { responseSchema: schema }, {}]) {
     res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -203,6 +205,31 @@ export function parseRead(text: string): { rows: Row[]; supplier: string } | nul
     .map((r) => ({ name: clean((r as Row)?.name), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
     .filter((r) => r.name.length >= 2 && r.name.length <= 250);
   return { rows, supplier: clean((parsed as { supplier?: unknown })?.supplier).slice(0, 80) };
+}
+
+// A supplier photo/PDF -> rows (Gemini). Used by the inbox, its background retry and the page's «اقرا تاني».
+async function readFileRows(env: Env, fetchImpl: typeof fetch, bytes: Uint8Array, kind: string, name: string, ct: string, timeoutMs = GEMINI_TIMEOUT_MS): Promise<Row[]> {
+  const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
+  const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
+  const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA, timeoutMs));
+  if (!read) throw new Error('رد Gemini مش مفهوم');
+  return read.rows;
+}
+// Rows matched to the shortages, with the counts kept in ar_inbox (sure, review).
+async function scoreInboxRows(env: Env, auth: Auth, fetchImpl: typeof fetch, rs: Row[]) {
+  let list: ReturnType<typeof matchRows> = [];
+  // each shortage's Arabic name in the bot (said when 1 to 3 items came)
+  const arOf = new Map<string, string>(), keyOf = new Map<string, string>();
+  if (rs.length) {
+    const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
+    list = matchRows(rs, shortageCatalog(shortages, k.names, k.answers), k, shortages);
+    const ar = new Map(k.names.map((n) => [n.name_key, n.arabic_name]));
+    for (const s of shortages) { const a = ar.get(nameKey(s.product_name)); if (a) arOf.set(s.id, a); keyOf.set(s.id, nameKey(s.product_name)); }
+  }
+  const sureIds = new Set(list.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
+  const review = list.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
+    r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
+  return { list, sureIds, review, arOf, keyOf };
 }
 
 // ---------- automatic incoming (the owner's phone forwards supplier messages) ----------
@@ -542,28 +569,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       } else filePath = null;
     }
   }
-  const readImage = async (): Promise<Row[]> => {
-    const t = ct.split(';')[0].trim().toLowerCase(), magic = sniffMime(bytes);
-    const mime = kind === 'pdf' ? 'application/pdf' : magic || (/\.png$/i.test(name) ? 'image/png' : /\.webp$/i.test(name) ? 'image/webp' : t.startsWith('image/') ? t : 'image/jpeg');
-    const read = parseRead(await gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: MIME_TYPES.includes(mime) ? mime : 'image/jpeg', data: b64(bytes) } }], READ_SCHEMA));
-    if (!read) throw new Error('رد Gemini مش مفهوم');
-    return read.rows;
-  };
-  const scoreRows = async (rs: Row[]) => {
-    let list: ReturnType<typeof matchRows> = [];
-    // each shortage's Arabic name in the bot (said when 1 to 3 items came)
-    const arOf = new Map<string, string>(), keyOf = new Map<string, string>();
-    if (rs.length) {
-      const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
-      list = matchRows(rs, shortageCatalog(shortages, k.names, k.answers), k, shortages);
-      const ar = new Map(k.names.map((n) => [n.name_key, n.arabic_name]));
-      for (const s of shortages) { const a = ar.get(nameKey(s.product_name)); if (a) arOf.set(s.id, a); keyOf.set(s.id, nameKey(s.product_name)); }
-    }
-    const sureIds = new Set(list.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
-    const review = list.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
-      r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
-    return { list, sureIds, review, arOf, keyOf };
-  };
+  const readImage = (): Promise<Row[]> => readFileRows(env, fetchImpl, bytes, kind, name, ct);
+  const scoreRows = (rs: Row[]) => scoreInboxRows(env, auth, fetchImpl, rs);
   try {
     if (kind === 'text') {
       text = new TextDecoder().decode(bytes).slice(0, 20000);
@@ -725,6 +732,29 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const out = matchRows(rows, shortageCatalog(shortages, k.names, k.answers), k, shortages);
       log('lines', t0, { rows: out.length, sure: out.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').length });
       return reply(200, { rows: out, shortages: shortages.length, arabic: k.names.length, version: VERSION }, headers);
+    }
+
+    if (body.action === 'reread') {
+      // «اقرا تاني»: an incoming photo/PDF that was not read is read again from its stored copy, in this request
+      // (not in the background, which the server can stop), and its row filled in only if it is still not read.
+      const id = String((body as { id?: unknown }).id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return reply(400, { error: 'id', message: 'الوارد مش معروف.' }, headers);
+      const base = env.SUPABASE_URL.replace(/\/$/, ''), uh = { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' };
+      const [row] = await restAll<{ id: string; kind: string; file_path: string | null; status: string }>(env, auth, fetchImpl, 'ar_inbox?select=id,kind,file_path,status&id=eq.' + id);
+      if (!row) return reply(404, { error: 'id', message: 'الوارد ده مش موجود.' }, headers);
+      if (row.status !== 'error') return reply(200, { ok: true, already: true, version: VERSION }, headers);
+      if (!row.file_path || !(row.kind === 'image' || row.kind === 'pdf')) return reply(400, { error: 'file', message: 'مفيش نسخة محفوظة من الصورة دي؛ شاركها يدوي من الواتس.' }, headers);
+      const f = await fetchImpl(`${base}/storage/v1/object/authenticated/ar-inbox/${row.file_path}`, { headers: uh, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      if (!f.ok) return reply(502, { error: 'file', message: 'الصورة المحفوظة ماتفتحتش (' + f.status + ').' }, headers);
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const s2 = await scoreInboxRows(env, auth, fetchImpl, await readFileRows(env, fetchImpl, bytes, row.kind, row.file_path, '', REREAD_TIMEOUT_MS));
+      const w = await fetchImpl(`${base}/rest/v1/ar_inbox?id=eq.${id}&status=eq.error`, {
+        method: 'PATCH', body: JSON.stringify({ status: 'new', error: null, rows: s2.list, sure: s2.sureIds.size, review: s2.review }),
+        headers: { ...uh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!w.ok) return reply(502, { error: 'save', message: 'اتقرت بس ماتحفظتش (' + w.status + ').' }, headers);
+      log('reread', t0, { rows: s2.list.length, sure: s2.sureIds.size, review: s2.review });
+      return reply(200, { ok: true, rows: s2.list.length, sure: s2.sureIds.size, review: s2.review, version: VERSION }, headers);
     }
 
     if (body.action === 'match') {
