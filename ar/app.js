@@ -1203,14 +1203,14 @@
       const { data, error } = await client
         .from('ar_inbox')
         .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review,maybe')
-        .gte('received_at', since)
+        // photos still waiting for their company and messages not read stay listed until handled, however old
+        .or(`received_at.gte."${since}",maybe.not.is.null,status.eq.error`)
         .is('hidden_at', null)
         .order('received_at', { ascending: false })
         .limit(200);
       if (error) throw Error(error.message);
       inbox = data || [];
-      // messages hidden more than 2 days ago are not needed to recognise WhatsApp's repeats anymore
-      client.from('ar_inbox').delete().lt('hidden_at', new Date(Date.now() - 2 * 864e5).toISOString()).then(() => {}, () => {});
+      // hidden messages are kept (never deleted): they are the original record and stop WhatsApp's repeats being read again
     } catch (e) {
       inbox = [];
     }
@@ -1357,8 +1357,9 @@
     await loadInbox();
   }
   $('inboxClear').onclick = async () => {
-    if (!inbox.length || !confirm('تمسح كل الوارد؟ الموردين وإجاباتك مش هيتمسحوا.')) return;
-    const { error } = await client.from('ar_inbox').update({ hidden_at: new Date().toISOString() }).is('hidden_at', null);
+    if (!inbox.length || !confirm('تمسح كل الوارد؟ الصور اللي لسه مش معروف صاحبها واللي ماتقريتش هتفضل لحد ما تخلصها.')) return;
+    // photos waiting for their company and messages not read are not cleared with the rest (each card can still remove them)
+    const { error } = await client.from('ar_inbox').update({ hidden_at: new Date().toISOString() }).is('hidden_at', null).is('maybe', null).neq('status', 'error');
     if (error) return alert('ماتمسحش: ' + error.message);
     await loadInbox();
   };
