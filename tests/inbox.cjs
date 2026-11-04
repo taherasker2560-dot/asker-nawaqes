@@ -225,14 +225,20 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 // a call notification is ignored, not kept
 {const g=fake();for(const x of ['\u200fمكالمة صوتية واردة','‏مكالمة صوتية فائتة','مكالمة فيديو فائتة','Missed voice call']){const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g);assert.equal(await r.text(),'');}
  assert.equal(g.saved.length,0,'calls are not saved');}
-// an old text notification shown again after midnight (its time is old): the same text from the last 24 h is a repeat
-{const g=fake();const old=Date.now()-3*3600e3;
- await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','ديبوفيت امبول','text/plain'),env,g);
- g.saved[0].received_at=new Date(Date.parse(F.cairoDayStart())-3600e3).toISOString(); // yesterday 11 pm
- const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+old)+'&say=1','ديبوفيت امبول','text/plain'),env,g);
- assert.equal(await r.text(),'');assert.equal(g.saved.length,1,'old notification shown again: not saved twice');
- await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+Date.now())+'&say=1','ديبوفيت امبول','text/plain'),env,g);
- assert.equal(g.saved.length,2,'sent again today (new notification time): kept');}
+// text repeats by the notification's time (~w), never by the clock: the tests set every time relative to now
+{const co=encodeURIComponent('المتحدة للأدوية'),send=(w,x)=>F.handle(post('from='+co+(w?' ~w'+w:'')+'&say=1',x,'text/plain'),env,g),g=fake();
+ const sent=Date.now()-26*3600e3; // a message from yesterday evening, saved when it came
+ await send(sent,'ديبوفيت امبول');g.saved[0].received_at=new Date(sent+5000).toISOString();
+ await send(sent,'ديبوفيت امبول');assert.equal(g.saved.length,1,'the same notification shown again a day later (after midnight): not saved twice');
+ await send(Math.floor(sent/1000),'ديبوفيت امبول');assert.equal(g.saved.length,1,'notification time in seconds: the same');
+ await send(Date.now()-60000,'ديبوفيت امبول');assert.equal(g.saved.length,2,'sent again (a new notification time), same words: kept');
+ g.saved[1].received_at=new Date(Date.now()-55000).toISOString();
+ await send(Date.now()-60000,'ديبوفيت امبول');assert.equal(g.saved.length,2,'that new one shown again: not saved twice');
+ const g2=fake(),s2=(w,x)=>F.handle(post('from='+co+(w?' ~w'+w:'')+'&say=1',x,'text/plain'),env,g2);
+ await s2(Date.now()-3*3600e3,'توبرادكس مرهم');g2.saved[0].received_at=new Date(Date.now()-3*3600e3).toISOString();
+ await s2(Date.now()-30000,'توبرادكس مرهم');assert.equal(g2.saved.length,2,'same words three hours later, same day: kept (was lost before)');
+ const g3=fake(),s3=x=>F.handle(post('from='+co+'&say=1',x,'text/plain'),env,g3);
+ await s3('جانوفيا');await s3('جانوفيا');assert.equal(g3.saved.length,1,'no notification time: the same text once a day, as before');}
 // Gemini too slow («Signal timed out.»): read again once in the background, like busy
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
  const h=async(u,o)=>{if(u.startsWith('https://generativelanguage')&&calls++<1){const e=new Error('Signal timed out.');e.name='TimeoutError';throw e}return g(u,o)};
