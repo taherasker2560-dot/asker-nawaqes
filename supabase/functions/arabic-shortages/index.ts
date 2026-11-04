@@ -328,6 +328,18 @@ export function inboxSay(company: string, sure: number, review: number): string 
   if (!sure && !review) return `${company}: مفيش حاجة من النواقص`;
   return `${company}: وصل ${sure} صنف من النواقص` + (review ? ` و${review} محتاجين تأكيدك` : '');
 }
+// A company name as the phone says it: «شركه» → «شركة», «(المندوب)» → «، المندوب». Only the spoken words change;
+// the names saved in the bot stay as they are.
+export function sayCompany(name: string): string {
+  return name.replace(/(^|[\s(])شركه(?=$|[\s(),،])/gu, '$1شركة')
+    .replace(/\s*\(\s*([^()]*?)\s*\)\s*/gu, (_m, x: string) => (x ? '، ' + x + ' ' : ' '))
+    .replace(/\s+/g, ' ').replace(/\s+،/g, '،').replace(/،\s*$/u, '').trim();
+}
+// the saved company names in a spoken line, said as sayCompany (longest first, so one name inside another is safe)
+export function sayCompanies(text: string, names: string[]): string {
+  for (const n of [...new Set(names)].sort((a, b) => b.length - a.length)) { const s = sayCompany(n); if (n && s !== n) text = text.split(n).join(s); }
+  return text;
+}
 // 1 to 3 items: said by name, so the owner knows what came without opening the bot
 export function namesSay(company: string, names: string[], review: number): string {
   return `${company}: وصل ${[...new Set(names)].join(' و')}` + (review ? `، و${review} محتاجين تأكيدك` : '');
@@ -387,8 +399,9 @@ export function serviceHeaders(service: string): Record<string, string> {
   return service.startsWith('sb_') ? { apikey: service } : { Authorization: 'Bearer ' + service, apikey: service };
 }
 export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
+  const companies: string[] = [];
   const out = (status: number, body: Record<string, unknown>, say: boolean) => say
-    ? new Response(String(body.say || body.message || ''), { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    ? new Response(sayCompanies(String(body.say || body.message || ''), companies), { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
     : reply(status, body, {});
   const url = new URL(req.url), say = url.searchParams.get('say') === '1';
   const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -408,6 +421,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const from = inboxSender(fromParam), fileName = (url.searchParams.get('name') || '').split(/[\\/]/).pop()!.slice(-120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
   const company = suppliers.find((x) => sameCompany(x.name, from));
+  companies.push(...suppliers.map((x) => x.name));
   // not one of the saved companies: ignored before anything is read or stored
   if (!company) return out(200, { ok: false, ignored: true, say: '' }, say);
   const since = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
