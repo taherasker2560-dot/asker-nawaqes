@@ -19,7 +19,7 @@
 
 import { Catalog, OFFER_MIN, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar10';
+export const VERSION = 'ar11';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -185,6 +185,9 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
       }
       if (near.size === 1 && !notListed) match = { id: idOf.get([...near][0])!, name: '', score: 0.95, confidence: 'high', via: 'alias' };
     }
+    // a line Gemini could not read clearly is never a sure match by guess: the owner confirms it (an exact «أيوه» before
+    // for this same text stays confirmed)
+    if (r.unclear && match?.confidence === 'high') match = { ...match, confidence: 'review' };
     return { ...r, key, corrected, match, candidates, ignored: k.ignored.has(key) };
   });
 }
@@ -636,6 +639,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
     return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
   }
+  // a photo/file with no product lines (a photo from another chat in the phone's folder, a logo, a chat screenshot):
+  // kept for the page, but nothing is said for it
+  if (kind !== 'text' && !out2.length) return out(200, { ok: true, id: saved?.id, supplier, sure: 0, review: 0, empty: true, say: '' }, say);
   // items the owner ordered today («اتطلب», ar_orders) are not news: not said and not counted again
   const ordered = sureIds.size ? new Set((await restAll<{ name_key: string }>(env, auth, fetchImpl, 'ar_orders?select=name_key&ordered_at=gte.' + encodeURIComponent(cairoDayStart())).catch(() => [])).map((o) => o.name_key)) : new Set<string>();
   const wasOrdered = (id: string) => ordered.has(scored.keyOf.get(id) || '');

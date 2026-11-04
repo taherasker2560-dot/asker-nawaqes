@@ -6,7 +6,7 @@
     FN = 'arabic-shortages',
     // The server version this page expects (VERSION in supabase/functions/arabic-shortages/index.ts).
     // tests/shared-matcher.cjs fails when they differ; the page warns when the deployed function is older.
-    SERVER_VERSION = 'ar10',
+    SERVER_VERSION = 'ar11',
     OFFER_MIN = 0.45,
     NOT_LISTED = '*'; // same as NOT_LISTED in the function: «مش واحد منهم» for a whole line
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
