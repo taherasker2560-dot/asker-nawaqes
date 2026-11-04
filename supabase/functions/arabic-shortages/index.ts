@@ -234,6 +234,9 @@ const STOP_LOOKING_MS = 15 * 60 * 1000;
 // Gemini busy (5xx): the photo is saved as not read and the phone is told; it is read again in the background
 // (after 15 s, then 30 s) and its row filled in. The phone is not told again (it already has its answer).
 const RETRY_WAITS_MS = [15000, 30000];
+// Gemini too slow (no answer within GEMINI_TIMEOUT_MS, «Signal timed out.») is retried like busy, but once only:
+// the first try already used most of the function's time
+export const geminiBusy = (m: string) => /^gemini 5\d\d$/.test(m) || /timed out|timeout/i.test(m);
 // some suppliers send a list as one message per item: after the first text, the next ones from the same company within
 // this time are spoken only when they bring something from the shortages (then with today's totals)
 const TEXT_BURST_MS = 3 * 60 * 1000;
@@ -590,9 +593,10 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   log('inbox', t0, { kind, rows: out2.length, sure: sureIds.size, review, error: !!error, moved: supplier !== company.name, maybe: !!maybe });
   // the photo/file arrived: its company's notifications need no «seen» anymore
   if (kind !== 'text') for (const n of maybe || [supplier]) await handled(n, false);
-  if (error && /^gemini 5\d\d$/.test(error) && saved?.id && (kind === 'image' || kind === 'pdf')) {
+  if (error && geminiBusy(error) && saved?.id && (kind === 'image' || kind === 'pdf')) {
     // Gemini busy: read again in the background; the row is filled in when it works
-    const id = saved.id, waits = env.INBOX_RETRY_WAIT_MS ? RETRY_WAITS_MS.map(() => Number(env.INBOX_RETRY_WAIT_MS)) : RETRY_WAITS_MS;
+    const all = env.INBOX_RETRY_WAIT_MS ? RETRY_WAITS_MS.map(() => Number(env.INBOX_RETRY_WAIT_MS)) : RETRY_WAITS_MS;
+    const id = saved.id, waits = /^gemini 5/.test(error) ? all : all.slice(0, 1);
     const retry = (async () => {
       for (const ms of waits) {
         await new Promise((r) => setTimeout(r, ms));
@@ -607,7 +611,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
         } catch (e) {
           const m = String((e as Error).message || e);
           log('inbox-retry', t0, { ok: false, m: m.slice(0, 60) });
-          if (!/^gemini 5\d\d$/.test(m)) return;
+          if (!geminiBusy(m)) return;
         }
       }
     })();

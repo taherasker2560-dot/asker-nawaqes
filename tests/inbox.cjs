@@ -222,6 +222,15 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake();let calls=0;const h=async(u,o)=>u.startsWith('https://generativelanguage')?(calls++,new Response('',{status:500})):g(u,o);
  await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
  assert.equal(g.saved[0].status,'error');assert.equal(calls,3,'first try + 2 retries, then it stays not read');}
+// Gemini too slow («Signal timed out.»): read again once in the background, like busy
+{const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
+ const h=async(u,o)=>{if(u.startsWith('https://generativelanguage')&&calls++<1){const e=new Error('Signal timed out.');e.name='TimeoutError';throw e}return g(u,o)};
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,42]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
+ assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده');
+ assert.equal(g.saved[0].status,'new');assert.equal(g.saved[0].sure,1);assert.equal(calls,2);}
+{const g=fake();let calls=0;const h=async(u,o)=>{if(u.startsWith('https://generativelanguage')){calls++;throw Object.assign(new Error('Signal timed out.'),{name:'TimeoutError'})}return g(u,o)};
+ await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,43]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
+ assert.equal(g.saved[0].status,'error');assert.equal(calls,2,'too slow: first try + 1 retry only');}
 // a list sent as one message per item: the first is spoken, the next ones within 3 minutes only when they bring
 // something from the shortages (then with today's totals)
 {const g=fake();const t=(x)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g).then(r=>r.text());
