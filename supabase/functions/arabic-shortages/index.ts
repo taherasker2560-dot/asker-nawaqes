@@ -261,6 +261,8 @@ const SEEN_NOTE_MS = 5 * 60 * 1000;
 // a photo not downloaded this long after its notification: WhatsApp's repeats stop making the phone check the folder
 // (it checked every minute and a half for over an hour once); the owner shares it by hand
 const STOP_LOOKING_MS = 15 * 60 * 1000;
+// a text notification is the same message as a saved one when that one was saved after the notification's time minus this
+const REPEAT_SKEW_MS = 2 * 60 * 1000;
 // Gemini busy (5xx): the photo is saved as not read and the phone is told; it is read again in the background
 // (after 15 s, then 30 s) and its row filled in. The phone is not told again (it already has its answer).
 const RETRY_WAITS_MS = [15000, 30000];
@@ -537,12 +539,12 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       return out(200, { ok: false, duplicate: true, say: old ? seenSay(company.name, what, await today()) : '' }, say);
     }
   }
-  // the same notification can fire again (twice at once, or WhatsApp shows unread chats again later):
-  // the same text from the same company is kept once a day (Cairo day). An old notification shown again after midnight
-  // (its time is older than STOP_LOOKING_MS) is also checked against the last 24 hours, so it is not saved again.
+  // the same notification can fire again (twice at once, or WhatsApp shows unread chats again later, also after midnight).
+  // With the notification's time (~w): it is a repeat when the same text from the same company was saved after that
+  // time (a little earlier allowed for the phone's clock), so a message sent again later, even with the same words,
+  // is new. Without it: the same text is kept once a Cairo day.
   if (kind === 'text') {
-    const day = cairoDayStart(), stale = !!whenMs && whenMs < Date.now() - STOP_LOOKING_MS;
-    const since = stale ? new Date(Math.min(Date.parse(day), Date.now() - 864e5)).toISOString() : day, body = new TextDecoder().decode(bytes).slice(0, 20000);
+    const since = whenMs ? new Date(Math.min(whenMs, Date.now()) - REPEAT_SKEW_MS).toISOString() : cairoDayStart(), body = new TextDecoder().decode(bytes).slice(0, 20000);
     const recent = await restAll<{ body_text: string | null }>(env, auth, fetchImpl, 'ar_inbox?select=body_text&kind=eq.text&supplier=eq.' + encodeURIComponent(company.name) + '&received_at=gte.' + encodeURIComponent(since));
     if (recent.some((r) => r.body_text === body)) return out(200, { ok: false, duplicate: true, say: '' }, say);
   }
