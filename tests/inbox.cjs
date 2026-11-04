@@ -27,7 +27,7 @@ function fake({gem,fileAt='2026-01-01T00:00:00Z',orders=[]}={}){const calls=[],s
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text&or=')){const sup=decodeURIComponent(url).match(/supplier\.eq\."([^"]+)"/)[1];return page(url,saved.filter(r=>r.kind!=='text'&&(r.supplier===sup||(r.maybe||[]).includes(sup))).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=neq.text')){const sup=decodeURIComponent((url.match(/supplier=eq\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind!=='text'&&r.supplier===sup).map(()=>({id:'x'})))}
   if(url.includes('/rest/v1/ar_inbox?select=id&kind=eq.text')){const lt=decodeURIComponent((url.match(/received_at=lt\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind==='text'&&r.received_at<lt).map(()=>({id:'x'})))}
-  if(url.includes('/rest/v1/ar_inbox?select=body_text'))return page(url,saved.filter(r=>r.kind==='text').map(r=>({body_text:r.body_text})));
+  if(url.includes('/rest/v1/ar_inbox?select=body_text')){const gte=decodeURIComponent((url.match(/received_at=gte\.([^&]+)/)||[])[1]||'');return page(url,saved.filter(r=>r.kind==='text'&&(!gte||r.received_at>=gte)).map(r=>({body_text:r.body_text})))}
   if(url.includes('/rest/v1/ar_inbox?select=id,received_at&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
   if(url.includes('/rest/v1/ar_inbox?id=eq.')&&o.method==='PATCH'){const id=decodeURIComponent(url.match(/id=eq\.([^&]+)/)[1]);const r=saved.find(x=>x.id===id&&x.status==='error');if(r)Object.assign(r,JSON.parse(o.body));return new Response('',{status:204})}
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);row.received_at=new Date(Date.now()+saved.length).toISOString();row.id='in'+(saved.length+1);saved.push(row);return new Response(JSON.stringify([{id:'in'+saved.length,received_at:row.received_at}]),{status:201})}
@@ -222,6 +222,17 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake();let calls=0;const h=async(u,o)=>u.startsWith('https://generativelanguage')?(calls++,new Response('',{status:500})):g(u,o);
  await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
  assert.equal(g.saved[0].status,'error');assert.equal(calls,3,'first try + 2 retries, then it stays not read');}
+// a call notification is ignored, not kept
+{const g=fake();for(const x of ['\u200fمكالمة صوتية واردة','‏مكالمة صوتية فائتة','مكالمة فيديو فائتة','Missed voice call']){const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g);assert.equal(await r.text(),'');}
+ assert.equal(g.saved.length,0,'calls are not saved');}
+// an old text notification shown again after midnight (its time is old): the same text from the last 24 h is a repeat
+{const g=fake();const old=Date.now()-3*3600e3;
+ await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','ديبوفيت امبول','text/plain'),env,g);
+ g.saved[0].received_at=new Date(Date.parse(F.cairoDayStart())-3600e3).toISOString(); // yesterday 11 pm
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+old)+'&say=1','ديبوفيت امبول','text/plain'),env,g);
+ assert.equal(await r.text(),'');assert.equal(g.saved.length,1,'old notification shown again: not saved twice');
+ await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+Date.now())+'&say=1','ديبوفيت امبول','text/plain'),env,g);
+ assert.equal(g.saved.length,2,'sent again today (new notification time): kept');}
 // Gemini too slow («Signal timed out.»): read again once in the background, like busy
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
  const h=async(u,o)=>{if(u.startsWith('https://generativelanguage')&&calls++<1){const e=new Error('Signal timed out.');e.name='TimeoutError';throw e}return g(u,o)};
