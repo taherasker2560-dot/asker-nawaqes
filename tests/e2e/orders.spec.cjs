@@ -1,5 +1,6 @@
-// «اتطلب»: opening a company's message in WhatsApp marks its items ordered today; the next company's message leaves
-// them out (listed under it), the results show «اتطلب», and «لغي «اتطلب»» puts an item back. No duplicate marks.
+// «اتطلب»: opening a company's message in WhatsApp only makes its items «جاهز للطلب» (nothing marked, nothing hidden);
+// «أيوه اتبعت» marks them ordered today; then the next company's message leaves them out (listed under it), the results
+// show «اتطلب», and «لغي «اتطلب»» puts an item back. «لأ، متبعتتش» marks nothing. No duplicate marks.
 const {run,text,waitStatus,assert}=require('./harness.cjs');
 run('items ordered today',async({page,table})=>{
  const now=new Date().toISOString();
@@ -13,11 +14,28 @@ run('items ordered today',async({page,table})=>{
   await page.click(`[data-inbox-open="${i}"]`);await waitStatus(page,new RegExp(co+': اتقرا'))};
  await openCo('المتحدة للأدوية');
  const sent=await page.inputValue('#msgText');assert.match(sent,/فلاجيل شراب ١٢٥/);assert.match(sent,/جانوفيا ٥٠ مجم/);
- await page.click('#waBtn');await waitStatus(page,/اتعلّم 2 صنف «اتطلب»/,'msgStatus');
+ await page.click('#waBtn');await waitStatus(page,/دوس «أيوه اتبعت»/,'msgStatus');
+ assert.equal((await table('ar_orders')).length,0,'opening WhatsApp marks nothing');
+ assert.match(await text(page,'#pendingText'),/جاهز للطلب: 2 صنف لـالمتحدة للأدوية/);
+ assert.doesNotMatch(await text(page,'#results'),/اتطلب النهارده/);
+ // not confirmed yet: another company's message still has the item
+ await openCo('شركة النور');assert.match(await page.inputValue('#msgText'),/فلاجيل شراب ١٢٥/);
+ // kept on the phone: still asked after leaving and coming back
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ar-pending-orders')).length),1);
+ await page.evaluate(()=>{document.getElementById('pendingOrder').classList.add('hidden');document.dispatchEvent(new Event('visibilitychange'))});
+ assert.equal(await page.evaluate(()=>document.getElementById('pendingOrder').classList.contains('hidden')),false);
+ // «لأ، متبعتتش»: nothing marked, the question goes away
+ await page.click('#pendingNo');await waitStatus(page,/مفيش صنف اتعلّم/,'msgStatus');
+ assert.equal((await table('ar_orders')).length,0);assert.equal(await page.evaluate(()=>localStorage.getItem('ar-pending-orders')),null);
+ // sent: open again, then «أيوه اتبعت»
+ await openCo('المتحدة للأدوية');
+ await page.click('#waBtn');await waitStatus(page,/دوس «أيوه اتبعت»/,'msgStatus');
+ await page.click('#pendingYes');await waitStatus(page,/اتعلّم 2 صنف «اتطلب»/,'msgStatus');
+ assert.equal(await page.evaluate(()=>document.getElementById('pendingOrder').classList.contains('hidden')),true);
  assert.deepEqual((await table('ar_orders')).map(o=>[o.name_key,o.supplier]).sort(),[['FLAGYL 125MG SYP','المتحدة للأدوية'],['JANUVIA 50MG 28TAB','المتحدة للأدوية']]);
  assert.equal(await page.inputValue('#msgText'),sent,'the sent message stays as it was');
  assert.match(await text(page,'#results'),/اتطلب النهارده من المتحدة للأدوية/);
- await page.click('#waBtn');await page.waitForTimeout(200);assert.equal((await table('ar_orders')).length,2,'not marked twice');
+ await page.click('#waBtn');await page.click('#pendingYes');await page.waitForTimeout(200);assert.equal((await table('ar_orders')).length,2,'not marked twice');
  // another company with an ordered item and a new one: the message has only the new one, the other is listed under it
  await openCo('شركة النور');
  const m=await page.inputValue('#msgText');assert.match(m,/بروفين ٤٠٠/);assert.doesNotMatch(m,/فلاجيل/);
