@@ -130,6 +130,7 @@
       drawShort();
       await loadSuppliers();
       await loadOrders();
+      drawPending();
       await loadInbox();
       // opened from the phone's notification (…html#inbox): go straight to the incoming list
       if (location.hash === '#inbox') {
@@ -1127,8 +1128,9 @@
   $('copyKey').onclick = () => copy('keyText', 'المفتاح');
   $('copyUrl').onclick = () => copy('inboxUrl', 'العنوان');
   // ---------- items ordered today («اتطلب») ----------
-  // Opening a company's message in WhatsApp marks its items ordered today: they are left out of the next company's
-  // message, shown as «اتطلب», and the phone does not say them again. The owner can undo a mark («لغي»).
+  // Items ordered today: they are left out of the next company's message, shown as «اتطلب», and the phone does not say
+  // them again. Opening WhatsApp only makes them «جاهز للطلب»; they become «اتطلب» when the owner says the message was
+  // sent («أيوه اتبعت»). The owner can undo a mark («لغي»).
   let orders = [];
   const dayStart = () => {
     const d = new Date();
@@ -1171,6 +1173,51 @@
     drawToday();
     return rows.length;
   }
+  // «جاهز للطلب»: kept on this phone (also after the browser is closed) until the owner answers, one entry per company,
+  // today only. Until then nothing is «اتطلب»: other companies' messages and the phone still include these items.
+  const PENDING = 'ar-pending-orders';
+  const readPending = () => {
+    try {
+      const l = JSON.parse(localStorage.getItem(PENDING) || '[]');
+      return Array.isArray(l) ? l.filter((p) => p && Array.isArray(p.ids) && p.ids.length && String(p.at) >= dayStart()) : [];
+    } catch (e) {
+      return [];
+    }
+  };
+  const writePending = (l) => {
+    try {
+      if (l.length) localStorage.setItem(PENDING, JSON.stringify(l));
+      else localStorage.removeItem(PENDING);
+    } catch (e) {}
+  };
+  function drawPending() {
+    const p = readPending()[0];
+    $('pendingOrder').classList.toggle('hidden', !p);
+    if (p) $('pendingText').textContent = `جاهز للطلب: ${p.ids.length} صنف لـ${p.supplier || 'الشركة'}. الرسالة اتبعتت في الواتس؟`;
+  }
+  $('pendingYes').onclick = async () => {
+    const l = readPending(), p = l[0];
+    if (!p) return drawPending();
+    try {
+      const n = await markOrdered(p.ids, p.supplier);
+      writePending(l.slice(1));
+      drawPending();
+      status('msgStatus', n ? `اتعلّم ${n} صنف «اتطلب» النهارده، فمش هيدخلوا في رسالة شركة تانية.` : 'الأصناف دي متعلّمة «اتطلب» من قبل.', 'good');
+      if (n) {
+        // the message stays as it was sent; the items show «اتطلب»
+        msgEdited = true;
+        drawResults();
+      }
+    } catch (e) {
+      status('msgStatus', 'ماتسجلش «اتطلب»، دوس «أيوه اتبعت» تاني: ' + e.message, 'bad');
+    }
+  };
+  $('pendingNo').onclick = () => {
+    const l = readPending();
+    writePending(l.slice(1));
+    drawPending();
+    status('msgStatus', 'تمام، مفيش صنف اتعلّم «اتطلب».');
+  };
   async function unmarkOrdered(id) {
     const { error } = await client.from('ar_orders').delete().eq('name_key', nk(sName(id))).gte('ordered_at', dayStart());
     if (error) throw Error(error.message);
@@ -1410,7 +1457,10 @@
   }
   $('inboxRefresh').onclick = loadInbox;
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && !$('app').classList.contains('hidden')) loadOrders().then(loadInbox);
+    if (!document.hidden && !$('app').classList.contains('hidden')) {
+      drawPending();
+      loadOrders().then(loadInbox);
+    }
   });
   $('supplier').addEventListener('input', () => {
     const x = suppliers.find((s) => s.name === $('supplier').value.trim());
@@ -1500,16 +1550,13 @@
     const t = $('msgText').value.trim();
     if (!t) return;
     await saveSupplier();
-    // the items in the message (as it is now, after the owner's edits) are marked ordered today from this company
-    let marked = 0;
-    try {
-      marked = await markOrdered(
-        msgItems()
-          .filter((x) => t.includes(x.line))
-          .map((x) => x.id),
-        $('supplier').value.replace(/\s+/g, ' ').trim().slice(0, 80),
-      );
-    } catch (e) {}
+    // the items in the message (as it is now, after the owner's edits) are «جاهز للطلب» from this company, not «اتطلب»
+    const co = $('supplier').value.replace(/\s+/g, ' ').trim().slice(0, 80);
+    const ids = [...new Set(msgItems().filter((x) => t.includes(x.line)).map((x) => x.id))];
+    if (ids.length) {
+      writePending([...readPending().filter((p) => p.supplier !== co), { supplier: co, ids, at: new Date().toISOString() }]);
+      drawPending();
+    }
     const ph = waPhone($('supplierPhone').value);
     const web = `https://wa.me/${ph}?text=${encodeURIComponent(t)}`;
     // On Android, open WhatsApp Business (com.whatsapp.w4b) directly when chosen, instead of whichever WhatsApp
@@ -1521,14 +1568,9 @@
       (ph
         ? 'اتفتحت محادثة الشركة في الواتس، اضغط إرسال هناك.'
         : 'اختار محادثة الشركة في الواتس واضغط إرسال. (لو كتبت رقم الشركة فوق، المرة الجاية هتتفتح محادثتها على طول.)') +
-        (marked ? ` واتعلّم ${marked} صنف «اتطلب» النهارده، فمش هيدخلوا في رسالة شركة تانية.` : ''),
+        (ids.length ? ' بعد ما تبعت ارجع هنا ودوس «أيوه اتبعت»، ولحد كده الأصناف مش هتتعلّم «اتطلب».' : ''),
       'good',
     );
-    if (marked) {
-      // the message stays as it was sent; the items show «اتطلب»
-      msgEdited = true;
-      drawResults();
-    }
   };
   $('copyBtn').onclick = async () => {
     try {
