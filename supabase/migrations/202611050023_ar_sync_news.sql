@@ -1,4 +1,4 @@
-202611050023_ar_sync_news.sql-- 202611050023_ar_sync_news
+-- 202611050023_ar_sync_news
 -- ASKER: the owner's phone says aloud that the shortage list was updated by the laptop (ar_sync_shortages).
 -- Tasker on the phone asks every 15 minutes: POST /rest/v1/rpc/ar_sync_news {"p_key": <the phone's inbox key>}
 -- with header Accept: text/plain. It gets one sentence for the updates not said yet (then they are marked said),
