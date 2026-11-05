@@ -96,6 +96,17 @@ async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schem
   return data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
 }
 
+// The page's «اقرا وقارن»: Google busy (5xx) is tried again twice (after 2 s, then 5 s) before the owner sees an error.
+async function geminiRetry(env: Env, fetchImpl: typeof fetch, parts: unknown[], schema: unknown): Promise<string> {
+  const waits = env.GEMINI_RETRY_WAIT_MS ? [1, 1].map(() => Number(env.GEMINI_RETRY_WAIT_MS)) : [2000, 5000];
+  for (let i = 0; ; i++) {
+    try { return await gemini(env, fetchImpl, parts, schema); } catch (e) {
+      if (i >= waits.length || !/^gemini 5\d\d$/.test((e as Error).message || '')) throw e;
+      await new Promise((r) => setTimeout(r, waits[i]));
+    }
+  }
+}
+
 async function knowledge(env: Env, auth: Auth, fetchImpl: typeof fetch): Promise<Knowledge> {
   const soft = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]);
   const [names, answers, fixes, ignored] = await Promise.all([
@@ -261,6 +272,9 @@ const SEEN_NOTE_MS = 5 * 60 * 1000;
 // a photo not downloaded this long after its notification: WhatsApp's repeats stop making the phone check the folder
 // (it checked every minute and a half for over an hour once); the owner shares it by hand
 const STOP_LOOKING_MS = 15 * 60 * 1000;
+// a photo notification's run waits 20 s and checks the folder twice (about a minute): WhatsApp's repeats in that time
+// start no run of their own (they piled up in Tasker's queue and new messages were dropped)
+const LOOKING_MS = 90 * 1000;
 // a text notification is the same message as a saved one when that one was saved after the notification's time minus this
 const REPEAT_SKEW_MS = 2 * 60 * 1000;
 // Gemini busy (5xx): the photo is saved as not read and the phone is told; it is read again in the background
@@ -522,6 +536,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
         .then((r) => r.ok ? r.json() : []).catch(() => []) as { at: string }[];
       const at = (Array.isArray(first) && first[0]?.at) || (whenMs ? new Date(whenMs).toISOString() : '');
       if (at && Date.parse(at) < Date.now() - STOP_LOOKING_MS) return out(200, { ok: false, media: true, fresh, late: true, say: '' }, say);
+      // the run of that notification is still looking (it waits 20 s and checks the folder twice): no second run now
+      if (at && Date.parse(at) > Date.now() - LOOKING_MS) return out(200, { ok: false, media: true, fresh, looking: true, say: '' }, say);
       const got = at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&kind=neq.text&or=' + encodeURIComponent(`(supplier.eq."${company.name}",maybe.cs.{"${company.name}"})`) + '&received_at=gte.' + encodeURIComponent(at)).catch(() => []) : [];
       if (got.length) return out(200, { ok: false, media: true, fresh, came: true, say: '' }, say);
     }
@@ -719,7 +735,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       if (!MIME_TYPES.includes(mimeType) || !image || !/^[A-Za-z0-9+/=]+$/.test(image)) return reply(400, { error: 'image', message: 'الملف مش واصل صح (صورة JPG أو PNG أو WebP، أو PDF).' }, headers);
       if (Math.floor(image.length * 3 / 4) > MAX_IMAGE_BYTES) return reply(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا.' }, headers);
       const [text, shortages, k] = await Promise.all([
-        gemini(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: mimeType, data: image } }], READ_SCHEMA),
+        geminiRetry(env, fetchImpl, [{ text: READ_PROMPT }, { inline_data: { mime_type: mimeType, data: image } }], READ_SCHEMA),
         restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'),
         knowledge(env, auth, fetchImpl),
       ]);
