@@ -407,6 +407,36 @@ label.check input {
   height: 20px;
   accent-color: var(--crimson);
 }
+/* quantity next to each item in the message to the company */
+label.qty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+label.qty span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+label.qty input {
+  width: 86px;
+  flex: none;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 16px;
+  text-align: center;
+  color: var(--ink);
+  background: #fff;
+}
+.qty-hint {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+}
 .inbox {
   margin: 10px 0 14px;
   padding: 12px 14px;
