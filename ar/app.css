@@ -407,6 +407,11 @@ label.check input {
   height: 20px;
   accent-color: var(--crimson);
 }
+/* how the phone says the item (optional), under its Arabic name in «ترجمة النواقص» */
+.item input.say {
+  margin-top: 6px;
+  font-size: 15px;
+}
 /* quantity next to each item in the message to the company */
 label.qty {
   display: flex;

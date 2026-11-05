@@ -6,7 +6,7 @@
     FN = 'arabic-shortages',
     // The server version this page expects (VERSION in supabase/functions/arabic-shortages/index.ts).
     // tests/shared-matcher.cjs fails when they differ; the page warns when the deployed function is older.
-    SERVER_VERSION = 'ar11',
+    SERVER_VERSION = 'ar12',
     OFFER_MIN = 0.45,
     NOT_LISTED = '*'; // same as NOT_LISTED in the function: «مش واحد منهم» for a whole line
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -25,9 +25,15 @@
   // back later keeps its approved translation. Same key as the function and the database.
   const nk = (s) => key(s).slice(0, 250);
   async function loadNames() {
-    const byKey = new Map(
-      (await all('ar_names', 'name_key,english_name,arabic_name,status')).map((n) => [n.name_key, n]),
-    );
+    let rows;
+    try {
+      // spoken_name: how the phone says the item (optional; migration 202611050027)
+      rows = await all('ar_names', 'name_key,english_name,arabic_name,status,spoken_name');
+    } catch (e) {
+      if (!/spoken_name|column/i.test(e.message)) throw e;
+      rows = await all('ar_names', 'name_key,english_name,arabic_name,status');
+    }
+    const byKey = new Map(rows.map((n) => [n.name_key, n]));
     knownNames = byKey;
     names = new Map();
     shortages.forEach((x) => {
@@ -303,7 +309,7 @@
                 ? ' <span class="pill warn">محتاجة مراجعة</span>'
                 : ' <span class="pill bad">لسه ماتترجمتش</span>'
             : '';
-          return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}${pill}</div>${n ? `<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><button data-ok>${n.status === 'approved' ? 'احفظ التعديل' : 'تمام'}</button>` : '<p class="hint">لسه ماتترجمش.</p>'}</div>`;
+          return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}${pill}</div>${n ? `<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><input type="text" dir="auto" class="say" value="${esc(n.spoken_name || '')}" placeholder="النطق (اختياري): الموبايل يقول الصنف كده" data-say><button data-ok>${n.status === 'approved' ? 'احفظ التعديل' : 'تمام'}</button>` : '<p class="hint">لسه ماتترجمش.</p>'}</div>`;
         })
         .join('') || '<p class="hint">مفيش.</p>';
     $('trMore').classList.toggle('hidden', list.length <= shown);
@@ -314,21 +320,23 @@
           (b.onclick = async () => {
             const box = b.closest('[data-id]'),
               id = box.dataset.id,
-              ar = box.querySelector('[data-ar]').value.replace(/\s+/g, ' ').trim();
+              ar = box.querySelector('[data-ar]').value.replace(/\s+/g, ' ').trim(),
+              sayBox = box.querySelector('[data-say]'),
+              say = sayBox ? sayBox.value.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
             if (ar.length < 2) return;
             b.disabled = true;
             const en = shortages.find((x) => x.id === id)?.product_name || '';
             const before = names.get(id) ? { ...names.get(id) } : null;
-            const { error } = await client.from('ar_names').upsert(
-              {
-                name_key: nk(en),
-                english_name: en,
-                arabic_name: ar,
-                status: 'approved',
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: 'name_key' },
-            );
+            const row = {
+              name_key: nk(en),
+              english_name: en,
+              arabic_name: ar,
+              status: 'approved',
+              updated_at: new Date().toISOString(),
+            };
+            // the spoken form is sent only when it is set or changed, so a database without the column still saves names
+            if (say || before?.spoken_name) row.spoken_name = say.length >= 2 ? say : null;
+            const { error } = await client.from('ar_names').upsert(row, { onConflict: 'name_key' });
             if (error) {
               status('trStatus', 'ماتحفظش: ' + error.message, 'bad');
               b.disabled = false;
@@ -336,8 +344,15 @@
             }
             shortages
               .filter((x) => nk(x.product_name) === nk(en))
-              .forEach((x) => names.set(x.id, { name_key: nk(en), arabic_name: ar, status: 'approved' }));
-            status('trStatus', 'اتحفظ: ' + ar, 'good');
+              .forEach((x) =>
+                names.set(x.id, {
+                  name_key: nk(en),
+                  arabic_name: ar,
+                  status: 'approved',
+                  spoken_name: 'spoken_name' in row ? row.spoken_name : before?.spoken_name || null,
+                }),
+              );
+            status('trStatus', 'اتحفظ: ' + ar + (row.spoken_name ? ` (بيتنطق: ${row.spoken_name})` : ''), 'good');
             drawTranslate();
             savedBar(en, before);
           }),
@@ -364,6 +379,7 @@
               english_name: en,
               arabic_name: before.arabic_name,
               status: before.status,
+              ...('spoken_name' in before ? { spoken_name: before.spoken_name } : {}),
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'name_key' },
