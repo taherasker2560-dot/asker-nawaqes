@@ -143,6 +143,8 @@ assert.equal(F.missingSay('الفتح',['📷 صورة']),'الفتح: بعت ص
  const note=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 صورة','text/plain'),env,g);
  const seen=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1&seen=1','','text/plain'),env,g).then(r=>r.text());
  assert.equal((await note()).status,202);assert.match(await seen(),/مالقيتهاش/);
+ assert.equal((await note()).status,200,'its own run is still looking: no second run');g.media.pop();
+ g.media[0].at=new Date(Date.now()-2*60e3).toISOString();
  for(let i=0;i<3;i++){assert.equal((await note()).status,202,'still checks the folder');assert.equal(await seen(),'')}
  assert.deepEqual(g.media.map(m=>m.fresh),[true,false,false,false]);assert.equal(g.media[1].chat,'المتحدة للأدوية');
  // another chat of the same company has its own last notification
@@ -268,7 +270,7 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 // before it came (not downloaded yet): still 202, so a late download is sent
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
  const note=()=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1','📷 ‏تم إرسال ٤ صور','text/plain'),env,g);
- assert.equal((await note()).status,202);
+ assert.equal((await note()).status,202);g.media[0].at=new Date(Date.now()-2*60e3).toISOString();
  assert.equal((await note()).status,202,'repeat, photo not come yet: still check');
  await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,77]),'application/octet-stream'),env,g);
  assert.equal(g.saved.length,1);
@@ -279,7 +281,9 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake();const t0=Date.now();
  const note=(w)=>F.handle(post('from='+encodeURIComponent('المتحدة للأدوية ~w'+w)+'&say=1','📷 ‏تم إرسال صورة','text/plain'),env,g);
  assert.equal((await note(t0)).status,202);assert.equal(g.media.at(-1).fresh,true);assert.equal(g.media.at(-1).chat,'المتحدة للأدوية');
- assert.equal((await note(t0)).status,202,'same time again, photo not come yet: still check');assert.equal(g.media.at(-1).fresh,false);
+ assert.equal((await note(t0)).status,200,'same time again at once: its run is still looking');
+ g.media[0].at=new Date(t0-2*60e3).toISOString();
+ assert.equal((await note(t0)).status,202,'same time again later, photo not come yet: still check');assert.equal(g.media.at(-1).fresh,false);
  assert.equal((await note(t0+60000)).status,202);assert.equal(g.media.at(-1).fresh,true,'a new message: new time');
  const old=t0-20*60000;assert.equal((await note(old)).status,200,'an old notification shown again');assert.equal(g.media.at(-1).fresh,false);
  assert.equal((await note(Math.floor(old/1000))).status,200,'time in seconds too');

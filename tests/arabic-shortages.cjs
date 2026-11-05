@@ -68,5 +68,9 @@ assert.ok(!b.rows[1].candidates.some(c=>c.id==='s3'),'rejected shortage not sugg
 // security: other accounts refused before any Gemini call
 const g=fake({gem:()=>({})});const other=async(u,o)=>u.endsWith('/auth/v1/user')?new Response(JSON.stringify({email:'x@y.z'})):g(u,o);
 r=await F.handle(req({action:'translate'}),env,other);assert.equal(r.status,403);assert.ok(!g.calls.some(c=>c.url.includes('generativelanguage')));
+// Google busy (503) on the page's «اقرا وقارن»: tried again before an error; a lasting 503 still shows the error
+{const e2={...env,GEMINI_RETRY_WAIT_MS:'1'};let n=0;const g0=fake({names,gem:()=>gemRows});const busy=k=>async(u,o)=>u.startsWith('https://generativelanguage')&&n++<k?new Response('',{status:503}):g0(u,o);
+ let x=await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),e2,busy(2));assert.equal(x.status,200,'two 503s then read');assert.equal(n,3);
+ n=0;x=await F.handle(req({action:'read',image:'aGVsbG8=',mimeType:'image/png'}),e2,busy(9));assert.equal(x.status,502);assert.equal(n,3,'three tries in all');}
 console.log('PASS: arabic-shortages: translate only missing names, read + match Arabic-to-Arabic with strength from the English name, yes/no decisions, owner only');
 })().catch(e=>{console.error(e);process.exitCode=1});
