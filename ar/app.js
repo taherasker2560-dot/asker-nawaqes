@@ -118,9 +118,17 @@
   );
 
   async function loadShortages() {
-    shortages = (await all('ar_shortages', 'id,product_name', (q) => q.eq('is_active', true))).sort((a, b) =>
-      a.product_name.localeCompare(b.product_name),
-    );
+    const active = (q) => q.eq('is_active', true);
+    let rows;
+    try {
+      // suggested_qty: «المطلوب» sent by the pharmacy laptop; order_qty: the quantity the owner typed (wins)
+      rows = await all('ar_shortages', 'id,product_name,suggested_qty,order_qty', active);
+    } catch (e) {
+      // database without the quantity columns yet (migration 202611050026): the list still loads, without quantities
+      if (!/suggested_qty|order_qty|column/i.test(e.message)) throw e;
+      rows = await all('ar_shortages', 'id,product_name', active);
+    }
+    shortages = rows.sort((a, b) => a.product_name.localeCompare(b.product_name));
   }
   async function loadAll() {
     try {
@@ -673,6 +681,11 @@
   excelPicker('xls', 'readStatus', (n, label, btn) => matchLines(n, label, btn));
   const sName = (id) => shortages.find((s) => s.id === id)?.product_name || '',
     aName = (id) => names.get(id)?.arabic_name || '';
+  // the quantity in the message to the company: the owner's (order_qty), else the laptop's suggestion (suggested_qty)
+  const sRow = (id) => shortages.find((s) => s.id === id),
+    qtyNum = (v) => (v === null || v === undefined || v === '' || !isFinite(Number(v)) ? null : Number(v)),
+    qtyOf = (id) => qtyNum(sRow(id)?.order_qty) ?? qtyNum(sRow(id)?.suggested_qty),
+    fmtQty = (q) => (q === null ? '' : String(Math.round(q * 10) / 10));
   const isSure = (r) => r.match && (r.match.confidence === 'high' || r.match.confidence === 'confirmed');
   const options = (r) =>
     (r.candidates || []).filter(
@@ -1506,19 +1519,60 @@
     return out;
   }
   function buildMessage() {
-    const lines = msgItems()
-      .filter((x) => !x.from.length)
-      .map((x) => x.line);
-    if (!lines.length) return '';
+    const items = msgItems().filter((x) => !x.from.length);
+    if (!items.length) return '';
     return [
       'السلام عليكم،',
       'محتاجين من المتاح عندكم:',
-      ...lines.map((l, i) => `${i + 1}- ${l}`),
+      ...items.map((x, i) => `${i + 1}- ${x.line}` + (qtyOf(x.id) === null ? '' : ` — ${fmtQty(qtyOf(x.id))}`)),
       '',
       'صيدلية عسكر',
     ].join('\n');
   }
+  // a quantity box for each item in the message: the suggestion is filled in, the owner changes it before sending
+  function drawQty() {
+    const items = msgItems().filter((x) => !x.from.length);
+    $('msgQty').innerHTML = items.length
+      ? '<p class="hint">الكمية (مقترحة من البرنامج، غيّرها لو حابب، ولو مسحتها يرجع للمقترح):</p>' +
+        items
+          .map((x) => {
+            const sug = fmtQty(qtyNum(sRow(x.id)?.suggested_qty));
+            return `<label class="qty"><span dir="auto">${esc(x.line)}</span><input type="number" min="0" step="1" inputmode="decimal" data-qty="${esc(x.id)}" value="${esc(fmtQty(qtyOf(x.id)))}" placeholder="${esc(sug)}"></label>${sug ? `<p class="hint qty-hint">مقترح: ${esc(sug)}</p>` : ''}`;
+          })
+          .join('')
+      : '';
+  }
+  $('msgQty').addEventListener('change', async (e) => {
+    const id = e.target?.dataset?.qty,
+      s = id && sRow(id);
+    if (!s) return;
+    const raw = String(e.target.value).trim(),
+      v = raw === '' ? null : Math.round(Number(raw) * 10) / 10;
+    if (v !== null && !(v > 0)) {
+      status('msgStatus', 'الكمية لازم تكون رقم أكبر من صفر، أو سيبها فاضية عشان ترجع للمقترح.', 'bad');
+      e.target.value = fmtQty(qtyOf(id));
+      return;
+    }
+    const before = s.order_qty;
+    s.order_qty = v;
+    if (!msgEdited) $('msgText').value = buildMessage();
+    const { error } = await client.from('ar_shortages').update({ order_qty: v }).eq('id', id);
+    if (error) {
+      s.order_qty = before;
+      e.target.value = fmtQty(qtyOf(id));
+      if (!msgEdited) $('msgText').value = buildMessage();
+      status('msgStatus', 'ماتحفظتش الكمية: ' + error.message, 'bad');
+      return;
+    }
+    status(
+      'msgStatus',
+      (v === null ? 'رجعت للكمية المقترحة.' : 'اتحفظت الكمية.') +
+        (msgEdited ? ' الرسالة اتعدّلت بإيدك، فغيّر الرقم فيها بنفسك.' : ''),
+      'good',
+    );
+  });
   function drawMessage() {
+    drawQty();
     if (msgEdited) return;
     const t = buildMessage(),
       skipped = msgItems().filter((x) => x.from.length);
