@@ -19,7 +19,7 @@
 
 import { Catalog, OFFER_MIN, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
 
-export const VERSION = 'ar11';
+export const VERSION = 'ar12';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -31,7 +31,8 @@ const REREAD_TIMEOUT_MS = 120000;
 
 type Env = Record<string, string | undefined>;
 type Shortage = { id: string; product_name: string };
-type ArName = { name_key: string; arabic_name: string; status: string };
+// spoken_name: how the owner wants the phone to say the item (optional, set in the page; migration 202611050027)
+type ArName = { name_key: string; arabic_name: string; status: string; spoken_name?: string | null };
 type Decision = { alias_key: string; read_text: string; name_key: string; decision: 'yes' | 'no' };
 // Same key in the page (asker-nawaqes-arabic.html) and in the database migration.
 export const nameKey = (s: string) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim().slice(0, 250);
@@ -110,7 +111,9 @@ async function geminiRetry(env: Env, fetchImpl: typeof fetch, parts: unknown[], 
 async function knowledge(env: Env, auth: Auth, fetchImpl: typeof fetch): Promise<Knowledge> {
   const soft = <T>(p: Promise<T[]>) => p.catch(() => [] as T[]);
   const [names, answers, fixes, ignored] = await Promise.all([
-    restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
+    // spoken_name is read when the database has it; without it (older database) the names load as before
+    restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status,spoken_name&order=name_key')
+      .catch(() => restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key')),
     restAll<Decision>(env, auth, fetchImpl, 'ar_answers?select=alias_key,read_text,name_key,decision&order=id'),
     soft(restAll<Fix>(env, auth, fetchImpl, 'ar_fixes?select=read_key,corrected_text&order=read_key')),
     soft(restAll<{ alias_key: string }>(env, auth, fetchImpl, 'ar_ignored?select=alias_key&order=alias_key')),
@@ -232,18 +235,23 @@ async function readFileRows(env: Env, fetchImpl: typeof fetch, bytes: Uint8Array
 // Rows matched to the shortages, with the counts kept in ar_inbox (sure, review).
 async function scoreInboxRows(env: Env, auth: Auth, fetchImpl: typeof fetch, rs: Row[]) {
   let list: ReturnType<typeof matchRows> = [];
-  // each shortage's Arabic name in the bot (said when 1 to 3 items came)
-  const arOf = new Map<string, string>(), keyOf = new Map<string, string>();
+  // each shortage's Arabic name in the bot (said when 1 to 3 items came), and the owner's spoken form when set
+  const arOf = new Map<string, string>(), sayOf = new Map<string, string>(), keyOf = new Map<string, string>();
   if (rs.length) {
     const [shortages, k] = await Promise.all([restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'), knowledge(env, auth, fetchImpl)]);
     list = matchRows(rs, shortageCatalog(shortages, k.names, k.answers), k, shortages);
-    const ar = new Map(k.names.map((n) => [n.name_key, n.arabic_name]));
-    for (const s of shortages) { const a = ar.get(nameKey(s.product_name)); if (a) arOf.set(s.id, a); keyOf.set(s.id, nameKey(s.product_name)); }
+    const ar = new Map(k.names.map((n) => [n.name_key, n]));
+    for (const s of shortages) {
+      const n = ar.get(nameKey(s.product_name));
+      if (n?.arabic_name) arOf.set(s.id, n.arabic_name);
+      if (n?.spoken_name && n.spoken_name.trim()) sayOf.set(s.id, n.spoken_name.trim());
+      keyOf.set(s.id, nameKey(s.product_name));
+    }
   }
   const sureIds = new Set(list.filter((r) => r.match?.confidence === 'high' || r.match?.confidence === 'confirmed').map((r) => r.match!.id));
   const review = list.filter((r) => !(r.match?.confidence === 'high' || r.match?.confidence === 'confirmed') && !r.ignored &&
     r.candidates.some((c) => c.numbersOk && c.formOk !== false && (c.score ?? 1) >= OFFER_MIN)).length;
-  return { list, sureIds, review, arOf, keyOf };
+  return { list, sureIds, review, arOf, sayOf, keyOf };
 }
 
 // ---------- automatic incoming (the owner's phone forwards supplier messages) ----------
@@ -395,10 +403,27 @@ export function sayCompanies(text: string, names: string[]): string {
 export function namesSay(company: string, names: string[], review: number): string {
   return `${company}: وصل ${[...new Set(names)].join(' و')}` + (review ? `، و${review} محتاجين تأكيدك` : '');
 }
-// The name said for an item: its Arabic name in the bot, else the supplier's line without notes after «//» or symbols.
-export function spokenName(arabic: string | undefined, line: string): string {
-  if (arabic && arabic.trim()) return arabic.trim();
-  return line.split('//')[0].replace(/[^\p{L}\p{N}\s.%\/-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+// The name said for an item: the owner's spoken form (said exactly), else its Arabic name in the bot, else the supplier's
+// line without notes after «//» or symbols; units are said as words (sayUnits).
+export function spokenName(arabic: string | undefined, line: string, spoken?: string): string {
+  if (spoken && spoken.trim()) return spoken.trim();
+  if (arabic && arabic.trim()) return sayUnits(arabic.trim());
+  return sayUnits(line.split('//')[0].replace(/[^\p{L}\p{N}\s.%\/-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60));
+}
+// Units as the phone should say them: «١٠٠٠مجم» → «١٠٠٠ مللي جرام», «١٢٠مل» → «١٢٠ مللي», «١٥جم» → «١٥ جرام»,
+// «٢٪» → «٢ في المية». A number stuck to a word is split first. Only whole words change («مجموعة» stays).
+const UNIT = (w: string) => new RegExp(`(?<![\\p{L}])(?:${w})(?![\\p{L}])`, 'giu');
+export function sayUnits(s: string): string {
+  return s
+    .replace(/([0-9٠-٩])(?=\p{L})/gu, '$1 ')
+    .replace(/(\p{L})(?=[0-9٠-٩])/gu, '$1 ')
+    .replace(UNIT('مجم|ملجم|مج|ملغ|mg'), 'مللي جرام')
+    .replace(UNIT('مكجم|ميكروجم|mcg'), 'ميكرو جرام')
+    .replace(UNIT('مل|ml'), 'مللي')
+    .replace(UNIT('جم|gm'), 'جرام')
+    .replace(/\s*[%٪]/g, ' في المية')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 // Start of today in Cairo (the pharmacy's day), as an ISO time.
 // Midnight of Cairo's date, found from the clock in Cairo (right also on the day the clock moves for summer time).
@@ -671,7 +696,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     if (before.length) return out(200, { ok: true, id: saved.id, supplier, sure: sureIds.size, review: 0, quiet: true, say: '' }, say);
   }
   if (news.size >= 1 && news.size <= SAY_NAMES) {
-    const said = [...news].map((id) => { const r = out2.find((x) => x.match?.id === id); return spokenName(scored.arOf.get(id), r ? r.corrected || r.name : ''); });
+    const said = [...news].map((id) => { const r = out2.find((x) => x.match?.id === id); return spokenName(scored.arOf.get(id), r ? r.corrected || r.name : '', scored.sayOf.get(id)); });
     return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: namesSay(supplier, said, review) }, say);
   }
   if (!news.size && sureIds.size) return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: `${supplier}: اللي وصل من النواقص اتطلب النهارده` + (review ? `، و${review} محتاجين تأكيدك` : '') }, say);

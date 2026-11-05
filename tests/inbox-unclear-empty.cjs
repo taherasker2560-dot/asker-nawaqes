@@ -40,7 +40,7 @@ const CO='from='+encodeURIComponent('المتحدة للأدوية')+'&say=1';
 // a clear line: sure, said by name (unchanged behaviour)
 let f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});
 let r=await F.handle(post(CO,new Uint8Array([255,216,255,1]),'image/jpeg'),env,f);
-assert.equal(await r.text(),'المتحدة للأدوية: وصل بروفين ٤٠٠ مجم ٣٠ قرص');assert.equal(f.saved[0].sure,1);
+assert.equal(await r.text(),'المتحدة للأدوية: وصل بروفين ٤٠٠ مللي جرام ٣٠ قرص');assert.equal(f.saved[0].sure,1);
 // the same line read unclearly: not sure, the owner is asked to confirm
 f=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB',unclear:true}]})});
 r=await F.handle(post(CO,new Uint8Array([255,216,255,2]),'image/jpeg'),env,f);
