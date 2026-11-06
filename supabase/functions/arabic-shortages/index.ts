@@ -63,6 +63,11 @@ export function arabicLetters(s: string): string {
 }
 const clean = (s: unknown) => typeof s === 'string' ? arabicLetters(s).replace(/[\r\n|]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
 
+// «كوته 2» / «كوتة ٣» on a supplier's line is the company's quota (how many boxes it will give), not a strength: it is
+// dropped with its number, the same way a quantity after | is dropped. Only the whole word counts (كوتيستاد is a product).
+const QUOTA = /(?<![\p{L}])كوت[ةه](?![\p{L}])\s*[:：=\-–]?\s*[0-9٠-٩۰-۹]+(?:[.,٫][0-9٠-٩۰-۹]+)?/gu;
+export const dropQuota = (s: string) => s.replace(QUOTA, ' ').replace(/\s+/g, ' ').trim();
+
 // All rows of a table through PostgREST, 1000 at a time, with the caller's session
 // (auth = 'Bearer <user token>') or with ready headers (the inbox's service-role headers).
 type Auth = string | Record<string, string>;
@@ -209,7 +214,7 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
 // One typed line (or Excel cell) -> a row. Anything after | or a tab is the quantity/price and is dropped.
 // A line with no Arabic letters is an English name, so it is also given as the "english" reading.
 export function lineRow(v: unknown): Row | null {
-  const name = clean(String(v ?? '').split(/[|\t]/)[0]).replace(/^[\s\-–•*\d٠-٩]{0,4}[.)\-–]\s+/, '').trim();
+  const name = dropQuota(clean(String(v ?? '').split(/[|\t]/)[0])).replace(/^[\s\-–•*\d٠-٩]{0,4}[.)\-–]\s+/, '').trim();
   if (name.length < 2 || name.length > 250 || !/[\p{L}]/u.test(name)) return null;
   return { name, english: /[\u0600-\u06FF]/.test(name) ? '' : name.slice(0, 250), unclear: false };
 }
@@ -219,7 +224,7 @@ export function parseRead(text: string): { rows: Row[]; supplier: string } | nul
   let parsed: unknown;
   try { parsed = JSON.parse(text); } catch { return null; }
   const rows: Row[] = (((parsed as { rows?: unknown[] })?.rows) || []).slice(0, 600)
-    .map((r) => ({ name: clean((r as Row)?.name), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
+    .map((r) => ({ name: dropQuota(clean((r as Row)?.name)), english: clean((r as Row)?.english).slice(0, 250), unclear: (r as Row)?.unclear === true }))
     .filter((r) => r.name.length >= 2 && r.name.length <= 250);
   return { rows, supplier: clean((parsed as { supplier?: unknown })?.supplier).slice(0, 80) };
 }

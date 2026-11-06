@@ -17,6 +17,7 @@ const STOP = new Set([
   'امبول', 'امبولات', 'فيال', 'حقن', 'كريم', 'جل', 'جيل', 'مرهم', 'نقط', 'نقطه', 'قطره', 'بخاخ', 'لبوس', 'كيس', 'اكياس',
   'غسول', 'لوسيون', 'لوشن', 'سبراي', 'اسبراي', 'برطمان', 'شريط', 'عادي', 'جديد', 'قديم', 'انتبه', 'بديل', 'فوار',
   'صغير', 'كبير', 'وحده', 'وحدة', 'محلول', 'معلق', 'فم', 'للفم', 'عضل', 'وريدي',
+  'كوته', // the supplier's quota (كوته 2): its number is dropped when the line is read, the word alone must not count either
   'MG', 'MCG', 'ML', 'G', 'GM', 'GR', 'TAB', 'TABS', 'TABLET', 'TABLETS', 'CAP', 'CAPS', 'CAPSULE', 'CAPSULES', 'SYP', 'SYRUP',
   'SUSP', 'SUSPENSION', 'AMP', 'AMPS', 'AMPOULE', 'VIAL', 'VIALS', 'INJ', 'CREAM', 'CR', 'GEL', 'OINT', 'OINTMENT', 'DROPS',
   'DROP', 'DRP', 'SPRAY', 'SUPP', 'SUPPOSITORIES', 'SACH', 'SACHET', 'SACHETS', 'LOTION', 'WASH', 'SOL', 'SOLUTION',
