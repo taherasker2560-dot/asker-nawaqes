@@ -26,7 +26,7 @@ run('share from WhatsApp, ready message, companies',async({page,fixture,table})=
 run('Android opens WhatsApp Business',async({page})=>{
  await page.addInitScript(()=>Object.defineProperty(navigator,'userAgent',{get:()=>'Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile'}));
  await page.reload();await page.waitForFunction(()=>/\d/.test(document.getElementById('shStats')?.textContent||''));
- await page.click('[data-tab="read"]');await page.click('[data-src="text"]');await page.fill('#pasteText','فلاجيل شراب ١٢٥');await page.click('#textBtn');await waitStatus(page,/اتقرا/);
+ await page.click('[data-tab="read"]');await page.click('[data-sub="manual"]');await page.click('[data-src="text"]');await page.fill('#pasteText','فلاجيل شراب ١٢٥');await page.click('#textBtn');await waitStatus(page,/اتقرا/);
  await page.evaluate(()=>{window.__urls=[];window.__openUrl=u=>window.__urls.push(u);window.open=u=>window.__urls.push(u)});
  await page.fill('#supplierPhone','01112223334');await page.click('#waBtn');await page.waitForTimeout(200);
  const [u]=await page.evaluate(()=>window.__urls);
@@ -35,7 +35,7 @@ run('Android opens WhatsApp Business',async({page})=>{
  assert.match((await page.evaluate(()=>window.__urls))[1],/^https:\/\/wa\.me\/201112223334\?text=/,'unchecked: normal link');
 });
 run('paste copied WhatsApp messages',async({page})=>{
- await page.click('[data-tab="read"]');await page.click('[data-src="text"]');
+ await page.click('[data-tab="read"]');await page.click('[data-sub="manual"]');await page.click('[data-src="text"]');
  await page.click('#pasteBtn');await page.waitForTimeout(300);assert.match(await text(page,'#readStatus'),/مالقيتش كلام منسوخ/);
  await page.evaluate(()=>navigator.clipboard.writeText('[10:15, 28/10] المتحدة: فلاجيل شراب ١٢٥\nجانوفيا ٥٠ مجم'));
  await page.click('#pasteBtn');await waitStatus(page,/اتقرا/);
