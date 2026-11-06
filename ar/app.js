@@ -94,8 +94,43 @@
     $('loginCard').classList.toggle('hidden', on);
     $('app').classList.toggle('hidden', !on);
     $('logoutBtn').classList.toggle('hidden', !on);
+    if (!on) $('dataAge').classList.add('hidden');
     if (on) await loadAll();
   }
+  // ---------- «حسب داتا الساعة …»: how old the list's pharmacy data is (ar/data-age.js) ----------
+  // The newest successful send from the laptop (ar_sync_log). A failed read keeps the strip as it was.
+  let dataAgeRow = null;
+  async function loadDataAge() {
+    try {
+      const { data, error } = await client
+        .from('ar_sync_log')
+        .select('at,data_at')
+        .eq('dry_run', false)
+        .eq('status', 'ok')
+        .order('at', { ascending: false })
+        .limit(1);
+      if (error) throw Error(error.message);
+      dataAgeRow = (data && data[0]) || null;
+      drawDataAge();
+    } catch (e) {
+      console.warn('data age:', e.message);
+    }
+  }
+  function drawDataAge() {
+    const d = window.AskerDataAge.describe(dataAgeRow);
+    $('dataAge').className = 'dataage ' + d.level;
+    $('dataAgeText').textContent = d.text;
+    $('dataAgeAgo').textContent = d.ago;
+    $('dataAgeMore').innerHTML = d.details.map(esc).join('<br>');
+  }
+  $('dataAge').onclick = () => {
+    const open = $('dataAge').getAttribute('aria-expanded') !== 'true';
+    $('dataAge').setAttribute('aria-expanded', String(open));
+    $('dataAgeMore').classList.toggle('hidden', !open);
+  };
+  setInterval(() => {
+    if (!document.hidden && !$('app').classList.contains('hidden')) loadDataAge();
+  }, 5 * 60e3);
   $('loginBtn').onclick = async () => {
     status('loginStatus', 'بيدخل…');
     const { error } = await client.auth.signInWithPassword({
@@ -138,6 +173,7 @@
   }
   async function loadAll() {
     try {
+      loadDataAge();
       await loadShortages();
       await loadNames();
       drawTranslate();
@@ -1487,6 +1523,7 @@
   $('inboxRefresh').onclick = loadInbox;
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && !$('app').classList.contains('hidden')) {
+      loadDataAge();
       drawPending();
       loadOrders().then(loadInbox);
     }

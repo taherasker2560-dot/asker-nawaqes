@@ -88,6 +88,66 @@ body {
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* ---------- data age strip («حسب داتا الساعة …», ar/data-age.js) ---------- */
+.dataage {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  padding: 9px 16px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  text-align: start;
+  font-size: 14.5px;
+}
+.dataage:active {
+  transform: none;
+}
+.dataage .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.dataage .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+.dataage small {
+  margin-inline-start: auto;
+  font-size: 12.5px;
+  font-weight: 400;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+.dataage .more {
+  display: block;
+  max-width: 720px;
+  margin: 4px auto 0;
+  padding-inline-start: 18px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.7;
+}
+.dataage.good {
+  background: var(--good-bg);
+  color: var(--good);
+}
+.dataage.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.dataage.bad {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
 /* ---------- layout ---------- */
 main {
   max-width: 720px;
