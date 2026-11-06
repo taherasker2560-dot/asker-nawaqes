@@ -3,7 +3,7 @@
 const {run,assert}=require('./harness.cjs');
 const CACHE='ar-cache-v1',ready=p=>p.waitForFunction(()=>/\d/.test(document.getElementById('shStats')?.textContent||''),null,{timeout:15000});
 const reads=(page,t)=>page.evaluate(t=>window.__reads.filter(r=>!t||r.table===t),t);
-const reload=async(page,store={})=>{await page.evaluate(s=>{for(const k of['__fakeDelay','__fakeNames','ar-cache-v1'])localStorage.removeItem(k);for(const[k,v]of Object.entries(s))localStorage.setItem(k,v)},store);await page.reload()};
+const reload=async(page,store={})=>{await page.evaluate(s=>{for(const k of['__fakeDelay','__fakeNames','__fakeFail','ar-cache-v1'])localStorage.removeItem(k);for(const[k,v]of Object.entries(s))localStorage.setItem(k,v)},store);await page.reload()};
 const strongs=page=>page.$$eval('#shStats .stat strong',e=>e.map(x=>x.textContent.trim()));
 
 run('fast opening',async({page})=>{
@@ -22,7 +22,7 @@ run('fast opening',async({page})=>{
  // 3) a long table: first page, then the next two together, nothing missed (the list's own names are the last rows)
  await reload(page,{__fakeNames:'2497'});await ready(page);await page.waitForTimeout(300);
  assert.equal((await reads(page,'ar_names')).length,3,'names: page 1, then pages 2 and 3 together');
- assert.deepEqual(await strongs(page),['3','3','3'],'names from the last page reached the list');
+ assert.equal(await page.$$eval('#shList .sr-ar',e=>e.filter(x=>/ع s\d/.test(x.textContent)).length),3,'names from the last page reached the list');
 
  // 4) saved on the phone after a full load
  await reload(page);await ready(page);await page.waitForTimeout(2200);
@@ -42,6 +42,12 @@ run('fast opening',async({page})=>{
  await page.reload();await page.waitForTimeout(1200);
  assert.equal((await page.textContent('#shStats')).trim(),'','nothing shown before the server answers');
  await page.waitForFunction(()=>document.querySelector('#shStats .stat strong')?.textContent.trim()==='3',null,{timeout:15000});
+
+ // 6b) the server cannot be reached: the saved list stays, with a clear note
+ await page.evaluate(k=>{localStorage.setItem(k,JSON.stringify({uid:'u1',at:Date.now(),shortages:[{id:'c1',product_name:'CACHED ITEM'}],names:[],suppliers:[]}));localStorage.setItem('__fakeFail','ar_shortages');localStorage.removeItem('__fakeDelay')},CACHE);
+ await page.reload();await ready(page);
+ await page.waitForFunction(()=>/النت واقف/.test(document.getElementById('shNote').textContent),null,{timeout:10000});
+ assert.match(await page.textContent('#shList'),/CACHED ITEM/,'the saved list stays');
 
  // 7) logout forgets the saved data
  await reload(page);await ready(page);await page.waitForTimeout(2200);
