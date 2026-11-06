@@ -208,6 +208,7 @@
       (b.onclick = () => {
         document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('secondary', x !== b));
         $('shortPanel').classList.toggle('hidden', b.dataset.tab !== 'short');
+        if (b.dataset.tab === 'short') drawShort(); // names may have changed in the other tabs
         $('translatePanel').classList.toggle('hidden', b.dataset.tab !== 'translate');
         $('readPanel').classList.toggle('hidden', b.dataset.tab !== 'read');
       }),
@@ -255,10 +256,11 @@
       drawShort();
       applySuppliers((await asked[2]) ?? (cached ? cached.suppliers || [] : []));
       orders = await asked[3];
+      drawShort(); // the «اتطلب» marks need the orders
       drawPending();
       inbox = await asked[4];
       drawInbox();
-      if (cached) status('shStatus', '');
+      if (cached) status('shNote', '');
       cacheReady = true;
       saveCache();
       // opened from the phone's notification (…html#inbox): go straight to the incoming list
@@ -270,16 +272,106 @@
       return true;
     } catch (e) {
       status('trStatus', 'تعذّر التحميل: ' + e.message, 'bad');
-      if (cached) status('shStatus', 'النت واقف: ده آخر داتا اتحفظت على الموبايل، مش لسه محدّثة.', 'bad');
+      if (cached) status('shNote', 'النت واقف: ده آخر داتا اتحفظت على الموبايل، مش لسه محدّثة.', 'bad');
       return false;
     }
   }
 
   // ---------- shortages (this bot's own list) ----------
+  // The list itself: search, a view (alphabetical / most needed / ordered today / no Arabic name) and one row per item.
+  // Read-only; the quantity is the owner's (order_qty) if he typed one, else the laptop's suggestion (suggested_qty).
+  let shView = 'alpha',
+    shQuery = '';
+  const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  // for searching and sorting: western digits, no diacritics, one form of alef / yaa / taa marbuta, upper case
+  const normAr = (s) =>
+    String(s || '')
+      .toUpperCase()
+      .replace(/[٠-٩]/g, (d) => AR_DIGITS.indexOf(d))
+      .replace(/[ً-ٰٟـ]/g, '')
+      .replace(/[أإآٱ]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const arSort = new Intl.Collator('ar');
+  // the letter an item is filed under: digits first, then the Arabic letters, then names with no Arabic name
+  const letterOf = (s) => {
+    const c = normAr(aName(s.id) || s.product_name).charAt(0);
+    return /\d/.test(c) ? '١٢٣' : /[ا-ي]/.test(c) ? c : 'A-Z';
+  };
+  const LETTER_ORDER = (l) => (l === '١٢٣' ? 0 : l === 'A-Z' ? 2 : 1);
   function drawShort() {
+    // the companies each item was ordered from today (same answer as orderedFrom, worked out once for the whole list)
+    const ordBy = new Map();
+    orders.forEach((o) => ordBy.set(o.name_key, [...(ordBy.get(o.name_key) || []), o.supplier || '']));
+    const fromOf = (s) => ordBy.get(nk(s.product_name)) || [],
+      orderedNow = (s) => fromOf(s).length > 0,
+      written = (s) => qtyNum(s.order_qty) !== null,
+      noAr = shortages.filter((s) => !names.has(s.id)).length;
     $('shStats').innerHTML =
-      `<div class="stat"><strong>${shortages.length}</strong>صنف في النواقص</div><div class="stat"><strong>${shortages.filter((s) => names.has(s.id)).length}</strong>ليهم اسم عربي</div><div class="stat"><strong>${[...names.values()].filter((n) => n.status === 'approved').length}</strong>اتأكدت منك</div>`;
+      `<div class="stat"><strong>${shortages.length}</strong>صنف</div><div class="stat"><strong>${shortages.filter(orderedNow).length}</strong>اتطلب النهارده</div><div class="stat"><strong>${shortages.filter(written).length}</strong>كمية كتبتها</div>`;
+    if (shView === 'noar' && !noAr) shView = 'alpha';
+    const chips = [
+      ['alpha', 'أبجدي'],
+      ['qty', 'الأكتر مطلوب'],
+      ['ordered', 'اتطلب النهارده'],
+      ...(noAr ? [['noar', `من غير اسم عربي ${noAr}`]] : []),
+    ];
+    $('shChips').innerHTML = chips
+      .map(([v, t]) => `<button type="button" class="chip${v === shView ? ' on' : ''}" data-view="${v}" aria-pressed="${v === shView}">${esc(t)}</button>`)
+      .join('');
+    const words = normAr(shQuery).split(' ').filter(Boolean);
+    let rows = shortages.filter((s) => {
+      if (shView === 'ordered' && !orderedNow(s)) return false;
+      if (shView === 'noar' && names.has(s.id)) return false;
+      const hay = normAr(aName(s.id)) + ' ' + normAr(s.product_name);
+      return words.every((w) => hay.includes(w));
+    });
+    const shown = rows.length;
+    const byName = (a, b) => arSort.compare(normAr(aName(a.id) || a.product_name), normAr(aName(b.id) || b.product_name));
+    if (shView === 'qty') rows = rows.sort((a, b) => (qtyOf(b.id) ?? -1) - (qtyOf(a.id) ?? -1) || byName(a, b));
+    else rows = rows.sort(byName);
+    const row = (s) => {
+      const q = qtyOf(s.id),
+        from = fromOf(s),
+        ar = aName(s.id),
+        pill = from.length ? ` <span class="pill good">اتطلب${esc(who(from))}</span>` : '',
+        miss = ar ? '' : ' <span class="pill warn">لسه ماتترجمش</span>';
+      return `<div class="srow"><div class="sr-main"><div class="sr-ar" dir="auto">${esc(ar || s.product_name)}${pill}${miss}</div>${ar ? `<div class="sr-en" dir="ltr">${esc(s.product_name)}</div>` : ''}</div>${q === null ? '' : `<div class="qty${written(s) ? ' own' : ''}"${written(s) ? ' title="الكمية اللي كتبتها"' : ''}>${esc(fmtQty(q))}</div>`}</div>`;
+    };
+    let html = '';
+    if (shView === 'alpha') {
+      const groups = new Map();
+      rows.forEach((s) => groups.set(letterOf(s), [...(groups.get(letterOf(s)) || []), s]));
+      html = [...groups.entries()]
+        .sort(([a], [b]) => LETTER_ORDER(a) - LETTER_ORDER(b) || arSort.compare(a, b))
+        // one box per letter, so each sticky letter lets go when its group ends
+        .map(([l, list]) => `<div class="sr-group"><div class="sr-letter">${esc(l)}</div>${list.map(row).join('')}</div>`)
+        .join('');
+    } else html = rows.map(row).join('');
+    $('shList').innerHTML = html || `<p class="hint sr-empty">${shortages.length ? 'مفيش صنف بالشكل ده.' : 'مفيش نواقص لسه.'}</p>`;
+    $('shCount').textContent = `عرض ${shown} من ${shortages.length}`;
+    $('shCount').classList.toggle('hidden', shown === shortages.length);
+    document.documentElement.style.setProperty('--sticky-top', (document.querySelector('.appbar')?.offsetHeight || 72) + 'px');
   }
+  $('shChips').onclick = (e) => {
+    const b = e.target.closest('[data-view]');
+    if (!b) return;
+    shView = b.dataset.view;
+    drawShort();
+  };
+  $('shSearch').addEventListener('input', () => {
+    shQuery = $('shSearch').value;
+    $('shClear').classList.toggle('hidden', !shQuery);
+    drawShort();
+  });
+  $('shClear').onclick = () => {
+    $('shSearch').value = shQuery = '';
+    $('shClear').classList.add('hidden');
+    $('shSearch').focus();
+    drawShort();
+  };
   // PharmaFly's shortage report cuts names at 25 letters (MOVIPREP POWDER ORAL SOLU). A cut name that is the start of
   // exactly one product this bot already knows (translated before, or in the list now) gets that product's full name
   // back, so it keeps its Arabic name and matches as well as before.
@@ -1308,6 +1400,7 @@
   }
   async function loadOrders() {
     orders = await fetchOrders();
+    drawShort();
   }
   // the companies an item was ordered from today ('' when marked without a company)
   const orderedFrom = (id) => {
