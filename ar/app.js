@@ -24,15 +24,16 @@
   // Arabic names and answers are kept per product (English name), so an item that leaves the shortage list and comes
   // back later keeps its approved translation. Same key as the function and the database.
   const nk = (s) => key(s).slice(0, 250);
-  async function loadNames() {
-    let rows;
+  async function fetchNames() {
     try {
       // spoken_name: how the phone says the item (optional; migration 202611050027)
-      rows = await all('ar_names', 'name_key,english_name,arabic_name,status,spoken_name');
+      return await all('ar_names', 'name_key,english_name,arabic_name,status,spoken_name');
     } catch (e) {
       if (!/spoken_name|column/i.test(e.message)) throw e;
-      rows = await all('ar_names', 'name_key,english_name,arabic_name,status');
+      return await all('ar_names', 'name_key,english_name,arabic_name,status');
     }
+  }
+  function applyNames(rows) {
     const byKey = new Map(rows.map((n) => [n.name_key, n]));
     knownNames = byKey;
     names = new Map();
@@ -40,6 +41,10 @@
       const n = byKey.get(nk(x.product_name));
       if (n) names.set(x.id, n);
     });
+  }
+  async function loadNames() {
+    applyNames(await fetchNames());
+    saveCache();
   }
   const status = (id, m, cls = '') => {
     $(id).textContent = m;
@@ -75,27 +80,77 @@
     return data;
   }
   let warnedVersion = false;
+  // every row of a table, 1000 per page: after the first page the next pages come two at a time
   async function all(table, cols, q = (x) => x) {
-    const out = [];
-    for (let from = 0; ; from += 1000) {
+    const page = async (from) => {
       const { data, error } = await q(client.from(table).select(cols))
         .order(table === 'ar_names' ? 'name_key' : 'id')
         .range(from, from + 999);
       if (error) throw Error(error.message);
-      out.push(...(data || []));
-      if (!data || data.length < 1000) return out;
+      return data || [];
+    };
+    let last = await page(0);
+    const out = [...last];
+    for (let from = 1000; last.length === 1000; from += 2000) {
+      const [a, b] = await Promise.all([page(from), page(from + 1000)]);
+      out.push(...a, ...b);
+      last = b;
+    }
+    return out;
+  }
+
+  // ---------- last data kept on the phone: the page opens on it at once, then updates ----------
+  // Only the list, the Arabic names and the companies (no messages, no customer data); removed on logout.
+  const CACHE_KEY = 'ar-cache-v1';
+  let currentUid = null,
+    cacheReady = false, // true once a full load worked: a half-loaded page must never overwrite the saved data
+    cacheTimer = null;
+  function saveCache() {
+    clearTimeout(cacheTimer);
+    cacheTimer = setTimeout(() => {
+      try {
+        if (!currentUid || !cacheReady) return;
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({ uid: currentUid, at: Date.now(), shortages, names: [...knownNames.values()], suppliers, dataAge: dataAgeRow }),
+        );
+      } catch (e) {}
+    }, 1500);
+  }
+  function readCache(uid) {
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      return c && c.uid === uid && Array.isArray(c.shortages) && Array.isArray(c.names) ? c : null;
+    } catch (e) {
+      return null;
     }
   }
 
   // ---------- login ----------
+  // loadedFor / loadingFor: the page loads once per sign-in (the auth listener and the first call both ask for it)
+  let loadedFor = null,
+    loadingFor = null;
   async function refresh() {
     const { data } = await client.auth.getSession();
     const on = !!data.session;
     $('loginCard').classList.toggle('hidden', on);
     $('app').classList.toggle('hidden', !on);
     $('logoutBtn').classList.toggle('hidden', !on);
-    if (!on) $('dataAge').classList.add('hidden');
-    if (on) await loadAll();
+    if (!on) {
+      $('dataAge').classList.add('hidden');
+      currentUid = loadedFor = loadingFor = null;
+      cacheReady = false;
+      try {
+        localStorage.removeItem(CACHE_KEY);
+      } catch (e) {}
+      return;
+    }
+    const uid = data.session.user.id;
+    if (loadedFor === uid || loadingFor === uid) return;
+    loadingFor = currentUid = uid;
+    const ok = await loadAll(uid);
+    if (loadingFor === uid) loadingFor = null;
+    if (ok && currentUid === uid) loadedFor = uid;
   }
   // ---------- «حسب داتا الساعة …»: how old the list's pharmacy data is (ar/data-age.js) ----------
   // The newest successful send from the laptop (ar_sync_log). A failed read keeps the strip as it was.
@@ -158,7 +213,7 @@
       }),
   );
 
-  async function loadShortages() {
+  async function fetchShortages() {
     const active = (q) => q.eq('is_active', true);
     let rows;
     try {
@@ -169,27 +224,54 @@
       if (!/suggested_qty|order_qty|column/i.test(e.message)) throw e;
       rows = await all('ar_shortages', 'id,product_name', active);
     }
-    shortages = rows.sort((a, b) => a.product_name.localeCompare(b.product_name));
+    return rows.sort((a, b) => a.product_name.localeCompare(b.product_name));
   }
-  async function loadAll() {
-    try {
-      loadDataAge();
-      await loadShortages();
-      await loadNames();
+  async function loadShortages() {
+    shortages = await fetchShortages();
+    saveCache();
+  }
+  // Opens on the data saved on the phone (if it belongs to this sign-in), then asks the server for everything at once
+  // and shows it in the same order as before. Returns true when the data loaded.
+  async function loadAll(uid) {
+    const cached = readCache(uid);
+    if (cached) {
+      shortages = cached.shortages;
+      applyNames(cached.names);
+      applySuppliers(cached.suppliers || []);
+      if (cached.dataAge) {
+        dataAgeRow = cached.dataAge;
+        drawDataAge();
+      }
       drawTranslate();
       drawShort();
-      await loadSuppliers();
-      await loadOrders();
+    }
+    try {
+      loadDataAge();
+      const asked = [fetchShortages(), fetchNames(), fetchSuppliers(), fetchOrders(), fetchInbox()];
+      asked.forEach((p) => p.catch(() => {})); // an answer nobody is waiting for yet is not an error
+      shortages = await asked[0];
+      applyNames(await asked[1]);
+      drawTranslate();
+      drawShort();
+      applySuppliers((await asked[2]) ?? (cached ? cached.suppliers || [] : []));
+      orders = await asked[3];
       drawPending();
-      await loadInbox();
+      inbox = await asked[4];
+      drawInbox();
+      if (cached) status('shStatus', '');
+      cacheReady = true;
+      saveCache();
       // opened from the phone's notification (…html#inbox): go straight to the incoming list
       if (location.hash === '#inbox') {
         document.querySelector('[data-tab="read"]').click();
         $('inboxBox').scrollIntoView({ block: 'start' });
       }
       await takeShare();
+      return true;
     } catch (e) {
       status('trStatus', 'تعذّر التحميل: ' + e.message, 'bad');
+      if (cached) status('shStatus', 'النت واقف: ده آخر داتا اتحفظت على الموبايل، مش لسه محدّثة.', 'bad');
+      return false;
     }
   }
 
@@ -1105,16 +1187,24 @@
     else if (/^00\d+/.test(d)) d = d.slice(2);
     return /^\d{8,15}$/.test(d) ? d : '';
   };
-  async function loadSuppliers() {
+  // the saved companies, or null when they could not be read
+  async function fetchSuppliers() {
     try {
-      const { data } = await client.from('ar_suppliers').select('name,phone').order('name');
-      suppliers = data || [];
+      const { data, error } = await client.from('ar_suppliers').select('name,phone').order('name');
+      return error ? null : data || [];
     } catch (e) {
-      suppliers = [];
+      return null;
     }
+  }
+  function applySuppliers(list) {
+    suppliers = list;
     $('supplierList').innerHTML = suppliers.map((x) => `<option value="${esc(x.name)}">`).join('');
     drawSupplierRows();
     drawSupplierPick();
+  }
+  async function loadSuppliers() {
+    applySuppliers((await fetchSuppliers()) ?? []);
+    saveCache();
   }
   // «غيّر الشركة (المندوب)»: every saved company, whatever is written in the box now (the list under the box only
   // shows names like the one already written). Picking one writes its name and its number (or empties the number).
@@ -1202,7 +1292,7 @@
     d.setHours(0, 0, 0, 0);
     return d.toISOString();
   };
-  async function loadOrders() {
+  async function fetchOrders() {
     try {
       const { data, error } = await client
         .from('ar_orders')
@@ -1211,10 +1301,13 @@
         .order('ordered_at', { ascending: true })
         .limit(2000);
       if (error) throw Error(error.message);
-      orders = data || [];
+      return data || [];
     } catch (e) {
-      orders = [];
+      return [];
     }
+  }
+  async function loadOrders() {
+    orders = await fetchOrders();
   }
   // the companies an item was ordered from today ('' when marked without a company)
   const orderedFrom = (id) => {
@@ -1309,7 +1402,7 @@
     }
     return [...g.values()];
   }
-  async function loadInbox() {
+  async function fetchInbox() {
     try {
       const since = new Date(Date.now() - 3 * 864e5).toISOString();
       const { data, error } = await client
@@ -1321,11 +1414,14 @@
         .order('received_at', { ascending: false })
         .limit(200);
       if (error) throw Error(error.message);
-      inbox = data || [];
       // hidden messages are kept (never deleted): they are the original record and stop WhatsApp's repeats being read again
+      return data || [];
     } catch (e) {
-      inbox = [];
+      return [];
     }
+  }
+  async function loadInbox() {
+    inbox = await fetchInbox();
     drawInbox();
   }
   function drawInbox() {
