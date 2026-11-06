@@ -213,6 +213,16 @@
         $('readPanel').classList.toggle('hidden', b.dataset.tab !== 'read');
       }),
   );
+  // «الوارد» has three small tabs: today (the automatic inbox), reading by hand, and the companies / phone link.
+  // The status line, the results and the message to the company sit under the first two and are hidden under «الشركات».
+  function showSub(name) {
+    document.querySelectorAll('[data-sub]').forEach((b) => b.classList.toggle('secondary', b.dataset.sub !== name));
+    $('subToday').classList.toggle('hidden', name !== 'today');
+    $('subManual').classList.toggle('hidden', name !== 'manual');
+    $('subCompanies').classList.toggle('hidden', name !== 'companies');
+    $('readOut').classList.toggle('hidden', name === 'companies');
+  }
+  document.querySelectorAll('[data-sub]').forEach((b) => (b.onclick = () => showSub(b.dataset.sub)));
 
   async function fetchShortages() {
     const active = (q) => q.eq('is_active', true);
@@ -1519,6 +1529,10 @@
   }
   function drawInbox() {
     const groups = inboxGroups();
+    // the number on the «النهارده» tab: companies with something new, and photos still waiting for their company
+    const fresh = groups.filter((g) => g.maybe || g.items.some((x) => x.status === 'new')).length;
+    $('subBadge').textContent = fresh;
+    $('subBadge').classList.toggle('hidden', !fresh);
     const time = (t) => new Date(t).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' });
     $('inboxList').innerHTML =
       groups
@@ -1686,6 +1700,7 @@
     await loadInbox();
   };
   async function openInbox(g) {
+    showSub('today');
     newRun();
     results = [];
     for (const x of [...g.items].reverse())
@@ -1813,8 +1828,21 @@
       'good',
     );
   });
+  // who the message goes to, shown on the message itself (the company box is on the «قراية بإيدك» tab)
+  function drawMsgTo() {
+    const co = $('supplier').value.trim(),
+      ph = $('supplierPhone').value.trim();
+    $('msgTo').textContent = co ? `الرسالة لـ ${co}${ph ? ' · ' + ph : ''}` : 'اختار الشركة الأول (من «غيّر الشركة»)';
+  }
+  $('msgChange').onclick = () => {
+    showSub('manual');
+    $('supplier').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('supplier').focus();
+  };
+  $('supplierPhone').addEventListener('input', drawMsgTo);
   function drawMessage() {
     drawQty();
+    drawMsgTo();
     if (msgEdited) return;
     const t = buildMessage(),
       skipped = msgItems().filter((x) => x.from.length);
@@ -1914,6 +1942,7 @@
     pendingShare = null;
     history.replaceState(null, '', location.pathname);
     document.querySelector('[data-tab="read"]').click();
+    showSub('manual');
     if (id === 'error' || !('caches' in window)) {
       status('readStatus', 'الملفات اللي اتشاركت ماوصلتش؛ شاركها تاني أو اختارها من هنا.', 'bad');
       return;

@@ -2,7 +2,7 @@
 const {run,text,waitStatus,assert}=require('./harness.cjs');
 run('ignore, correct and re-match, undo',async({page,fixture,table})=>{
  await page.click('[data-tab="translate"]');await page.click('#trOne');await page.waitForTimeout(500);
- await page.click('[data-tab="read"]');await page.setInputFiles('#images',fixture('lines0.png'));await page.click('#readBtn');await waitStatus(page,/اتقرا/);
+ await page.click('[data-tab="read"]');await page.click('[data-sub="manual"]');await page.setInputFiles('#images',fixture('lines0.png'));await page.click('#readBtn');await waitStatus(page,/اتقرا/);
  const open=()=>page.evaluate(()=>document.querySelectorAll('#results details').forEach(d=>d.open=true));
  await open();await page.click('[data-ignore]');await page.waitForTimeout(300);
  assert.deepEqual((await table('ar_ignored')).map(x=>x.read_text),['بانادول اكسترا']);assert.match(await text(page,'#results'),/اتخبّى 1/);
