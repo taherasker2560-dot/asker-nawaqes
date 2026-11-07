@@ -81,7 +81,15 @@
       })
       .filter((x) => x.supplier_name);
   }
-  const api = { normName, parseCsv, metaFromFileName, rowsFromDraft };
+  // Search filter over every warehouse line (owner, 2026-11-07: lines we do not stock are a source too): the Arabic name
+  // (normalized like name_norm) or the PharmaFly name. Characters that would break the filter are dropped; '' = no search.
+  function searchFilter(q) {
+    const clean = (s) => String(s ?? '').replace(/[,()*%"\\:]/g, ' ').replace(/\s+/g, ' ').trim();
+    const ar = clean(normName(q)), en = clean(q);
+    if (ar.length < 2 && en.length < 2) return '';
+    return `name_norm.ilike."*${ar}*",pharmafly_name.ilike."*${en}*"`;
+  }
+  const api = { normName, parseCsv, metaFromFileName, rowsFromDraft, searchFilter };
   if (typeof module !== 'undefined') module.exports = api;
   root.AskerSuppliersLib = api;
   if (typeof document === 'undefined') return;
@@ -307,8 +315,44 @@
     }
   }
 
+  // Search every warehouse line of every list, whether we stock the item or not; best discount first.
+  let searchTimer = null, searchSeq = 0;
+  async function search(q) {
+    const seq = ++searchSeq;
+    const box = $('spFound'), note = $('spSearchNote');
+    const f = searchFilter(q);
+    if (!f) { box.innerHTML = ''; note.classList.add('hidden'); return; }
+    const { data, error } = await db()
+      .from('ar_supplier_items')
+      .select('supplier,list_date,supplier_name,price,discount_pct,pharmafly_name,review,match_status')
+      .or(f)
+      .order('discount_pct', { ascending: false })
+      .limit(60);
+    if (seq !== searchSeq) return; // a newer search already started
+    note.classList.remove('hidden');
+    if (error) { note.textContent = 'البحث وقف: ' + error.message; return; }
+    const rows = data || [];
+    note.textContent = rows.length ? `${rows.length === 60 ? 'أول 60' : rows.length} سطر من قوايم المخازن، الأعلى خصم الأول` : 'مفيش حاجة بالاسم ده في قوايم المخازن.';
+    box.innerHTML = rows
+      .map((r) => {
+        const pf =
+          r.review === 'accepted' && r.pharmafly_name
+            ? `<div class="en">${esc(r.pharmafly_name)}</div>`
+            : r.pharmafly_name && r.review === 'pending' && r.match_status !== 'none'
+              ? `<div class="hint">غالبًا: <span class="en">${esc(r.pharmafly_name)}</span></div>`
+              : '<div class="hint">مش متطابق مع صنف عندنا</div>';
+        const meta = [r.supplier, r.list_date, r.price != null ? r.price + ' ج' : '', r.discount_pct != null ? 'خصم ' + r.discount_pct + '%' : ''].filter(Boolean).join(' · ');
+        return `<div class="item"><div>${esc(r.supplier_name)}</div><div class="hint">${esc(meta)}</div>${pf}</div>`;
+      })
+      .join('');
+  }
+
   function bind() {
     if (!$('suppliersPanel')) return;
+    $('spSearch').oninput = () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => search($('spSearch').value).catch((e) => say('البحث وقف: ' + e.message, 'bad')), 350);
+    };
     $('spList').onchange = () => draw($('spList').value).catch((e) => say(e.message, 'bad'));
     $('spBulk').onclick = acceptStrong;
     $('spMore').onclick = () => more();
