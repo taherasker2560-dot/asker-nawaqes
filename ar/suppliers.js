@@ -187,15 +187,32 @@
     $('spMore').classList.toggle('hidden', (data || []).length < PAGE);
     if (!shown) box.innerHTML = '<p class="hint">مفيش سطور محتاجة مراجعة.</p>';
   }
+  // first_seen of the names this warehouse already has. A few names: ask for those names only. Many names: read the
+  // warehouse's saved names page by page, because hundreds of Arabic names in one request make the address too long
+  // and the server answers 400 (that is what stopped «اقبل القوي» on the first real list, 2026-11-07).
+  async function firstSeen(supplier, names) {
+    const out = new Map();
+    if (names.length <= 20) {
+      const { data, error } = await db().from('ar_supplier_aliases').select('name_norm,first_seen').eq('supplier', supplier).in('name_norm', names);
+      if (error) throw error;
+      (data || []).forEach((a) => out.set(a.name_norm, a.first_seen));
+      return out;
+    }
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db().from('ar_supplier_aliases').select('name_norm,first_seen').eq('supplier', supplier).range(from, from + 999);
+      if (error) throw error;
+      (data || []).forEach((a) => out.set(a.name_norm, a.first_seen));
+      if (!data || data.length < 1000) break;
+    }
+    return out;
+  }
   // Keep the first date a name was seen; update the item and the last date.
   async function saveAliases(rows) {
     const withItem = rows.filter((r) => r.item_id && r.pharmafly_name);
+    if (!withItem.length) return;
+    const first = await firstSeen(withItem[0].supplier, [...new Set(withItem.map((r) => r.name_norm))]);
     for (let i = 0; i < withItem.length; i += 500) {
       const part = withItem.slice(i, i + 500);
-      const supplier = part[0].supplier;
-      const { data: old, error: e1 } = await db().from('ar_supplier_aliases').select('name_norm,first_seen').eq('supplier', supplier).in('name_norm', part.map((r) => r.name_norm));
-      if (e1) throw e1;
-      const first = new Map((old || []).map((a) => [a.name_norm, a.first_seen]));
       const seen = new Map();
       part.forEach((r) => seen.set(r.name_norm, { supplier: r.supplier, name_norm: r.name_norm, supplier_name: r.supplier_name, item_id: r.item_id, pharmafly_name: r.pharmafly_name, first_seen: first.get(r.name_norm) || r.list_date, last_seen: r.list_date }));
       const { error } = await db().from('ar_supplier_aliases').upsert([...seen.values()], { onConflict: 'supplier,name_norm' });
@@ -221,7 +238,7 @@
           .eq('match_status', 'strong')
           .eq('review', 'pending')
           .or('item_id.not.is.null')
-          .limit(500);
+          .limit(200); // the ids go in the address of the update below, so keep the batch short
         if (error) throw error;
         if (!data || !data.length) break;
         await saveAliases(data);
