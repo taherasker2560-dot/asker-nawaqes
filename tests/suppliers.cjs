@@ -39,4 +39,9 @@ assert.equal(rows[2].pharmafly_name, null);
 assert.equal(rows[3].match_status, 'none'); // unknown status is never trusted as a match
 assert.equal(rows[3].item_id, null);
 assert.throws(() => S.rowsFromDraft('name,price\nx,1', { supplier: 'AMG', list_date: '2026-04-05' }), /ناقص أعمدة/);
+// search filter: Arabic normalized like name_norm, English as typed, characters that would break the filter dropped
+assert.equal(S.searchFilter('كونكور ٥'), 'name_norm.ilike."*كونكور 5*",pharmafly_name.ilike."*كونكور ٥*"');
+assert.equal(S.searchFilter('concor, (5)'), 'name_norm.ilike."*concor 5*",pharmafly_name.ilike."*concor 5*"');
+assert.equal(S.searchFilter(' x '), '');
+assert.equal(S.searchFilter(''), '');
 console.log('suppliers ok');
