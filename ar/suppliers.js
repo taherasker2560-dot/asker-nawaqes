@@ -324,7 +324,7 @@
     if (!f) { box.innerHTML = ''; note.classList.add('hidden'); return; }
     const { data, error } = await db()
       .from('ar_supplier_items')
-      .select('supplier,list_date,supplier_name,price,discount_pct,pharmafly_name,review,match_status')
+      .select('id,supplier,list_date,supplier_name,name_norm,price,discount_pct,item_id,pharmafly_name,review,match_status')
       .or(f)
       .order('discount_pct', { ascending: false })
       .limit(60);
@@ -333,18 +333,35 @@
     if (error) { note.textContent = 'البحث وقف: ' + error.message; return; }
     const rows = data || [];
     note.textContent = rows.length ? `${rows.length === 60 ? 'أول 60' : rows.length} سطر من قوايم المخازن، الأعلى خصم الأول` : 'مفيش حاجة بالاسم ده في قوايم المخازن.';
-    box.innerHTML = rows
-      .map((r) => {
-        const pf =
-          r.review === 'accepted' && r.pharmafly_name
-            ? `<div class="en">${esc(r.pharmafly_name)}</div>`
-            : r.pharmafly_name && r.review === 'pending' && r.match_status !== 'none'
-              ? `<div class="hint">غالبًا: <span class="en">${esc(r.pharmafly_name)}</span></div>`
-              : '<div class="hint">مش متطابق مع صنف عندنا</div>';
-        const meta = [r.supplier, r.list_date, r.price != null ? r.price + ' ج' : '', r.discount_pct != null ? 'خصم ' + r.discount_pct + '%' : ''].filter(Boolean).join(' · ');
-        return `<div class="item"><div>${esc(r.supplier_name)}</div><div class="hint">${esc(meta)}</div>${pf}</div>`;
-      })
-      .join('');
+    box.innerHTML = '';
+    rows.forEach((r) => {
+      box.insertAdjacentHTML('beforeend', foundHtml(r));
+      box.lastElementChild._row = r;
+    });
+  }
+  // One search result. Accepted lines get «غلط، رجّعه» (owner, 2026-11-07: «اقبل القوي» can let a wrong cosmetic through);
+  // pending suggestions get «صح» / «غلط» like the review list.
+  function foundHtml(r) {
+    const pf =
+      r.review === 'accepted' && r.pharmafly_name
+        ? `<div class="en">${esc(r.pharmafly_name)}</div>`
+        : r.pharmafly_name && r.review === 'pending' && r.match_status !== 'none'
+          ? `<div class="hint">غالبًا: <span class="en">${esc(r.pharmafly_name)}</span></div>`
+          : '<div class="hint">مش متطابق مع صنف عندنا</div>';
+    const meta = [r.supplier, r.list_date, r.price != null ? r.price + ' ج' : '', r.discount_pct != null ? 'خصم ' + r.discount_pct + '%' : ''].filter(Boolean).join(' · ');
+    let acts = '';
+    if (r.review === 'accepted' && r.item_id) acts = '<button type="button" class="small secondary" data-sp-found="undo">غلط، رجّعه</button>';
+    else if (r.review === 'pending' && r.item_id && r.match_status !== 'none')
+      acts = '<button type="button" class="small" data-sp-found="accepted">صح ✓</button> <button type="button" class="small secondary" data-sp-found="rejected">غلط</button>';
+    return `<div class="item" data-sp-found-row="${r.id}"><div>${esc(r.supplier_name)}</div><div class="hint">${esc(meta)}</div>${pf}${acts ? '<div class="sp-actions">' + acts + '</div>' : ''}</div>`;
+  }
+  // Undo an accepted line: it becomes «غلط», and the warehouse forgets that name (only if it still points at this item),
+  // so the next list from the same warehouse does not accept it again by itself.
+  async function undoAccepted(r) {
+    const { error } = await db().from('ar_supplier_items').update({ review: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', r.id).eq('review', 'accepted');
+    if (error) throw error;
+    const { error: e2 } = await db().from('ar_supplier_aliases').delete().eq('supplier', r.supplier).eq('name_norm', r.name_norm).eq('item_id', r.item_id);
+    if (e2) throw e2;
   }
 
   function bind() {
@@ -352,6 +369,27 @@
     $('spSearch').oninput = () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => search($('spSearch').value).catch((e) => say('البحث وقف: ' + e.message, 'bad')), 350);
+    };
+    $('spFound').onclick = async (ev) => {
+      const b = ev.target.closest('[data-sp-found]');
+      if (!b) return;
+      const item = b.closest('[data-sp-found-row]');
+      const r = item && item._row;
+      if (!r) return;
+      b.disabled = true;
+      try {
+        const act = b.dataset.spFound;
+        if (act === 'undo') { await undoAccepted(r); r.review = 'rejected'; }
+        else { await setReview(r, act); r.review = act; }
+        item.outerHTML = foundHtml(r);
+        const fresh = $('spFound').querySelector(`[data-sp-found-row="${r.id}"]`);
+        if (fresh) fresh._row = r;
+        $('spSearchNote').textContent = act === 'undo' ? 'اترجع: السطر بقى «غلط»، والمخزن نسي الاسم ده.' : act === 'accepted' ? 'اتقبل واتحفظ الاسم.' : 'اتسجّل «غلط».';
+        if (current) draw(current.id).catch(() => {});
+      } catch (e) {
+        b.disabled = false;
+        $('spSearchNote').textContent = 'مااتسجّلش: ' + e.message;
+      }
     };
     $('spList').onchange = () => draw($('spList').value).catch((e) => say(e.message, 'bad'));
     $('spBulk').onclick = acceptStrong;
