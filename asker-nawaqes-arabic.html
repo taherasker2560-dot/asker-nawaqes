@@ -48,7 +48,10 @@
             <span>الترجمة</span></button
           ><button data-tab="read" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2.5-7h11L20 13M4 13v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5M4 13h4.5l1.5 2.5h4l1.5-2.5H20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-            <span>الوارد</span></button>
+            <span>الوارد</span></button
+          ><button data-tab="suppliers" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-5 9 5v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM8 20v-6h8v6M8 17h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            <span>المخازن</span></button>
         </nav>
 
         <section id="shortPanel" class="card">
@@ -239,10 +242,39 @@
           </div>
           </div>
         </section>
+
+        <section id="suppliersPanel" class="card hidden">
+          <h2>قوايم المخازن</h2>
+          <p class="hint">
+            القايمة بتتجهز على اللاب: كل اسم عربي من المخزن قصاده صنف من فارمافلاي بنفس السعر. هنا تقبل «القوي» مرة واحدة
+            وتراجع الباقي. اللي تقبله بيتحفظ، والقايمة الجاية من نفس المخزن بتتعرف لوحدها.
+          </p>
+          <p id="spEmpty" class="hint">مفيش قوايم مرفوعة لسه.</p>
+          <div id="spListBox" class="hidden">
+            <label for="spList">القايمة</label
+            ><select id="spList" style="width: 100%; padding: 10px; font-size: 16px"></select>
+            <div class="grid" id="spStats"></div>
+            <button id="spBulk" type="button" class="hidden"></button>
+            <p id="spNoneNote" class="hint"></p>
+            <h3>محتاج مراجعة</h3>
+            <div id="spRows"></div>
+            <button id="spMore" type="button" class="secondary hidden">اعرض أكتر</button>
+          </div>
+          <p id="spStatus" class="status"></p>
+          <details class="tools" id="spTools">
+            <summary>ارفع قايمة جديدة (الملف اللي اتجهز على اللاب)</summary>
+            <label for="spFile">ملف المطابقة (CSV)</label><input id="spFile" type="file" accept=".csv" />
+            <label for="spSupplier">اسم المخزن المختصر</label><input id="spSupplier" type="text" dir="ltr" placeholder="AMG" />
+            <label for="spDate">تاريخ القايمة</label
+            ><input id="spDate" type="date" style="width: 100%; padding: 10px; font-size: 16px" />
+            <button id="spUpload" type="button">ارفع القايمة</button>
+          </details>
+        </section>
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=inbox-20261106a"></script>
-    <script src="ar/app.js?v=inbox-20261106a"></script>
+    <script src="ar/app.js?v=suppliers-20261107a"></script>
+    <script src="ar/suppliers.js?v=suppliers-20261107a"></script>
   </body>
 </html>
