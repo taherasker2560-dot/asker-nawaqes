@@ -139,8 +139,8 @@ function routes(s: string): Set<string> {
   for (const t of splitDots(s)) { const r = ROUTE[t]; if (r) out.add(r); }
   return out;
 }
-export function routesAgree(a: string, b: string): boolean {
-  const x = routes(a), y = routes(b);
+export function routesAgree(a: string, b: string): boolean { return routeSetsAgree(routes(a), routes(b)); }
+function routeSetsAgree(x: Set<string>, y: Set<string>): boolean {
   return !x.size || !y.size || [...x].some((r) => y.has(r));
 }
 export function formsAgree(a: Set<string>, b: Set<string>): boolean {
@@ -194,7 +194,17 @@ function dice(a: Set<string>, b: Set<string>): number {
   return (2 * n) / (a.size + b.size);
 }
 
-type Entry = { id: string; name: string; nums: string[]; g: Set<string>[]; b: Set<string>[]; sc: { strength: string[]; count: string[] } };
+// What sameNumbers, formsAgree and similarity read from a text, worked out once: a long pasted list compares
+// every line with every answer of the owner, and working them out again each time ran out of server time (7 Nov 2026).
+export type Facts = { nums: string; forms: Set<string>; grams: Set<string> };
+export function facts(s: string): Facts { return { nums: numbers(s).sort().join('|'), forms: forms(s), grams: grams(s, true) }; }
+// same as sameNumbers(a, b) && formsAgree(forms(a), forms(b)) ? similarity(a, b) : 0
+export function factsSimilarity(a: Facts, b: Facts): number {
+  return a.nums === b.nums && formsAgree(a.forms, b.forms) ? dice(a.grams, b.grams) : 0;
+}
+
+// f, r: the item's forms and injection routes, worked out once instead of for every supplier line
+type Entry = { id: string; name: string; nums: string[]; g: Set<string>[]; b: Set<string>[]; sc: { strength: string[]; count: string[] }; f: Set<string>; r: Set<string> };
 export class Catalog {
   private entries: Entry[] = [];
   private index = new Map<string, number[]>();
@@ -202,9 +212,9 @@ export class Catalog {
   private learned = new Set<string>();
   constructor(items: CatalogItem[]) {
     items.forEach((it, i) => {
-      const forms = [it[1], ...(it[2] || [])];
-      const g = forms.map((f) => grams(f));
-      this.entries.push({ id: it[0], name: it[1], nums: numbers(it[1]), g, b: forms.flatMap((f) => brand(f)), sc: strengthAndCount(it[1]) });
+      const texts = [it[1], ...(it[2] || [])];
+      const g = texts.map((f) => grams(f));
+      this.entries.push({ id: it[0], name: it[1], nums: numbers(it[1]), g, b: texts.flatMap((f) => brand(f)), sc: strengthAndCount(it[1]), f: forms(it[1]), r: routes(it[1]) });
       const seen = new Set<string>();
       for (const set of g) for (const t of set) if (!seen.has(t)) { seen.add(t); let l = this.index.get(t); if (!l) this.index.set(t, (l = [])); l.push(i); }
       this.byId.set(it[0], i);
@@ -248,6 +258,7 @@ export class Catalog {
     const brands = [...brand(arabic, true), ...brand(latin, true)];
     const arForms = forms(arabic), srcForms = arForms.size ? arForms : forms(latin);
     const routeSrc = /[\u0600-\u06FF]/.test(arabic) && routes(arabic).size ? arabic : latin;
+    const srcRoutes = routes(routeSrc);
     const scored = shortlist.map((i) => {
       const e = this.entries[i];
       let sim = 0; for (const q of queries) for (const g of e.g) sim = Math.max(sim, dice(q, g));
@@ -257,8 +268,8 @@ export class Catalog {
       const countOff = src.count.length > 0 && itemCount.length > 0 && !src.count.some((n) => itemCount.includes(n));
       let brandSim = 0; for (const x of brands) for (const y of e.b) brandSim = Math.max(brandSim, dice(x, y));
       const brandOk = brandSim >= 0.45;
-      const itemForms = srcForms.size ? forms(e.name) : new Set<string>();
-      const formOk = formsAgree(srcForms, itemForms) && routesAgree(routeSrc, e.name);
+      // (formsAgree is true when the supplier line states no form)
+      const formOk = formsAgree(srcForms, e.f) && routeSetsAgree(srcRoutes, e.r);
       const factor = (!src.strength.length ? (e.nums.length ? 0.95 : 1) : numbersOk ? 1.05 : 0.5) * (countOff ? 0.85 : 1) * (formOk ? 1 : 0.6) * (brandOk ? 1 : 0.75);
       return { id: e.id, name: e.name, score: Math.min(1, Math.round(sim * factor * 1000) / 1000), numbersOk, formOk, brandOk };
     });
