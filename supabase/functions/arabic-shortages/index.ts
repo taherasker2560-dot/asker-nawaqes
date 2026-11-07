@@ -17,7 +17,7 @@
 // ar_answers / ar_fixes (migration 202610280013).
 // Tables are read and written with the caller's own session (owner-only RLS).
 
-import { Catalog, OFFER_MIN, aliasKey, decide, forms, formsAgree, sameNumbers, similarity, type CatalogItem, type Candidate, type Match } from './match.ts';
+import { Catalog, OFFER_MIN, aliasKey, decide, facts, factsSimilarity, type CatalogItem, type Candidate, type Facts, type Match } from './match.ts';
 
 export const VERSION = 'ar12';
 const DEFAULT_MODEL = 'gemini-flash-latest';
@@ -174,8 +174,15 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
     else { const s = no.get(d.alias_key) || new Set<string>(); s.add(d.name_key); no.set(d.alias_key, s); }
   }
   const fixOf = new Map(k.fixes.map((f) => [f.read_key, f.corrected_text]));
-  const yesTexts = k.answers.filter((d) => d.decision === 'yes' && idOf.has(d.name_key));
-  const noTexts = k.answers.filter((d) => d.decision === 'no');
+  // each answer's numbers, form and letters are worked out once, and a line is only compared with the answers that
+  // have its same numbers (a 108-line paste against ~900 answers ran out of server time, 7 Nov 2026)
+  const byNumbers = (list: Decision[]) => {
+    const m = new Map<string, { d: Decision; f: Facts }[]>();
+    for (const d of list) { const f = facts(d.read_text); const l = m.get(f.nums); if (l) l.push({ d, f }); else m.set(f.nums, [{ d, f }]); }
+    return m;
+  };
+  const yesTexts = byNumbers(k.answers.filter((d) => d.decision === 'yes' && idOf.has(d.name_key)));
+  const noTexts = byNumbers(k.answers.filter((d) => d.decision === 'no'));
   return rows.map((r) => {
     const key = aliasKey(r.name);
     const corrected = readKey ? null : fixOf.get(key) || null;
@@ -183,10 +190,9 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
     const rejected = new Set([...(no.get(key) || []), ...(no.get(textKey) || []), ...(readKey ? no.get(readKey) || [] : [])]);
     // «مش ده» / «مش واحد منهم» also hold when the same line is read a little differently next time
     // (same numbers, same form, very close text), like confirmed lines do.
-    const textForms = forms(text);
-    for (const d of noTexts) {
-      if (rejected.has(d.name_key) || !sameNumbers(text, d.read_text) || !formsAgree(textForms, forms(d.read_text))) continue;
-      if (similarity(text, d.read_text) >= 0.85) rejected.add(d.name_key);
+    const tf = facts(text);
+    for (const { d, f } of noTexts.get(tf.nums) || []) {
+      if (!rejected.has(d.name_key) && factsSimilarity(tf, f) >= 0.85) rejected.add(d.name_key);
     }
     // NOT_LISTED: the owner said this line is none of the shortages offered; it is not offered again (no new
     // suggestions after the first ones were refused) and shows with the unknown lines, where «تصحيح» can still pick.
@@ -198,9 +204,8 @@ export function matchRows(rows: Row[], cat: Catalog, k: Knowledge, shortages: Sh
     else {
       // written a little differently from a line the owner confirmed: same numbers, same form, very close text
       const near = new Set<string>();
-      for (const d of yesTexts) {
-        if (rejected.has(d.name_key) || !sameNumbers(text, d.read_text) || !formsAgree(textForms, forms(d.read_text))) continue;
-        if (similarity(text, d.read_text) >= 0.85) near.add(d.name_key);
+      for (const { d, f } of yesTexts.get(tf.nums) || []) {
+        if (!rejected.has(d.name_key) && factsSimilarity(tf, f) >= 0.85) near.add(d.name_key);
       }
       if (near.size === 1 && !notListed) match = { id: idOf.get([...near][0])!, name: '', score: 0.95, confidence: 'high', via: 'alias' };
     }
