@@ -10,6 +10,7 @@
     OFFER_MIN = 0.45,
     NOT_LISTED = '*'; // same as NOT_LISTED in the function: «مش واحد منهم» for a whole line
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  window.AskerApp = { client }; // shared with ar/suppliers.js («المخازن»), so there is one login session
   const $ = (id) => document.getElementById(id),
     esc = (s) =>
       String(s ?? '').replace(
@@ -211,6 +212,8 @@
         if (b.dataset.tab === 'short') drawShort(); // names may have changed in the other tabs
         $('translatePanel').classList.toggle('hidden', b.dataset.tab !== 'translate');
         $('readPanel').classList.toggle('hidden', b.dataset.tab !== 'read');
+        $('suppliersPanel')?.classList.toggle('hidden', b.dataset.tab !== 'suppliers');
+        if (b.dataset.tab === 'suppliers') window.AskerSuppliers?.open();
       }),
   );
   // «الوارد» has three small tabs: today (the automatic inbox), reading by hand, and the companies / phone link.
