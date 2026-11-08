@@ -18,6 +18,16 @@ run('suppliers search: every line, undo an accepted one',async({page,table})=>{
  await page.fill('#spSearch','مش عندنا');
  await page.waitForFunction(()=>/صنف مش عندنا/.test(document.getElementById('spFound').textContent));
  assert.match(await page.textContent('#spFound'),/مش متطابق مع صنف عندنا/);
+ // smart search (owner 2026-11-08): letters skipped, closest first; every line is read once, then kept
+ await page.fill('#spSearch','كنكر 10');
+ await page.waitForFunction(()=>/كونكور ١٠ مجم اقراص/.test(document.getElementById('spFound').textContent));
+ assert.match(await page.textContent('#spSearchNote'),/الأقرب للي كتبته الأول/);
+ assert.equal(await page.$$eval('#spFound .item',e=>e.length),1,'only the line that matches');
+ const reads=()=>page.evaluate(()=>window.__reads.filter(r=>r.table==='ar_supplier_items').length);
+ const before=await reads();
+ await page.fill('#spSearch','zzzz');
+ await page.waitForFunction(()=>/مفيش حاجة قريبة/.test(document.getElementById('spSearchNote').textContent));
+ assert.equal(await reads(),before,'the second search uses the lines already read');
  // undo the wrong accepted cosmetic
  await page.fill('#spSearch','كانتي');
  await page.waitForSelector('#spFound [data-sp-found="undo"]');
@@ -29,4 +39,9 @@ run('suppliers search: every line, undo an accepted one',async({page,table})=>{
  assert.equal(aliases.length,1);
  assert.equal(aliases[0].item_id,1001);
  assert.equal(await page.$('#spFound [data-sp-found="undo"]'),null); // the line now offers nothing to undo
+ // searching again: the kept copy knows the line was undone
+ await page.fill('#spSearch','');await page.fill('#spSearch','كانتي');
+ await page.waitForFunction(()=>/كانتي كولين شراب/.test(document.getElementById('spFound').textContent));
+ assert.equal(await page.$('#spFound [data-sp-found="undo"]'),null,'still nothing to undo after a new search');
+ assert.match(await page.textContent('#spFound'),/مش متطابق مع صنف عندنا/,'an undone line no longer shows the wrong item');
 });

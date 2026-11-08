@@ -334,16 +334,24 @@
     $('shChips').innerHTML = chips
       .map(([v, t]) => `<button type="button" class="chip${v === shView ? ' on' : ''}" data-view="${v}" aria-pressed="${v === shView}">${esc(t)}</button>`)
       .join('');
-    const words = normAr(shQuery).split(' ').filter(Boolean);
+    // smart search (ar/fuzzy.js, owner 2026-11-08): letters in order with skips, sound-alike letters, Arabic or English;
+    // while searching, the closest names come first in every view
+    const fz = window.AskerFuzzy,
+      words = fz.words(shQuery),
+      closeness = new Map();
     let rows = shortages.filter((s) => {
       if (shView === 'ordered' && !orderedNow(s)) return false;
       if (shView === 'noar' && names.has(s.id)) return false;
-      const hay = normAr(aName(s.id)) + ' ' + normAr(s.product_name);
-      return words.every((w) => hay.includes(w));
+      if (!words.length) return true;
+      const c = fz.score(words, fz.fold(aName(s.id)), fz.fold(s.product_name));
+      if (c === -Infinity) return false;
+      closeness.set(s.id, c);
+      return true;
     });
     const shown = rows.length;
     const byName = (a, b) => arSort.compare(normAr(aName(a.id) || a.product_name), normAr(aName(b.id) || b.product_name));
-    if (shView === 'qty') rows = rows.sort((a, b) => (qtyOf(b.id) ?? -1) - (qtyOf(a.id) ?? -1) || byName(a, b));
+    if (words.length) rows = rows.sort((a, b) => closeness.get(b.id) - closeness.get(a.id) || byName(a, b));
+    else if (shView === 'qty') rows = rows.sort((a, b) => (qtyOf(b.id) ?? -1) - (qtyOf(a.id) ?? -1) || byName(a, b));
     else rows = rows.sort(byName);
     const row = (s) => {
       const q = qtyOf(s.id),
@@ -354,7 +362,7 @@
       return `<div class="srow"><div class="sr-main"><div class="sr-ar" dir="auto">${esc(ar || s.product_name)}${pill}${miss}</div>${ar ? `<div class="sr-en" dir="ltr">${esc(s.product_name)}</div>` : ''}</div>${q === null ? '' : `<div class="qty${written(s) ? ' own' : ''}"${written(s) ? ' title="الكمية اللي كتبتها"' : ''}>${esc(fmtQty(q))}</div>`}</div>`;
     };
     let html = '';
-    if (shView === 'alpha') {
+    if (shView === 'alpha' && !words.length) {
       const groups = new Map();
       rows.forEach((s) => groups.set(letterOf(s), [...(groups.get(letterOf(s)) || []), s]));
       html = [...groups.entries()]

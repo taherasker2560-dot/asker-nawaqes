@@ -36,6 +36,11 @@ run('shortage list rows',async({page})=>{
  assert.deepEqual(await search('امبيسلين'),['أمبيسلين ٥٠٠ شراب'],'ا finds أ');
  assert.deepEqual(await search('بروفين 400'),['بروفين ٤٠٠ مجم ٣٠ قرص'],'western digits find Arabic digits');
  assert.deepEqual(await search('janu 50'),['جانوفيا ٥٠ مجم ٢٨ قرص'],'English, several words');
+ // smart search (owner 2026-11-08): some letters of the name in order are enough, Arabic or English
+ assert.deepEqual(await search('جنوفي'),['جانوفيا ٥٠ مجم ٢٨ قرص'],'letters skipped');
+ assert.deepEqual(await search('بروفن 400'),['بروفين ٤٠٠ مجم ٣٠ قرص'],'letters skipped, with the strength');
+ assert.deepEqual(await search('jnv'),['جانوفيا ٥٠ مجم ٢٨ قرص'],'English letters skipped');
+ assert.deepEqual(await letters(page),[],'search results are one list, closest first (no letter groups)');
  assert.deepEqual(await search('zzz'),[]);
  assert.match(await text(page,'#shList'),/مفيش صنف بالشكل ده/);
  assert.equal(await text(page,'#shCount'),'عرض 0 من 3');
