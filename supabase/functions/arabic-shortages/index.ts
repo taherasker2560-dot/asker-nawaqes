@@ -484,6 +484,67 @@ export function sameCompany(saved: string, title: string): boolean {
 export function serviceHeaders(service: string): Record<string, string> {
   return service.startsWith('sb_') ? { apikey: service } : { Authorization: 'Bearer ' + service, apikey: service };
 }
+
+// ---------- documents chats (owner 2026-11-08) ----------
+// The pharmacy's own WhatsApp group (ar_doc_chats) carries purchase invoices, credit notes, collection receipts and
+// water/electricity bills. Its photos/PDFs are kept for the owner (ar_documents, files in ar-inbox/docs/): never read
+// by Gemini, never spoken. Claude reads them later on the laptop. Anything else from the group is ignored.
+type DocCtx = {
+  base: string; sh: Record<string, string>; from: string; fromParam: string; whenMs: number; fileName: string; chat: string; say: boolean;
+  out: (status: number, body: Record<string, unknown>, say: boolean) => Response;
+};
+// keeps one photo/PDF as a document (its name is its content hash, so the phone's re-sends are kept once)
+async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<string, string>, bytes: Uint8Array, kind: 'image' | 'pdf', chat: string): Promise<'saved' | 'duplicate' | 'error'> {
+  const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  const filePath = `docs/${new Date().toISOString().slice(0, 10)}/${hash}.${kind === 'pdf' ? 'pdf' : 'jpg'}`;
+  const known = await fetchImpl(`${base}/rest/v1/ar_documents?select=id&file_path=like.*${hash}*&limit=1`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) })
+    .then((r) => r.ok ? r.json() : []).catch(() => []) as { id: string }[];
+  if (Array.isArray(known) && known.length) return 'duplicate';
+  const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': kind === 'pdf' ? 'application/pdf' : 'image/jpeg' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  // stored a moment ago by another run of the same photo: that run saves the row
+  if (!up.ok && !/duplicate|exists/i.test(await up.text().catch(() => ''))) return 'error';
+  const ins = await fetchImpl(`${base}/rest/v1/ar_documents`, { method: 'POST', body: JSON.stringify({ source: 'whatsapp', chat, file_path: filePath, kind }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (ins.status === 409) return 'duplicate';
+  return ins.ok ? 'saved' : 'error';
+}
+async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: DocCtx): Promise<Response> {
+  const { base, sh, out, say } = c;
+  const since = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
+  // «seen» (the phone found no new photo): nothing is said for documents
+  if (url.searchParams.get('seen') === '1') return out(200, { ok: true, seen: true, docs: true, say: '' }, say);
+  let ct = req.headers.get('content-type') || '', name = c.fileName, bytes: Uint8Array;
+  if (/^multipart\//i.test(ct)) {
+    const part = filePart(new Uint8Array(await req.arrayBuffer()), (ct.match(/boundary="?([^";]+)"?/i) || [])[1] || '');
+    bytes = part.bytes; ct = part.type; name = name || part.name;
+  } else bytes = new Uint8Array(await req.arrayBuffer());
+  const kind = sniffKind(bytes) || inboxKind(ct, name);
+  if (kind === 'text') {
+    const head = new TextDecoder().decode(bytes.subarray(0, 64));
+    // only a photo/file notification matters (the phone then sends the file); any other text in the group is ignored
+    if (!MEDIA_NOTE.test(head)) return out(200, { ok: false, ignored: true, docs: true, say: '' }, say);
+    // remembered like a company's photo notification: the phone's photo folder is shared, so a photo that comes while
+    // only this chat announced photos is this chat's document (see the company path), and WhatsApp's repeats stay quiet
+    const note = (c.fromParam + (c.whenMs ? ' ~w' + c.whenMs : '') + ' ' + new TextDecoder().decode(bytes.subarray(0, 600))).replace(/\s+/g, ' ').trim().slice(0, 300);
+    const last = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=note,at&supplier=eq.${encodeURIComponent(c.chat)}&at=gte.${since(REPEAT_MS)}&order=at.desc&limit=1`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) })
+      .then((r) => r.ok ? r.json() : []).catch(() => []) as { note: string | null; at?: string }[];
+    const stale = !!c.whenMs && c.whenMs < Date.now() - STOP_LOOKING_MS;
+    const fresh = !stale && (!Array.isArray(last) || last[0]?.note !== note);
+    await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: c.chat, chat: c.from, note, fresh }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+    if (stale) return out(200, { ok: false, media: true, docs: true, late: true, say: '' }, say);
+    // WhatsApp showing it again while the first run still looks at the folder: no second run
+    const at = Array.isArray(last) ? last[0]?.at : undefined;
+    if (!fresh && at && Date.parse(at) > Date.now() - LOOKING_MS) return out(200, { ok: false, media: true, docs: true, looking: true, say: '' }, say);
+    return out(202, { ok: false, media: true, docs: true, fresh, say: '' }, say);
+  }
+  // Excel/CSV, voice notes and the like: not documents
+  if (kind !== 'image' && kind !== 'pdf') return out(200, { ok: false, ignored: true, docs: true, say: '' }, say);
+  if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
+  if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
+  const r = await saveDocument(fetchImpl, base, sh, bytes, kind, c.chat);
+  log('inbox-doc', Date.now(), { kind, result: r });
+  if (r === 'error') return out(502, { error: 'save', docs: true, message: 'الصورة ماتحفظتش' }, say);
+  return out(200, { ok: true, docs: true, duplicate: r === 'duplicate', say: '' }, say);
+}
 export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
   const companies: string[] = [];
   const out = (status: number, body: Record<string, unknown>, say: boolean) => say
@@ -506,6 +567,12 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const whenNum = wm && /^\d{9,14}$/.test(wm[1]) ? Number(wm[1]) : 0, whenMs = whenNum && whenNum < 1e12 ? whenNum * 1000 : whenNum;
   const from = inboxSender(fromParam), fileName = (url.searchParams.get('name') || '').split(/[\\/]/).pop()!.slice(-120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
+  // the pharmacy's own documents group: checked first (a group title also holds the sender's name); its photos are
+  // kept as documents, never read as a list (handleDocs)
+  const docChats = await restAll<{ name: string }>(env, auth, fetchImpl, 'ar_doc_chats?select=name').catch(() => [] as { name: string }[]);
+  const docNames = new Set(docChats.map((x) => x.name));
+  const docChat = docChats.find((x) => sameCompany(x.name, from));
+  if (docChat) return handleDocs(req, url, fetchImpl, { base, sh, from, fromParam, whenMs, fileName, chat: docChat.name, say, out });
   const company = suppliers.find((x) => sameCompany(x.name, from));
   companies.push(...suppliers.map((x) => x.name));
   // not one of the saved companies: ignored before anything is read or stored
@@ -590,6 +657,17 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       return out(200, { ok: false, duplicate: true, say: old ? seenSay(company.name, what, await today()) : '' }, say);
     }
   }
+  // the phone's photo folder is shared with the documents group: a photo that comes while only that group announced
+  // photos just now (no fresh notification from any company) is the group's document, not this company's list
+  if ((kind === 'image' || kind === 'pdf') && docNames.size) {
+    const notes = await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
+    const freshDoc = notes.find((n) => n.fresh !== false && docNames.has(n.supplier));
+    if (freshDoc && !notes.some((n) => n.fresh !== false && !docNames.has(n.supplier))) {
+      const r = await saveDocument(fetchImpl, base, sh, bytes, kind, freshDoc.supplier);
+      log('inbox-doc', Date.now(), { kind, result: r, via: 'company' });
+      return out(200, { ok: r !== 'error', docs: true, duplicate: r === 'duplicate', say: '' }, say);
+    }
+  }
   // the same notification can fire again (twice at once, or WhatsApp shows unread chats again later, also after midnight).
   // With the notification's time (~w): it is a repeat when the same text from the same company was saved after that
   // time (a little earlier allowed for the phone's clock), so a message sent again later, even with the same words,
@@ -646,7 +724,9 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   // None new: any company with a notification in that time may be the one.
   let maybe: string[] | null = null;
   if (kind !== 'text') {
-    const notes = await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
+    // the documents group's notifications never make a photo a company's (nor add the group to «maybe»)
+    const notes = (await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []))
+      .filter((n) => !docNames.has(n.supplier));
     const fresh = [...new Set(notes.filter((n) => n.fresh !== false).map((n) => n.supplier))];
     const names = fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])];
     if (names.length > 1) maybe = names.sort(); else supplier = names[0];

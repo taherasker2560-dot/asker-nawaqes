@@ -750,3 +750,79 @@ button.small {
 #autoSetup > h3:first-child {
   margin-top: 4px;
 }
+
+/* «فواتير» tab (ar/docs.js): big take-a-photo button, a row per document with its photo */
+#docsPanel {
+  position: relative;
+}
+/* the real file box is hidden (the big label opens it); clipped so its own button never widens the page */
+.dc-file {
+  position: absolute;
+  top: 0;
+  inset-inline-start: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+}
+.dc-pick {
+  display: block;
+  margin: 12px 0 6px;
+  padding: 18px 12px;
+  border-radius: 14px;
+  background: #ffd54f;
+  color: #3a2a00;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.dc-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.dc-thumb {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 96px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--rose);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--crimson);
+  font-weight: 700;
+  text-decoration: none;
+}
+.dc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dc-st {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b25f00;
+}
+.dc-st.dc-entered,
+.dc-st.dc-kept {
+  color: #2e7d32;
+}
+.dc-st.dc-skipped {
+  color: var(--muted);
+}
