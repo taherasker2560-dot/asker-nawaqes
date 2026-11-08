@@ -262,6 +262,7 @@
     } finally {
       busy = false;
       $('spBulk').disabled = false;
+      forget(); // lines changed (even if it stopped half way): the search reads them again
     }
   }
   async function upload() {
@@ -312,27 +313,71 @@
     } finally {
       busy = false;
       $('spUpload').disabled = false;
+      forget(); // new lines (even a half list): the search reads them again
     }
   }
 
-  // Search every warehouse line of every list, whether we stock the item or not; best discount first.
-  let searchTimer = null, searchSeq = 0;
+  // Search every warehouse line of every list, whether we stock the item or not (owner, 2026-11-07), the smart way
+  // (owner, 2026-11-08, ar/fuzzy.js): letters in order with skips, sound-alike letters, closest first, then best discount.
+  // All lines are read once (about 30,000 → a few seconds) and kept while the page is open; reviews made here update the
+  // kept copy. The warehouse's own Arabic name counts most; our PharmaFly name counts a bit less, and only when the line
+  // is accepted or suggested «قوي»/«كويس» (a «ضعيف» guess would bring wrong lines). If reading them all fails, the old
+  // server search (part of the name, best discount first) still answers.
+  const LINE_COLS = 'id,supplier,list_date,supplier_name,name_norm,price,discount_pct,item_id,pharmafly_name,review,match_status';
+  let searchTimer = null, searchSeq = 0, allLines = null, allById = null, allLoading = null, allGen = 0;
+  const fz = () => root.AskerFuzzy;
+  const sure = (r) => !!r.item_id && (r.review === 'accepted' || (r.review === 'pending' && (r.match_status === 'strong' || r.match_status === 'good')));
+  const prep = (r) => { r._h = [fz().fold(r.supplier_name), [sure(r) ? fz().fold(r.pharmafly_name) : '', 1]]; return r; };
+  function forget() { allGen++; allLines = allById = null; } // after a new list or «اقبل القوي»: read again at the next search
+  function patchKept(id, fields) { const r = allById && allById.get(id); if (r) prep(Object.assign(r, fields)); }
+  async function loadAll() {
+    if (allLines) return allLines;
+    if (!allLoading)
+      allLoading = (async () => {
+        const gen = allGen;
+        const page = (a, z, opts) => db().from('ar_supplier_items').select(LINE_COLS, opts).order('id', { ascending: true }).range(a, z);
+        const first = await page(0, 999, { count: 'exact' });
+        if (first.error) throw first.error;
+        const out = [...(first.data || [])];
+        const size = out.length, total = first.count == null ? null : first.count; // the server may give less than 1000 a page
+        if (size && (total == null ? size === 1000 : total > size)) {
+          for (let from = size; total == null || from < total; from += size * 4) {
+            const parts = await Promise.all([0, 1, 2, 3].map((k) => page(from + k * size, from + (k + 1) * size - 1)));
+            let short = false;
+            for (const p of parts) { if (p.error) throw p.error; out.push(...(p.data || [])); if ((p.data || []).length < size) short = true; }
+            if (short) break;
+          }
+        }
+        out.sort((a, b) => (b.discount_pct ?? -1) - (a.discount_pct ?? -1)); // a tie in closeness: best discount first
+        out.forEach(prep);
+        if (gen !== allGen) return out; // lines changed while reading: use these once, read again next time
+        allById = new Map(out.map((r) => [r.id, r]));
+        return (allLines = out);
+      })().finally(() => { allLoading = null; });
+    return allLoading;
+  }
   async function search(q) {
     const seq = ++searchSeq;
     const box = $('spFound'), note = $('spSearchNote');
-    const f = searchFilter(q);
-    if (!f) { box.innerHTML = ''; note.classList.add('hidden'); return; }
-    const { data, error } = await db()
-      .from('ar_supplier_items')
-      .select('id,supplier,list_date,supplier_name,name_norm,price,discount_pct,item_id,pharmafly_name,review,match_status')
-      .or(f)
-      .order('discount_pct', { ascending: false })
-      .limit(60);
-    if (seq !== searchSeq) return; // a newer search already started
+    if (fz().words(q).join('').length < 2) { box.innerHTML = ''; note.classList.add('hidden'); return; }
     note.classList.remove('hidden');
-    if (error) { note.textContent = 'البحث وقف: ' + error.message; return; }
-    const rows = data || [];
-    note.textContent = rows.length ? `${rows.length === 60 ? 'أول 60' : rows.length} سطر من قوايم المخازن، الأعلى خصم الأول` : 'مفيش حاجة بالاسم ده في قوايم المخازن.';
+    let rows;
+    try {
+      if (!allLines) note.textContent = 'بحمّل كل سطور المخازن مرة واحدة…';
+      const all = await loadAll();
+      if (seq !== searchSeq) return; // a newer search already started
+      rows = fz().rank(q, all, (r) => r._h, 60);
+      note.textContent = rows.length ? `${rows.length === 60 ? 'أقرب 60' : rows.length} سطر من ${all.length} في قوايم المخازن، الأقرب للي كتبته الأول` : 'مفيش حاجة قريبة من الاسم ده في قوايم المخازن.';
+    } catch (e) {
+      // reading every line failed: the old search on the server (part of the name, best discount first)
+      const f = searchFilter(q);
+      if (!f) { box.innerHTML = ''; note.classList.add('hidden'); return; }
+      const { data, error } = await db().from('ar_supplier_items').select(LINE_COLS).or(f).order('discount_pct', { ascending: false }).limit(60);
+      if (seq !== searchSeq) return;
+      if (error) { note.textContent = 'البحث وقف: ' + error.message; return; }
+      rows = data || [];
+      note.textContent = rows.length ? `${rows.length === 60 ? 'أول 60' : rows.length} سطر من قوايم المخازن، الأعلى خصم الأول (البحث العادي، لأن تحميل كل السطور وقف: ${e.message})` : 'مفيش حاجة بالاسم ده في قوايم المخازن.';
+    }
     box.innerHTML = '';
     rows.forEach((r) => {
       box.insertAdjacentHTML('beforeend', foundHtml(r));
@@ -381,6 +426,7 @@
         const act = b.dataset.spFound;
         if (act === 'undo') { await undoAccepted(r); r.review = 'rejected'; }
         else { await setReview(r, act); r.review = act; }
+        prep(r); // r is the kept copy itself: the next search sees the new review
         item.outerHTML = foundHtml(r);
         const fresh = $('spFound').querySelector(`[data-sp-found-row="${r.id}"]`);
         if (fresh) fresh._row = r;
@@ -410,6 +456,7 @@
       b.disabled = true;
       try {
         await setReview(r, b.dataset.spAct);
+        patchKept(r.id, { review: b.dataset.spAct });
         item.remove();
         say(b.dataset.spAct === 'accepted' ? 'اتقبل واتحفظ الاسم.' : 'اتسجّل.', 'good');
       } catch (e) {
