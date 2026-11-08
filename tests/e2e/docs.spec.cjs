@@ -24,7 +24,7 @@ run('documents tab: list and take photos',async({page,table})=>{
  await waitStatus(page,/اتبعتت 2 صفحة/,'dcStatus');
  const rows=(await table('ar_documents')).filter(r=>r.source==='upload');
  assert.equal(rows.length,2);assert.equal(rows[0].batch,rows[1].batch,'same invoice');assert.ok(rows[0].batch);
- assert.ok(rows.every(r=>r.note==='فيها إشعار'&&r.kind==='image'&&/^docs\/\d{4}-\d\d-\d\d\/[0-9a-f]{32}\.jpg$/.test(r.file_path)));
+ assert.ok(rows.every(r=>r.note==='فيها إشعار'&&r.kind==='image'&&r.status==='new'&&/^docs\/\d{4}-\d\d-\d\d\/[0-9a-f]{32}\.jpg$/.test(r.file_path)));
  assert.notEqual(rows[0].file_path,rows[1].file_path);
  assert.ok(await page.evaluate((p)=>p.every(x=>x in window.__storage),rows.map(r=>r.file_path)),'files kept in the private bucket');
  await page.waitForFunction(()=>/مستنية \(3\)/.test(document.getElementById('dcWaitTitle').textContent));

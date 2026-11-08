@@ -126,7 +126,7 @@
         const path = docPath(await hashOf(buf), f.type, f.name, day);
         const up = await db().storage.from('ar-inbox').upload(path, f, { contentType: f.type || 'image/jpeg', upsert: false });
         if (up.error && !/exist|duplicate/i.test(up.error.message || '')) throw up.error;
-        const { error } = await db().from('ar_documents').insert({ source: 'upload', file_path: path, kind: fileKind(f.type, f.name), batch, note });
+        const { error } = await db().from('ar_documents').insert({ source: 'upload', file_path: path, kind: fileKind(f.type, f.name), batch, note, status: 'new' });
         if (error) { if (/duplicate|unique/i.test(error.message || '')) { again++; continue; } throw error; }
         sent++;
       }
