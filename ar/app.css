@@ -752,10 +752,21 @@ button.small {
 }
 
 /* «فواتير» tab (ar/docs.js): big take-a-photo button, a row per document with its photo */
+#docsPanel {
+  position: relative;
+}
+/* the real file box is hidden (the big label opens it); clipped so its own button never widens the page */
 .dc-file {
   position: absolute;
+  top: 0;
+  inset-inline-start: 0;
   width: 1px;
   height: 1px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
   opacity: 0;
 }
 .dc-pick {
@@ -801,6 +812,7 @@ button.small {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .dc-st {
   font-size: 13px;
