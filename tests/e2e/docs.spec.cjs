@@ -31,5 +31,6 @@ run('documents tab: list and take photos',async({page,table})=>{
  assert.match(await page.textContent('#dcWait'),/صورتها من هنا/);
  assert.equal(await page.inputValue('#dcNote'),'');assert.ok(await page.$eval('#dcSend',b=>b.disabled));
  // the page still fits the phone with five tabs
- assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen');
+ const wide=await page.evaluate(()=>{const W=document.documentElement.clientWidth;return [...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.right>W+0.5||r.left<-0.5)}).map(e=>e.tagName+'#'+e.id+'.'+e.className+' '+Math.round(e.getBoundingClientRect().left)+'..'+Math.round(e.getBoundingClientRect().right)).slice(0,8)});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen; too wide: '+wide.join(' | '));
 });
