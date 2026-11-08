@@ -514,6 +514,14 @@ async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<st
   if (ins.status === 409) return 'duplicate';
   return ins.ok ? 'saved' : 'error';
 }
+// a photo belongs to the message when it was saved on the phone from a minute before (clocks differ) to 3 minutes after
+// (slow download) the message's time. Without both times (an older phone setup) every photo is taken, as before.
+export function nearMessage(modParam: string | null, whenMs: number): boolean {
+  const mod = Number(modParam);
+  if (!modParam || !Number.isFinite(mod) || mod <= 0 || !whenMs) return true;
+  const modMs = mod < 1e12 ? mod * 1000 : mod;
+  return modMs >= whenMs - 60 * 1000 && modMs <= whenMs + 180 * 1000;
+}
 async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: DocCtx): Promise<Response> {
   const { base, sh, out, say } = c;
   const since = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
@@ -538,15 +546,19 @@ async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: Do
     const fresh = !stale && (!Array.isArray(last) || last[0]?.note !== note);
     await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: c.chat, chat: c.from, note, fresh }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
     if (stale) return out(200, { ok: false, media: true, docs: true, late: true, say: '' }, say);
-    // WhatsApp showing it again while the first run still looks at the folder: no second run
-    const at = Array.isArray(last) ? last[0]?.at : undefined;
-    if (!fresh && at && Date.parse(at) > Date.now() - LOOKING_MS) return out(200, { ok: false, media: true, docs: true, looking: true, say: '' }, say);
+    // WhatsApp shows the group's notification again every few minutes (24 times in half an hour, live 2026-11-08). Only
+    // the first one makes the phone look at its folder: a repeat would send whatever other chats just sent (a
+    // customer's prescription was kept that way).
+    if (!fresh) return out(200, { ok: false, media: true, docs: true, repeat: true, say: '' }, say);
     return out(202, { ok: false, media: true, docs: true, fresh, say: '' }, say);
   }
   // Excel/CSV, voice notes and the like: not documents
   if (kind !== 'image' && kind !== 'pdf') return out(200, { ok: false, ignored: true, docs: true, say: '' }, say);
   if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
   if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
+  // the phone sends every photo of the last 3 minutes, from any chat. With the photo's own time (&mod=, seconds, from
+  // Tasker's Test File) only a photo saved around the group message's time (~w) is the group's
+  if (!nearMessage(url.searchParams.get('mod'), c.whenMs)) return out(200, { ok: false, docs: true, other: true, say: '' }, say);
   const r = await saveDocument(fetchImpl, base, sh, bytes, kind, c.chat, true);
   log('inbox-doc', Date.now(), { kind, result: r });
   if (r === 'error') return out(502, { error: 'save', docs: true, message: 'الصورة ماتحفظتش' }, say);
