@@ -214,6 +214,8 @@
         $('readPanel').classList.toggle('hidden', b.dataset.tab !== 'read');
         $('suppliersPanel')?.classList.toggle('hidden', b.dataset.tab !== 'suppliers');
         if (b.dataset.tab === 'suppliers') window.AskerSuppliers?.open();
+        $('docsPanel')?.classList.toggle('hidden', b.dataset.tab !== 'docs');
+        if (b.dataset.tab === 'docs') window.AskerDocs?.open();
       }),
   );
   // «الوارد» has three small tabs: today (the automatic inbox), reading by hand, and the companies / phone link.
