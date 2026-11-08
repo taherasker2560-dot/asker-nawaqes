@@ -493,10 +493,17 @@ type DocCtx = {
   base: string; sh: Record<string, string>; from: string; fromParam: string; whenMs: number; fileName: string; chat: string; say: boolean;
   out: (status: number, body: Record<string, unknown>, say: boolean) => Response;
 };
-// keeps one photo/PDF as a document (its name is its content hash, so the phone's re-sends are kept once)
-async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<string, string>, bytes: Uint8Array, kind: 'image' | 'pdf', chat: string): Promise<'saved' | 'duplicate' | 'error'> {
+// keeps one photo/PDF as a document (its name is its content hash, so the phone's re-sends are kept once).
+// notCompanys: the phone sends the newest photos of its shared folder, so a group's run also sends photos a company
+// sent minutes ago; a photo already kept as a company's message (ar_inbox) is that company's, not a document.
+async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<string, string>, bytes: Uint8Array, kind: 'image' | 'pdf', chat: string, notCompanys = false): Promise<'saved' | 'duplicate' | 'company' | 'error'> {
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
   const filePath = `docs/${new Date().toISOString().slice(0, 10)}/${hash}.${kind === 'pdf' ? 'pdf' : 'jpg'}`;
+  if (notCompanys) {
+    const theirs = await fetchImpl(`${base}/rest/v1/ar_inbox?select=id&file_path=like.*${hash}*&limit=1`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) })
+      .then((r) => r.ok ? r.json() : []).catch(() => []) as { id: string }[];
+    if (Array.isArray(theirs) && theirs.length) return 'company';
+  }
   const known = await fetchImpl(`${base}/rest/v1/ar_documents?select=id&file_path=like.*${hash}*&limit=1`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) })
     .then((r) => r.ok ? r.json() : []).catch(() => []) as { id: string }[];
   if (Array.isArray(known) && known.length) return 'duplicate';
@@ -540,9 +547,10 @@ async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: Do
   if (kind !== 'image' && kind !== 'pdf') return out(200, { ok: false, ignored: true, docs: true, say: '' }, say);
   if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
   if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
-  const r = await saveDocument(fetchImpl, base, sh, bytes, kind, c.chat);
+  const r = await saveDocument(fetchImpl, base, sh, bytes, kind, c.chat, true);
   log('inbox-doc', Date.now(), { kind, result: r });
   if (r === 'error') return out(502, { error: 'save', docs: true, message: 'الصورة ماتحفظتش' }, say);
+  if (r === 'company') return out(200, { ok: false, docs: true, company: true, say: '' }, say);
   return out(200, { ok: true, docs: true, duplicate: r === 'duplicate', say: '' }, say);
 }
 export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
