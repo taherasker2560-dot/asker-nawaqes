@@ -43,8 +43,23 @@ assert.equal(r.status,200);assert.equal(await r.text(),'');assert.equal(f.docs.l
 // 2) a photo notification in the group: remembered under the group's name, 202 so the phone sends the photo
 f=fake();r=await F.handle(post(from(TITLE,'&say=1'),'📷 صورة','text/plain'),env,f);
 assert.equal(r.status,202);assert.equal(await r.text(),'');assert.equal(f.media.length,1);assert.equal(f.media[0].supplier,GROUP);
-// the same notification shown again while the first run still looks: no second run
-r=await F.handle(post(from(TITLE),'📷 صورة','text/plain'),env,f);assert.equal(r.status,200);assert.equal((await r.json()).looking,true);
+// the same notification shown again (WhatsApp repeats it every few minutes): never a second look at the folder, even
+// long after (live 2026-11-08: a repeat sent a customer's prescription photo)
+r=await F.handle(post(from(TITLE),'📷 صورة','text/plain'),env,f);assert.equal(r.status,200);assert.equal((await r.json()).repeat,true);
+f.media.forEach(m=>{m.at=new Date(Date.now()-10*60e3).toISOString()});
+r=await F.handle(post(from(TITLE),'📷 صورة','text/plain'),env,f);assert.equal(r.status,200,'a repeat 10 minutes later: still no look');
+// a new photo in the group (WhatsApp changes the notification: new time) is looked at
+r=await F.handle(post(from(TITLE+' ~w'+Date.now()),'📷 صورة','text/plain'),env,f);assert.equal(r.status,202);
+
+// 2b) the photo's own time (&mod=, from the phone) must be around the group message's time (~w): other chats' photos
+// of the last 3 minutes are not the group's; without the times every photo is taken (older phone setup)
+{const when=Date.now()-30e3,sec=(ms)=>Math.floor(ms/1000);f=fake();
+ r=await F.handle(post(from(TITLE+' ~w'+when,'&mod='+sec(when-150e3)),jpg(11),'image/jpeg'),env,f);assert.equal((await r.json()).other,true);assert.equal(f.docs.length,0,'saved 2.5 minutes before the message: another chat');
+ r=await F.handle(post(from(TITLE+' ~w'+when,'&mod='+sec(when+250e3)),jpg(12),'image/jpeg'),env,f);assert.equal(f.docs.length,0,'4 minutes after: another chat');
+ r=await F.handle(post(from(TITLE+' ~w'+when,'&mod='+sec(when+8e3)),jpg(13),'image/jpeg'),env,f);assert.equal(f.docs.length,1,'8 seconds after the message: the group\'s');
+ r=await F.handle(post(from(TITLE+' ~w'+when),jpg(14),'image/jpeg'),env,f);assert.equal(f.docs.length,2,'no photo time: taken as before');
+ assert.equal(F.nearMessage(null,when),true);assert.equal(F.nearMessage('abc',when),true);assert.equal(F.nearMessage(String(sec(when)),0),true);
+ assert.equal(F.nearMessage(String(sec(when-50e3)),when),true,'phone clock a little behind');assert.equal(F.nearMessage(String(when+5e3),when),true,'milliseconds too');}
 
 // 3) the group's photo: kept as a document under docs/, never read by Gemini, nothing said; the same photo again kept once
 f=fake();r=await F.handle(post(from(TITLE,'&say=1&name=IMG-20261108-WA0001.jpg'),jpg(1),'application/octet-stream'),env,f);
