@@ -8,7 +8,7 @@ const F=await import(pathToFileURL(path.join(__dirname,'..','supabase','function
 const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service',INBOX_CLAIM_WAIT_MS:'1'};
 const KEY='a'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
 const GROUP='ص/عسكر( نواقص و فواتير)',TITLE=GROUP+': احمد',COMPANY='المتحدة للأدوية';
-function fake({chats=[GROUP],media=[]}={}){const calls=[],docs=[],files=[],saved=[];let gemini=0;
+function fake({chats=[GROUP],media=[],inboxFiles=[]}={}){const calls=[],docs=[],files=[],saved=[];let gemini=0;
  const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')||!u.includes('offset=')?a:[]));
  const f=async(url,o={})=>{calls.push({url,o});const m=o.method||'GET';
   if(url.includes('/rest/v1/ar_inbox_keys'))return page(url,url.includes('key_hash=eq.'+HASH)?[{key_hash:HASH}]:[]);
@@ -26,6 +26,7 @@ function fake({chats=[GROUP],media=[]}={}){const calls=[],docs=[],files=[],saved
    if(m==='POST'){const row=JSON.parse(o.body);if(docs.some(d=>d.file_path===row.file_path))return new Response('{}',{status:409});docs.push(row);return new Response('',{status:201})}
    const h=(url.match(/file_path=like\.\*([0-9a-f]+)\*/)||[])[1];return new Response(JSON.stringify(docs.filter(d=>h&&d.file_path.includes(h)).map(()=>({id:'d'}))))}
   if(url.includes('/storage/v1/object/ar-inbox/')){files.push({url,headers:o.headers});return new Response('{}')}
+  if(url.includes('/rest/v1/ar_inbox?select=id&file_path=like.')){const h=(url.match(/like\.\*([0-9a-f]+)\*/)||[])[1];return new Response(JSON.stringify(inboxFiles.some(p=>h&&p.includes(h))?[{id:'in'}]:[]))}
   if(url.includes('/rest/v1/ar_inbox')&&m==='POST'){const row=JSON.parse(o.body);row.id='in'+(saved.length+1);row.received_at=new Date().toISOString();saved.push(row);return new Response(JSON.stringify([{id:row.id,received_at:row.received_at}]),{status:201})}
   if(url.startsWith('https://generativelanguage')){gemini++;return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})}]}}]}))}
   if(url.includes('/rest/v1/')&&m==='GET')return page(url,[]);
@@ -74,6 +75,13 @@ assert.equal(r.status,200);assert.equal(await r.text(),'');assert.equal(f.docs.l
 f=fake({media:[{supplier:GROUP,chat:TITLE,note:'x',fresh:true,done:false,at:new Date().toISOString()},{supplier:COMPANY,chat:COMPANY,note:'new',fresh:true,done:false,at:new Date().toISOString()}]});
 r=await F.handle(post(from(COMPANY),jpg(3),'image/jpeg'),env,f);
 assert.equal(r.status,200);assert.equal(f.gemini(),1);assert.equal(f.saved.length,1);assert.equal(f.saved[0].supplier,COMPANY);assert.equal(f.saved[0].maybe,null);assert.equal(f.docs.length,0);
+
+// 7b) the group's run also sends the newest photos of the phone's shared folder: a photo a company sent minutes ago
+// (already kept as that company's message) is not saved again as a document (seen live 2026-11-08: 5 of 6)
+{const h=crypto.createHash('sha256').update(jpg(4)).digest('hex').slice(0,32);
+ f=fake({inboxFiles:['2026-11-08/'+h+'.jpg']});r=await F.handle(post(from(TITLE,'&say=1'),jpg(4),'image/jpeg'),env,f);
+ assert.equal(r.status,200);assert.equal(await r.text(),'');assert.equal(f.docs.length,0,'a company photo is not a document');assert.equal(f.files.length,0,'not stored again');
+ r=await F.handle(post(from(TITLE),jpg(5),'image/jpeg'),env,f);assert.equal(f.docs.length,1,'the group\'s own photo is kept');}
 
 // 8) no documents chat saved yet (or the table is missing): companies work exactly as before
 f=fake({chats:[]});r=await F.handle(post(from(TITLE),'📷 صورة','text/plain'),env,f);assert.equal(r.status,200);assert.equal((await r.json()).ignored,true);
