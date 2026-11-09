@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#8E1530" />
+    <title>صيدلية عسكر</title>
+    <link rel="icon" href="icons/arabic-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" />
+    <link rel="stylesheet" href="store/store.css?v=store-20261109a" />
+  </head>
+  <body>
+    <p class="trial">نسخة تجريبية</p>
+
+    <!-- الرئيسية -->
+    <div data-view="home">
+      <header class="top">
+        <div class="brand">
+          <img src="icons/arabic-192.png" alt="لوجو صيدلية عسكر" width="48" height="48" />
+          <div><strong>صيدلية عسكر</strong><span dir="ltr">Asker Pharmacy</span></div>
+        </div>
+        <a href="#cart" class="cart-btn" aria-label="السلة">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>
+          <span class="cart-n" hidden>0</span>
+        </a>
+      </header>
+      <div class="top-search">
+        <label for="homeSearch" class="sr">دوّر</label>
+        <input id="homeSearch" type="search" placeholder="دوّر على دوا أو منتج…" autocomplete="off" readonly />
+      </div>
+      <section class="hero">
+        <h1>اطلب من صيدليتك وهي توصلك</h1>
+        <p>اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
+        <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
+      </section>
+      <section class="block">
+        <h2>الأقسام</h2>
+        <div id="sections" class="sections"></div>
+      </section>
+      <p class="foot">الأسعار والمتوفر بيتحدثوا من الصيدلية كل كام ساعة.</p>
+    </div>
+
+    <!-- البحث -->
+    <div data-view="search" hidden>
+      <header class="bar">
+        <a href="#" class="back" aria-label="رجوع">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+        </a>
+        <form id="searchForm" class="search-form" role="search">
+          <label for="q" class="sr">دوّر</label>
+          <input id="q" type="search" placeholder="اسم الدوا أو المنتج (عربي أو إنجليزي)" autocomplete="off" enterkeyhint="search" />
+        </form>
+      </header>
+      <p id="resNote" class="note">اكتب حرفين على الأقل من اسم الدوا أو المنتج</p>
+      <div id="results" class="list"></div>
+      <button id="more" type="button" class="more" hidden>اعرض أكتر</button>
+      <p class="note dashed">مش لاقي اللي بتدور عليه؟ اكتب اسمه في ملاحظات الطلب وهنشوفه ونرد عليك.</p>
+    </div>
+
+    <!-- السلة -->
+    <div data-view="cart" hidden>
+      <header class="bar">
+        <a href="#" class="back" aria-label="رجوع">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+        </a>
+        <h1>السلة</h1>
+      </header>
+      <div id="cartItems" class="list"></div>
+      <form id="orderForm" novalidate>
+        <div id="checkout" hidden>
+          <section class="panel">
+            <h2>بيانات التوصيل</h2>
+            <label for="cName">الاسم</label>
+            <input id="cName" type="text" autocomplete="name" maxlength="80" required />
+            <label for="cPhone">رقم الموبايل (واتساب)</label>
+            <input id="cPhone" type="tel" dir="ltr" autocomplete="tel" inputmode="tel" maxlength="16" placeholder="01xxxxxxxxx" required />
+            <label for="cAddr">العنوان</label>
+            <input id="cAddr" type="text" autocomplete="street-address" maxlength="300" required />
+            <label for="cNotes">ملاحظات (اختياري)</label>
+            <textarea id="cNotes" rows="2" maxlength="500" placeholder="مثلًا: صنف مش لاقيه، أو ميعاد يناسبك"></textarea>
+          </section>
+          <section class="panel sums">
+            <div><span>المنتجات</span><span id="sumItems"></span></div>
+            <div><span>التوصيل</span><span>هنقولك على واتساب</span></div>
+            <div class="total"><span>الإجمالي (من غير التوصيل)</span><span id="sumTotal"></span></div>
+            <span class="hint-sm">الدفع كاش عند الاستلام</span>
+          </section>
+          <div class="send">
+            <p id="formMsg" class="form-msg" role="status"></p>
+            <button id="sendBtn" type="submit">إرسال الطلب</button>
+            <p class="hint-sm center">هنكلمك على واتساب نأكد الطلب قبل التوصيل</p>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- الطلب وصل -->
+    <div data-view="done" hidden>
+      <section class="done">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M7 12.5l3.2 3L17 9" /></svg>
+        <h1>طلبك وصل</h1>
+        <p id="doneText"></p>
+        <p>هنكلمك على واتساب قريب نأكد الطلب ومصاريف التوصيل.</p>
+        <a href="#" class="hero-btn">ارجع للرئيسية</a>
+      </section>
+    </div>
+
+    <nav class="tabbar" aria-label="القائمة">
+      <a href="#" data-go="home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z" /></svg>الرئيسية</a>
+      <a href="#search" data-go="search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>بحث</a>
+      <a href="#cart" data-go="cart"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>السلة <span class="cart-n" hidden>0</span></a>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+    <script src="store/store.js?v=store-20261109a"></script>
+  </body>
+</html>
