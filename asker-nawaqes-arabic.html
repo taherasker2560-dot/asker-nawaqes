@@ -54,7 +54,10 @@
             <span>المخازن</span></button
           ><button data-tab="docs" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
-            <span>فواتير</span></button>
+            <span>فواتير</span></button
+          ><button data-tab="storeorders" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 12H7L6 7zM9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>طلبات</span></button>
         </nav>
 
         <section id="shortPanel" class="card">
@@ -297,13 +300,27 @@
           <div id="dcWait"></div>
           <div id="dcDoneBox" class="hidden"><h3>اتعملت</h3><div id="dcDone"></div></div>
         </section>
+
+        <section id="storeOrdersPanel" class="card hidden">
+          <h2>طلبات الموقع</h2>
+          <p class="hint">
+            طلبات الزباين من موقع البيع (تجربة). «واتساب» بيفتح محادثة الزبون ومعاها رسالة تأكيد جاهزة: زوّد مصاريف التوصيل وابعتها
+            بنفسك.
+          </p>
+          <button id="soRefresh" type="button" class="secondary small">حدّث</button>
+          <p id="soStatus" class="status"></p>
+          <h3 id="soOpenTitle">مفتوحة</h3>
+          <div id="soOpen"></div>
+          <div id="soClosedBox" class="hidden"><h3>خلصت</h3><div id="soClosed"></div></div>
+        </section>
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=inbox-20261106a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=docs-20261108a"></script>
+    <script src="ar/app.js?v=store-20261109a"></script>
     <script src="ar/suppliers.js?v=search-20261108a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
+    <script src="ar/store-orders.js?v=store-20261109a"></script>
   </body>
 </html>

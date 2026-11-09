@@ -826,3 +826,57 @@ button.small {
 .dc-st.dc-skipped {
   color: var(--muted);
 }
+/* ---------- «طلبات» tab (ar/store-orders.js) ---------- */
+.bottomnav:has(> button:nth-child(6)) button svg {
+  padding: 3px 8px;
+}
+.so-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.so-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.so-st {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b25f00;
+}
+.so-confirmed .so-st,
+.so-done .so-st {
+  color: var(--good);
+}
+.so-cancelled .so-st {
+  color: var(--muted);
+}
+.so-lines {
+  margin: 4px 0;
+  padding-inline-start: 18px;
+  font-size: 14px;
+}
+.so-total {
+  font-weight: 700;
+}
+.so-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.so-wa {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #1f8a4c;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
