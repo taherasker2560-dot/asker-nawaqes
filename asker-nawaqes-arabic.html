@@ -312,15 +312,37 @@
           <h3 id="soOpenTitle">مفتوحة</h3>
           <div id="soOpen"></div>
           <div id="soClosedBox" class="hidden"><h3>خلصت</h3><div id="soClosed"></div></div>
+
+          <details id="storeSettings" class="ss-box">
+            <summary>إعدادات الموقع</summary>
+            <label class="ss-check"><input id="ssOpen" type="checkbox" checked /> الموقع مفتوح وبيستقبل طلبات</label>
+            <label for="ssClosedMsg">رسالة وقت ما يكون مقفول</label
+            ><input id="ssClosedMsg" type="text" maxlength="300" placeholder="مثلًا: الطلبات هترجع الساعة 9 الصبح" />
+            <label for="ssHeroTitle">عنوان الرئيسية</label
+            ><input id="ssHeroTitle" type="text" maxlength="120" placeholder="فاضي = اطلب من صيدليتك وهي توصلك" />
+            <label for="ssHeroText">الجملة اللي تحت العنوان</label
+            ><textarea id="ssHeroText" rows="2" maxlength="400" placeholder="فاضي = الجملة الأصلية"></textarea>
+            <label for="ssWhatsapp">رقم الواتساب اللي يظهر للزبون</label
+            ><input id="ssWhatsapp" type="tel" dir="ltr" maxlength="16" placeholder="01xxxxxxxxx (فاضي = مايظهرش)" />
+            <button id="ssSave" type="button">احفظ الإعدادات</button>
+            <p id="ssStatus" class="status"></p>
+            <h3>صنف معين</h3>
+            <p class="hint">دوّر على الصنف عشان تخفيه من الموقع أو تعدّل اسمه العربي.</p>
+            <div class="ss-row"><input id="ssQ" type="search" placeholder="اسم الصنف (عربي أو إنجليزي)" aria-label="دوّر على صنف في الموقع" />
+              <button id="ssSearch" type="button" class="small">دوّر</button></div>
+            <p id="ssItemStatus" class="status"></p>
+            <div id="ssItems"></div>
+          </details>
         </section>
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=inbox-20261106a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=store-20261109a"></script>
+    <script src="ar/app.js?v=store-20261109b"></script>
     <script src="ar/suppliers.js?v=search-20261108a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
-    <script src="ar/store-orders.js?v=store-20261109a"></script>
+    <script src="ar/store-orders.js?v=store-20261109c"></script>
+    <script src="ar/store-settings.js?v=store-20261109b"></script>
   </body>
 </html>
