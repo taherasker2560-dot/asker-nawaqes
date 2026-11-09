@@ -10,7 +10,7 @@
 
   // ---------- pure helpers (also used by tests/order-drafts.cjs) ----------
   const PATH = 'orders/drafts.json';
-  const OLD_HOURS = 36; // the laptop rebuilds after every shortages update (every 2 hours in the day); older than this = say so
+  const OLD_HOURS = 36; // the laptop prepares the orders once a day, an hour before closing (task PharmaYaqez_Orders_Daily); older than a day and a half = say so
   const MAX_URL_TEXT = 3000; // longer messages cannot ride in a wa.me link: the chat opens empty and the owner pastes (it is already copied)
   const MAX_QTY = 9999;
   const DIST = ['PHARMA', 'IBNSINA']; // their lines use the PharmaFly name only
@@ -288,7 +288,7 @@
       if (error || !blob) {
         drafts = null;
         draw();
-        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها بعد كل تحديث للنواقص.');
+        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها مرة في اليوم قبل القفل بساعة.');
       }
       drafts = parseDrafts(JSON.parse(await blob.text()));
       if (!drafts) {
