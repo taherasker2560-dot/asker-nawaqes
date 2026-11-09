@@ -113,7 +113,20 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^[0-9a-f-]{20,40}$/.test(id) || !/^(jpg|png|webp|heic|pdf)$/.test(ext)) return null;
     return `rx/${day}/${id}.${ext}`;
   }
-  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, searchTerms, termFilter, normPhone, money, canAdd, cartAdd, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  // شكل الصنف من اسمه (للأيقونة لما مايكونش له صورة)
+  function shapeOf(name, cat) {
+    const n = ' ' + String(name || '').toUpperCase() + ' ';
+    if (/\b(SYR|SYRUP|SUSP|SUSPENSION|ELIXIR|SOLUTION|ORAL SOL)\b|\d+\s*(ML|CC)\b.*\b(SYR|SUSP)|شراب/.test(n)) return 'bottle';
+    if (/\b(AMP|AMPOULE|VIAL|VL|INJ|INJECTION|I\.?M\.?|I\.?V\.?|PEN|SYRINGE|UNIT\/ML)\b|حقن|امبول/.test(n)) return 'injection';
+    if (/\b(DROP|DROPS|E\.?D\.?|EYE|EAR|NASAL|NSE)\b|نقط|قطرة/.test(n)) return 'drops';
+    if (/\b(CREAM|CREA|CR|OINT|OINTMENT|GEL|LOTION|LOT|PASTE)\b|كريم|مرهم|جل/.test(n)) return 'tube';
+    if (/\b(SPRAY|INH|INHALER|AEROSOL|FOAM)\b|بخاخ|سبراي/.test(n)) return 'spray';
+    if (/\b(MILK|FORMULA)\b|\d+\s*(G|GM|GR)\b/.test(n) || cat === 'baby') return 'can';
+    if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
+    if (cat === 'cosmetic') return 'tube';
+    return 'box';
+  }
+  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, canAdd, cartAdd, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -137,6 +150,30 @@
   let shown = [], popular = [], lastQuery = null, offset = 0, seq = 0, sending = false;
   let settings = { is_open: true };
   let rxFiles = []; // [{file, url}] صور الروشتة اللي الزبون اختارها (على الموبايل لحد ما يبعت)
+  // صور الأصناف اللي صاحب الصيدلية وافق عليها: store/img/index.json = {id: "اسم الملف"}
+  let pics = {};
+  const ICONS = {
+    pills: '<rect x="3" y="9" width="18" height="6" rx="3"/><path d="M12 9v6"/>',
+    bottle: '<path d="M9 3h6v3l2 3v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V9l2-3z"/><path d="M7 12h10"/>',
+    injection: '<path d="M18 2l4 4M17 7l-9 9-3 1 1-3 9-9zM14 4l6 6M3 21l3-3"/>',
+    drops: '<path d="M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11z"/>',
+    tube: '<path d="M8 3h8l-1 4H9zM9 7h6v12a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>',
+    spray: '<path d="M9 8h6v13H9zM10 8V5h4v3M14 5h3M18 3v1M19 6h1"/>',
+    can: '<ellipse cx="12" cy="5" rx="7" ry="2"/><path d="M5 5v14c0 1.1 3.1 2 7 2s7-.9 7-2V5"/>',
+    box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/>',
+  };
+  function thumb(it) {
+    const f = pics[it.id];
+    if (f) return `<div class="thumb"><img src="store/img/${esc(f)}" alt="" loading="lazy"></div>`;
+    return `<div class="thumb icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[shapeOf(it.name, it.cat)]}</svg></div>`;
+  }
+  async function loadPics() {
+    try {
+      const r = await fetch('store/img/index.json', { cache: 'no-cache' });
+      if (r.ok) pics = await r.json();
+    } catch (e) { pics = {}; }
+    drawList(!$('more').hidden);
+  }
 
   function saveCart() {
     store.set('asker_store_cart', cart);
@@ -169,6 +206,7 @@
       action = `<span class="hint-sm">ممكن نجيبهولك: اكتبه في ملاحظات الطلب</span>`;
     }
     return `<article class="item">
+      ${thumb(it)}
       <div class="item-text">
         <h3 dir="ltr">${esc(it.name)}</h3>
         ${it.arabic_name ? `<p class="ar">${esc(it.arabic_name)}</p>` : ''}
@@ -451,4 +489,5 @@
   route();
   loadSettings();
   loadPopular();
+  loadPics();
 })(typeof window === 'undefined' ? globalThis : window);

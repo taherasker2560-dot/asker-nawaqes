@@ -66,4 +66,12 @@ assert.equal(S.rxPath('2026-11-09','../etc','jpg'),null);assert.equal(S.rxPath('
 assert.equal(S.rxPath('2026-11-09','3f2a9c1e-7b4d-4e8a-9c2b-1d5e6f7a8b9c','exe'),null);
 assert.equal(S.MAX_RX,4);assert.equal(S.MAX_RX_BYTES,8388608);
 for(const k of ['bad_rx','rx_upload','rx_big'])assert.ok(S.errorText(k)!==S.errorText('x'),k);
+// shape icons for items without a photo (from PharmaFly names)
+const sh=(n,c)=>S.shapeOf(n,c);
+assert.equal(sh('PANADOL EXTRA 48 TAB'),'pills');assert.equal(sh('URSOPLUS 20CAP'),'pills');assert.equal(sh('CONCOR 5 30TAB'),'pills');
+assert.equal(sh('CONTAFEVER 120ML SYR'),'bottle');assert.equal(sh('HIBIOTIC N 600MG SUSP'),'bottle');assert.equal(sh('DUPHALAC 200ML SYR.'),'bottle');
+assert.equal(sh('VOLTAREN AMP 6 AMP'),'injection');assert.equal(sh('APIDRA 100 UNIT/ML'),'injection');assert.equal(sh('EPICEPHIN 1GM I.M.'),'injection');
+assert.equal(sh('OTRIVIN AD. 1% 15ML NSE DROPS'),'drops');assert.equal(sh('MEBO 15GM OINT'),'tube');assert.equal(sh('REGAINE 5% SPRAY'),'spray');
+assert.equal(sh('NAN COMFORT 400 G'),'can');assert.equal(sh('HERO BABY 2 MILK'),'can');assert.equal(sh('بيبى جوى رقم 4','baby'),'can');
+assert.equal(sh('SOMETHING ODD'),'box');assert.equal(sh('GLOSS NATURE','cosmetic'),'tube');
 console.log('store ok');
