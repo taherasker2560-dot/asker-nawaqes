@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=orders-20261109a" />
+    <link rel="stylesheet" href="ar/app.css?v=orders-20261109b" />
   </head>
   <body>
     <header class="appbar">
@@ -307,24 +307,32 @@
         <section id="draftsPanel" class="card hidden">
           <h2>الطلبيات المقترحة</h2>
           <p class="hint">
-            رسالة جاهزة لكل مورد بالأصناف اللي خصمه فيها أحسن (من الحقيبة). إنت اللي تعدّل وتبعت: مفيش حاجة بتتبعت لوحدها.
-            الخصم من آخر شرا فعلي أو من آخر قايمة نزلتها (الأحدث).
+            طلب جاهز لكل مورد بالأصناف اللي خصمه فيها أحسن (من الحقيبة). «تعديل الأصناف» تعلّم على اللي هتطلبه وتكتب الكمية،
+            وتبعت لمحادثة المورد بإيدك: مفيش حاجة بتتبعت لوحدها. الخصم من آخر شرا فعلي أو آخر قايمة نزلتها (الأحدث).
           </p>
           <button id="odRefresh" type="button" class="secondary small">حدّث</button>
           <p id="odInfo" class="status"></p>
           <div id="odBody" class="hidden">
             <div id="odChips" class="chips" role="group" aria-label="المورد"></div>
-            <label for="odMsg">الرسالة (عدّلها زي ما تحب قبل ما تبعتها)</label>
-            <textarea id="odMsg" rows="12" dir="auto"></textarea>
+            <p id="odTo" class="od-to"></p>
+            <div id="odPick" class="od-pick"></div>
+            <label for="odMsg">الطلب (بيتغير لما تعدّل الأصناف تحت)</label>
+            <textarea id="odMsg" rows="9" dir="auto" readonly></textarea>
             <p id="odTotal" class="od-total"></p>
             <div class="od-actions">
               <button id="odCopy" type="button">انسخ الرسالة وافتح واتساب</button>
               <button id="odMark" type="button" class="secondary">علّمها اتطلب</button>
             </div>
-            <details class="od-box" id="odItemsBox">
-              <summary id="odItemsTitle">تفاصيل الأصناف</summary>
+            <button id="odEdit" type="button" class="od-edit" aria-expanded="false" aria-controls="odEditBox">تعديل الأصناف</button>
+            <div id="odEditBox" class="od-editbox hidden">
+              <p class="hint">علّم على اللي هتطلبه واكتب الكمية. اللي مش معلّم عليه مش بينزل في الطلب.</p>
+              <div class="od-editbar">
+                <span id="odEditCount"></span>
+                <button id="odAll" type="button" class="secondary small">علّم الكل</button>
+                <button id="odNone" type="button" class="secondary small">شيل الكل</button>
+              </div>
               <div id="odItems"></div>
-            </details>
+            </div>
             <details class="od-box hidden" id="odNoBox">
               <summary id="odNoTitle">مفيش عليهم عرض</summary>
               <div id="odNo"></div>
@@ -371,10 +379,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=inbox-20261106a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=orders-20261109a"></script>
+    <script src="ar/app.js?v=orders-20261109b"></script>
     <script src="ar/suppliers.js?v=search-20261108a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
-    <script src="ar/order-drafts.js?v=orders-20261109a"></script>
+    <script src="ar/order-drafts.js?v=orders-20261109b"></script>
     <script src="ar/store-orders.js?v=store-20261109c"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
   </body>

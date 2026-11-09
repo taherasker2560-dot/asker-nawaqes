@@ -1887,12 +1887,14 @@
       localStorage.setItem('ar-wa-biz', $('waBiz').checked ? '1' : '0');
     } catch (e) {}
   };
-  // shared with ar/order-drafts.js («الطلبيات»): open WhatsApp (Business when chosen) with a ready message and no number
-  // (the owner picks the chat); an empty text opens WhatsApp bare (the message was too long for a link and is on the clipboard)
-  window.AskerApp.openWhatsApp = (text) => {
+  // shared with ar/order-drafts.js («الطلبيات»): open WhatsApp (Business when chosen) on a supplier's chat (its saved number;
+  // no number = the owner picks the chat) with a ready message; an empty text opens the chat bare (the message was too long
+  // for a link and is on the clipboard)
+  window.AskerApp.openWhatsApp = (text, phone) => {
     const t = text || '',
-      web = t ? `https://wa.me/?text=${encodeURIComponent(t)}` : 'https://wa.me/';
-    if (isAndroid() && $('waBiz').checked) openUrl(waIntent('', t, web));
+      ph = waPhone(phone || ''),
+      web = `https://wa.me/${ph}${t ? '?text=' + encodeURIComponent(t) : ''}`;
+    if (isAndroid() && $('waBiz').checked) openUrl(waIntent(ph, t, web));
     else window.open(web, '_blank');
   };
   $('waBtn').onclick = async () => {

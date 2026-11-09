@@ -864,6 +864,138 @@ button.small {
 .od-box {
   margin-top: 12px;
 }
+.od-to {
+  margin: 10px 0 4px;
+  font-weight: 700;
+}
+.od-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.od-pick button {
+  min-height: 36px;
+  margin: 0;
+}
+.od-edit {
+  width: 100%;
+  margin-top: 10px;
+  background: #ffd54f;
+  color: #3a2a00;
+  font-weight: 700;
+}
+.od-editbox {
+  margin-top: 10px;
+}
+.od-editbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+.od-editbar span {
+  flex: 1;
+  font-weight: 700;
+  color: var(--crimson);
+}
+.od-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.od-item.off {
+  opacity: 0.5;
+}
+.od-check {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+.od-check input {
+  width: 26px;
+  height: 26px;
+  margin: 0;
+}
+.od-thumb {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.od-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.od-thumb.icon {
+  background: var(--rose);
+  border-color: transparent;
+  color: var(--crimson);
+}
+.od-thumb.icon svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.od-info {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.od-info strong {
+  font-size: 14.5px;
+  line-height: 1.35;
+  text-align: start;
+}
+.od-info .hint {
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.od-avg {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--crimson);
+}
+.od-warn {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #b25f00;
+}
+.od-qty {
+  flex: 0 0 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.od-qty input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 2px;
+  font-size: 17px;
+  text-align: center;
+  box-sizing: border-box;
+}
 .od-row {
   display: flex;
   flex-wrap: wrap;
