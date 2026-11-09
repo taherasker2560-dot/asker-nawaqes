@@ -45,4 +45,16 @@ const before=[{id:1,name:'A',price:10,qty:1}];S.cartAdd(before,{id:1,name:'A',pr
 for(const k of ['bad_phone','bad_name','bad_address','bad_items','too_many','item_not_available'])assert.ok(S.errorText(k)!==S.errorText('x'),k);
 assert.equal(S.MAX_LINES,30);assert.equal(S.MAX_QTY,20);
 assert.deepEqual(Object.keys(S.STATUS),['available','on_order','unavailable'],'same statuses as ar_store_items');
+// «طلباتي»: newest first, no repeats, at most 20
+let mine=[];for(let i=1;i<=25;i++)mine=S.rememberOrder(mine,{id:i});
+assert.equal(mine.length,S.MAX_SAVED_ORDERS);assert.equal(mine[0].id,25);
+mine=S.rememberOrder(mine,{id:20,status:'confirmed'});assert.equal(mine[0].id,20);assert.equal(mine.filter(x=>x.id===20).length,1);
+assert.deepEqual(S.rememberOrder(null,{id:1}),[{id:1}]);
+// «اطلب تاني»: what is still in stock goes back to the cart with the same quantity, the rest is named
+const plan=S.reorderPlan([{id:1,name:'A',qty:2},{id:2,name:'B',qty:1},{id:3,name:'C',qty:50}],
+ [{id:1,status:'available',price:10,needs_rx:false},{id:2,status:'on_order',price:null,needs_rx:false},{id:3,status:'available',price:5,needs_rx:false}]);
+assert.deepEqual(plan.add.map(a=>[a.item.id,a.qty]),[[1,2],[3,20]]);assert.deepEqual(plan.missing,['B']);
+assert.deepEqual(S.reorderPlan([{id:9,name:'Z',qty:1}],[]).missing,['Z'],'item gone from the site');
+assert.deepEqual(Object.keys(S.ORDER_STATUS),['new','confirmed','done','cancelled'],'same statuses as ar_store_orders');
+assert.ok(S.errorText('closed')!==S.errorText('x'),'closed has words');
 console.log('store ok');

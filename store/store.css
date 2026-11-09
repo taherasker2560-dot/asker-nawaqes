@@ -138,3 +138,18 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .tabbar a.on { color: var(--accent); font-weight: 700; }
 .tabbar svg { width: 22px; height: 22px; }
 .tabbar .cart-n { margin-top: -2px; }
+
+/* improvements 1: closed note, best sellers, my orders */
+.tabbar { grid-template-columns: repeat(4, 1fr); }
+.closed-note { margin: 12px 16px 0; padding: 10px 14px; border-radius: 12px; background: var(--order-bg); color: var(--order); font-weight: 700; font-size: 14px; }
+.send .closed-note { margin: 0; }
+.popular-block { padding-top: 22px; }
+.list.flush { padding: 0; }
+.order { padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; display: flex; flex-direction: column; gap: 4px; }
+.order-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.order-lines { margin: 4px 0; padding-inline-start: 18px; font-size: 13.5px; }
+.again { align-self: flex-start; min-height: 38px; padding: 0 14px; border-radius: 10px; border: 1.5px solid var(--accent); background: var(--card); color: var(--accent); font-weight: 700; }
+.badge.st-new { background: var(--order-bg); color: var(--order); }
+.badge.st-confirmed, .badge.st-done { background: var(--ok-bg); color: var(--ok); }
+.badge.st-cancelled { background: var(--out-bg); color: var(--out); }
+.foot a { font-weight: 700; }

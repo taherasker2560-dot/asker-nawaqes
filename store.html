@@ -9,7 +9,7 @@
     <link rel="icon" href="icons/arabic-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" />
-    <link rel="stylesheet" href="store/store.css?v=store-20261109a" />
+    <link rel="stylesheet" href="store/store.css?v=store-20261109b" />
   </head>
   <body>
     <p class="trial">نسخة تجريبية</p>
@@ -30,15 +30,21 @@
         <label for="homeSearch" class="sr">دوّر</label>
         <input id="homeSearch" type="search" placeholder="دوّر على دوا أو منتج…" autocomplete="off" readonly />
       </div>
+      <p class="closed-note" hidden></p>
       <section class="hero">
-        <h1>اطلب من صيدليتك وهي توصلك</h1>
-        <p>اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
+        <h1 id="heroTitle">اطلب من صيدليتك وهي توصلك</h1>
+        <p id="heroText">اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
         <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
       </section>
       <section class="block">
         <h2>الأقسام</h2>
         <div id="sections" class="sections"></div>
       </section>
+      <section id="popularBox" class="block popular-block" hidden>
+        <h2>الأكثر طلبًا</h2>
+        <div id="popular" class="list flush"></div>
+      </section>
+      <p id="contact" class="foot" hidden>عندك سؤال؟ كلمنا واتساب: <a id="waLink" href="#" target="_blank" rel="noopener" dir="ltr"><span id="waNumber"></span></a></p>
       <p class="foot">الأسعار والمتوفر بيتحدثوا من الصيدلية كل كام ساعة.</p>
     </div>
 
@@ -88,6 +94,7 @@
             <span class="hint-sm">الدفع كاش عند الاستلام</span>
           </section>
           <div class="send">
+            <p class="closed-note" hidden></p>
             <p id="formMsg" class="form-msg" role="status"></p>
             <button id="sendBtn" type="submit">إرسال الطلب</button>
             <p class="hint-sm center">هنكلمك على واتساب نأكد الطلب قبل التوصيل</p>
@@ -96,24 +103,38 @@
       </form>
     </div>
 
+    <!-- طلباتي -->
+    <div data-view="orders" hidden>
+      <header class="bar">
+        <a href="#" class="back" aria-label="رجوع">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+        </a>
+        <h1>طلباتي</h1>
+      </header>
+      <p class="note">الطلبات اللي بعتها من الموبايل ده، وحالتها من الصيدلية.</p>
+      <p id="ordersNote" class="note" role="status"></p>
+      <div id="ordersList" class="list"></div>
+    </div>
+
     <!-- الطلب وصل -->
     <div data-view="done" hidden>
       <section class="done">
         <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M7 12.5l3.2 3L17 9" /></svg>
         <h1>طلبك وصل</h1>
         <p id="doneText"></p>
-        <p>هنكلمك على واتساب قريب نأكد الطلب ومصاريف التوصيل.</p>
-        <a href="#" class="hero-btn">ارجع للرئيسية</a>
+        <p>هنكلمك على واتساب قريب نأكد الطلب ومصاريف التوصيل. وتقدر تتابعه من «طلباتي».</p>
+        <a href="#orders" class="hero-btn">تابع طلبك</a>
       </section>
     </div>
 
     <nav class="tabbar" aria-label="القائمة">
       <a href="#" data-go="home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z" /></svg>الرئيسية</a>
       <a href="#search" data-go="search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>بحث</a>
+      <a href="#orders" data-go="orders"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h4" /></svg>طلباتي</a>
       <a href="#cart" data-go="cart"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>السلة <span class="cart-n" hidden>0</span></a>
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="store/store.js?v=store-20261109a"></script>
+    <script src="store/store.js?v=store-20261109b"></script>
   </body>
 </html>

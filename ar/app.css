@@ -880,3 +880,42 @@ button.small {
   font-weight: 700;
   text-decoration: none;
 }
+
+/* «إعدادات الموقع» (ar/store-settings.js) */
+.ss-box {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.ss-box summary {
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--crimson-ink);
+}
+.ss-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-weight: 700;
+}
+.ss-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ss-row input {
+  flex: 1;
+  min-width: 0;
+}
+.ss-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.ss-label {
+  font-size: 13px;
+}
