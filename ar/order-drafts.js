@@ -10,7 +10,11 @@
 
   // ---------- pure helpers (also used by tests/order-drafts.cjs) ----------
   const PATH = 'orders/drafts.json';
-  const OLD_HOURS = 36; // the laptop prepares the orders once a day, an hour before closing (task PharmaYaqez_Orders_Daily); older than a day and a half = say so
+  // the laptop prepares the orders from 6 pm every 2 hours (task PharmaYaqez_Orders_Evening: 18:40, 20:40, 22:40) and a last
+  // time an hour before closing (PharmaYaqez_Orders_Daily); older than a day and a half = say so
+  const OLD_HOURS = 36;
+  // the pharmacy's day: 9:00 to 2:00 (after midnight is still the same night), so a working day starts at 6:00
+  const DAY_STARTS_AT = 6;
   const MAX_URL_TEXT = 3000; // longer messages cannot ride in a wa.me link: the chat opens empty and the owner pastes (it is already copied)
   const MAX_QTY = 9999;
   const DIST = ['PHARMA', 'IBNSINA']; // their lines use the PharmaFly name only
@@ -34,6 +38,32 @@
     if (!o || typeof o !== 'object' || !Array.isArray(o.suppliers)) return null;
     const suppliers = o.suppliers.filter((s) => s && s.id && Array.isArray(s.items) && s.items.length);
     return { generatedAt: o.generated_at || '', suppliers, noOffer: Array.isArray(o.no_offer) ? o.no_offer : [], summary: o.summary || {} };
+  }
+  // the start of the pharmacy's working day (6:00); at 1:00 at night it is still yesterday's 6:00
+  function businessDayStart(now = new Date()) {
+    const d = new Date(now);
+    if (d.getHours() < DAY_STARTS_AT) d.setDate(d.getDate() - 1);
+    d.setHours(DAY_STARTS_AT, 0, 0, 0);
+    return d;
+  }
+  // the owner's rule (2026-11-10): what he picked and marked «اتطلب» today does not come back in the next suggestions
+  // the same day (they are refreshed every 2 hours in the evening), so he does not order it twice. Only today's ORDERS
+  // hide it («تمنع ظهوره فى طلبيه اليوم مش ظهورة فى النواقص»): the shortages list is not touched. Tomorrow it shows
+  // again if it is still needed (ordered and not arrived). Suppliers left with nothing are dropped.
+  function hideOrdered(d, orderedRows) {
+    if (!d) return { drafts: d, hidden: 0 };
+    const done = new Set((orderedRows || []).map((o) => o && o.name_key).filter(Boolean));
+    if (!done.size) return { drafts: d, hidden: 0 };
+    const gone = new Set();
+    const keep = (i) => {
+      const k = nk(i && i.name_pf);
+      if (done.has(k)) { gone.add(k); return false; }
+      return true;
+    };
+    const suppliers = d.suppliers.map((s) => ({ ...s, items: s.items.filter(keep) })).filter((s) => s.items.length)
+      .map((s) => ({ ...s, count: s.items.length }));
+    const noOffer = (d.noOffer || []).filter(keep);
+    return { drafts: { ...d, suppliers, noOffer }, hidden: gone.size };
   }
   // how old the numbers are, in words
   function age(iso, now = new Date()) {
@@ -139,7 +169,7 @@
     if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
     return 'box';
   }
-  const api = { PATH, OLD_HOURS, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf };
+  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf };
   root.AskerOrderDraftsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -148,11 +178,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
-  const dayStart = () => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
-  };
+  const dayStart = () => businessDayStart().toISOString();
   const ICONS = {
     pills: '<rect x="3" y="9" width="18" height="6" rx="3"/><path d="M12 9v6"/>',
     bottle: '<path d="M9 3h6v3l2 3v11a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V9l2-3z"/><path d="M7 12h10"/>',
@@ -288,7 +314,7 @@
       if (error || !blob) {
         drafts = null;
         draw();
-        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها مرة في اليوم قبل القفل بساعة.');
+        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها من 6 المغرب كل ساعتين لحد قبل القفل بساعة.');
       }
       drafts = parseDrafts(JSON.parse(await blob.text()));
       if (!drafts) {
@@ -296,7 +322,9 @@
         return say('ملف الطلبيات شكله مش مظبوط، استنى التحديث الجاي.', 'bad');
       }
       [ordered, saved, pics] = await Promise.all([soft(loadOrdered(), []), soft(loadSaved(), []), soft(loadPics(), {})]);
-      say('');
+      const h = hideOrdered(drafts, ordered);
+      drafts = h.drafts;
+      say(h.hidden ? `${h.hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
       draw();
     } catch (e) {
       say('مقدرتش أجيب الطلبيات: ' + (e.message || e), 'bad');

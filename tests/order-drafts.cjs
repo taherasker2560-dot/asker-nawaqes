@@ -76,4 +76,19 @@ assert.equal(D.chooseContact([{name:'x',phone:''}],null).name,'x');assert.equal(
 // no approved photo: a shape from the name (same shapes as the store)
 assert.equal(D.shapeOf('FERRODEP 150 ML SYRUP'),'bottle');assert.equal(D.shapeOf('ADRENOCORTINE 1MG AMP'),'injection');assert.equal(D.shapeOf('FLUCON 5CC E.D.'),'drops');
 assert.equal(D.shapeOf('SKINOPROCIN OINT'),'tube');assert.equal(D.shapeOf('AMARYL 3MG 30TAB'),'pills');assert.equal(D.shapeOf('WISE CARE'),'box');
+// the pharmacy's working day starts at 6:00 (after midnight is still the same night)
+assert.equal(D.businessDayStart(new Date(2026,10,10,19,0)).getTime(),new Date(2026,10,10,6,0).getTime());
+assert.equal(D.businessDayStart(new Date(2026,10,11,1,30)).getTime(),new Date(2026,10,10,6,0).getTime(),'1:30 at night = still yesterday');
+assert.equal(D.businessDayStart(new Date(2026,10,11,6,0)).getTime(),new Date(2026,10,11,6,0).getTime());
+// what was marked «اتطلب» today is hidden from today's orders (any supplier); a supplier left empty is dropped; noOffer too
+const dd={generatedAt:'x',summary:{},suppliers:[{id:'NEWCITY',label:'نيوسيتي',count:2,items:[{item_id:1,name_pf:'BRUFEN 400MG 30TAB'},{item_id:2,name_pf:'FLAGYL 125MG SYP'}]},{id:'AMG',label:'AMG',count:1,items:[{item_id:1,name_pf:'brufen  400mg 30tab'}]}],noOffer:[{name_pf:'FLAGYL 125MG SYP',qty:2},{name_pf:'OTHER',qty:1}]};
+let h=D.hideOrdered(dd,[{name_key:'BRUFEN 400MG 30TAB',supplier:'نيوسيتي'}]);
+assert.equal(h.hidden,1);
+assert.deepEqual(h.drafts.suppliers.map(s=>[s.id,s.count,s.items.map(i=>i.item_id)]),[['NEWCITY',1,[2]]],'AMG had only the ordered item: dropped');
+assert.deepEqual(h.drafts.noOffer.map(i=>i.name_pf),['FLAGYL 125MG SYP','OTHER']);
+h=D.hideOrdered(dd,[{name_key:'FLAGYL 125MG SYP'},{name_key:'BRUFEN 400MG 30TAB'}]);
+assert.equal(h.hidden,2);assert.deepEqual(h.drafts.suppliers,[]);assert.deepEqual(h.drafts.noOffer.map(i=>i.name_pf),['OTHER']);
+// nothing ordered: the same drafts back; the original object is never changed
+assert.equal(D.hideOrdered(dd,[]).drafts,dd);assert.equal(D.hideOrdered(dd,null).hidden,0);assert.equal(D.hideOrdered(null,[{name_key:'X'}]).drafts,null);
+assert.equal(dd.suppliers[0].items.length,2,'the loaded file is not changed in place');
 console.log('order-drafts ok');
