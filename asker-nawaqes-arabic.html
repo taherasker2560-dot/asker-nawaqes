@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=docs-20261108a" />
+    <link rel="stylesheet" href="ar/app.css?v=orders-20261109a" />
   </head>
   <body>
     <header class="appbar">
@@ -55,6 +55,9 @@
           ><button data-tab="docs" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>فواتير</span></button
+          ><button data-tab="drafts" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8.5 9l1.5 1.5L13 7.5M8.5 15l1.5 1.5L13 13.5M15.5 9h1.5M15.5 15h1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>الطلبيات</span></button
           ><button data-tab="storeorders" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 12H7L6 7zM9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>طلبات</span></button>
@@ -301,6 +304,35 @@
           <div id="dcDoneBox" class="hidden"><h3>اتعملت</h3><div id="dcDone"></div></div>
         </section>
 
+        <section id="draftsPanel" class="card hidden">
+          <h2>الطلبيات المقترحة</h2>
+          <p class="hint">
+            رسالة جاهزة لكل مورد بالأصناف اللي خصمه فيها أحسن (من الحقيبة). إنت اللي تعدّل وتبعت: مفيش حاجة بتتبعت لوحدها.
+            الخصم من آخر شرا فعلي أو من آخر قايمة نزلتها (الأحدث).
+          </p>
+          <button id="odRefresh" type="button" class="secondary small">حدّث</button>
+          <p id="odInfo" class="status"></p>
+          <div id="odBody" class="hidden">
+            <div id="odChips" class="chips" role="group" aria-label="المورد"></div>
+            <label for="odMsg">الرسالة (عدّلها زي ما تحب قبل ما تبعتها)</label>
+            <textarea id="odMsg" rows="12" dir="auto"></textarea>
+            <p id="odTotal" class="od-total"></p>
+            <div class="od-actions">
+              <button id="odCopy" type="button">انسخ الرسالة وافتح واتساب</button>
+              <button id="odMark" type="button" class="secondary">علّمها اتطلب</button>
+            </div>
+            <details class="od-box" id="odItemsBox">
+              <summary id="odItemsTitle">تفاصيل الأصناف</summary>
+              <div id="odItems"></div>
+            </details>
+            <details class="od-box hidden" id="odNoBox">
+              <summary id="odNoTitle">مفيش عليهم عرض</summary>
+              <div id="odNo"></div>
+            </details>
+          </div>
+          <p id="odStatus" class="status"></p>
+        </section>
+
         <section id="storeOrdersPanel" class="card hidden">
           <h2>طلبات الموقع</h2>
           <p class="hint">
@@ -339,9 +371,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=inbox-20261106a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=store-20261109b"></script>
+    <script src="ar/app.js?v=orders-20261109a"></script>
     <script src="ar/suppliers.js?v=search-20261108a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
+    <script src="ar/order-drafts.js?v=orders-20261109a"></script>
     <script src="ar/store-orders.js?v=store-20261109c"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
   </body>

@@ -830,6 +830,61 @@ button.small {
 .bottomnav:has(> button:nth-child(6)) button svg {
   padding: 3px 8px;
 }
+/* seven tabs (with «الطلبيات») still fit a 360px phone */
+.bottomnav:has(> button:nth-child(7)) button {
+  margin: 0 1px;
+  padding: 4px 0;
+  font-size: 11.5px;
+}
+.bottomnav:has(> button:nth-child(7)) button svg {
+  padding: 3px 5px;
+}
+/* ---------- «الطلبيات» tab (ar/order-drafts.js) ---------- */
+#draftsPanel textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 10px;
+  font-size: 15px;
+  line-height: 1.7;
+  box-sizing: border-box;
+}
+.od-total {
+  margin: 8px 0;
+  font-weight: 700;
+  color: var(--crimson);
+}
+.od-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.od-actions button {
+  flex: 1 1 150px;
+}
+.od-box {
+  margin-top: 12px;
+}
+.od-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.od-row .hint {
+  flex: 1 1 100%;
+}
+.od-done strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.od-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--good);
+}
 .so-item {
   display: flex;
   flex-direction: column;
