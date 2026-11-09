@@ -18,6 +18,8 @@
 // Tables are read and written with the caller's own session (owner-only RLS).
 
 import { Catalog, OFFER_MIN, aliasKey, decide, facts, factsSimilarity, type CatalogItem, type Candidate, type Facts, type Match } from './match.ts';
+// WhatsApp Cloud API webhook (Meta's GET check and signed POSTs): shadow mode only, see wa.ts
+import { handleWa, isWaRequest } from './wa.ts';
 
 export const VERSION = 'ar12';
 const DEFAULT_MODEL = 'gemini-flash-latest';
@@ -819,6 +821,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
 
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
   if (req.headers.get('x-inbox-key') !== null) return handleInbox(req, env, fetchImpl);
+  if (isWaRequest(req)) return handleWa(req, env, fetchImpl, log);
   const headers = cors(req.headers.get('origin'), env, req.headers.get('access-control-request-headers'));
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
   if (req.method !== 'POST') return reply(405, { error: 'method' }, headers);
