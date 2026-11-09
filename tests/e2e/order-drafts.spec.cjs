@@ -81,7 +81,7 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
  await page.click('#odChips [data-sup="REDA"]');
  const wide=await page.evaluate(()=>{const W=document.documentElement.clientWidth;return [...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.right>W+0.5||r.left<-0.5)}).map(e=>e.tagName+'#'+e.id+'.'+e.className).slice(0,8)});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen; too wide: '+wide.join(' | '));
- assert.equal(await page.$$eval('.bottomnav button',b=>b.length),3);assert.deepEqual(wide,[],'nothing sticks out of the screen');
+ assert.equal(await page.$$eval('.bottomnav button',b=>b.length),4);assert.deepEqual(wide,[],'nothing sticks out of the screen');
 },{permissions:['clipboard-read','clipboard-write']});
 run('orders tab: a supplier with no saved number, no file yet, an old file, a broken file',async({page})=>{
  await page.evaluate(()=>{window.__opened=[]});
