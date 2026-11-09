@@ -165,3 +165,36 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .rx-thumb { position: relative; width: 84px; height: 108px; border-radius: 10px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--accent); font-weight: 700; }
 .rx-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .rx-thumb button { position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 14px; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 16px; line-height: 1; }
+
+/* ---------- كمبيوتر وتابلت: الصفحة بتملا العرض (لحد 1200 بكسل) والأصناف في أعمدة ---------- */
+@media (min-width: 760px) {
+  body > div { max-width: 1200px; }
+  .top, .top-search { padding-inline: 24px; }
+  .hero { margin: 20px 24px; padding: 32px 36px; }
+  .hero h1 { font-size: 30px; }
+  .hero p { font-size: 16px; max-width: 60ch; }
+  .block { padding: 0 24px; }
+  .sections { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+  .sec { padding: 18px 8px; font-size: 14px; }
+  .list { padding: 0 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; align-items: stretch; }
+  .list.flush { padding: 0; }
+  .list > .empty, .list > .note { grid-column: 1 / -1; }
+  .note, .foot { margin-inline: 24px; }
+  .note.dashed { margin: 16px 24px; }
+  .bar { padding: 14px 24px; }
+  .search-form { max-width: 640px; }
+  /* السلة: الأصناف والبيانات جنب بعض */
+  [data-view="cart"] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 0 8px; align-items: start; }
+  [data-view="cart"] > .bar { grid-column: 1 / -1; }
+  [data-view="cart"] > #cartItems { grid-column: 1; grid-template-columns: 1fr; padding-top: 16px; }
+  [data-view="cart"] > .rx-panel { grid-column: 1; margin: 12px 24px; }
+  [data-view="cart"] > #orderForm { grid-column: 2; grid-row: 2 / span 3; position: sticky; top: 16px; }
+  [data-view="orders"] .list { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+  .done { max-width: 520px; margin: 60px auto; }
+  /* التبويبات تحت بتتلم في النص بدل ما تتمد على الشاشة كلها */
+  .tabbar { padding-inline: calc((100% - 560px) / 2); }
+}
+@media (min-width: 1100px) {
+  .list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  [data-view="cart"] > #cartItems { grid-template-columns: 1fr; }
+}
