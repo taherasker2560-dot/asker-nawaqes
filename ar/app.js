@@ -157,16 +157,23 @@
   // The newest send of any kind from the laptop (ar_sync_log: the shortage list 'ok', or the store / stock items 'STORE_OK' that go
   // every 2 hours) says how fresh the laptop's copy of the pharmacy data is. The shortage list itself is sent twice a day only
   // (owner, 2026-11-09), so its own newest send is read apart and shown under the strip. A failed read keeps the strip as it was.
+  // ONE read (the page reads each table once when it opens: tests/e2e/fast-load.spec.cjs): the newest 60 sends of both kinds; the
+  // newest of them is the strip, and the newest 'ok' among them is the list's own send (false = older than these 60 sends).
+  const SYNC_ROWS = 60;
   let dataAgeRow = null, listRow = null;
   async function loadDataAge() {
     try {
-      const newest = (statuses) =>
-        client.from('ar_sync_log').select('at,data_at,status').eq('dry_run', false).in('status', statuses).order('at', { ascending: false }).limit(1);
-      const [any, list] = await Promise.all([newest(['ok', 'STORE_OK']), newest(['ok'])]);
-      if (any.error) throw Error(any.error.message);
-      if (list.error) throw Error(list.error.message);
-      dataAgeRow = (any.data && any.data[0]) || null;
-      listRow = (list.data && list.data[0]) || null;
+      const { data, error } = await client
+        .from('ar_sync_log')
+        .select('at,data_at,status')
+        .eq('dry_run', false)
+        .in('status', ['ok', 'STORE_OK'])
+        .order('at', { ascending: false })
+        .limit(SYNC_ROWS);
+      if (error) throw Error(error.message);
+      const rows = data || [];
+      dataAgeRow = rows[0] || null;
+      listRow = rows.find((r) => r.status === 'ok') || (rows.length >= SYNC_ROWS ? false : null);
       drawDataAge();
     } catch (e) {
       console.warn('data age:', e.message);

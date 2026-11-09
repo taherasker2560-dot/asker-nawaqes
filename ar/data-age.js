@@ -75,7 +75,8 @@
       details.push('داتا الصيدلية عند اللاب: ' + when(data, now));
       const ls = cairoEpoch(listRow && listRow.at),
         ld = cairoEpoch(listRow && listRow.data_at);
-      details.push(isFinite(ls) ? 'آخر تحديث للنواقص: ' + when(ls, now) + (isFinite(ld) ? ' (على نسخة ' + when(ld, now) + ')' : '') : 'النواقص لسه ما اتحدثتش');
+      // listRow === false: the list's own send is older than the newest sends that were read
+      details.push(isFinite(ls) ? 'آخر تحديث للنواقص: ' + when(ls, now) + (isFinite(ld) ? ' (على نسخة ' + when(ld, now) + ')' : '') : listRow === false ? 'آخر تحديث للنواقص: من أكتر من 5 أيام' : 'النواقص لسه ما اتحدثتش');
     }
     return { level, text, ago: ago(age), details };
   }
