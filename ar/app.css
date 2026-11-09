@@ -1127,6 +1127,32 @@ button.small {
   font-size: 13px;
 }
 
+/* «المخزون»: one card per item (ar/stock.js) */
+.st-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.st-en {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+.st-qty {
+  color: var(--crimson-ink);
+  font-size: 20px;
+  font-weight: 800;
+}
+.st-other {
+  color: var(--warn);
+  font-size: 13px;
+}
+
 /* prescription photos in «طلبات» */
 .so-rxs {
   display: flex;

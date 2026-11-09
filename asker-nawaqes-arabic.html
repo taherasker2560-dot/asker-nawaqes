@@ -46,11 +46,14 @@
           ><button data-group="orders" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8.5 9l1.5 1.5L13 7.5M8.5 15l1.5 1.5L13 13.5M15.5 9h1.5M15.5 15h1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>الطلبيات</span></button
+          ><button data-group="stock" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4V8zM4 8l8 4 8-4M12 12v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>المخزون</span></button
           ><button data-group="site" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 12H7L6 7zM9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>الموقع</span></button>
         </nav>
-        <!-- the small tabs of each place (the panels below are unchanged); «الموقع» has one panel, so no bar -->
+        <!-- the small tabs of each place (the panels below are unchanged); «المخزون» and «الموقع» have one panel, so no bar -->
         <div class="subbar chips" data-for="general" role="group" aria-label="النواقص العامة">
           <button type="button" class="chip on" data-tab="short">القايمة</button
           ><button type="button" class="chip" data-tab="translate">الترجمة</button
@@ -344,6 +347,18 @@
           <p id="odStatus" class="status"></p>
         </section>
 
+        <section id="stockPanel" class="card hidden">
+          <h2>رصيد الصيدلية</h2>
+          <p class="hint">من فارمافلاي، كل ساعتين. من غير التشغيلات اللي صلاحيتها الشهر ده أو خلصت.</p>
+          <p id="stAge" class="status"></p>
+          <div class="search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="stQ" type="search" autocomplete="off" aria-label="دوّر في الرصيد" placeholder="اكتب اسم الصنف عربي أو إنجليزي…" />
+          </div>
+          <p id="stStatus" class="status"></p>
+          <div id="stItems"></div>
+        </section>
+
         <section id="storeOrdersPanel" class="card hidden">
           <h2>طلبات الموقع</h2>
           <p class="hint">
@@ -382,12 +397,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=heartbeat-20261109a"></script>
+    <script src="ar/app.js?v=stock-20261109a"></script>
     <script src="ar/suppliers.js?v=search-20261108a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=orders-20261109b"></script>
     <script src="ar/refresh.js?v=nav-20261109a"></script>
     <script src="ar/store-orders.js?v=store-20261109c"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
+    <script src="ar/stock.js?v=stock-20261109a"></script>
   </body>
 </html>

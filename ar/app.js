@@ -212,10 +212,11 @@
     refresh();
   };
   // The bar at the bottom has the main places (owner's layout of 2026-11-09): «النواقص العامة» (القايمة، الترجمة، الوارد),
-  // «الطلبيات» (الطلبيات، الفواتير، قوايم المخازن) and «الموقع» (طلبات الموقع). Each place has its small tabs under the top strip
-  // (the .subbar for that place); a small tab is still a [data-tab], and a place remembers the small tab you were on.
-  const GROUP_OF = { short: 'general', translate: 'general', read: 'general', drafts: 'orders', docs: 'orders', suppliers: 'orders', storeorders: 'site' };
-  const lastTab = { general: 'short', orders: 'drafts', site: 'storeorders' };
+  // «الطلبيات» (الطلبيات، الفواتير، قوايم المخازن), «المخزون» (رصيد الصيدلية, ar/stock.js) and «الموقع» (طلبات الموقع). Each
+  // place has its small tabs under the top strip (the .subbar for that place); a small tab is still a [data-tab], and a place
+  // remembers the small tab you were on.
+  const GROUP_OF = { short: 'general', translate: 'general', read: 'general', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', storeorders: 'site' };
+  const lastTab = { general: 'short', orders: 'drafts', stock: 'stock', site: 'storeorders' };
   function showTab(tab) {
     const group = GROUP_OF[tab] || 'general';
     lastTab[group] = tab;
@@ -232,6 +233,8 @@
     if (tab === 'docs') window.AskerDocs?.open();
     $('draftsPanel')?.classList.toggle('hidden', tab !== 'drafts');
     if (tab === 'drafts') window.AskerOrderDrafts?.open();
+    $('stockPanel')?.classList.toggle('hidden', tab !== 'stock');
+    if (tab === 'stock') window.AskerStock?.open();
     $('storeOrdersPanel')?.classList.toggle('hidden', tab !== 'storeorders');
     if (tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); }
   }
