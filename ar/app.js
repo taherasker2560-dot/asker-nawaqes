@@ -216,6 +216,8 @@
         if (b.dataset.tab === 'suppliers') window.AskerSuppliers?.open();
         $('docsPanel')?.classList.toggle('hidden', b.dataset.tab !== 'docs');
         if (b.dataset.tab === 'docs') window.AskerDocs?.open();
+        $('draftsPanel')?.classList.toggle('hidden', b.dataset.tab !== 'drafts');
+        if (b.dataset.tab === 'drafts') window.AskerOrderDrafts?.open();
         $('storeOrdersPanel')?.classList.toggle('hidden', b.dataset.tab !== 'storeorders');
         if (b.dataset.tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); }
       }),
@@ -1884,6 +1886,14 @@
     try {
       localStorage.setItem('ar-wa-biz', $('waBiz').checked ? '1' : '0');
     } catch (e) {}
+  };
+  // shared with ar/order-drafts.js («الطلبيات»): open WhatsApp (Business when chosen) with a ready message and no number
+  // (the owner picks the chat); an empty text opens WhatsApp bare (the message was too long for a link and is on the clipboard)
+  window.AskerApp.openWhatsApp = (text) => {
+    const t = text || '',
+      web = t ? `https://wa.me/?text=${encodeURIComponent(t)}` : 'https://wa.me/';
+    if (isAndroid() && $('waBiz').checked) openUrl(waIntent('', t, web));
+    else window.open(web, '_blank');
   };
   $('waBtn').onclick = async () => {
     const t = $('msgText').value.trim();
