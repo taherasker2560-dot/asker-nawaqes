@@ -46,6 +46,14 @@ for (const r of [null, row(''), row('bad')]) {
 // no laptop time: only the data line
 assert.deepEqual(A.describe({ data_at: '2026-11-06 16:30:00' }, now).details, ['النواقص محسوبة على نسخة الصيدلية: النهارده 4:30 م']);
 
+// with the shortage list's own newest send (the list goes twice a day only): the strip follows the newest send of any kind
+// (the store / stock items go every 2 hours), and the list's own send is shown apart
+d = A.describe(row('2026-11-06 16:30:00'), now, { at: '2026-11-06T09:00:00+00:00', data_at: '2026-11-06 10:55:00' });
+assert.deepEqual(d.details, ['آخر مرة اللاب بعت: النهارده 4:31 م', 'داتا الصيدلية عند اللاب: النهارده 4:30 م', 'آخر تحديث للنواقص: النهارده 11:00 ص (على نسخة النهارده 10:55 ص)']);
+assert.equal(d.level, 'good', 'the colour follows the newest send, not the list');
+assert.deepEqual(A.describe(row('2026-11-06 16:30:00'), now, null).details.slice(1), ['داتا الصيدلية عند اللاب: النهارده 4:30 م', 'النواقص لسه ما اتحدثتش']);
+assert.equal(A.describe(row('2026-11-06 16:30:00'), now, { at: '2026-11-06T09:00:00+00:00' }).details[2], 'آخر تحديث للنواقص: النهارده 11:00 ص', 'a list send without its data time');
+assert.equal(A.describe(row('2026-11-06 16:30:00'), now, false).details[2], 'آخر تحديث للنواقص: من أكتر من 5 أيام', 'older than the sends that were read');
 // day words and 12-hour clock
 assert.equal(A.when(A.cairoEpoch('2026-11-06 00:10:00'), now), 'النهارده 12:10 ص');
 assert.equal(A.when(A.cairoEpoch('2026-11-06 12:05:00'), now), 'النهارده 12:05 م');

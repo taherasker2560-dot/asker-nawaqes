@@ -154,26 +154,33 @@
     if (ok && currentUid === uid) loadedFor = uid;
   }
   // ---------- «حسب داتا الساعة …»: how old the list's pharmacy data is (ar/data-age.js) ----------
-  // The newest successful send from the laptop (ar_sync_log). A failed read keeps the strip as it was.
-  let dataAgeRow = null;
+  // The newest send of any kind from the laptop (ar_sync_log: the shortage list 'ok', or the store / stock items 'STORE_OK' that go
+  // every 2 hours) says how fresh the laptop's copy of the pharmacy data is. The shortage list itself is sent twice a day only
+  // (owner, 2026-11-09), so its own newest send is read apart and shown under the strip. A failed read keeps the strip as it was.
+  // ONE read (the page reads each table once when it opens: tests/e2e/fast-load.spec.cjs): the newest 60 sends of both kinds; the
+  // newest of them is the strip, and the newest 'ok' among them is the list's own send (false = older than these 60 sends).
+  const SYNC_ROWS = 60;
+  let dataAgeRow = null, listRow = null;
   async function loadDataAge() {
     try {
       const { data, error } = await client
         .from('ar_sync_log')
-        .select('at,data_at')
+        .select('at,data_at,status')
         .eq('dry_run', false)
-        .eq('status', 'ok')
+        .in('status', ['ok', 'STORE_OK'])
         .order('at', { ascending: false })
-        .limit(1);
+        .limit(SYNC_ROWS);
       if (error) throw Error(error.message);
-      dataAgeRow = (data && data[0]) || null;
+      const rows = data || [];
+      dataAgeRow = rows[0] || null;
+      listRow = rows.find((r) => r.status === 'ok') || (rows.length >= SYNC_ROWS ? false : null);
       drawDataAge();
     } catch (e) {
       console.warn('data age:', e.message);
     }
   }
   function drawDataAge() {
-    const d = window.AskerDataAge.describe(dataAgeRow);
+    const d = window.AskerDataAge.describe(dataAgeRow, Date.now(), listRow);
     $('dataAge').className = 'dataage ' + d.level;
     $('dataAgeText').textContent = d.text;
     $('dataAgeAgo').textContent = d.ago;

@@ -59,8 +59,9 @@
     if (h < 48) return 'من ' + say(h, 'ساعة', 'ساعتين', 'ساعات', 'ساعة');
     return 'من ' + say(Math.floor(h / 24), 'يوم', 'يومين', 'أيام', 'يوم');
   }
-  // row: { at, data_at } from ar_sync_log, or null. Returns what the strip shows.
-  function describe(row, now = Date.now()) {
+  // row: { at, data_at } of the newest send of any kind from ar_sync_log, or null. listRow (optional): the newest send of the
+  // shortage list itself (null = none yet); the list goes twice a day only, so it is shown apart. Returns what the strip shows.
+  function describe(row, now = Date.now(), listRow = undefined) {
     const data = cairoEpoch(row && row.data_at),
       sent = cairoEpoch(row && row.at);
     if (!row || !isFinite(data)) return { level: 'none', text: 'لسه مفيش نواقص اتبعتت من اللاب', ago: '', details: [] };
@@ -69,7 +70,14 @@
     const text = (level === 'bad' ? 'الداتا قديمة: آخر نسخة ' : 'داتا الصيدلية: ') + when(data, now);
     const details = [];
     if (isFinite(sent)) details.push('آخر مرة اللاب بعت: ' + when(sent, now));
-    details.push('النواقص محسوبة على نسخة الصيدلية: ' + when(data, now));
+    if (listRow === undefined) details.push('النواقص محسوبة على نسخة الصيدلية: ' + when(data, now));
+    else {
+      details.push('داتا الصيدلية عند اللاب: ' + when(data, now));
+      const ls = cairoEpoch(listRow && listRow.at),
+        ld = cairoEpoch(listRow && listRow.data_at);
+      // listRow === false: the list's own send is older than the newest sends that were read
+      details.push(isFinite(ls) ? 'آخر تحديث للنواقص: ' + when(ls, now) + (isFinite(ld) ? ' (على نسخة ' + when(ld, now) + ')' : '') : listRow === false ? 'آخر تحديث للنواقص: من أكتر من 5 أيام' : 'النواقص لسه ما اتحدثتش');
+    }
     return { level, text, ago: ago(age), details };
   }
   const api = { cairoEpoch, describe, when, ago, WARN_HOURS, BAD_HOURS };
