@@ -348,6 +348,11 @@
               <select id="odSendTo"></select>
             </div>
             <p id="odSendNote" class="hint hidden"></p>
+            <!-- sent to another supplier after part of it was already ordered today: the owner chooses what goes -->
+            <div id="odCarry" class="od-carry hidden" role="radiogroup" aria-label="تبعت إيه للمورد الجديد">
+              <label><input type="radio" name="odCarry" value="new" checked /> <span>ابعت الجديد بس<small id="odCarryNew" class="hint"></small></span></label>
+              <label><input type="radio" name="odCarry" value="both" /> <span>ابعت اللي اتطلب قبل كده + الجديد<small id="odCarryBoth" class="hint"></small></span></label>
+            </div>
             <p id="odTo" class="od-to"></p>
             <div id="odPick" class="od-pick"></div>
             <label for="odMsg">الطلب (بيتغير لما تعدّل الأصناف تحت)</label>

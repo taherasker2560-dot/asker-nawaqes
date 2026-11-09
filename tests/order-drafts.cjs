@@ -84,13 +84,20 @@ assert.equal(D.businessDayStart(new Date(2026,10,11,6,0)).getTime(),new Date(202
 const dd={generatedAt:'x',summary:{},suppliers:[{id:'NEWCITY',label:'نيوسيتي',count:2,items:[{item_id:1,name_pf:'BRUFEN 400MG 30TAB'},{item_id:2,name_pf:'FLAGYL 125MG SYP'}]},{id:'AMG',label:'AMG',count:1,items:[{item_id:1,name_pf:'brufen  400mg 30tab'}]}],noOffer:[{name_pf:'FLAGYL 125MG SYP',qty:2},{name_pf:'OTHER',qty:1}]};
 let h=D.hideOrdered(dd,[{name_key:'BRUFEN 400MG 30TAB',supplier:'نيوسيتي'}]);
 assert.equal(h.hidden,1);
-assert.deepEqual(h.drafts.suppliers.map(s=>[s.id,s.count,s.items.map(i=>i.item_id)]),[['NEWCITY',1,[2]]],'AMG had only the ordered item: dropped');
+assert.deepEqual(h.drafts.suppliers.map(s=>[s.id,s.count,s.items.map(i=>i.item_id)]),[['NEWCITY',1,[2]],['AMG',0,[]]],'AMG had only the ordered item: kept empty, so it can still be sent to another supplier');
+assert.deepEqual(Object.fromEntries(Object.entries(h.hiddenBySup).map(([k,v])=>[k,v.map(i=>i.item_id)])),{NEWCITY:[1],AMG:[1]});
 assert.deepEqual(h.drafts.noOffer.map(i=>i.name_pf),['FLAGYL 125MG SYP','OTHER']);
 h=D.hideOrdered(dd,[{name_key:'FLAGYL 125MG SYP'},{name_key:'BRUFEN 400MG 30TAB'}]);
-assert.equal(h.hidden,2);assert.deepEqual(h.drafts.suppliers,[]);assert.deepEqual(h.drafts.noOffer.map(i=>i.name_pf),['OTHER']);
+assert.equal(h.hidden,2);assert.deepEqual(h.drafts.suppliers.map(s=>s.items.length),[0,0]);assert.deepEqual(h.drafts.noOffer.map(i=>i.name_pf),['OTHER']);
 // nothing ordered: the same drafts back; the original object is never changed
 assert.equal(D.hideOrdered(dd,[]).drafts,dd);assert.equal(D.hideOrdered(dd,null).hidden,0);assert.equal(D.hideOrdered(null,[{name_key:'X'}]).drafts,null);
 assert.equal(dd.suppliers[0].items.length,2,'the loaded file is not changed in place');
+// sent to another supplier: «الجديد بس» = the order's items; «اللي اتطلب قبل كده + الجديد» = the ordered ones first, then the new
+const supN={id:'NEWCITY',items:[{item_id:2}]},old=[{item_id:1}];
+assert.deepEqual(D.orderItems(supN,old,'AMG','both').map(i=>i.item_id),[1,2]);
+assert.equal(D.orderItems(supN,old,'AMG','new'),supN.items);assert.equal(D.orderItems(supN,old,'AMG',undefined),supN.items);
+assert.equal(D.orderItems(supN,old,'NEWCITY','both'),supN.items,'to its own supplier: nothing carried');
+assert.equal(D.orderItems(supN,[],'AMG','both'),supN.items);assert.deepEqual(D.orderItems(null,old,'AMG','both'),[]);
 // «ابعت الطلبية دي لـ»: the six suppliers, the file's own label when that supplier has an order
 assert.deepEqual(D.sendOptions({suppliers:[{id:'NEWCITY',label:'نيوسيتى'}]}).map(x=>x.id),['NEWCITY','AMG','REDA','ELFATH','PHARMA','IBNSINA']);
 assert.equal(D.sendOptions({suppliers:[{id:'NEWCITY',label:'نيوسيتى'}]})[0].label,'نيوسيتى');assert.equal(D.sendOptions(null)[1].label,'AMG');

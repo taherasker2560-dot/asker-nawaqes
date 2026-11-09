@@ -63,9 +63,15 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
  // «علّمها اتطلب»: only the ticked item, under this supplier's name, once
  await page.click('#odMark');await waitStatus(page,/اتعلّم 1 صنف «اتطلب» من نيو سيتي/,'odStatus');
  assert.deepEqual((await table('ar_orders')).map(o=>[o.name_key,o.product_name,o.supplier]),[['SALINE 0.9% 500CC RCقديم','SALINE 0.9% 500CC RCقديم','نيو سيتي']]);
- assert.equal(await page.$$eval('#odItems .od-badge',x=>x.length),1);assert.match(await text(page,'#odItems .od-item:nth-child(1)'),/اتطلب النهارده من نيو سيتي/);
- await page.click('#odMark');await waitStatus(page,/متعلّمة «اتطلب» من نيو سيتي قبل كده/,'odStatus');
+ // what was marked leaves the order right away (only FERRODEP, not ticked, is left), so it is not ordered twice
+ assert.equal(await page.$$eval('#odItems .od-item',x=>x.length),1);assert.doesNotMatch(await text(page,'#odItems'),/SALINE/);
+ assert.ok(await page.$eval('#odMark',b=>b.disabled),'nothing ticked is left to mark');
  assert.equal((await table('ar_orders')).length,1,'not marked twice');
+ // sent to another supplier now: choose between only the new items and the already ordered + the new
+ await page.selectOption('#odSendTo','AMG');assert.ok(await page.isVisible('#odCarry'));
+ await page.check('#odCarry input[value="both"]');assert.match(await msgOf(page),/• SALINE 0\.9% 500CC RCقديم × 5/,'the quantity typed before is kept');
+ await page.check('#odCarry input[value="new"]');assert.doesNotMatch(await msgOf(page),/SALINE/);
+ await page.selectOption('#odSendTo','NEWCITY');assert.ok(!(await page.isVisible('#odCarry')));
  // a long order (150 items): the chat opens without the text, which is only on the clipboard
  await page.click('#odChips [data-sup="REDA"]');
  assert.match(await text(page,'#odTo'),/هتتفتح محادثة: مخزن رضا عطيه \(احمد\)/,'a number written with Arabic digits works');

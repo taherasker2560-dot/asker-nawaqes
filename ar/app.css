@@ -1165,6 +1165,26 @@ button.small {
   flex: 1;
   min-width: 0;
 }
+.od-carry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rose-line);
+  border-radius: 12px;
+  background: var(--rose);
+}
+.od-carry label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 500;
+}
+.od-carry small {
+  display: block;
+  margin: 0;
+}
 
 /* «المخزون»: one card per item (ar/stock.js) */
 .st-item {

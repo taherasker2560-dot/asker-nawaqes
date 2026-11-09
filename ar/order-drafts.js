@@ -49,21 +49,31 @@
   // the owner's rule (2026-11-10): what he picked and marked «اتطلب» today does not come back in the next suggestions
   // the same day (they are refreshed every 2 hours in the evening), so he does not order it twice. Only today's ORDERS
   // hide it («تمنع ظهوره فى طلبيه اليوم مش ظهورة فى النواقص»): the shortages list is not touched. Tomorrow it shows
-  // again if it is still needed (ordered and not arrived). Suppliers left with nothing are dropped.
+  // again if it is still needed (ordered and not arrived). hiddenBySup keeps, per supplier, the items hidden from its
+  // order, so the owner can still send them to another supplier («اللي اتطلب قبل كده + الجديد»); an order whose items
+  // were all ordered stays, empty, for that reason.
   function hideOrdered(d, orderedRows) {
-    if (!d) return { drafts: d, hidden: 0 };
+    if (!d) return { drafts: d, hidden: 0, hiddenBySup: {} };
     const done = new Set((orderedRows || []).map((o) => o && o.name_key).filter(Boolean));
-    if (!done.size) return { drafts: d, hidden: 0 };
-    const gone = new Set();
-    const keep = (i) => {
-      const k = nk(i && i.name_pf);
-      if (done.has(k)) { gone.add(k); return false; }
-      return true;
-    };
-    const suppliers = d.suppliers.map((s) => ({ ...s, items: s.items.filter(keep) })).filter((s) => s.items.length)
-      .map((s) => ({ ...s, count: s.items.length }));
-    const noOffer = (d.noOffer || []).filter(keep);
-    return { drafts: { ...d, suppliers, noOffer }, hidden: gone.size };
+    if (!done.size) return { drafts: d, hidden: 0, hiddenBySup: {} };
+    const gone = new Set(), hiddenBySup = {};
+    const isDone = (i) => done.has(nk(i && i.name_pf));
+    const suppliers = d.suppliers.map((s) => {
+      const out = s.items.filter(isDone);
+      out.forEach((i) => gone.add(nk(i.name_pf)));
+      if (out.length) hiddenBySup[s.id] = out;
+      const items = s.items.filter((i) => !isDone(i));
+      return { ...s, items, count: items.length };
+    });
+    const noOffer = (d.noOffer || []).filter((i) => { if (isDone(i)) { gone.add(nk(i.name_pf)); return false; } return true; });
+    return { drafts: { ...d, suppliers, noOffer }, hidden: gone.size, hiddenBySup };
+  }
+  // the items an order really has: sent to another supplier with «اللي اتطلب قبل كده + الجديد», the ones already
+  // ordered from it today come first
+  function orderItems(sup, hiddenItems, toId, carry) {
+    if (!sup) return [];
+    if (toId && toId !== sup.id && carry === 'both' && (hiddenItems || []).length) return [...hiddenItems, ...sup.items];
+    return sup.items;
   }
   // how old the numbers are, in words
   function age(iso, now = new Date()) {
@@ -182,7 +192,7 @@
     if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
     return 'box';
   }
-  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, sendOptions, buildMessageTo };
+  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, orderItems, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, sendOptions, buildMessageTo };
   root.AskerOrderDraftsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -204,8 +214,10 @@
   };
   const CHOICE = 'ar-draft-contact'; // the contact picked for each supplier, remembered on this phone
   let drafts = null, current = '', sel = {}, ordered = [], saved = [], pics = {}, busy = false, editing = false, choice = {};
-  // which supplier each order is sent to (the owner may send it to another one); not kept on the phone
-  let sendTo = {};
+  // which supplier each order is sent to (the owner may send it to another one); not kept on the phone.
+  // carry: sent to another supplier, 'new' = only the items not ordered yet today, 'both' = also the ones already ordered.
+  // base = the file as the laptop wrote it; hiddenBy = per supplier, the items already ordered today (hidden from it)
+  let sendTo = {}, carry = {}, base = null, hiddenBy = {};
   try {
     const c = JSON.parse(localStorage.getItem(CHOICE) || '{}');
     if (c && typeof c === 'object') choice = c;
@@ -218,10 +230,29 @@
     el.className = 'status' + (kind ? ' ' + kind : '');
   }
   const supplier = (id) => (drafts ? drafts.suppliers.find((s) => s.id === id) : null);
-  const state = (id) => sel[id] || (sel[id] = defaultSel(supplier(id)));
+  const toId = () => sendTo[current] || current;
+  // the order as it will be sent: its items (plus the ones already ordered, when chosen) with the same supplier details
+  const effective = (id) => {
+    const s = supplier(id);
+    if (!s) return null;
+    const items = orderItems(s, hiddenBy[id], sendTo[id] || id, carry[id]);
+    return items === s.items ? s : { ...s, items };
+  };
+  // ticks and quantities: every item of the order starts ticked at the laptop's quantity (also the carried ones)
+  const state = (id) => {
+    const st = sel[id] || (sel[id] = {}), s = effective(id);
+    for (const i of (s && s.items) || []) if (!st[String(i.item_id)]) st[String(i.item_id)] = { on: true, qty: String(i.qty) };
+    return st;
+  };
+  // hide what is already ordered today, from the file as the laptop wrote it
+  function reapply() {
+    const h = hideOrdered(base, ordered);
+    drafts = h.drafts;
+    hiddenBy = h.hiddenBySup || {};
+    return h.hidden;
+  }
   // marked «اتطلب» today (from any supplier) for this PharmaFly name
   const orderedFrom = (i) => ordered.filter((o) => o.name_key === nk(i.name_pf)).map((o) => o.supplier || '');
-  const toId = () => sendTo[current] || current;
   const labelOf = (id) => (sendOptions(drafts).find((x) => x.id === id) || { label: id }).label;
   const target = () => chooseContact(contactsFor(toId(), saved), choice[toId()]);
 
@@ -247,7 +278,7 @@
   }
   function drawChips() {
     $('odChips').innerHTML = drafts.suppliers
-      .map((s) => `<button type="button" class="chip${s.id === current ? ' on' : ''}" data-sup="${esc(s.id)}">${esc(s.label)} · ${esc(s.count || s.items.length)}</button>`)
+      .map((s) => `<button type="button" class="chip${s.id === current ? ' on' : ''}" data-sup="${esc(s.id)}">${esc(s.label)} · ${esc(s.items.length || 'اتطلبت')}</button>`)
       .join('');
   }
   // «هتتفتح محادثة: …» and, when the supplier has several saved people, a button for each
@@ -260,6 +291,17 @@
     const other = toId() !== s.id;
     $('odSendNote').classList.toggle('hidden', !other);
     $('odSendNote').textContent = other ? `الطلبية دي اتعملت لـ ${s.label}: الخصم والأسعار اللي فيها بتاعته، مش بتاعة ${labelOf(toId())}. الأصناف هتتكتب بأسامي فارمافلاي.` : '';
+    // sent to another supplier after some of it was already ordered today: the owner chooses (2026-11-10: «تخيرني ابعت
+    // اللي احنا مختارينه والجديد ولا ابعت الجديد بس»)
+    const old = (hiddenBy[current] || []).length, box2 = $('odCarry');
+    if (!box2) return;
+    box2.classList.toggle('hidden', !(other && old));
+    if (other && old) {
+      const mode = carry[current] === 'both' ? 'both' : 'new';
+      box2.querySelectorAll('input[name="odCarry"]').forEach((r) => { r.checked = r.value === mode; });
+      $('odCarryNew').textContent = `${s.items.length} صنف`;
+      $('odCarryBoth').textContent = `${old} اتطلب قبل كده + ${s.items.length} جديد`;
+    }
   }
   function drawTarget() {
     const list = contactsFor(toId(), saved), c = target();
@@ -275,17 +317,19 @@
   }
   // the message and the total follow the ticks and quantities; the rows themselves are not redrawn (typing keeps its place)
   function drawOrder() {
-    const s = supplier(current);
+    const s = effective(current);
     if (!s) return;
     const p = picked(s, state(current));
     $('odMsg').value = buildMessageTo(s, state(current), toId());
-    $('odTotal').textContent = p.length ? `${p.length} من ${s.items.length} صنف في الطلب، حوالي ${money(totalOf(p))} ج بعد الخصم` : 'مفيش أصناف معلّم عليها في الطلب';
+    $('odTotal').textContent = p.length
+      ? `${p.length} من ${s.items.length} صنف في الطلب، حوالي ${money(totalOf(p))} ج بعد الخصم`
+      : !s.items.length && (hiddenBy[current] || []).length ? 'كل أصناف الطلبية دي اتطلبت النهارده' : 'مفيش أصناف معلّم عليها في الطلب';
     $('odCopy').disabled = !p.length;
     $('odMark').disabled = busy || !p.length;
     $('odEditCount').textContent = `هتطلب ${p.length} من ${s.items.length}`;
   }
   function drawRows() {
-    const s = supplier(current);
+    const s = effective(current);
     $('odEditBox').classList.toggle('hidden', !editing);
     $('odEdit').textContent = editing ? 'اقفل التعديل' : 'تعديل الأصناف';
     $('odEdit').setAttribute('aria-expanded', editing ? 'true' : 'false');
@@ -344,15 +388,14 @@
         draw();
         return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها كل ساعتين مع المخزون، وآخر مرة قبل القفل بساعة.');
       }
-      drafts = parseDrafts(JSON.parse(await blob.text()));
+      base = drafts = parseDrafts(JSON.parse(await blob.text()));
       if (!drafts) {
         draw();
         return say('ملف الطلبيات شكله مش مظبوط، استنى التحديث الجاي.', 'bad');
       }
       [ordered, saved, pics] = await Promise.all([soft(loadOrdered(), []), soft(loadSaved(), []), soft(loadPics(), {})]);
-      const h = hideOrdered(drafts, ordered);
-      drafts = h.drafts;
-      say(h.hidden ? `${h.hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
+      const hidden = reapply();
+      say(hidden ? `${hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
       draw();
     } catch (e) {
       say('مقدرتش أجيب الطلبيات: ' + (e.message || e), 'bad');
@@ -386,7 +429,7 @@
   }
   async function mark() {
     if (busy) return;
-    const s = supplier(current);
+    const s = effective(current);
     if (!s) return;
     const items = picked(s, state(current)).map((x) => x.item);
     if (!items.length) return say('مفيش أصناف معلّم عليها تتعلّم.', 'bad');
@@ -402,8 +445,11 @@
       const { error } = await db().from('ar_orders').insert(rows);
       if (error) throw error;
       ordered = await soft(loadOrdered(), ordered);
-      drawRows();
-      say(`اتعلّم ${rows.length} صنف «اتطلب» من ${to}. مش هيتقترحوا تاني النهارده في طلب مورد تاني.`, 'good');
+      // what was just marked leaves the order right away (owner: «ما يظهرش تاني لما اجي اطلب تعديل»)
+      reapply();
+      carry[current] = 'new';
+      drawSupplier();
+      say(`اتعلّم ${rows.length} صنف «اتطلب» من ${to}، ومش هيظهروا تاني في طلبيات النهارده.`, 'good');
     } catch (e) {
       say('ماتسجلش «اتطلب»، دوس تاني: ' + (e.message || e), 'bad');
     } finally {
@@ -430,6 +476,14 @@
     drawSendTo();
     drawTarget();
     drawOrder();
+    drawRows();
+  });
+  // «ابعت الجديد بس» / «اللي اتطلب قبل كده + الجديد»
+  $('odCarry')?.addEventListener('change', (e) => {
+    if (!e.target.matches('input[name="odCarry"]')) return;
+    carry[current] = e.target.value === 'both' ? 'both' : 'new';
+    drawOrder();
+    drawRows();
   });
   $('odEdit')?.addEventListener('click', () => {
     editing = !editing;
