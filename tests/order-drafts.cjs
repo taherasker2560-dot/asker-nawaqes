@@ -91,4 +91,13 @@ assert.equal(h.hidden,2);assert.deepEqual(h.drafts.suppliers,[]);assert.deepEqua
 // nothing ordered: the same drafts back; the original object is never changed
 assert.equal(D.hideOrdered(dd,[]).drafts,dd);assert.equal(D.hideOrdered(dd,null).hidden,0);assert.equal(D.hideOrdered(null,[{name_key:'X'}]).drafts,null);
 assert.equal(dd.suppliers[0].items.length,2,'the loaded file is not changed in place');
+// «ابعت الطلبية دي لـ»: the six suppliers, the file's own label when that supplier has an order
+assert.deepEqual(D.sendOptions({suppliers:[{id:'NEWCITY',label:'نيوسيتى'}]}).map(x=>x.id),['NEWCITY','AMG','REDA','ELFATH','PHARMA','IBNSINA']);
+assert.equal(D.sendOptions({suppliers:[{id:'NEWCITY',label:'نيوسيتى'}]})[0].label,'نيوسيتى');assert.equal(D.sendOptions(null)[1].label,'AMG');
+// sent to its own supplier: the same message as before; to another one: PharmaFly names only
+const supX={id:'REDA',items:[{item_id:7,name_pf:'BRUFEN 400MG 30TAB',name_supplier:'بروفين ٤٠٠',qty:3}]},stX=D.defaultSel(supX);
+assert.equal(D.buildMessageTo(supX,stX,'REDA'),D.buildMessage(supX,stX));
+assert.match(D.buildMessageTo(supX,stX,'REDA'),/بروفين ٤٠٠ \(BRUFEN 400MG 30TAB\) × 3/);
+assert.equal(D.buildMessageTo(supX,stX,'AMG'),'السلام عليكم\nمحتاج الأصناف دي:\n• BRUFEN 400MG 30TAB × 3\nشكرًا');
+assert.equal(D.buildMessageTo(supX,{},'AMG'),'','nothing ticked: no message');
 console.log('order-drafts ok');

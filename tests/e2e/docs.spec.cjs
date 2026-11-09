@@ -7,7 +7,7 @@ run('documents tab: list and take photos',async({page,table})=>{
  await page.evaluate((t)=>{window.__tables.ar_documents=[
   {id:'d1',received_at:t,source:'whatsapp',chat:'الجروب',file_path:'docs/2026-11-08/aaa.jpg',kind:'image',status:'new'},
   {id:'d2',received_at:'2026-11-07T10:00:00Z',source:'whatsapp',chat:'الجروب',file_path:'docs/2026-11-07/bbb.jpg',kind:'image',status:'entered',doc_type:'purchase',supplier:'رضا عطية',doc_no:'89233',total:1156.86}]},t);
- await page.click('[data-group="orders"]');await page.click('[data-tab="docs"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-tab="docs"]');
  await page.waitForFunction(()=>/مستنية \(1\)/.test(document.getElementById('dcWaitTitle').textContent));
  assert.ok(await page.isVisible('#docsPanel'));assert.ok(!(await page.isVisible('#suppliersPanel')));
  assert.match(await page.textContent('#dcWait'),/النهارده .* · من الجروب/);assert.match(await page.textContent('#dcWait'),/مستنية Claude/);

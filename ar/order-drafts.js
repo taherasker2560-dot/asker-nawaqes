@@ -10,7 +10,7 @@
 
   // ---------- pure helpers (also used by tests/order-drafts.cjs) ----------
   const PATH = 'orders/drafts.json';
-  // the laptop prepares the orders from 6 pm every 2 hours (task PharmaYaqez_Orders_Evening: 18:40, 20:40, 22:40) and a last
+  // the laptop prepares the orders every 2 hours with the stock (task PharmaYaqez_Orders_Evening: 10:40 .. 22:40) and a last
   // time an hour before closing (PharmaYaqez_Orders_Daily); older than a day and a half = say so
   const OLD_HOURS = 36;
   // the pharmacy's day: 9:00 to 2:00 (after midnight is still the same night), so a working day starts at 6:00
@@ -145,6 +145,19 @@
   // which saved companies (the ones under «الوارد» ← «الشركات», several people per supplier) belong to which supplier
   const fold = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[\s()\-_.]+/g, '');
   const KEYS = { NEWCITY: ['نيوسيتي'], AMG: ['ايهامجروب', 'amgroup', 'amg'], REDA: ['رضاعطيه'], ELFATH: ['الفتح'], PHARMA: ['فارما'], IBNSINA: ['ابنسينا'] };
+  // the six suppliers an order can be sent to; the file's own label wins when that supplier has an order today
+  const LABELS = { NEWCITY: 'نيو سيتي', AMG: 'AMG', REDA: 'رضا عطية', ELFATH: 'الفتح', PHARMA: 'فارما', IBNSINA: 'ابن سينا' };
+  function sendOptions(d) {
+    const own = new Map(((d && d.suppliers) || []).map((s) => [s.id, s.label]));
+    return Object.keys(LABELS).map((id) => ({ id, label: own.get(id) || LABELS[id] }));
+  }
+  // the message of an order sent to another supplier: the PharmaFly names only (the other warehouse's own names do not fit)
+  function buildMessageTo(sup, st, toId) {
+    if (!toId || toId === sup.id) return buildMessage(sup, st);
+    const p = picked(sup, st);
+    if (!p.length) return '';
+    return ['السلام عليكم', 'محتاج الأصناف دي:', ...p.map((x) => `• ${x.item.name_pf} × ${x.qty}`), 'شكرًا'].join('\n');
+  }
   function contactsFor(supId, saved) {
     const keys = KEYS[supId] || [];
     return (saved || []).filter((c) => {
@@ -169,7 +182,7 @@
     if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
     return 'box';
   }
-  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf };
+  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, sendOptions, buildMessageTo };
   root.AskerOrderDraftsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -191,6 +204,8 @@
   };
   const CHOICE = 'ar-draft-contact'; // the contact picked for each supplier, remembered on this phone
   let drafts = null, current = '', sel = {}, ordered = [], saved = [], pics = {}, busy = false, editing = false, choice = {};
+  // which supplier each order is sent to (the owner may send it to another one); not kept on the phone
+  let sendTo = {};
   try {
     const c = JSON.parse(localStorage.getItem(CHOICE) || '{}');
     if (c && typeof c === 'object') choice = c;
@@ -206,7 +221,9 @@
   const state = (id) => sel[id] || (sel[id] = defaultSel(supplier(id)));
   // marked «اتطلب» today (from any supplier) for this PharmaFly name
   const orderedFrom = (i) => ordered.filter((o) => o.name_key === nk(i.name_pf)).map((o) => o.supplier || '');
-  const target = () => chooseContact(contactsFor(current, saved), choice[current]);
+  const toId = () => sendTo[current] || current;
+  const labelOf = (id) => (sendOptions(drafts).find((x) => x.id === id) || { label: id }).label;
+  const target = () => chooseContact(contactsFor(toId(), saved), choice[toId()]);
 
   function thumb(i) {
     const f = pics[String(i.item_id)];
@@ -234,8 +251,18 @@
       .join('');
   }
   // «هتتفتح محادثة: …» and, when the supplier has several saved people, a button for each
+  // «ابعت الطلبية دي لـ»: the six suppliers, this order's own supplier first chosen; another one = a note that the
+  // discounts and prices shown are the first supplier's
+  function drawSendTo() {
+    const s = supplier(current), box = $('odSendTo');
+    if (!s || !box) return;
+    box.innerHTML = sendOptions(drafts).map((o) => `<option value="${esc(o.id)}"${o.id === toId() ? ' selected' : ''}>${esc(o.label)}${o.id === s.id ? ' (المقترح)' : ''}</option>`).join('');
+    const other = toId() !== s.id;
+    $('odSendNote').classList.toggle('hidden', !other);
+    $('odSendNote').textContent = other ? `الطلبية دي اتعملت لـ ${s.label}: الخصم والأسعار اللي فيها بتاعته، مش بتاعة ${labelOf(toId())}. الأصناف هتتكتب بأسامي فارمافلاي.` : '';
+  }
   function drawTarget() {
-    const list = contactsFor(current, saved), c = target();
+    const list = contactsFor(toId(), saved), c = target();
     if (!list.length) {
       $('odTo').textContent = 'مفيش رقم محفوظ للمورد ده، فالواتس هيتفتح من غير محادثة. ضيف رقمه من «الوارد» ← «الشركات».';
       $('odPick').innerHTML = '';
@@ -251,7 +278,7 @@
     const s = supplier(current);
     if (!s) return;
     const p = picked(s, state(current));
-    $('odMsg').value = buildMessage(s, state(current));
+    $('odMsg').value = buildMessageTo(s, state(current), toId());
     $('odTotal').textContent = p.length ? `${p.length} من ${s.items.length} صنف في الطلب، حوالي ${money(totalOf(p))} ج بعد الخصم` : 'مفيش أصناف معلّم عليها في الطلب';
     $('odCopy').disabled = !p.length;
     $('odMark').disabled = busy || !p.length;
@@ -267,6 +294,7 @@
   function drawSupplier() {
     if (!supplier(current)) return;
     drawChips();
+    drawSendTo();
     drawTarget();
     drawOrder();
     drawRows();
@@ -314,7 +342,7 @@
       if (error || !blob) {
         drafts = null;
         draw();
-        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها من 6 المغرب كل ساعتين لحد قبل القفل بساعة.');
+        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها كل ساعتين مع المخزون، وآخر مرة قبل القفل بساعة.');
       }
       drafts = parseDrafts(JSON.parse(await blob.text()));
       if (!drafts) {
@@ -362,10 +390,12 @@
     if (!s) return;
     const items = picked(s, state(current)).map((x) => x.item);
     if (!items.length) return say('مفيش أصناف معلّم عليها تتعلّم.', 'bad');
+    // marked under the supplier it was really sent to (the owner may have changed it)
+    const to = labelOf(toId());
     const rows = items
-      .filter((i) => !ordered.some((o) => o.name_key === nk(i.name_pf) && (o.supplier || null) === s.label))
-      .map((i) => ({ name_key: nk(i.name_pf), product_name: i.name_pf, supplier: s.label, ordered_at: new Date().toISOString() }));
-    if (!rows.length) return say('الأصناف دي متعلّمة «اتطلب» من ' + s.label + ' قبل كده.', 'good');
+      .filter((i) => !ordered.some((o) => o.name_key === nk(i.name_pf) && (o.supplier || null) === to))
+      .map((i) => ({ name_key: nk(i.name_pf), product_name: i.name_pf, supplier: to, ordered_at: new Date().toISOString() }));
+    if (!rows.length) return say('الأصناف دي متعلّمة «اتطلب» من ' + to + ' قبل كده.', 'good');
     busy = true;
     drawOrder();
     try {
@@ -373,7 +403,7 @@
       if (error) throw error;
       ordered = await soft(loadOrdered(), ordered);
       drawRows();
-      say(`اتعلّم ${rows.length} صنف «اتطلب» من ${s.label}. مش هيتقترحوا تاني النهارده في طلب مورد تاني.`, 'good');
+      say(`اتعلّم ${rows.length} صنف «اتطلب» من ${to}. مش هيتقترحوا تاني النهارده في طلب مورد تاني.`, 'good');
     } catch (e) {
       say('ماتسجلش «اتطلب»، دوس تاني: ' + (e.message || e), 'bad');
     } finally {
@@ -388,11 +418,18 @@
   $('odPick')?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-contact]');
     if (!b) return;
-    choice[current] = b.dataset.contact;
+    choice[toId()] = b.dataset.contact;
     try {
       localStorage.setItem(CHOICE, JSON.stringify(choice));
     } catch (err) {}
     drawTarget();
+  });
+  $('odSendTo')?.addEventListener('change', (e) => {
+    sendTo[current] = e.target.value === current ? '' : e.target.value;
+    say('');
+    drawSendTo();
+    drawTarget();
+    drawOrder();
   });
   $('odEdit')?.addEventListener('click', () => {
     editing = !editing;

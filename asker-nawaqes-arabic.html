@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=nav-20261109a" />
+    <link rel="stylesheet" href="ar/app.css?v=layout-20261110a" />
   </head>
   <body>
     <header class="appbar">
@@ -39,30 +39,45 @@
       <div id="app" class="hidden">
         <p id="versionWarn" class="status bad hidden"></p>
         <div id="pendingOrder" class="status hidden"><span id="pendingText"></span> <button id="pendingYes" class="small">أيوه اتبعت</button> <button id="pendingNo" class="secondary small">لأ، متبعتتش</button></div>
-        <nav class="bottomnav" aria-label="الأقسام">
-          <button data-group="general">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <span>النواقص العامة</span></button
-          ><button data-group="orders" class="secondary">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8.5 9l1.5 1.5L13 7.5M8.5 15l1.5 1.5L13 13.5M15.5 9h1.5M15.5 15h1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
-            <span>الطلبيات</span></button
-          ><button data-group="stock" class="secondary">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4V8zM4 8l8 4 8-4M12 12v8" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
-            <span>المخزون</span></button
-          ><button data-group="site" class="secondary">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 12H7L6 7zM9 7a3 3 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
-            <span>الموقع</span></button>
-        </nav>
-        <!-- the small tabs of each place (the panels below are unchanged); «المخزون» and «الموقع» have one panel, so no bar -->
-        <div class="subbar chips" data-for="general" role="group" aria-label="النواقص العامة">
-          <button type="button" class="chip on" data-tab="short">القايمة</button
-          ><button type="button" class="chip" data-tab="translate">الترجمة</button
-          ><button type="button" class="chip" data-tab="read">الوارد</button>
+        <!-- the stock search sits on top of every screen (owner 2026-11-10: «عاوز البوت يفتح عالبحث بتاع المخزون فوق»);
+             typing shows the stock cards here and hides the place below until the box is cleared (ar/stock.js) -->
+        <div class="topsearch">
+          <div class="search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="gsQ" type="search" autocomplete="off" aria-label="دوّر على صنف في المخزون" placeholder="دوّر على صنف في المخزون…" />
+            <button id="gsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+          </div>
+          <div id="gsOut" class="gs-out hidden"><p id="gsStatus" class="status"></p><div id="gsItems"></div></div>
         </div>
-        <div class="subbar chips" data-for="orders" role="group" aria-label="الطلبيات" hidden>
-          <button type="button" class="chip on" data-tab="drafts">الطلبيات</button
+        <!-- the bottom bar: three sections (owner's layout of 2026-11-10, (ب) «شريط تحت»): المشتريات، الحسابات، المبيعات -->
+        <nav class="bottomnav" aria-label="الأقسام">
+          <button data-group="purchases">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 10h10l2-7H7M10 19a1 1 0 1 0 0 .01M17 19a1 1 0 1 0 0 .01" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>المشتريات</span></button
+          ><button data-group="accounts" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5zM9 9h6M9 13h6M9 17h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>الحسابات</span></button
+          ><button data-group="sales" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M7 16V10M12 16V6M17 16v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>المبيعات</span></button>
+        </nav>
+        <!-- the small tabs of each section (the panels below are unchanged) -->
+        <div class="subbar chips" data-for="purchases" role="group" aria-label="المشتريات">
+          <button type="button" class="chip on" data-tab="short">النواقص</button
+          ><button type="button" class="chip" data-tab="read">الوارد</button
+          ><button type="button" class="chip" data-tab="translate">الترجمة</button
+          ><button type="button" class="chip" data-tab="drafts">الطلبيات</button
           ><button type="button" class="chip" data-tab="docs">الفواتير</button
-          ><button type="button" class="chip" data-tab="suppliers">قوايم المخازن</button>
+          ><button type="button" class="chip" data-tab="suppliers">قوايم المخازن</button
+          ><button type="button" class="chip" data-tab="stock">المخزون</button>
+        </div>
+        <div class="subbar chips" data-for="accounts" role="group" aria-label="الحسابات" hidden>
+          <button type="button" class="chip on" data-tab="customers">العملاء</button
+          ><button type="button" class="chip" data-tab="vendors">الموردين</button>
+        </div>
+        <div class="subbar chips" data-for="sales" role="group" aria-label="المبيعات" hidden>
+          <button type="button" class="chip on" data-tab="storeorders">الموقع</button
+          ><button type="button" class="chip" data-tab="sales">حركة البيع</button>
         </div>
 
         <section id="shortPanel" class="card">
@@ -320,6 +335,12 @@
           <p id="odInfo" class="status"></p>
           <div id="odBody" class="hidden">
             <div id="odChips" class="chips" role="group" aria-label="المورد"></div>
+            <!-- the owner may send the whole order to another supplier (2026-11-10: «تغيير المورد للطلبيه نفسها… ساعات بكون مضطر اطلب من حد معين») -->
+            <div class="od-sendto">
+              <label for="odSendTo">ابعت الطلبية دي لـ</label>
+              <select id="odSendTo"></select>
+            </div>
+            <p id="odSendNote" class="hint hidden"></p>
             <p id="odTo" class="od-to"></p>
             <div id="odPick" class="od-pick"></div>
             <label for="odMsg">الطلب (بيتغير لما تعدّل الأصناف تحت)</label>
@@ -345,6 +366,20 @@
             </details>
           </div>
           <p id="odStatus" class="status"></p>
+        </section>
+
+        <!-- new parts, designed with the owner one question at a time before they get data -->
+        <section id="customersPanel" class="card hidden">
+          <h2>العملاء</h2>
+          <p class="hint">قريب: هنصمم الشاشة دي سوا (اللي عليهم فلوس وحد كل عميل).</p>
+        </section>
+        <section id="vendorsPanel" class="card hidden">
+          <h2>الموردين</h2>
+          <p class="hint">قريب: هنصمم الشاشة دي سوا.</p>
+        </section>
+        <section id="salesPanel" class="card hidden">
+          <h2>حركة البيع اليومية</h2>
+          <p class="hint">قريب: هتتحدّث كل ساعتين، وهنصممها سوا.</p>
         </section>
 
         <section id="stockPanel" class="card hidden">
@@ -397,13 +432,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=stock-20261109a"></script>
+    <script src="ar/app.js?v=layout-20261110a"></script>
     <script src="ar/suppliers.js?v=search-20261108a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
-    <script src="ar/order-drafts.js?v=orders-20261109b"></script>
+    <script src="ar/order-drafts.js?v=layout-20261110a"></script>
     <script src="ar/refresh.js?v=nav-20261109a"></script>
     <script src="ar/store-orders.js?v=store-20261109c"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
-    <script src="ar/stock.js?v=stock-20261109a"></script>
+    <script src="ar/stock.js?v=layout-20261110a"></script>
   </body>
 </html>

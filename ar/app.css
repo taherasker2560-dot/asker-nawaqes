@@ -1127,6 +1127,42 @@ button.small {
   font-size: 13px;
 }
 
+/* the stock search on top of every screen (ar/stock.js): while it shows results, the section below is hidden */
+.topsearch {
+  margin: 4px 0 10px;
+}
+.topsearch .search {
+  margin: 0;
+}
+.topsearch .search input[type='search'] {
+  border: 2px solid var(--crimson) !important; /* the base input rule uses !important */
+}
+/* «المشتريات» has seven small tabs: two rows instead of a row that hides the last ones off the screen */
+.subbar[data-for='purchases'] {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.gs-out {
+  margin-top: 8px;
+}
+#app.searching > section.card,
+#app.searching > .subbar {
+  display: none;
+}
+
+/* «ابعت الطلبية دي لـ» in «الطلبيات» (ar/order-drafts.js) */
+.od-sendto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+.od-sendto select {
+  flex: 1;
+  min-width: 0;
+}
+
 /* «المخزون»: one card per item (ar/stock.js) */
 .st-item {
   display: flex;

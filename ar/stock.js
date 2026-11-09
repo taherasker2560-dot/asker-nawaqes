@@ -88,6 +88,7 @@
     </div>`;
   }
   function draw() {
+    if (!$('stQ')) return;
     const q = $('stQ').value.trim();
     if (!rows.length) { $('stItems').innerHTML = ''; return; }
     if (q.length < 2) {
@@ -98,26 +99,62 @@
     say(hits.length ? '' : 'مفيش صنف عليه رصيد بالاسم ده');
     $('stItems').innerHTML = hits.map(card).join('');
   }
+  // the search on top of every screen: typing shows the cards there and hides the section below; clearing brings it back
+  function sayTop(text, kind) {
+    const el = $('gsStatus');
+    if (!el) return;
+    el.textContent = text || '';
+    el.className = 'status' + (kind ? ' ' + kind : '');
+  }
+  let failText = '';
+  function drawTop() {
+    const box = $('gsQ');
+    if (!box) return;
+    const q = box.value.trim(), on = q.length >= 2;
+    $('gsClear')?.classList.toggle('hidden', !box.value);
+    $('gsOut').classList.toggle('hidden', !on);
+    $('app')?.classList.toggle('searching', on);
+    if (!on) { $('gsItems').innerHTML = ''; return sayTop(''); }
+    if (!rows.length) { $('gsItems').innerHTML = ''; return sayTop(loading ? 'بيحمّل الرصيد…' : failText, failText ? 'bad' : ''); }
+    const hits = search(q, rows, 20);
+    sayTop(hits.length ? $('stAge').textContent : 'مفيش صنف عليه رصيد بالاسم ده');
+    $('gsItems').innerHTML = hits.map(card).join('');
+  }
+  function closeSearch() {
+    if (!$('gsQ') || !$('gsQ').value) return;
+    $('gsQ').value = '';
+    drawTop();
+  }
   async function open(force) {
-    if (!db() || !$('stockPanel')) return;
-    if (!force && rows.length && Date.now() - loadedAt < FRESH_MS) return draw();
+    if (!db()) return;
+    if (!force && rows.length && Date.now() - loadedAt < FRESH_MS) { draw(); drawTop(); return; }
     if (loading) return loading;
     say('بيحمّل الرصيد…');
     loading = (async () => {
       try {
         rows = await load();
         loadedAt = Date.now();
+        failText = '';
         const newest = rows.reduce((a, r) => (String(r.data_at || '') > a ? String(r.data_at) : a), '');
-        $('stAge').textContent = ageText(newest);
-        draw();
+        if ($('stAge')) $('stAge').textContent = ageText(newest);
       } catch (e) {
         rows = [];
         const missing = /ar_stock|relation|schema cache|does not exist/i.test(String(e && e.message));
-        say(missing ? 'الرصيد لسه مش متاح: محتاج تفعيل على السيرفر الأول.' : 'مقدرتش أجيب الرصيد: ' + (e && e.message), 'bad');
-      } finally { loading = null; }
+        failText = missing ? 'الرصيد لسه مش متاح: محتاج تفعيل على السيرفر الأول.' : 'مقدرتش أجيب الرصيد: ' + (e && e.message);
+        say(failText, 'bad');
+      } finally {
+        loading = null;
+        draw();
+        drawTop();
+      }
     })();
     return loading;
   }
   $('stQ')?.addEventListener('input', draw);
-  root.AskerStock = { open };
+  $('gsQ')?.addEventListener('input', () => {
+    drawTop();
+    if ($('gsQ').value.trim().length >= 2 && !rows.length && !loading) open();
+  });
+  $('gsClear')?.addEventListener('click', () => { closeSearch(); $('gsQ').focus(); });
+  root.AskerStock = { open, closeSearch };
 })(typeof window === 'undefined' ? globalThis : window);

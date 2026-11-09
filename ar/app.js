@@ -211,14 +211,17 @@
     await client.auth.signOut();
     refresh();
   };
-  // The bar at the bottom has the main places (owner's layout of 2026-11-09): «النواقص العامة» (القايمة، الترجمة، الوارد),
-  // «الطلبيات» (الطلبيات، الفواتير، قوايم المخازن), «المخزون» (رصيد الصيدلية, ar/stock.js) and «الموقع» (طلبات الموقع). Each
-  // place has its small tabs under the top strip (the .subbar for that place); a small tab is still a [data-tab], and a place
-  // remembers the small tab you were on.
-  const GROUP_OF = { short: 'general', translate: 'general', read: 'general', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', storeorders: 'site' };
-  const lastTab = { general: 'short', orders: 'drafts', stock: 'stock', site: 'storeorders' };
+  // The bar at the bottom has three sections (owner's layout of 2026-11-10, (ب) «شريط تحت»): «المشتريات» (النواقص، الوارد،
+  // الترجمة، الطلبيات، الفواتير، قوايم المخازن، المخزون), «الحسابات» (العملاء، الموردين: coming) and «المبيعات» (الموقع، حركة البيع:
+  // coming). The stock search is always on top (ar/stock.js). Each section has its small tabs under the top strip (the .subbar
+  // for that section); a small tab is still a [data-tab], and a section remembers the small tab you were on.
+  const GROUP_OF = {
+    short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases',
+    customers: 'accounts', vendors: 'accounts', storeorders: 'sales', sales: 'sales',
+  };
+  const lastTab = { purchases: 'short', accounts: 'customers', sales: 'storeorders' };
   function showTab(tab) {
-    const group = GROUP_OF[tab] || 'general';
+    const group = GROUP_OF[tab] || 'purchases';
     lastTab[group] = tab;
     document.querySelectorAll('[data-group]').forEach((x) => x.classList.toggle('secondary', x.dataset.group !== group));
     document.querySelectorAll('.subbar').forEach((s) => (s.hidden = s.dataset.for !== group));
@@ -237,6 +240,10 @@
     if (tab === 'stock') window.AskerStock?.open();
     $('storeOrdersPanel')?.classList.toggle('hidden', tab !== 'storeorders');
     if (tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); }
+    $('customersPanel')?.classList.toggle('hidden', tab !== 'customers');
+    $('vendorsPanel')?.classList.toggle('hidden', tab !== 'vendors');
+    $('salesPanel')?.classList.toggle('hidden', tab !== 'sales');
+    window.AskerStock?.closeSearch?.(); // choosing a place leaves the stock search
   }
   document.querySelectorAll('.subbar [data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-group]').forEach((b) => (b.onclick = () => showTab(lastTab[b.dataset.group])));

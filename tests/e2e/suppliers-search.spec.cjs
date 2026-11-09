@@ -8,7 +8,7 @@ const LIST=[HEAD,
  '2,"صنف مش عندنا",50,30,none,,,,,,'].join('\r\n');
 const file=(name,body)=>({name,mimeType:'text/csv',buffer:Buffer.from('﻿'+body,'utf8')});
 run('suppliers search: every line, undo an accepted one',async({page,table})=>{
- await page.click('[data-group="orders"]');await page.click('[data-tab="suppliers"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-tab="suppliers"]');
  await page.click('#spTools summary');
  await page.setInputFiles('#spFile',file('AMG_2026-04-05_draft.csv',LIST));
  await page.click('#spUpload');await waitStatus(page,/اترفعت قايمة AMG/,'spStatus');
