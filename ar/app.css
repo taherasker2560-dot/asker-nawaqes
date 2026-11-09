@@ -1142,6 +1142,9 @@ button.small {
   flex-wrap: wrap;
   overflow-x: visible;
 }
+.topsearch .search.gw {
+  margin-top: 8px;
+}
 .gs-out {
   margin-top: 8px;
 }

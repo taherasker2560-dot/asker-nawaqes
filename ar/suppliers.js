@@ -384,9 +384,38 @@
       box.lastElementChild._row = r;
     });
   }
+  // The same search from the box on top of every screen (owner 2026-11-10: «تخرجلى بحث المخازن تحت بحث الصيدليه فى واجهه
+  // البوت»): results only, without the review buttons (those stay in «قوايم المخازن»).
+  let topSeq = 0, topTimer = null;
+  async function searchTop(q) {
+    const seq = ++topSeq;
+    const box = $('gwItems'), note = $('gwStatus');
+    if (!box || fz().words(q).join('').length < 2) { if (box) box.innerHTML = ''; if (note) note.textContent = ''; return; }
+    try {
+      if (!allLines) note.textContent = 'بحمّل كل سطور المخازن مرة واحدة…';
+      const all = await loadAll();
+      if (seq !== topSeq) return;
+      const rows = fz().rank(q, all, (r) => r._h, 30);
+      note.textContent = rows.length ? `${rows.length === 30 ? 'أقرب 30' : rows.length} سطر من قوايم المخازن، الأقرب للي كتبته الأول` : 'مفيش حاجة قريبة من الاسم ده في قوايم المخازن.';
+      box.innerHTML = rows.map((r) => foundHtml(r, true)).join('');
+    } catch (e) {
+      if (seq === topSeq) note.textContent = 'البحث وقف: ' + e.message;
+    }
+  }
+  function drawTopBox() {
+    const inp = $('gwQ');
+    if (!inp) return;
+    const on = inp.value.trim().length >= 2;
+    $('gwClear')?.classList.toggle('hidden', !inp.value);
+    $('gwOut')?.classList.toggle('hidden', !on);
+    $('app')?.classList.toggle('searching', on || ($('gsQ') ? $('gsQ').value.trim().length >= 2 : false));
+    clearTimeout(topTimer);
+    if (!on) { $('gwItems').innerHTML = ''; $('gwStatus').textContent = ''; topSeq++; return; }
+    topTimer = setTimeout(() => searchTop(inp.value), 350);
+  }
   // One search result. Accepted lines get «غلط، رجّعه» (owner, 2026-11-07: «اقبل القوي» can let a wrong cosmetic through);
-  // pending suggestions get «صح» / «غلط» like the review list.
-  function foundHtml(r) {
+  // pending suggestions get «صح» / «غلط» like the review list. plain = no buttons (the search on top of the screen).
+  function foundHtml(r, plain) {
     const pf =
       r.review === 'accepted' && r.pharmafly_name
         ? `<div class="en">${esc(r.pharmafly_name)}</div>`
@@ -395,7 +424,8 @@
           : '<div class="hint">مش متطابق مع صنف عندنا</div>';
     const meta = [r.supplier, r.list_date, r.price != null ? r.price + ' ج' : '', r.discount_pct != null ? 'خصم ' + r.discount_pct + '%' : ''].filter(Boolean).join(' · ');
     let acts = '';
-    if (r.review === 'accepted' && r.item_id) acts = '<button type="button" class="small secondary" data-sp-found="undo">غلط، رجّعه</button>';
+    if (plain) acts = '';
+    else if (r.review === 'accepted' && r.item_id) acts = '<button type="button" class="small secondary" data-sp-found="undo">غلط، رجّعه</button>';
     else if (r.review === 'pending' && r.item_id && r.match_status !== 'none')
       acts = '<button type="button" class="small" data-sp-found="accepted">صح ✓</button> <button type="button" class="small secondary" data-sp-found="rejected">غلط</button>';
     return `<div class="item" data-sp-found-row="${r.id}"><div>${esc(r.supplier_name)}</div><div class="hint">${esc(meta)}</div>${pf}${acts ? '<div class="sp-actions">' + acts + '</div>' : ''}</div>`;
@@ -465,7 +495,14 @@
       }
     };
   }
+  // the warehouses' search on top of every screen
+  function bindTop() {
+    if (!$('gwQ')) return;
+    $('gwQ').addEventListener('input', drawTopBox);
+    $('gwClear')?.addEventListener('click', () => { $('gwQ').value = ''; drawTopBox(); $('gwQ').focus(); });
+  }
   root.AskerSuppliers = { open };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
-  else bind();
+  const start = () => { bind(); bindTop(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
 })(typeof window === 'undefined' ? globalThis : window);

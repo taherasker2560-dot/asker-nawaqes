@@ -47,7 +47,14 @@
             <input id="gsQ" type="search" autocomplete="off" aria-label="دوّر على صنف في المخزون" placeholder="دوّر على صنف في المخزون…" />
             <button id="gsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
           </div>
+          <!-- the warehouses' lists search under it (owner 2026-11-10: «تخرجلى بحث المخازن تحت بحث الصيدليه فى واجهه البوت»), ar/suppliers.js -->
+          <div class="search gw">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-5 9 5v10H3zM8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            <input id="gwQ" type="search" autocomplete="off" aria-label="دوّر في قوايم المخازن" placeholder="دوّر في قوايم المخازن…" />
+            <button id="gwClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+          </div>
           <div id="gsOut" class="gs-out hidden"><p id="gsStatus" class="status"></p><div id="gsItems"></div></div>
+          <div id="gwOut" class="gs-out hidden"><p id="gwStatus" class="status"></p><div id="gwItems"></div></div>
         </div>
         <!-- the bottom bar: three sections (owner's layout of 2026-11-10, (ب) «شريط تحت»): المشتريات، الحسابات، المبيعات -->
         <nav class="bottomnav" aria-label="الأقسام">
@@ -433,7 +440,7 @@
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
     <script src="ar/app.js?v=layout-20261110a"></script>
-    <script src="ar/suppliers.js?v=search-20261108a"></script>
+    <script src="ar/suppliers.js?v=layout-20261110a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=layout-20261110a"></script>
     <script src="ar/refresh.js?v=nav-20261109a"></script>

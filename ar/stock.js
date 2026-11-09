@@ -113,17 +113,24 @@
     const q = box.value.trim(), on = q.length >= 2;
     $('gsClear')?.classList.toggle('hidden', !box.value);
     $('gsOut').classList.toggle('hidden', !on);
-    $('app')?.classList.toggle('searching', on);
+    // the section below hides while either top search (stock, or the warehouses' lists) shows results
+    $('app')?.classList.toggle('searching', on || ($('gwQ') ? $('gwQ').value.trim().length >= 2 : false));
     if (!on) { $('gsItems').innerHTML = ''; return sayTop(''); }
     if (!rows.length) { $('gsItems').innerHTML = ''; return sayTop(loading ? 'بيحمّل الرصيد…' : failText, failText ? 'bad' : ''); }
     const hits = search(q, rows, 20);
     sayTop(hits.length ? $('stAge').textContent : 'مفيش صنف عليه رصيد بالاسم ده');
     $('gsItems').innerHTML = hits.map(card).join('');
   }
+  // choosing a section leaves both top searches (the stock one and the warehouses' lists one)
   function closeSearch() {
-    if (!$('gsQ') || !$('gsQ').value) return;
-    $('gsQ').value = '';
-    drawTop();
+    if ($('gwQ') && $('gwQ').value) {
+      $('gwQ').value = '';
+      $('gwOut')?.classList.add('hidden');
+      $('gwClear')?.classList.add('hidden');
+      if ($('gwItems')) $('gwItems').innerHTML = '';
+    }
+    if ($('gsQ') && $('gsQ').value) $('gsQ').value = '';
+    if ($('gsQ')) drawTop();
   }
   async function open(force) {
     if (!db()) return;

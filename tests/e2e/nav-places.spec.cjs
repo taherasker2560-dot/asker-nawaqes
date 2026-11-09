@@ -8,6 +8,7 @@ run('bottom bar: three sections with small tabs, the stock search on top',async(
  // the first screen: المشتريات, the shortages list, the stock search on top
  assert.deepEqual(await page.$$eval('.bottomnav button',b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim())),['المشتريات','الحسابات','المبيعات']);
  assert.ok(await vis(page,'gsQ'),'stock search on top');assert.ok(!(await vis(page,'gsOut')));
+ assert.ok(await vis(page,'gwQ'),'the warehouses search under it');assert.ok(!(await vis(page,'gwOut')));
  assert.ok(await vis(page,'shortPanel'));assert.ok(!(await vis(page,'translatePanel')));assert.ok(!(await vis(page,'draftsPanel')));
  assert.ok(await page.isVisible('.subbar[data-for="purchases"]'));assert.ok(!(await page.isVisible('.subbar[data-for="accounts"]')));assert.ok(!(await page.isVisible('.subbar[data-for="sales"]')));
  assert.deepEqual(await chips(page,'purchases'),['النواقص','الوارد','الترجمة','الطلبيات','الفواتير','قوايم المخازن','المخزون']);
