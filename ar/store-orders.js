@@ -18,6 +18,17 @@
     return `https://wa.me/${intl}?text=${encodeURIComponent(text || '')}`;
   }
   function confirmMessage(o) {
+    // طلب روشتة بس: الأسعار بيكتبها صاحب الصيدلية بعد ما يقرا الروشتة
+    if (!(o.items || []).length) {
+      return [
+        `أهلًا ${o.customer_name}، معاك صيدلية عسكر.`,
+        `الروشتة (طلب رقم ${o.id}) وصلتنا، ودي الأدوية والأسعار:`,
+        '- ',
+        'الإجمالي:  جنيه، والدفع كاش عند الاستلام.',
+        'مصاريف التوصيل: ',
+        'نأكد الطلب؟',
+      ].join('\n');
+    }
     const lines = (o.items || []).map((x) => `- ${x.name} × ${x.qty} = ${money(x.line_total)} ج`);
     return [
       `أهلًا ${o.customer_name}، معاك صيدلية عسكر.`,
@@ -46,16 +57,21 @@
     el.textContent = text || '';
     el.className = 'status' + (kind ? ' ' + kind : '');
   }
+  let rxUrls = {};
   function card(o) {
     const items = (o.items || []).map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)} <b>${esc(money(x.line_total))}</b></li>`).join('');
     const open = o.status === 'new' || o.status === 'confirmed';
+    const rx = (o.rx_paths || []).map((p, i) => /\.pdf$/.test(p)
+      ? `<a class="so-rx so-rx-pdf" href="${esc(rxUrls[p] || '#')}" target="_blank" rel="noopener">PDF</a>`
+      : `<a class="so-rx" href="${esc(rxUrls[p] || '#')}" target="_blank" rel="noopener"><img src="${esc(rxUrls[p] || '')}" alt="الروشتة ${i + 1}" loading="lazy"></a>`).join('');
     return `<div class="so-item so-${esc(o.status)}" data-order="${esc(o.id)}">
       <div class="so-head"><strong>#${esc(o.id)} · ${esc(o.customer_name)}</strong><span class="so-st">${esc(STATUS[o.status] || o.status)}</span></div>
       <span class="hint">${esc(when(o.created_at))} · <span dir="ltr">${esc(o.phone)}</span></span>
       <span class="hint">${esc(o.address)}</span>
       ${o.notes ? `<span class="hint">ملاحظة: ${esc(o.notes)}</span>` : ''}
-      <ul class="so-lines">${items}</ul>
-      <div class="so-total">الإجمالي ${esc(money(o.total))} ج (من غير التوصيل)</div>
+      ${rx ? `<div class="so-rxs"><span class="hint">${items ? 'ومعاه روشتة:' : 'طلب بالروشتة: اقراها واكتب الأسعار في رسالة الواتساب'}</span>${rx}</div>` : ''}
+      ${items ? `<ul class="so-lines">${items}</ul>
+      <div class="so-total">الإجمالي ${esc(money(o.total))} ج (من غير التوصيل${rx ? ' والروشتة' : ''})</div>` : ''}
       <div class="so-actions">
         <a class="so-wa" href="${esc(waLink(o.phone, confirmMessage(o)))}" target="_blank" rel="noopener">واتساب</a>
         ${o.status === 'new' ? `<button type="button" class="small" data-set="confirmed">اتأكد</button>` : ''}
@@ -76,10 +92,17 @@
     if (!db()) return;
     try {
       const { data, error } = await db().from('ar_store_orders')
-        .select('id,created_at,customer_name,phone,address,notes,items,total,status')
+        .select('*')
         .order('created_at', { ascending: false }).limit(80);
       if (error) throw error;
       orders = data || [];
+      // صور الروشتات: روابط مؤقتة (ساعة) من المكان الخاص ar-store-rx
+      const paths = [...new Set(orders.flatMap((o) => o.rx_paths || []))];
+      rxUrls = {};
+      if (paths.length) {
+        const { data: signed } = await db().storage.from('ar-store-rx').createSignedUrls(paths, 3600);
+        for (const s of signed || []) if (s && s.path && s.signedUrl) rxUrls[s.path] = s.signedUrl;
+      }
       say('');
       draw();
     } catch (e) {

@@ -27,6 +27,9 @@
     too_many: 'بعت طلبات كتير في ساعة واحدة. استنى شوية وجرب تاني، أو كلمنا واتساب',
     item_not_available: 'صنف في السلة مبقاش متوفر. افتح السلة وشيله، وبعدين ابعت تاني',
     closed: 'الصيدلية مش بتستقبل طلبات من الموقع دلوقتي. جرب تاني بعد شوية',
+    bad_rx: 'صورة الروشتة ماوصلتش. اختارها تاني وابعت',
+    rx_upload: 'صورة الروشتة مارفعتش. اتأكد من النت وجرب تاني',
+    rx_big: 'الصورة أكبر من 8 ميجا. صوّرها تاني',
   };
   const MAX_LINES = 30, MAX_QTY = 20;
 
@@ -96,7 +99,21 @@
     }
     return { add, missing };
   }
-  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, searchTerms, termFilter, normPhone, money, canAdd, cartAdd, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan };
+  // صور الروشتة: نفس المسار اللي السيرفر بيقبله (rx/<يوم>/<اسم عشوائي>.<نوع>)، 4 صور بالكتير، 8 ميجا للصورة
+  const MAX_RX = 4, MAX_RX_BYTES = 8 * 1024 * 1024;
+  function rxExt(type, name) {
+    const t = String(type || '').toLowerCase(), n = String(name || '').toLowerCase();
+    if (t === 'application/pdf' || n.endsWith('.pdf')) return 'pdf';
+    if (t === 'image/png') return 'png';
+    if (t === 'image/webp') return 'webp';
+    if (t === 'image/heic' || t === 'image/heif' || n.endsWith('.heic')) return 'heic';
+    return 'jpg';
+  }
+  function rxPath(day, id, ext) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^[0-9a-f-]{20,40}$/.test(id) || !/^(jpg|png|webp|heic|pdf)$/.test(ext)) return null;
+    return `rx/${day}/${id}.${ext}`;
+  }
+  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, searchTerms, termFilter, normPhone, money, canAdd, cartAdd, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -119,6 +136,7 @@
   if (!Array.isArray(myOrders)) myOrders = [];
   let shown = [], popular = [], lastQuery = null, offset = 0, seq = 0, sending = false;
   let settings = { is_open: true };
+  let rxFiles = []; // [{file, url}] صور الروشتة اللي الزبون اختارها (على الموبايل لحد ما يبعت)
 
   function saveCart() {
     store.set('asker_store_cart', cart);
@@ -228,14 +246,59 @@
     runQuery(lastQuery, false);
   }
 
+  function drawRx() {
+    $('rxThumbs').innerHTML = rxFiles.map((r, i) => `<div class="rx-thumb">
+      ${r.url ? `<img src="${r.url}" alt="صورة الروشتة ${i + 1}">` : '<span>PDF</span>'}
+      <button type="button" data-rx-remove="${i}" aria-label="شيل الصورة ${i + 1}">×</button></div>`).join('');
+    $('rxPickLabel').textContent = rxFiles.length ? 'زوّد صورة تانية للروشتة' : 'صوّر الروشتة أو اختار صورتها';
+    $('rxPickLabel').hidden = rxFiles.length >= MAX_RX;
+  }
+  function addRx(files) {
+    for (const f of files) {
+      if (rxFiles.length >= MAX_RX) break;
+      if (f.size > MAX_RX_BYTES && rxExt(f.type, f.name) === 'pdf') { say(ERRORS.rx_big, true); continue; }
+      rxFiles.push({ file: f, url: /^image\//.test(f.type) ? URL.createObjectURL(f) : null });
+    }
+    drawRx(); drawCart();
+  }
+  // الصور الكبيرة بتتصغّر لـ 1600 بكسل (JPEG) قبل الرفع، عشان تترفع بسرعة على نت الموبايل
+  async function shrink(file) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+    try {
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      if (scale === 1 && file.size < 1.5 * 1024 * 1024) return file;
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.85));
+      return blob ? new File([blob], 'rx.jpg', { type: 'image/jpeg' }) : file;
+    } catch (e) { return file; }
+  }
+  function uuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
+  }
+  async function uploadRx() {
+    const day = new Date().toISOString().slice(0, 10), paths = [];
+    for (const r of rxFiles) {
+      const f = await shrink(r.file);
+      if (f.size > MAX_RX_BYTES) throw new Error('rx_big');
+      const path = rxPath(day, uuid(), rxExt(f.type, f.name));
+      const up = await client.storage.from('ar-store-rx').upload(path, f, { contentType: f.type || 'image/jpeg', upsert: false });
+      if (up.error) throw new Error('rx_upload');
+      paths.push(path);
+    }
+    return paths;
+  }
   function drawCart() {
     const box = $('cartItems');
+    $('checkout').hidden = !cart.length && !rxFiles.length;
+    $('sumBox').hidden = !cart.length;
     if (!cart.length) {
-      box.innerHTML = '<p class="empty">السلة فاضية. دوّر على اللي محتاجه وضيفه.</p>';
-      $('checkout').hidden = true;
+      box.innerHTML = rxFiles.length ? '' : '<p class="empty">السلة فاضية. دوّر على اللي محتاجه وضيفه، أو ابعت صورة الروشتة.</p>';
       return;
     }
-    $('checkout').hidden = false;
     box.innerHTML = cart.map((x) => `<article class="item cart-line">
       <div class="item-text"><h3 dir="ltr">${esc(x.name)}</h3>${x.arabic_name ? `<p class="ar">${esc(x.arabic_name)}</p>` : ''}
         <span class="hint-sm">${money(x.price)} ج للواحدة</span></div>
@@ -256,17 +319,21 @@
     e.preventDefault();
     if (sending) return;
     const name = $('cName').value.trim(), phone = normPhone($('cPhone').value), address = $('cAddr').value.trim(), notes = $('cNotes').value.trim();
-    if (!cart.length) return say(ERRORS.bad_items, true);
+    if (!cart.length && !rxFiles.length) return say(ERRORS.bad_items, true);
     if (name.length < 2) return say(ERRORS.bad_name, true);
     if (!phone) return say(ERRORS.bad_phone, true);
     if (address.length < 5) return say(ERRORS.bad_address, true);
     store.set('asker_store_me', { name, phone, address });
-    sending = true; $('sendBtn').disabled = true; say('بيبعت الطلب…');
+    sending = true; $('sendBtn').disabled = true; say(rxFiles.length ? 'بيرفع صورة الروشتة…' : 'بيبعت الطلب…');
     try {
-      const { data, error } = await client.rpc('ar_store_place_order', {
-        p_name: name, p_phone: phone, p_address: address, p_notes: notes || null,
-        p_items: cart.map((x) => ({ id: x.id, qty: x.qty })),
-      });
+      let rx = [];
+      if (rxFiles.length) {
+        try { rx = await uploadRx(); } catch (err) { return say(errorText(err.message), true); }
+        say('بيبعت الطلب…');
+      }
+      const args = { p_name: name, p_phone: phone, p_address: address, p_notes: notes || null, p_items: cart.map((x) => ({ id: x.id, qty: x.qty })) };
+      if (rx.length) args.p_rx = rx;
+      const { data, error } = await client.rpc('ar_store_place_order', args);
       if (error) throw error;
       if (!data || !data.ok) return say(errorText(data && data.error), true);
       const changed = Math.abs(Number(data.total) - cartTotal(cart)) > 0.009;
@@ -275,9 +342,13 @@
         items: (data.items || []).map((x) => ({ id: x.id, name: x.name, qty: x.qty })),
       });
       store.set('asker_store_orders', myOrders);
+      const onlyRx = !cart.length;
       cart = []; saveCart();
+      rxFiles.forEach((r) => r.url && URL.revokeObjectURL(r.url)); rxFiles = []; drawRx();
       $('cNotes').value = '';
-      $('doneText').textContent = `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + '.';
+      $('doneText').textContent = onlyRx
+        ? `طلب الروشتة رقم ${data.order_id} وصلنا. هنقرا الروشتة ونكلمك بالأسعار.`
+        : `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + (data.rx ? '، ومعاه الروشتة' : '') + '.';
       say('');
       location.hash = 'done';
     } catch (err) {
@@ -297,9 +368,9 @@
     if (!myOrders.length) { box.innerHTML = '<p class="empty">لسه مابعتش طلبات من الموبايل ده.</p>'; return; }
     box.innerHTML = myOrders.map((o) => `<article class="order">
       <div class="order-head"><strong>طلب رقم ${esc(o.id)}</strong><span class="badge st-${esc(o.status)}">${esc(ORDER_STATUS[o.status] || '')}</span></div>
-      <span class="hint-sm">${esc(when(o.at))} · ${money(o.total)} ج</span>
-      <ul class="order-lines">${(o.items || []).map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)}</li>`).join('')}</ul>
-      <button type="button" class="again" data-again="${esc(o.id)}">اطلب تاني</button>
+      <span class="hint-sm">${esc(when(o.at))}${(o.items || []).length ? ' · ' + money(o.total) + ' ج' : ''}</span>
+      ${(o.items || []).length ? `<ul class="order-lines">${o.items.map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)}</li>`).join('')}</ul>
+      <button type="button" class="again" data-again="${esc(o.id)}">اطلب تاني</button>` : '<span class="hint-sm">طلب بالروشتة</span>'}
     </article>`).join('');
     refreshStatuses();
   }
@@ -340,6 +411,12 @@
   document.addEventListener('click', (e) => {
     const again = e.target.closest('[data-again]');
     if (again) { orderAgain(again.dataset.again, again); return; }
+    const rm = e.target.closest('[data-rx-remove]');
+    if (rm) {
+      const r = rxFiles.splice(Number(rm.dataset.rxRemove), 1)[0];
+      if (r && r.url) URL.revokeObjectURL(r.url);
+      drawRx(); drawCart(); return;
+    }
     const add = e.target.closest('[data-add]');
     if (add) {
       const it = shown.concat(popular).find((x) => String(x.id) === add.dataset.add);
@@ -364,6 +441,7 @@
   $('homeSearch').addEventListener('focus', () => { location.hash = 'search'; setTimeout(() => $('q').focus(), 50); });
   $('more').addEventListener('click', () => { if (!lastQuery) return; offset += PAGE; runQuery(lastQuery, true); });
   $('orderForm').addEventListener('submit', send);
+  $('rxFile').addEventListener('change', () => { addRx([...($('rxFile').files || [])]); $('rxFile').value = ''; });
   window.addEventListener('hashchange', route);
 
   $('sections').innerHTML = SECTIONS.map((s) => `<a href="#search" data-section="${s.key}" class="sec"><span class="sec-mark">${s.mark}</span><span>${s.name}</span></a>`).join('');

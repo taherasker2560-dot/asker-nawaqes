@@ -16,5 +16,8 @@ assert.ok(link.startsWith('https://wa.me/201012345678?text='),'Egyptian number w
 assert.equal(decodeURIComponent(link.split('?text=')[1]),msg);
 assert.equal(O.waLink('201012345678',''),'https://wa.me/201012345678?text=');
 assert.equal(O.money(1234.5),'1,234.5');
+// prescription-only order: the owner writes the medicines and prices himself
+const rxMsg=O.confirmMessage({id:13,customer_name:'منى',items:[],total:0,rx_paths:['rx/2026-11-09/a.jpg']});
+assert.ok(rxMsg.includes('الروشتة (طلب رقم 13) وصلتنا'));assert.ok(rxMsg.includes('مصاريف التوصيل: '));assert.ok(!rxMsg.includes('0 جنيه'));
 assert.deepEqual(Object.keys(O.STATUS),['new','confirmed','done','cancelled'],'same statuses as ar_store_orders');
 console.log('store-orders ok');

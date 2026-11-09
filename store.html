@@ -9,7 +9,7 @@
     <link rel="icon" href="icons/arabic-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" />
-    <link rel="stylesheet" href="store/store.css?v=store-20261109b" />
+    <link rel="stylesheet" href="store/store.css?v=store-20261109c" />
   </head>
   <body>
     <p class="trial">نسخة تجريبية</p>
@@ -34,7 +34,10 @@
       <section class="hero">
         <h1 id="heroTitle">اطلب من صيدليتك وهي توصلك</h1>
         <p id="heroText">اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
-        <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
+        <div class="hero-actions">
+          <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
+          <a href="#cart" class="hero-btn ghost" id="heroRx">صوّر الروشتة وابعتها</a>
+        </div>
       </section>
       <section class="block">
         <h2>الأقسام</h2>
@@ -74,6 +77,13 @@
         <h1>السلة</h1>
       </header>
       <div id="cartItems" class="list"></div>
+      <section class="panel rx-panel">
+        <h2>روشتة (اختياري)</h2>
+        <p class="hint-sm">معاك روشتة؟ صوّرها وابعتها، وإحنا نقراها ونكلمك بالأسعار على واتساب. ممكن تبعتها لوحدها أو مع أصناف السلة.</p>
+        <label for="rxFile" id="rxPickLabel" class="rx-pick">صوّر الروشتة أو اختار صورتها</label>
+        <input id="rxFile" type="file" accept="image/*,application/pdf" multiple class="rx-file" />
+        <div id="rxThumbs" class="rx-thumbs"></div>
+      </section>
       <form id="orderForm" novalidate>
         <div id="checkout" hidden>
           <section class="panel">
@@ -87,7 +97,7 @@
             <label for="cNotes">ملاحظات (اختياري)</label>
             <textarea id="cNotes" rows="2" maxlength="500" placeholder="مثلًا: صنف مش لاقيه، أو ميعاد يناسبك"></textarea>
           </section>
-          <section class="panel sums">
+          <section class="panel sums" id="sumBox">
             <div><span>المنتجات</span><span id="sumItems"></span></div>
             <div><span>التوصيل</span><span>هنقولك على واتساب</span></div>
             <div class="total"><span>الإجمالي (من غير التوصيل)</span><span id="sumTotal"></span></div>
@@ -135,6 +145,6 @@
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="store/store.js?v=store-20261109b"></script>
+    <script src="store/store.js?v=store-20261109c"></script>
   </body>
 </html>

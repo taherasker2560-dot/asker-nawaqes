@@ -57,4 +57,13 @@ assert.deepEqual(plan.add.map(a=>[a.item.id,a.qty]),[[1,2],[3,20]]);assert.deepE
 assert.deepEqual(S.reorderPlan([{id:9,name:'Z',qty:1}],[]).missing,['Z'],'item gone from the site');
 assert.deepEqual(Object.keys(S.ORDER_STATUS),['new','confirmed','done','cancelled'],'same statuses as ar_store_orders');
 assert.ok(S.errorText('closed')!==S.errorText('x'),'closed has words');
+// prescription photos: same path rule as the storage policy, same limits as the bucket and the function
+assert.equal(S.rxExt('image/jpeg','a.jpg'),'jpg');assert.equal(S.rxExt('image/png',''),'png');assert.equal(S.rxExt('','scan.PDF'),'pdf');
+assert.equal(S.rxExt('image/heif','x'),'heic');assert.equal(S.rxExt('','photo'),'jpg');
+const rxRe=/^rx\/[0-9]{4}-[0-9]{2}-[0-9]{2}\/[0-9a-f-]{20,40}\.(jpg|png|webp|heic|pdf)$/;
+const p=S.rxPath('2026-11-09','3f2a9c1e-7b4d-4e8a-9c2b-1d5e6f7a8b9c','jpg');assert.ok(rxRe.test(p),'matches the upload policy');
+assert.equal(S.rxPath('2026-11-09','../etc','jpg'),null);assert.equal(S.rxPath('9-11','3f2a9c1e-7b4d-4e8a-9c2b-1d5e6f7a8b9c','jpg'),null);
+assert.equal(S.rxPath('2026-11-09','3f2a9c1e-7b4d-4e8a-9c2b-1d5e6f7a8b9c','exe'),null);
+assert.equal(S.MAX_RX,4);assert.equal(S.MAX_RX_BYTES,8388608);
+for(const k of ['bad_rx','rx_upload','rx_big'])assert.ok(S.errorText(k)!==S.errorText('x'),k);
 console.log('store ok');
