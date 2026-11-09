@@ -198,3 +198,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
   .list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   [data-view="cart"] > #cartItems { grid-template-columns: 1fr; }
 }
+
+/* صور الأصناف والأيقونات */
+.thumb { flex: none; width: 72px; height: 72px; border-radius: 12px; background: #fff; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.thumb.icon { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.thumb.icon svg { width: 34px; height: 34px; stroke-width: 1.6; }
+@media (min-width: 760px) { .thumb { width: 84px; height: 84px; } }
