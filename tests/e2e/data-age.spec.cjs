@@ -1,5 +1,5 @@
 // «حسب داتا الساعة …»: the strip under the app bar shows how old the list's pharmacy data is (newest successful
-// ar_sync_log row), turns green / yellow / red by age, opens two detail lines on a tap, and fits a phone screen.
+// ar_sync_log row), turns green / yellow / red by age, opens its detail lines on a tap, and fits a phone screen.
 const {run,text,assert}=require('./harness.cjs');
 run('data age strip',async({page})=>{
  // Cairo wall clock text, N minutes ago (same shape the laptop writes: yyyy-MM-dd HH:mm:ss)
@@ -27,16 +27,20 @@ run('data age strip',async({page})=>{
  await setRows([{dataMin:8*60,sentMin:30}]);await waitLevel('warn');
  assert.equal(await text(page,'#dataAgeAgo'),'من 8 ساعات');
 
+ // the list goes twice a day only: a fresh store / stock send keeps the strip green although the list's own send is 20 hours old
+ await setRows([{dataMin:30,sentMin:29,status:'STORE_OK'},{dataMin:20*60,sentMin:20*60}]);await waitLevel('good');
+ assert.equal(await text(page,'#dataAgeAgo'),'من 30 دقيقة');
+
  // 17 hours: red, and a dry run or a refused send never counts as fresh data
  await setRows([{dataMin:5,sentMin:5,dry:true},{dataMin:5,sentMin:5,status:'rejected'},{dataMin:17*60,sentMin:60}]);await waitLevel('bad');
  assert.match(await text(page,'#dataAgeText'),/^الداتا قديمة: آخر نسخة/);
  assert.equal(await text(page,'#dataAgeAgo'),'من 17 ساعة');
 
- // tap: two detail lines; tap again: closed
+ // tap: the detail lines (last send, the laptop's data, the list's own update); tap again: closed
  await page.click('#dataAge');
  assert.equal(await page.getAttribute('#dataAge','aria-expanded'),'true');
  const more=await text(page,'#dataAgeMore');
- assert.match(more,/آخر مرة اللاب بعت: .+ (ص|م)/);assert.match(more,/النواقص محسوبة على نسخة الصيدلية: .+ (ص|م)/);
+ assert.match(more,/آخر مرة اللاب بعت: .+ (ص|م)/);assert.match(more,/داتا الصيدلية عند اللاب: .+ (ص|م)/);assert.match(more,/آخر تحديث للنواقص: .+ (ص|م)/);
  await page.click('#dataAge');assert.ok(!(await page.isVisible('#dataAgeMore')));
 
  // visible on every tab, and no sideways scrolling on a phone
