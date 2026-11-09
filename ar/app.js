@@ -204,24 +204,32 @@
     await client.auth.signOut();
     refresh();
   };
-  document.querySelectorAll('[data-tab]').forEach(
-    (b) =>
-      (b.onclick = () => {
-        document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('secondary', x !== b));
-        $('shortPanel').classList.toggle('hidden', b.dataset.tab !== 'short');
-        if (b.dataset.tab === 'short') drawShort(); // names may have changed in the other tabs
-        $('translatePanel').classList.toggle('hidden', b.dataset.tab !== 'translate');
-        $('readPanel').classList.toggle('hidden', b.dataset.tab !== 'read');
-        $('suppliersPanel')?.classList.toggle('hidden', b.dataset.tab !== 'suppliers');
-        if (b.dataset.tab === 'suppliers') window.AskerSuppliers?.open();
-        $('docsPanel')?.classList.toggle('hidden', b.dataset.tab !== 'docs');
-        if (b.dataset.tab === 'docs') window.AskerDocs?.open();
-        $('draftsPanel')?.classList.toggle('hidden', b.dataset.tab !== 'drafts');
-        if (b.dataset.tab === 'drafts') window.AskerOrderDrafts?.open();
-        $('storeOrdersPanel')?.classList.toggle('hidden', b.dataset.tab !== 'storeorders');
-        if (b.dataset.tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); }
-      }),
-  );
+  // The bar at the bottom has the main places (owner's layout of 2026-11-09): «النواقص العامة» (القايمة، الترجمة، الوارد),
+  // «الطلبيات» (الطلبيات، الفواتير، قوايم المخازن) and «الموقع» (طلبات الموقع). Each place has its small tabs under the top strip
+  // (the .subbar for that place); a small tab is still a [data-tab], and a place remembers the small tab you were on.
+  const GROUP_OF = { short: 'general', translate: 'general', read: 'general', drafts: 'orders', docs: 'orders', suppliers: 'orders', storeorders: 'site' };
+  const lastTab = { general: 'short', orders: 'drafts', site: 'storeorders' };
+  function showTab(tab) {
+    const group = GROUP_OF[tab] || 'general';
+    lastTab[group] = tab;
+    document.querySelectorAll('[data-group]').forEach((x) => x.classList.toggle('secondary', x.dataset.group !== group));
+    document.querySelectorAll('.subbar').forEach((s) => (s.hidden = s.dataset.for !== group));
+    document.querySelectorAll('.subbar [data-tab]').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+    $('shortPanel').classList.toggle('hidden', tab !== 'short');
+    if (tab === 'short') { drawShort(); window.AskerRefresh?.open(); } // names may have changed in the other tabs
+    $('translatePanel').classList.toggle('hidden', tab !== 'translate');
+    $('readPanel').classList.toggle('hidden', tab !== 'read');
+    $('suppliersPanel')?.classList.toggle('hidden', tab !== 'suppliers');
+    if (tab === 'suppliers') window.AskerSuppliers?.open();
+    $('docsPanel')?.classList.toggle('hidden', tab !== 'docs');
+    if (tab === 'docs') window.AskerDocs?.open();
+    $('draftsPanel')?.classList.toggle('hidden', tab !== 'drafts');
+    if (tab === 'drafts') window.AskerOrderDrafts?.open();
+    $('storeOrdersPanel')?.classList.toggle('hidden', tab !== 'storeorders');
+    if (tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); }
+  }
+  document.querySelectorAll('.subbar [data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+  document.querySelectorAll('[data-group]').forEach((b) => (b.onclick = () => showTab(lastTab[b.dataset.group])));
   // «الوارد» has three small tabs: today (the automatic inbox), reading by hand, and the companies / phone link.
   // The status line, the results and the message to the company sit under the first two and are hidden under «الشركات».
   function showSub(name) {

@@ -830,6 +830,26 @@ button.small {
 .bottomnav:has(> button:nth-child(6)) button svg {
   padding: 3px 8px;
 }
+/* «حدّث النواقص دلوقتي» (ar/refresh.js) */
+.rf-box {
+  margin: 6px 0 10px;
+}
+.rf-btn {
+  width: 100%;
+  background: #ffd54f;
+  color: #3a2a00;
+  font-weight: 700;
+}
+.rf-btn:disabled {
+  opacity: 0.6;
+}
+/* the small tabs of each place of the bottom bar (النواقص العامة: القايمة / الترجمة / الوارد، الطلبيات: الطلبيات / الفواتير / قوايم المخازن) */
+.subbar {
+  margin: 4px 0 8px;
+}
+.subbar[hidden] {
+  display: none;
+}
 /* seven tabs (with «الطلبيات») still fit a 360px phone */
 .bottomnav:has(> button:nth-child(7)) button {
   margin: 0 1px;

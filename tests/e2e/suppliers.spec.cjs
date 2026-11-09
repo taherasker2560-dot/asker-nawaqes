@@ -12,7 +12,7 @@ const LIST2=[HEAD,
  '2,"دولوكسبرین ٣٠ مجم اقراص",185,27,none,,,,,,'].join('\r\n');
 const file=(name,body)=>({name,mimeType:'text/csv',buffer:Buffer.from('﻿'+body,'utf8')});
 run('suppliers tab: upload, accept strong at once, review the rest, next list knows the names',async({page,table})=>{
- await page.click('[data-tab="suppliers"]');
+ await page.click('[data-group="orders"]');await page.click('[data-tab="suppliers"]');
  await page.waitForSelector('#suppliersPanel:not(.hidden)');
  assert.ok(await page.isVisible('#spEmpty'));
  await page.click('#spTools summary');

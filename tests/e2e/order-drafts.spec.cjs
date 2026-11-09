@@ -17,7 +17,7 @@ const put=(page,o,saved=SAVED)=>page.evaluate(([o,saved])=>{window.__storage['or
 const msgOf=(page)=>page.inputValue('#odMsg');
 run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table})=>{
  await put(page,drafts());
- await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="orders"]');await page.click('[data-tab="drafts"]');
  await page.waitForSelector('#odChips [data-sup]');
  assert.ok(await page.isVisible('#draftsPanel'));assert.ok(!(await page.isVisible('#docsPanel')));assert.ok(!(await page.isVisible('#shortPanel')));
  assert.deepEqual(await page.$$eval('#odChips [data-sup]',b=>b.map(x=>x.textContent.trim())),['نيو سيتي · 2','AMG · 1','رضا عطية · 150'],'a supplier with no items has no chip');
@@ -77,15 +77,15 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
  await page.click('#odAll');assert.match(await text(page,'#odEditCount'),/هتطلب 150 من 150/);assert.ok(!(await page.$eval('#odCopy',b=>b.disabled)));
  // the unticked items of the first supplier are still out when it is shown again
  await page.click('#odChips [data-sup="NEWCITY"]');assert.doesNotMatch(await msgOf(page),/FERRODEP/);
- // seven tabs, the rows and the buttons still fit the phone
+ // the bottom bar, the rows and the buttons still fit the phone
  await page.click('#odChips [data-sup="REDA"]');
  const wide=await page.evaluate(()=>{const W=document.documentElement.clientWidth;return [...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.right>W+0.5||r.left<-0.5)}).map(e=>e.tagName+'#'+e.id+'.'+e.className).slice(0,8)});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen; too wide: '+wide.join(' | '));
- assert.equal(await page.$$eval('.bottomnav button',b=>b.length),7);assert.deepEqual(wide,[],'nothing sticks out of the screen');
+ assert.equal(await page.$$eval('.bottomnav button',b=>b.length),3);assert.deepEqual(wide,[],'nothing sticks out of the screen');
 },{permissions:['clipboard-read','clipboard-write']});
 run('orders tab: a supplier with no saved number, no file yet, an old file, a broken file',async({page})=>{
  await page.evaluate(()=>{window.__opened=[]});
- await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
+ await page.click('[data-group="orders"]');await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')),'nothing to show');
  await put(page,drafts(new Date(Date.now()-3*864e5).toISOString()),[]);
  await page.click('#odRefresh');await page.waitForSelector('#odChips [data-sup]');
