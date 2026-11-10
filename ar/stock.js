@@ -116,7 +116,8 @@
     // the section below hides while either top search (stock, or the warehouses' lists) shows results
     $('app')?.classList.toggle('searching', on || ($('gwQ') ? $('gwQ').value.trim().length >= 2 : false));
     if (!on) { $('gsItems').innerHTML = ''; return sayTop(''); }
-    if (!rows.length) { $('gsItems').innerHTML = ''; return sayTop(loading ? 'بيحمّل الرصيد…' : failText, failText ? 'bad' : ''); }
+    // never an empty box under the search: loading, the error, or «nothing recorded yet»
+    if (!rows.length) { $('gsItems').innerHTML = ''; return sayTop(loading ? 'بيحمّل الرصيد…' : failText || 'مفيش رصيد متسجّل لسه.', failText ? 'bad' : ''); }
     const hits = search(q, rows, 20);
     sayTop(hits.length ? $('stAge').textContent : 'مفيش صنف عليه رصيد بالاسم ده');
     $('gsItems').innerHTML = hits.map(card).join('');
@@ -159,8 +160,9 @@
   }
   $('stQ')?.addEventListener('input', draw);
   $('gsQ')?.addEventListener('input', () => {
-    drawTop();
+    // start loading first, so the box says «بيحمّل الرصيد…» right away
     if ($('gsQ').value.trim().length >= 2 && !rows.length && !loading) open();
+    drawTop();
   });
   $('gsClear')?.addEventListener('click', () => { closeSearch(); $('gsQ').focus(); });
   root.AskerStock = { open, closeSearch };
