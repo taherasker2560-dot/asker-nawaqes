@@ -58,16 +58,27 @@
     if (!isFinite(x)) return '';
     return (Math.round(x * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
-  function canAdd(it) {
-    return !!it && it.status === 'available' && Number(it.price) > 0 && !it.needs_rx;
+  // «بالطلب» (مفيش رصيد، الصيدلية بتجيبه): بيتطلب من غير سعر، والسعر بيتأكد مع الزبون يوم الطلب (قرار 2026-11-10)
+  function onOrder(it) {
+    return !!it && it.status === 'on_order';
   }
-  // السلة: [{id, name, arabic_name, price, qty}]
+  function canAdd(it) {
+    return !!it && !it.needs_rx && ((it.status === 'available' && Number(it.price) > 0) || it.status === 'on_order');
+  }
+  // السلة: [{id, name, arabic_name, price, qty, on_order}] (price = null للصنف اللي بالطلب)
   function cartAdd(cart, it) {
     const c = cart.map((x) => ({ ...x }));
     const f = c.find((x) => x.id === it.id);
     if (f) f.qty = Math.min(MAX_QTY, f.qty + 1);
-    else if (c.length < MAX_LINES) c.push({ id: it.id, name: it.name, arabic_name: it.arabic_name || null, price: Number(it.price), qty: 1 });
+    else if (c.length < MAX_LINES) {
+      const later = onOrder(it);
+      c.push(later ? { id: it.id, name: it.name, arabic_name: it.arabic_name || null, price: null, qty: 1, on_order: true }
+                    : { id: it.id, name: it.name, arabic_name: it.arabic_name || null, price: Number(it.price), qty: 1 });
+    }
     return c;
+  }
+  function cartLater(cart) {
+    return cart.filter((x) => x.on_order).length;
   }
   function cartSet(cart, id, qty) {
     return cart.map((x) => (x.id === id ? { ...x, qty: Math.min(MAX_QTY, qty) } : { ...x })).filter((x) => x.qty > 0);
@@ -126,7 +137,7 @@
     if (cat === 'cosmetic') return 'tube';
     return 'box';
   }
-  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, canAdd, cartAdd, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -201,9 +212,9 @@
     const inCart = cart.find((x) => x.id === it.id);
     let action = '';
     if (canAdd(it)) {
-      action = `<button type="button" class="add" data-add="${it.id}">${inCart ? 'في السلة (' + inCart.qty + ') +' : 'ضيف للسلة'}</button>`;
-    } else if (it.status === 'on_order') {
-      action = `<span class="hint-sm">ممكن نجيبهولك: اكتبه في ملاحظات الطلب</span>`;
+      action = `<button type="button" class="add" data-add="${it.id}">${inCart ? 'في السلة (' + inCart.qty + ') +' : onOrder(it) ? 'اطلبه' : 'ضيف للسلة'}</button>`;
+    } else if (onOrder(it)) {
+      action = `<span class="hint-sm">بالروشتة: ابعت صورة الروشتة</span>`;
     }
     return `<article class="item">
       ${thumb(it)}
@@ -213,7 +224,7 @@
         <span class="badge ${st.cls}">${st.label}</span>
       </div>
       <div class="item-side">
-        <span class="price">${canAdd(it) ? money(it.price) + ' ج' : '—'}</span>
+        <span class="price${onOrder(it) ? ' later' : ''}">${onOrder(it) ? 'السعر يوم الطلب' : canAdd(it) ? money(it.price) + ' ج' : '—'}</span>
         ${action}
       </div>
     </article>`;
@@ -339,14 +350,18 @@
     }
     box.innerHTML = cart.map((x) => `<article class="item cart-line">
       <div class="item-text"><h3 dir="ltr">${esc(x.name)}</h3>${x.arabic_name ? `<p class="ar">${esc(x.arabic_name)}</p>` : ''}
-        <span class="hint-sm">${money(x.price)} ج للواحدة</span></div>
+        <span class="hint-sm">${x.on_order ? 'بالطلب · السعر يتأكد معاك على واتساب' : money(x.price) + ' ج للواحدة'}</span></div>
       <div class="qty">
         <button type="button" data-qty="${x.id}" data-d="1" aria-label="زوّد واحدة">+</button>
         <span>${x.qty}</span>
         <button type="button" data-qty="${x.id}" data-d="-1" aria-label="${x.qty > 1 ? 'قلّل واحدة' : 'شيله من السلة'}">−</button>
       </div></article>`).join('');
-    $('sumItems').textContent = money(cartTotal(cart)) + ' ج';
-    $('sumTotal').textContent = money(cartTotal(cart)) + ' ج';
+    const later = cartLater(cart);
+    const sum = later && later === cart.length ? '—' : money(cartTotal(cart)) + ' ج';
+    $('sumItems').textContent = sum;
+    $('sumTotal').textContent = sum;
+    $('sumLater').hidden = !later;
+    $('sumLater').textContent = later ? `+ ${later} صنف بالطلب، سعره هيتأكد معاك على واتساب` : '';
   }
   function say(t, bad) {
     const el = $('formMsg');
@@ -380,13 +395,14 @@
         items: (data.items || []).map((x) => ({ id: x.id, name: x.name, qty: x.qty })),
       });
       store.set('asker_store_orders', myOrders);
-      const onlyRx = !cart.length;
+      const onlyRx = !cart.length, later = (data.items || []).filter((x) => x.on_order).length;
       cart = []; saveCart();
       rxFiles.forEach((r) => r.url && URL.revokeObjectURL(r.url)); rxFiles = []; drawRx();
       $('cNotes').value = '';
       $('doneText').textContent = onlyRx
         ? `طلب الروشتة رقم ${data.order_id} وصلنا. هنقرا الروشتة ونكلمك بالأسعار.`
-        : `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + (data.rx ? '، ومعاه الروشتة' : '') + '.';
+        : `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + (data.rx ? '، ومعاه الروشتة' : '') + '.'
+          + (later ? ` و${later} صنف بالطلب، هنكلمك بسعرهم وميعادهم.` : '');
       say('');
       location.hash = 'done';
     } catch (err) {

@@ -26,7 +26,11 @@ assert.equal(S.normPhone('02123456789'),null);
 assert.equal(S.money(91.5),'91.5');assert.equal(S.money(1234),'1,234');assert.equal(S.money('x'),'');
 assert.equal(S.canAdd({status:'available',price:75,needs_rx:false}),true);
 assert.equal(S.canAdd({status:'available',price:null,needs_rx:false}),false,'no price');
-assert.equal(S.canAdd({status:'on_order',price:75,needs_rx:false}),false);
+assert.equal(S.canAdd({status:'on_order',price:null,needs_rx:false}),true,'on order: asked for, priced on the order day');
+assert.equal(S.canAdd({status:'on_order',price:null,needs_rx:true}),false,'on order but prescription');
+assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:false}),false,'general shortage');
+{let o=S.cartAdd([],{id:7,name:'L',status:'on_order',price:null});o=S.cartAdd(o,{id:8,name:'M',status:'available',price:4});
+ assert.equal(o[0].price,null);assert.equal(o[0].on_order,true);assert.equal(o[1].on_order,undefined);assert.equal(S.cartTotal(o),4,'on-order lines add nothing to the total');assert.equal(S.cartLater(o),1);}
 assert.equal(S.canAdd({status:'available',price:75,needs_rx:true}),false,'prescription');
 
 // cart: add, add again, change, remove, limits
@@ -53,7 +57,8 @@ assert.deepEqual(S.rememberOrder(null,{id:1}),[{id:1}]);
 // «اطلب تاني»: what is still in stock goes back to the cart with the same quantity, the rest is named
 const plan=S.reorderPlan([{id:1,name:'A',qty:2},{id:2,name:'B',qty:1},{id:3,name:'C',qty:50}],
  [{id:1,status:'available',price:10,needs_rx:false},{id:2,status:'on_order',price:null,needs_rx:false},{id:3,status:'available',price:5,needs_rx:false}]);
-assert.deepEqual(plan.add.map(a=>[a.item.id,a.qty]),[[1,2],[3,20]]);assert.deepEqual(plan.missing,['B']);
+assert.deepEqual(plan.add.map(a=>[a.item.id,a.qty]),[[1,2],[2,1],[3,20]],'on order is asked for again');assert.deepEqual(plan.missing,[]);
+assert.deepEqual(S.reorderPlan([{id:4,name:'D',qty:1}],[{id:4,status:'unavailable',price:null,needs_rx:false}]).missing,['D'],'general shortage');
 assert.deepEqual(S.reorderPlan([{id:9,name:'Z',qty:1}],[]).missing,['Z'],'item gone from the site');
 assert.deepEqual(Object.keys(S.ORDER_STATUS),['new','confirmed','done','cancelled'],'same statuses as ar_store_orders');
 assert.ok(S.errorText('closed')!==S.errorText('x'),'closed has words');

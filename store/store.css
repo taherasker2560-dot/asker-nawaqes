@@ -205,3 +205,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .thumb.icon { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
 .thumb.icon svg { width: 34px; height: 34px; stroke-width: 1.6; }
 @media (min-width: 760px) { .thumb { width: 84px; height: 84px; } }
+
+/* «بالطلب»: السعر بيتأكد يوم الطلب (2026-11-10) */
+.price.later { font-size: 12px; font-weight: 600; color: var(--order); white-space: normal; text-align: center; }
+.later-note { display: block; color: var(--order); margin-top: 4px; }
