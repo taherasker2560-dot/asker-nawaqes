@@ -19,9 +19,10 @@ function fake({chats=[GROUP],media=[],inboxFiles=[]}={}){const calls=[],docs=[],
    if(m==='DELETE')return new Response('',{status:204});
    if(m==='PATCH')return new Response('[]');
    const sup=decodeURIComponent((url.match(/supplier=eq\.([^&]+)/)||[])[1]||'');
-   if(url.includes('select=note'))return new Response(JSON.stringify(media.filter(x=>x.supplier===sup).slice(-1).map(x=>({note:x.note,at:x.at}))));
+   const noteEq=decodeURIComponent((url.match(/[?&]note=eq\.([^&]+)/)||[])[1]||'');
+   if(url.includes('select=note'))return new Response(JSON.stringify(media.filter(x=>x.supplier===sup&&(!noteEq||x.note===noteEq)).slice(-1).map(x=>({note:x.note,at:x.at}))));
    if(url.includes('select=at&'))return new Response(JSON.stringify(media.filter(x=>x.supplier===sup&&x.fresh!==false).slice(-1).map(x=>({at:x.at}))));
-   return page(url,media.map(x=>({supplier:x.supplier,fresh:x.fresh})))}
+   return page(url,media.map(x=>({supplier:x.supplier,fresh:x.fresh,note:x.note})))}
   if(url.includes('/rest/v1/ar_documents')){
    if(m==='POST'){const row=JSON.parse(o.body);if(docs.some(d=>d.file_path===row.file_path))return new Response('{}',{status:409});docs.push(row);return new Response('',{status:201})}
    const h=(url.match(/file_path=like\.\*([0-9a-f]+)\*/)||[])[1];return new Response(JSON.stringify(docs.filter(d=>h&&d.file_path.includes(h)).map(()=>({id:'d'}))))}
@@ -102,5 +103,61 @@ assert.equal(r.status,200);assert.equal(f.gemini(),1);assert.equal(f.saved.lengt
 f=fake({chats:[]});r=await F.handle(post(from(TITLE),'📷 صورة','text/plain'),env,f);assert.equal(r.status,200);assert.equal((await r.json()).ignored,true);
 {const g=fake();const h=(u,o)=>u.includes('/rest/v1/ar_doc_chats')?Promise.reject(Error('no table')):g(u,o);
  r=await F.handle(post(from(COMPANY,'&say=1'),'📷 صورة','text/plain'),env,h);assert.equal(r.status,202,'a company photo notification still works');}
+// 9) whose photo, by time (live 2026-11-10: a customer's prescription and another chat's photo, saved 90 and 115 s
+// after the group's one photo, were kept as the group's). Real photos came 10 s before to 13 s after their message.
+{const sec=(ms)=>Math.floor(ms/1000),W=Date.now()-60e3;
+ // how many photos a notification announces
+ assert.equal(F.photoCount('📷 \u200fتم إرسال صورة'),1);assert.equal(F.photoCount(GROUP+': صيدلية ~w1 📷 مخمرية 🌹📢'),1,'a photo with its caption');
+ assert.equal(F.photoCount('📷 تم إرسال صورتين'),2);assert.equal(F.photoCount('📷 \u200fتم إرسال ١٥ صور'),15);assert.equal(F.photoCount('📷 تم ارسال 4 صور'),4);
+ assert.equal(F.photoCount('📄 فاتورة.pdf'),1);assert.equal(F.photoCount('تمام يا دكتور'),0,'no photo sign: not known');
+ assert.equal(F.noteWhen('x ~w1794342634000 📷'),1794342634000);assert.equal(F.noteWhen('x ~w1794342634 y'),1794342634000,'seconds too');assert.equal(F.noteWhen('none'),0);
+ // the rule itself
+ assert.equal(F.fileOwner(String(sec(W+2e3)),W,true,[]),'own');assert.equal(F.fileOwner(String(sec(W+90e3)),W,true,[]),'far','one photo: 90 s after is not it');
+ assert.equal(F.fileOwner(String(sec(W+90e3)),W,false,[]),'own','an album downloads for a minute or two');
+ assert.equal(F.fileOwner(String(sec(W-25e3)),W,true,[]),'own','several photos: the message time is the newest one');
+ assert.equal(F.fileOwner(String(sec(W+70e3)),W,false,[W+69e3]),'other','another chat\'s photo message is clearly nearer');
+ assert.equal(F.fileOwner(String(sec(W+20e3)),W,true,[W+19e3]),'unsure','another chat\'s photo is nearer but this one is close too');
+ assert.equal(F.fileOwner(String(sec(W+2e3)),W,true,[W+30e3]),'own','this chat\'s message is clearly nearer');
+ assert.equal(F.fileOwner(String(sec(W+5e3)),W,true,[W+9e3]),'unsure','about as near');
+ assert.equal(F.fileOwner(null,W,true,[W]),'unknown');assert.equal(F.fileOwner(String(sec(W)),0,true,[]),'unknown');
+ assert.equal(F.nearestPhoto(String(sec(W+6e3)),[{when:W,s:'a'},{when:W+5e3,s:'b'},{when:W+200e3,s:'c'}]).s,'b');assert.equal(F.nearestPhoto(String(sec(W+100e3)),[{when:W}]),null);
+
+ // the group's message of one photo: the photo saved a second later is kept, the photos 90 and 115 s later are not
+ f=fake();r=await F.handle(post(from(TITLE+' ~w'+W,'&say=1'),'📷 \u200fتم إرسال صورة','text/plain'),env,f);assert.equal(r.status,202);
+ r=await F.handle(post(from(TITLE+' ~w'+W,'&mod='+sec(W+1e3)),jpg(21),'image/jpeg'),env,f);assert.equal(f.docs.length,1,'the group\'s photo');assert.equal(f.docs[0].handled_note,undefined);
+ r=await F.handle(post(from(TITLE+' ~w'+W,'&mod='+sec(W+90e3)),jpg(22),'image/jpeg'),env,f);assert.equal((await r.json()).other,true);
+ r=await F.handle(post(from(TITLE+' ~w'+W,'&mod='+sec(W+115e3)),jpg(23),'image/jpeg'),env,f);assert.equal(f.docs.length,1,'other chats\' photos are not kept');assert.equal(f.files.length,1);
+ // an album keeps its photos for a minute or two, as before
+ const A=W+5e3;r=await F.handle(post(from(TITLE+' ~w'+A),'📷 \u200fتم إرسال ٥ صور','text/plain'),env,f);assert.equal(r.status,202);
+ r=await F.handle(post(from(TITLE+' ~w'+A,'&mod='+sec(A+90e3)),jpg(24),'image/jpeg'),env,f);assert.equal(f.docs.length,2,'a late page of an album');
+
+ // 10) another chat's photo: the phone sends only its message time (no name, no text); kept once, nothing said
+ f=fake();const O=W+300e3;r=await F.handle(post('other=1&say=1&'+from('~w'+O),'','text/plain'),env,f);assert.equal(r.status,200);assert.equal(await r.text(),'');
+ assert.equal(f.media.length,1);assert.equal(f.media[0].supplier,F.OTHER_CHAT);assert.equal(f.media[0].note,'~w'+O);assert.equal(f.media[0].fresh,false);
+ r=await F.handle(post('other=1&'+from('~w'+O),'','text/plain'),env,f);assert.equal(f.media.length,1,'WhatsApp shows it again: kept once');
+ r=await F.handle(post('other=1&'+from('no time'),'','text/plain'),env,f);assert.equal(f.media.length,1,'no time: nothing kept');
+ assert.equal(f.calls.some(c=>c.url.includes('ar_suppliers')||c.url.includes('ar_doc_chats')),false,'no chat lookup');
+ r=await F.handle(new Request('https://p.supabase.co/functions/v1/arabic-shortages?other=1&'+from('~w'+O),{method:'POST',headers:{'x-inbox-key':'b'.repeat(64)},body:''}),env,f);assert.equal(r.status,401,'still needs the phone key');
+ // the group's album and another chat's photo a minute later: the photo at that second is the other chat's (not kept);
+ // a photo near both is kept, marked for a look
+ const B=O-60e3;r=await F.handle(post(from(TITLE+' ~w'+B),'📷 \u200fتم إرسال ٥ صور','text/plain'),env,f);
+ r=await F.handle(post(from(TITLE+' ~w'+B,'&mod='+sec(B+61e3)),jpg(25),'image/jpeg'),env,f);assert.equal(f.docs.length,0,'the other chat\'s photo');
+ r=await F.handle(post('other=1&'+from('~w'+(B+22e3)),'','text/plain'),env,f);
+ r=await F.handle(post(from(TITLE+' ~w'+B,'&mod='+sec(B+20e3)),jpg(26),'image/jpeg'),env,f);assert.equal(f.docs.length,1);assert.match(f.docs[0].handled_note,/مش متأكد/);
+
+ // 11) a company's run: a customer's photo (another chat's photo message at its second) is not read as the list
+ f=fake();const C=W+600e3;
+ r=await F.handle(post(from(COMPANY+' ~w'+C,'&say=1'),'📷 صورة','text/plain'),env,f);assert.equal(r.status,202);
+ r=await F.handle(post('other=1&'+from('~w'+(C+100e3)),'','text/plain'),env,f);
+ r=await F.handle(post(from(COMPANY+' ~w'+C,'&say=1&mod='+sec(C+101e3)),jpg(31),'image/jpeg'),env,f);
+ assert.equal(r.status,200);assert.equal(await r.text(),'','nothing said');assert.equal(f.gemini(),0,'not read');assert.equal(f.saved.length,0);assert.equal(f.docs.length,0);
+ // its own photo is read as before
+ r=await F.handle(post(from(COMPANY+' ~w'+C,'&mod='+sec(C+2e3)),jpg(32),'image/jpeg'),env,f);assert.equal(f.gemini(),1);assert.equal(f.saved.length,1);assert.equal(f.saved[0].supplier,COMPANY);assert.equal(f.saved[0].maybe,null,'other chats never in «maybe»');
+ // a company's run gets the documents group's photo (the group's message at its second): kept as the group's document
+ const D=C+400e3;r=await F.handle(post(from(TITLE+' ~w'+D),'📷 \u200fتم إرسال صورة','text/plain'),env,f);
+ r=await F.handle(post(from(COMPANY+' ~w'+C,'&mod='+sec(D+1e3)),jpg(33),'image/jpeg'),env,f);assert.equal(f.docs.length,1);assert.equal(f.docs[0].chat,GROUP);assert.equal(f.gemini(),1,'not read');
+ // a late photo near nobody's message: decided as before (read as the company's)
+ r=await F.handle(post(from(COMPANY+' ~w'+C,'&mod='+sec(C+150e3)),jpg(34),'image/jpeg'),env,f);assert.equal(f.saved.length,2);}
+
 console.log('inbox-docs ok');
 })().catch(e=>{console.error(e);process.exit(1)});

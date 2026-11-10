@@ -290,6 +290,20 @@ const SEEN_NOTE_MS = 5 * 60 * 1000;
 // a photo not downloaded this long after its notification: WhatsApp's repeats stop making the phone check the folder
 // (it checked every minute and a half for over an hour once); the owner shares it by hand
 const STOP_LOOKING_MS = 15 * 60 * 1000;
+// whose photo, by time (live 2026-11-09/10): a real photo was saved on the phone 10 s before to 13 s after its
+// message's time, while other chats' photos that the 3-minute window took as the group's were 64 to 115 s after the
+// group's one photo. So a message of one photo («📷 تم إرسال صورة», a photo with its caption) keeps only the photos saved
+// this close to it. An album («📷 تم إرسال ١٥ صور») downloads over a minute or two, so it keeps the wide window.
+const ONE_PHOTO_BEFORE_MS = 30 * 1000, ONE_PHOTO_AFTER_MS = 40 * 1000;
+// another chat's photo message this much nearer to the photo's time than this chat's message decides against it
+const NEARER_MS = 8 * 1000;
+// the photo messages looked at around a photo (its time is at most ~16 minutes old when the phone sends it)
+const PHOTO_TIMES_MS = 20 * 60 * 1000;
+// a chat that is neither a company nor the documents group: only its photo messages' times are kept (ar_inbox_media),
+// never its name or text, so a photo saved at that time is not taken as a company's list or a document
+export const OTHER_CHAT = '~other';
+// shown under a document kept although another chat's photo came at about the same second (Claude looks at it)
+const UNSURE_DOC = 'مش متأكد إنها من الجروب: جت صورة من شات تاني في نفس الثواني';
 // a photo notification's run waits 20 s and checks the folder twice (about a minute): WhatsApp's repeats in that time
 // start no run of their own (they piled up in Tasker's queue and new messages were dropped)
 const LOOKING_MS = 90 * 1000;
@@ -496,7 +510,7 @@ type DocCtx = {
 // keeps one photo/PDF as a document (its name is its content hash, so the phone's re-sends are kept once).
 // notCompanys: the phone sends the newest photos of its shared folder, so a group's run also sends photos a company
 // sent minutes ago; a photo already kept as a company's message (ar_inbox) is that company's, not a document.
-async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<string, string>, bytes: Uint8Array, kind: 'image' | 'pdf', chat: string, notCompanys = false): Promise<'saved' | 'duplicate' | 'company' | 'error'> {
+async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<string, string>, bytes: Uint8Array, kind: 'image' | 'pdf', chat: string, notCompanys = false, handledNote = ''): Promise<'saved' | 'duplicate' | 'company' | 'error'> {
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
   const filePath = `docs/${new Date().toISOString().slice(0, 10)}/${hash}.${kind === 'pdf' ? 'pdf' : 'jpg'}`;
   if (notCompanys) {
@@ -510,7 +524,9 @@ async function saveDocument(fetchImpl: typeof fetch, base: string, sh: Record<st
   const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': kind === 'pdf' ? 'application/pdf' : 'image/jpeg' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
   // stored a moment ago by another run of the same photo: that run saves the row
   if (!up.ok && !/duplicate|exists/i.test(await up.text().catch(() => ''))) return 'error';
-  const ins = await fetchImpl(`${base}/rest/v1/ar_documents`, { method: 'POST', body: JSON.stringify({ source: 'whatsapp', chat, file_path: filePath, kind }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const row: Record<string, string> = { source: 'whatsapp', chat, file_path: filePath, kind };
+  if (handledNote) row.handled_note = handledNote;
+  const ins = await fetchImpl(`${base}/rest/v1/ar_documents`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (ins.status === 409) return 'duplicate';
   return ins.ok ? 'saved' : 'error';
 }
@@ -521,6 +537,63 @@ export function nearMessage(modParam: string | null, whenMs: number): boolean {
   if (!modParam || !Number.isFinite(mod) || mod <= 0 || !whenMs) return true;
   const modMs = mod < 1e12 ? mod * 1000 : mod;
   return modMs >= whenMs - 60 * 1000 && modMs <= whenMs + 180 * 1000;
+}
+// how many photos/files one notification announces: «📷 تم إرسال صورة» or a photo with its caption = 1, «تم إرسال صورتين»
+// = 2, «تم إرسال ١٥ صور» = 15; no photo sign (a text, an unknown wording) = 0 (not known)
+export function photoCount(text: string): number {
+  const m = String(text || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '').match(/(\u{1F4F7}|\u{1F4C4}|\u{1F5BC}|\u{1F4CE})\s*(.*)$/su);
+  if (!m) return 0;
+  if (/صورتين|مستندين|ملفين/u.test(m[2])) return 2;
+  const n = m[2].match(/^(?:تم\s*[إا]رسال\s*)?([0-9٠-٩]+)\s*(?:صور|صورة|مستند|مستندات|ملف|ملفات|photos?|files?|documents?)/iu);
+  return n ? Number(n[1].replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660))) : 1;
+}
+// the message time a notification note carries («… ~w<ms> …»), in ms; 0 when it has none
+export function noteWhen(note: string | null | undefined): number {
+  const m = String(note || '').match(/~w(\d{9,14})/);
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return n < 1e12 ? n * 1000 : n;
+}
+// whose photo, by its own time (&mod=) and the photo messages around it: 'own' this chat's; 'unsure' another chat's
+// photo message is about as near; 'other' another chat's is clearly nearer and this message is not close; 'far'
+// outside this message's time; 'unknown' without the times (an older phone setup: taken as before). single: this
+// message announced one photo (short window), else an album or not known (wide window, as before).
+export function fileOwner(modParam: string | null, whenMs: number, single: boolean, others: number[]): 'own' | 'unsure' | 'other' | 'far' | 'unknown' {
+  const mod = Number(modParam);
+  if (!modParam || !Number.isFinite(mod) || mod <= 0 || !whenMs) return 'unknown';
+  const modMs = mod < 1e12 ? mod * 1000 : mod;
+  const close = (w: number) => modMs >= w - ONE_PHOTO_BEFORE_MS && modMs <= w + ONE_PHOTO_AFTER_MS;
+  if (single ? !close(whenMs) : !nearMessage(modParam, whenMs)) return 'far';
+  const own = Math.abs(modMs - whenMs);
+  const near = others.filter((w) => w > 0 && close(w)).map((w) => Math.abs(modMs - w));
+  if (!near.length) return 'own';
+  const best = Math.min(...near);
+  if (best + NEARER_MS <= own) return close(whenMs) ? 'unsure' : 'other';
+  return own + NEARER_MS <= best ? 'own' : 'unsure';
+}
+// of these photo messages, the one nearest to a photo's time (&mod=) within the short window; null when none
+export function nearestPhoto<T extends { when: number }>(modParam: string | null, times: T[]): T | null {
+  const mod = Number(modParam);
+  if (!modParam || !Number.isFinite(mod) || mod <= 0) return null;
+  const modMs = mod < 1e12 ? mod * 1000 : mod;
+  let best: T | null = null, gap = Infinity;
+  for (const t of times) {
+    const g = Math.abs(modMs - t.when);
+    if (t.when > 0 && modMs >= t.when - ONE_PHOTO_BEFORE_MS && modMs <= t.when + ONE_PHOTO_AFTER_MS && g < gap) { best = t; gap = g; }
+  }
+  return best;
+}
+// the photo/file notifications of the last minutes (all chats: companies, the documents group, other chats' times)
+async function photoTimes(fetchImpl: typeof fetch, base: string, sh: Record<string, string>): Promise<{ supplier: string; when: number; count: number }[]> {
+  const since = encodeURIComponent(new Date(Date.now() - PHOTO_TIMES_MS).toISOString());
+  const got = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=supplier,note&at=gte.${since}&order=at.desc&limit=500`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) })
+    .then((r) => r.ok ? r.json() : []).catch(() => []) as { supplier: string; note: string | null }[];
+  return (Array.isArray(got) ? got : []).map((n) => ({ supplier: n.supplier, when: noteWhen(n.note), count: photoCount(n.note || '') })).filter((n) => n.when > 0);
+}
+// this chat's message at whenMs announced exactly one photo (every note of it says so)
+function onePhoto(times: { supplier: string; when: number; count: number }[], chat: string, whenMs: number): boolean {
+  const mine = times.filter((t) => t.supplier === chat && t.when === whenMs);
+  return mine.length > 0 && mine.every((t) => t.count === 1);
 }
 async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: DocCtx): Promise<Response> {
   const { base, sh, out, say } = c;
@@ -556,11 +629,15 @@ async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: Do
   if (kind !== 'image' && kind !== 'pdf') return out(200, { ok: false, ignored: true, docs: true, say: '' }, say);
   if (!bytes.length) return out(400, { error: 'empty', message: 'الرسالة فاضية' }, say);
   if (bytes.length > MAX_IMAGE_BYTES) return out(413, { error: 'size', message: 'الملف أكبر من ٨ ميجا' }, say);
-  // the phone sends every photo of the last 3 minutes, from any chat. With the photo's own time (&mod=, seconds, from
-  // Tasker's Test File) only a photo saved around the group message's time (~w) is the group's
-  if (!nearMessage(url.searchParams.get('mod'), c.whenMs)) return out(200, { ok: false, docs: true, other: true, say: '' }, say);
-  const r = await saveDocument(fetchImpl, base, sh, bytes, kind, c.chat, true);
-  log('inbox-doc', Date.now(), { kind, result: r });
+  // the phone sends every new photo of its folder, from any chat. With the photo's own time (&mod=, seconds, from
+  // Tasker's Test File) only a photo saved around the group message's time (~w) is the group's: close to it for a
+  // message of one photo, and not when another chat's photo message is clearly nearer (live 2026-11-10: a customer's
+  // prescription and another chat's photo were kept as the group's). About as near: kept, marked for a look.
+  const times = await photoTimes(fetchImpl, base, sh);
+  const who = fileOwner(url.searchParams.get('mod'), c.whenMs, onePhoto(times, c.chat, c.whenMs), times.filter((t) => t.supplier !== c.chat).map((t) => t.when));
+  if (who === 'other' || who === 'far') { log('inbox-doc', Date.now(), { kind, result: 'not-group', owner: who }); return out(200, { ok: false, docs: true, other: true, far: who === 'far', say: '' }, say); }
+  const r = await saveDocument(fetchImpl, base, sh, bytes, kind, c.chat, true, who === 'unsure' ? UNSURE_DOC : '');
+  log('inbox-doc', Date.now(), { kind, result: r, owner: who });
   if (r === 'error') return out(502, { error: 'save', docs: true, message: 'الصورة ماتحفظتش' }, say);
   if (r === 'company') return out(200, { ok: false, docs: true, company: true, say: '' }, say);
   return out(200, { ok: true, docs: true, duplicate: r === 'duplicate', say: '' }, say);
@@ -585,6 +662,18 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   const rawFrom = String(url.searchParams.get('from') || ''), wm = rawFrom.match(/\s*~w(\S*)\s*$/);
   const fromParam = wm ? rawFrom.slice(0, wm.index) : rawFrom;
   const whenNum = wm && /^\d{9,14}$/.test(wm[1]) ? Number(wm[1]) : 0, whenMs = whenNum && whenNum < 1e12 ? whenNum * 1000 : whenNum;
+  // another chat announced a photo (the phone sends this for chats that are not saved companies nor the documents
+  // group, with only «~w<time>», no name, no text): its time is kept (once) so a photo saved then is not taken as a
+  // company's list or a document
+  if (url.searchParams.get('other') === '1') {
+    if (whenMs) {
+      const note = '~w' + whenMs, signal = AbortSignal.timeout(TIMEOUT_MS);
+      const seen = await fetchImpl(`${base}/rest/v1/ar_inbox_media?select=note&supplier=eq.${encodeURIComponent(OTHER_CHAT)}&note=eq.${encodeURIComponent(note)}&limit=1`, { headers: sh, signal })
+        .then((r) => r.ok ? r.json() : []).catch(() => []) as { note: string }[];
+      if (!Array.isArray(seen) || !seen.length) await fetchImpl(`${base}/rest/v1/ar_inbox_media`, { method: 'POST', body: JSON.stringify({ supplier: OTHER_CHAT, chat: OTHER_CHAT, note, fresh: false }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal }).catch(() => null);
+    }
+    return out(200, { ok: true, other: true, say: '' }, say);
+  }
   const from = inboxSender(fromParam), fileName = (url.searchParams.get('name') || '').split(/[\\/]/).pop()!.slice(-120);
   const suppliers = await restAll<{ name: string; phone: string | null }>(env, auth, fetchImpl, 'ar_suppliers?select=name,phone&order=name');
   // the pharmacy's own documents group: checked first (a group title also holds the sender's name); its photos are
@@ -677,10 +766,28 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
       return out(200, { ok: false, duplicate: true, say: old ? seenSay(company.name, what, await today()) : '' }, say);
     }
   }
+  // whose photo by time (the phone's folder is shared by every chat): when this company's message is not close to the
+  // photo's time and another chat's photo message is, the photo is that chat's: the documents group's is kept as its
+  // document, a customer's (or another company's, which its own run reads) is not read here. Not close to anyone's
+  // (a late download): decided as before.
+  if ((kind === 'image' || kind === 'pdf') && whenMs) {
+    const times = await photoTimes(fetchImpl, base, sh), rivals = times.filter((t) => t.supplier !== company.name), mod = url.searchParams.get('mod');
+    const who = fileOwner(mod, whenMs, onePhoto(times, company.name, whenMs), rivals.map((t) => t.when));
+    const theirs = who === 'other' || who === 'far' ? nearestPhoto(mod, rivals) : null;
+    if (theirs && docNames.has(theirs.supplier)) {
+      const r = await saveDocument(fetchImpl, base, sh, bytes, kind, theirs.supplier);
+      log('inbox-doc', Date.now(), { kind, result: r, via: 'time' });
+      return out(200, { ok: r !== 'error', docs: true, duplicate: r === 'duplicate', say: '' }, say);
+    }
+    if (theirs) {
+      log('inbox-other', Date.now(), { kind, owner: who, theirs: theirs.supplier === OTHER_CHAT ? 'other-chat' : 'company' });
+      return out(200, { ok: false, other: true, say: '' }, say);
+    }
+  }
   // the phone's photo folder is shared with the documents group: a photo that comes while only that group announced
   // photos just now (no fresh notification from any company) is the group's document, not this company's list
   if ((kind === 'image' || kind === 'pdf') && docNames.size) {
-    const notes = await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []);
+    const notes = (await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => [])).filter((n) => n.supplier !== OTHER_CHAT);
     const freshDoc = notes.find((n) => n.fresh !== false && docNames.has(n.supplier));
     if (freshDoc && !notes.some((n) => n.fresh !== false && !docNames.has(n.supplier))) {
       const r = await saveDocument(fetchImpl, base, sh, bytes, kind, freshDoc.supplier);
@@ -746,7 +853,7 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (kind !== 'text') {
     // the documents group's notifications never make a photo a company's (nor add the group to «maybe»)
     const notes = (await restAll<{ supplier: string; fresh: boolean | null }>(env, auth, fetchImpl, 'ar_inbox_media?select=supplier,fresh&at=gte.' + since(MEDIA_WINDOW_MS)).catch(() => []))
-      .filter((n) => !docNames.has(n.supplier));
+      .filter((n) => !docNames.has(n.supplier) && n.supplier !== OTHER_CHAT);
     const fresh = [...new Set(notes.filter((n) => n.fresh !== false).map((n) => n.supplier))];
     const names = fresh.length ? fresh : [...new Set([company.name, ...notes.map((n) => n.supplier)])];
     if (names.length > 1) maybe = names.sort(); else supplier = names[0];
