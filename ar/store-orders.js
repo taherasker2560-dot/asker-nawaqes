@@ -29,12 +29,14 @@
         'نأكد الطلب؟',
       ].join('\n');
     }
-    const lines = (o.items || []).map((x) => `- ${x.name} × ${x.qty} = ${money(x.line_total)} ج`);
+    // الصنف «بالطلب» مالوش سعر: صاحب الصيدلية بيكتبه في الرسالة (2026-11-10)
+    const lines = (o.items || []).map((x) => (x.on_order ? `- ${x.name} × ${x.qty} = (بالطلب) ج` : `- ${x.name} × ${x.qty} = ${money(x.line_total)} ج`));
+    const later = (o.items || []).some((x) => x.on_order);
     return [
       `أهلًا ${o.customer_name}، معاك صيدلية عسكر.`,
       `طلبك رقم ${o.id} وصلنا:`,
       ...lines,
-      `الإجمالي ${money(o.total)} جنيه، والدفع كاش عند الاستلام.`,
+      later ? `الإجمالي ${money(o.total)} جنيه + الأصناف اللي بالطلب، والدفع كاش عند الاستلام.` : `الإجمالي ${money(o.total)} جنيه، والدفع كاش عند الاستلام.`,
       'مصاريف التوصيل: ',
       'نأكد الطلب؟',
     ].join('\n');
@@ -59,7 +61,8 @@
   }
   let rxUrls = {};
   function card(o) {
-    const items = (o.items || []).map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)} <b>${esc(money(x.line_total))}</b></li>`).join('');
+    const items = (o.items || []).map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)} <b>${x.on_order ? 'بالطلب' : esc(money(x.line_total))}</b></li>`).join('');
+    const later = (o.items || []).filter((x) => x.on_order).length;
     const open = o.status === 'new' || o.status === 'confirmed';
     const rx = (o.rx_paths || []).map((p, i) => /\.pdf$/.test(p)
       ? `<a class="so-rx so-rx-pdf" href="${esc(rxUrls[p] || '#')}" target="_blank" rel="noopener">PDF</a>`
@@ -71,7 +74,7 @@
       ${o.notes ? `<span class="hint">ملاحظة: ${esc(o.notes)}</span>` : ''}
       ${rx ? `<div class="so-rxs"><span class="hint">${items ? 'ومعاه روشتة:' : 'طلب بالروشتة: اقراها واكتب الأسعار في رسالة الواتساب'}</span>${rx}</div>` : ''}
       ${items ? `<ul class="so-lines">${items}</ul>
-      <div class="so-total">الإجمالي ${esc(money(o.total))} ج (من غير التوصيل${rx ? ' والروشتة' : ''})</div>` : ''}
+      <div class="so-total">الإجمالي ${esc(money(o.total))} ج (من غير التوصيل${rx ? ' والروشتة' : ''}${later ? `، و${later} صنف بالطلب لسه من غير سعر` : ''})</div>` : ''}
       <div class="so-actions">
         <a class="so-wa" href="${esc(waLink(o.phone, confirmMessage(o)))}" target="_blank" rel="noopener">واتساب</a>
         ${o.status === 'new' ? `<button type="button" class="small" data-set="confirmed">اتأكد</button>` : ''}

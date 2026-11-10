@@ -19,5 +19,8 @@ assert.equal(O.money(1234.5),'1,234.5');
 // prescription-only order: the owner writes the medicines and prices himself
 const rxMsg=O.confirmMessage({id:13,customer_name:'منى',items:[],total:0,rx_paths:['rx/2026-11-09/a.jpg']});
 assert.ok(rxMsg.includes('الروشتة (طلب رقم 13) وصلتنا'));assert.ok(rxMsg.includes('مصاريف التوصيل: '));assert.ok(!rxMsg.includes('0 جنيه'));
+// on-order line (2026-11-10): no price, the owner writes it in the message
+const lo=O.confirmMessage({id:14,customer_name:'سارة',total:90,items:[{name:'PANADOL EXTRA',qty:2,price:45,line_total:90},{name:'KENACOMB 15GM CREAM',qty:1,price:null,line_total:null,on_order:true}]});
+assert.ok(lo.includes('- KENACOMB 15GM CREAM × 1 = (بالطلب) ج'));assert.ok(lo.includes('الإجمالي 90 جنيه + الأصناف اللي بالطلب'));assert.ok(!lo.includes('null'));
 assert.deepEqual(Object.keys(O.STATUS),['new','confirmed','done','cancelled'],'same statuses as ar_store_orders');
 console.log('store-orders ok');
