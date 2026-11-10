@@ -209,3 +209,12 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 /* «بالطلب»: السعر بيتأكد يوم الطلب (2026-11-10) */
 .price.later { font-size: 12px; font-weight: 600; color: var(--order); white-space: normal; text-align: center; }
 .later-note { display: block; color: var(--order); margin-top: 4px; }
+
+/* البدايل تحت الصنف اللي مش متوفر (2026-11-11) */
+.item.has-alts { flex-wrap: wrap; }
+.alts { flex-basis: 100%; margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--ok-bg); display: flex; flex-direction: column; gap: 6px; }
+.alts-h { font-size: 13px; font-weight: 700; color: var(--ok); }
+.alt { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.alt > span[dir] { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.alt-p { font-weight: 700; white-space: nowrap; }
+.add.sm { padding: 4px 10px; font-size: 12px; }
