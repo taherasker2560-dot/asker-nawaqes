@@ -159,6 +159,8 @@
   let myOrders = store.get('asker_store_orders', []);
   if (!Array.isArray(myOrders)) myOrders = [];
   let shown = [], popular = [], lastQuery = null, offset = 0, seq = 0, sending = false;
+  // البدايل: {id الصنف اللي مش متوفر: [أصناف متوفرة بنفس المادة الفعالة والتركيز والشكل]} (ar_store_alternatives، 2026-11-11)
+  let alts = {};
   let settings = { is_open: true };
   let rxFiles = []; // [{file, url}] صور الروشتة اللي الزبون اختارها (على الموبايل لحد ما يبعت)
   // صور الأصناف اللي صاحب الصيدلية وافق عليها: store/img/index.json = {id: "اسم الملف"}
@@ -216,7 +218,12 @@
     } else if (onOrder(it)) {
       action = `<span class="hint-sm">بالروشتة: ابعت صورة الروشتة</span>`;
     }
-    return `<article class="item">
+    const al = !canAdd(it) || it.status !== 'available' ? alts[it.id] || [] : [];
+    const altBox = al.length ? `<div class="alts"><span class="alts-h">بديل متوفر بنفس المادة الفعالة والتركيز:</span>
+      ${al.map((a) => `<div class="alt"><span dir="ltr">${esc(a.name)}</span><span class="alt-p">${money(a.price)} ج</span>
+        <button type="button" class="add sm" data-add="${a.id}">${cart.find((x) => x.id === a.id) ? 'في السلة +' : 'ضيف'}</button></div>`).join('')}
+      <span class="hint-sm">اتأكد مع الصيدلي قبل ما تغيّر الدوا</span></div>` : '';
+    return `<article class="item${altBox ? ' has-alts' : ''}">
       ${thumb(it)}
       <div class="item-text">
         <h3 dir="ltr">${esc(it.name)}</h3>
@@ -227,6 +234,7 @@
         <span class="price${onOrder(it) ? ' later' : ''}">${onOrder(it) ? 'السعر يوم الطلب' : canAdd(it) ? money(it.price) + ' ج' : '—'}</span>
         ${action}
       </div>
+      ${altBox}
     </article>`;
   }
   function drawList(more) {
@@ -275,8 +283,19 @@
     if (my !== seq) return;
     if (error) { $('resNote').textContent = 'مقدرتش أجيب الأصناف. اتأكد من النت وجرب تاني.'; return; }
     shown = append ? shown.concat(data || []) : data || [];
+    loadAlts((data || []).filter((x) => x.status !== 'available').map((x) => x.id));
     $('resNote').textContent = shown.length ? (q.title || `نتايج «${q.text}»`) : (q.text ? `مفيش حاجة باسم «${q.text}». جرب جزء من الاسم أو اكتبه إنجليزي.` : 'مفيش أصناف هنا دلوقتي.');
     drawList((data || []).length === PAGE);
+  }
+  // البدايل للأصناف اللي مش متوفرة في الصفحة دي (طلب واحد للصفحة كلها)
+  async function loadAlts(ids) {
+    const need = ids.filter((id) => !(id in alts)).slice(0, 40);
+    if (!need.length) return;
+    need.forEach((id) => { alts[id] = []; });
+    const { data, error } = await client.rpc('ar_store_alternatives', { p_ids: need });
+    if (error || !Array.isArray(data)) return;
+    for (const r of data) alts[r.id] = r.alts || [];
+    if (data.length) drawList(!$('more').hidden);
   }
   function search(text) {
     const terms = searchTerms(text);
@@ -473,7 +492,7 @@
     }
     const add = e.target.closest('[data-add]');
     if (add) {
-      const it = shown.concat(popular).find((x) => String(x.id) === add.dataset.add);
+      const it = shown.concat(popular, ...Object.values(alts)).find((x) => String(x.id) === add.dataset.add);
       if (it && canAdd(it)) {
         if (cart.length >= MAX_LINES && !cart.find((x) => x.id === it.id)) { $('resNote').textContent = 'السلة فيها 30 صنف، ودي أقصى حاجة في الطلب الواحد'; return; }
         cart = cartAdd(cart, it); saveCart(); drawList(!$('more').hidden);
