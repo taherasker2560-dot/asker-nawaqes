@@ -1,0 +1,88 @@
+// Migration 202611112300 (ar_sync_news one sentence): everything is updated every hour, and the phone says ONE sentence when it
+// is all done: «البوت اتحدث كله، لحد الساعة ...». A good list update is no longer said on its own; a refused one still warns.
+// Runs the migrations on an in-memory Postgres. Run with PGLITE_MODULE pointing to an installed @electric-sql/pglite package.
+const {PGlite}=require(process.env.PGLITE_MODULE || '@electric-sql/pglite');
+const fs=require('node:fs');
+const crypto=require('node:crypto');
+const assert=require('node:assert/strict');
+const KEY='c'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
+(async()=>{
+ const db=new PGlite();
+ await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+ CREATE DOMAIN public."text/plain" AS text;
+ CREATE TABLE public.ar_sync_keys(key_hash text PRIMARY KEY, label text, last_used_at timestamptz);
+ CREATE TABLE public.ar_inbox_keys(key_hash text PRIMARY KEY);
+ CREATE TABLE public.ar_sync_log(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), source text, data_at text,
+  dry_run boolean NOT NULL DEFAULT false, status text NOT NULL, sent int DEFAULT 0, listed int DEFAULT 0, added int DEFAULT 0, reactivated int DEFAULT 0, kept int DEFAULT 0,
+  leaving int DEFAULT 0, active_before int DEFAULT 0, active_after int DEFAULT 0, without_arabic int DEFAULT 0, details jsonb, announced_at timestamptz);
+ CREATE TABLE public.ar_sync_alerts(kind text PRIMARY KEY CHECK (char_length(kind) BETWEEN 1 AND 40), said_at timestamptz);
+ CREATE TABLE public.ar_shortages(name_key text, is_active boolean);
+ CREATE TABLE public.ar_names(name_key text);
+ CREATE TABLE public.ar_store_orders(id bigint PRIMARY KEY, announced_at timestamptz, status text, items jsonb, customer_name text, total numeric, rx_paths text[]);
+ CREATE TABLE public.ar_stock(item_id bigint PRIMARY KEY, data_at text, updated_at timestamptz DEFAULT now());
+ CREATE FUNCTION public.ar_spoken_name(text) RETURNS text LANGUAGE sql AS $$ select $1 $$;`);
+ await db.query(`INSERT INTO public.ar_sync_keys(key_hash,label) VALUES ($1,'laptop')`,[HASH]);
+ const before=fs.readFileSync('supabase/migrations/202611112100_ar_sync_news_hourly_data.sql','utf8');
+ const sql=fs.readFileSync('supabase/migrations/202611112300_ar_sync_news_one_sentence.sql','utf8');
+ const reset=async()=>{await db.exec(`DELETE FROM public.ar_sync_log; DELETE FROM public.ar_sync_alerts; DELETE FROM public.ar_shortages; DELETE FROM public.ar_names; DELETE FROM public.ar_store_orders; DELETE FROM public.ar_stock;`)};
+ const store=(dataAt,minutesAgo=2,dry=false)=>db.query(`INSERT INTO public.ar_sync_log(at,source,data_at,status,announced_at,dry_run) VALUES (now() - ($1 || ' minutes')::interval,'store r1',$2,'STORE_OK',now(),$3)`,[String(minutesAgo),dataAt,dry]);
+ const list=(hoursAgo,said,active=490,status='ok',details=null)=>db.query(`INSERT INTO public.ar_sync_log(at,source,status,active_after,details,announced_at) VALUES (now() - ($1 || ' hours')::interval,'laptop',$2,$3,$4,${said?'now()':'NULL'})`,[String(hoursAgo),status,active,details]);
+ const stock=(dataAt,n=3)=>db.query(`INSERT INTO public.ar_stock(item_id,data_at) SELECT g,$1 FROM generate_series(1,${n}) g ON CONFLICT (item_id) DO UPDATE SET data_at=excluded.data_at`,[dataAt]);
+ const news=async(peek=false)=>String((await db.query(`SELECT public.ar_sync_news($1,$2) AS t`,[KEY,peek])).rows[0].t);
+ const alerts=async()=>(await db.query(`SELECT kind FROM public.ar_sync_alerts ORDER BY kind`)).rows.map(r=>r.kind);
+ const unsaid=async()=>Number((await db.query(`SELECT count(*)::int AS n FROM public.ar_sync_log WHERE announced_at IS NULL`)).rows[0].n);
+ const fullRun=async(dataAt,active=494,details={added:['NEWONE'],leaving:[]})=>{await list(0,false,active,'ok',details);await store(dataAt,0);await stock(dataAt)};
+ const shortagesState=async()=>{await db.exec(`INSERT INTO public.ar_shortages VALUES ('NEWONE',true)`)};
+
+ // BEFORE (202611112100): a run that also sends the list says two sentences, with the list details
+ await db.exec(before);
+ await reset();await shortagesState();await fullRun('2026-11-11 21:45:40');
+ assert.equal(await news(),'الداتا اتحدثت، لحد الساعة 9 و45 دقيقة. النواقص اتحدثت، 494 صنف، دخل 1: NEWONE، و1 محتاجين ترجمة','before: two sentences');
+
+ // the new function (applied twice: safe)
+ await db.exec(sql);await db.exec(sql);
+
+ // a full hourly run (list + store + stock): ONE sentence, said once, and the list row is marked as said
+ await reset();await shortagesState();await fullRun('2026-11-11 21:45:40');
+ assert.equal(await news(true),'البوت اتحدث كله، لحد الساعة 9 و45 دقيقة');assert.equal(await unsaid(),1,'peek marks nothing');assert.deepEqual(await alerts(),[]);
+ assert.equal(await news(),'البوت اتحدث كله، لحد الساعة 9 و45 دقيقة');
+ assert.equal(await unsaid(),0,'the list row is marked as said');assert.deepEqual(await alerts(),['data']);
+ assert.equal(await news(),'','said once');
+ // the next hour: said again
+ await fullRun('2026-11-11 22:45:40');
+ assert.equal(await news(),'البوت اتحدث كله، لحد الساعة 10 و45 دقيقة');
+ // the list went but the store / stock are not done yet: nothing yet (the list row is marked so it is not said later on its own)
+ await reset();await stock('2026-11-11 20:45:00');await store('2026-11-11 20:45:00',70);await news();
+ await list(0,false);await store('2026-11-11 21:45:40',0);
+ assert.equal(await news(),'','stock still on the older data: wait');assert.equal(await unsaid(),0);
+ await stock('2026-11-11 21:45:40');
+ assert.equal(await news(),'البوت اتحدث كله، لحد الساعة 9 و45 دقيقة','all done: said now');
+ // a list update alone (no store send): silent, as the owner asked for one sentence only
+ await reset();await list(0,false);assert.equal(await news(),'');assert.equal(await unsaid(),0);
+ // a refused list is still said (a warning), after the update sentence
+ await reset();await list(0,false,0,'refused_empty');await store('2026-11-11 21:45:40',0);await stock('2026-11-11 21:45:40');
+ assert.equal(await news(),'البوت اتحدث كله، لحد الساعة 9 و45 دقيقة. تحديث النواقص اترفض لأن القايمة الجديدة فيها مشكلة، والبوت لسه على القايمة القديمة');
+ await reset();await list(0,false,0,'refused_empty');
+ assert.match(await news(),/^تحديث النواقص اترفض/);
+ // a dry-run store send is not an update
+ await reset();await store('2026-11-11 21:45:40',2,true);await stock('2026-11-11 21:45:40');assert.equal(await news(),'');
+ // a store send without a readable time: the sentence without the time
+ await reset();await store(null);await stock('2026-11-11 21:45:40');assert.equal(await news(),'البوت اتحدث كله');
+ // the spoken time (a few)
+ for(const [t,say] of [['2026-11-11 22:00:10','10'],['2026-11-11 22:05:00','10 و5 دقايق'],['2026-11-11 22:30:00','10 ونص'],['2026-11-12 00:45:40','12 و45 دقيقة'],['2026-11-11 10:45:00','10 و45 دقيقة']]){
+  await reset();await store(t);await stock(t);
+  assert.equal(await news(),'البوت اتحدث كله، لحد الساعة '+say,t);
+ }
+ // a store site order is still said first
+ await reset();await db.exec(`INSERT INTO public.ar_store_orders(id,status,items,customer_name,total,rx_paths) VALUES (7,'new','[]','منى',0,'{}')`);
+ await fullRun('2026-11-11 21:45:40');
+ assert.equal(await news(),'طلب روشتة جديد من الموقع رقم 7، منى. البوت اتحدث كله، لحد الساعة 9 و45 دقيقة');
+ // the laptop/list warnings are unchanged
+ await reset();await list(31,true);await store('2026-11-11 19:57:03',60);
+ assert.match(await news(),/^تنبيه: النواقص ماتحدّثتش من 31 ساعة، دوس حدّث النواقص دلوقتي أو شوف اللابتوب$/);
+ await reset();await list(40,true);await store('2026-11-11 13:00:00',7*60);
+ assert.match(await news(),/^تنبيه: اللاب ما بعتش حاجة من 7 ساعة، شوف اللابتوب$/,'no stock rows: only the warning');
+ // a wrong key is refused
+ await assert.rejects(()=>db.query(`SELECT public.ar_sync_news($1,false)`,['d'.repeat(64)]),/bad key/);
+ console.log('sync-news-one-sentence ok');
+})().catch(e=>{console.error(e);process.exit(1)});
