@@ -1,41 +1,47 @@
-// The bottom bar has 3 sections (owner's layout of 2026-11-10, (ب) «شريط تحت»): «المشتريات» (النواقص، الوارد، الترجمة، الطلبيات،
-// الفواتير، قوايم المخازن، المخزون), «الحسابات» (العملاء، الموردين: coming), «المبيعات» (الموقع، حركة البيع: coming). The stock
-// search is on top of every screen. Each section has small tabs under the top strip and remembers the one you were on.
+// The bottom bar has 5 sections (owner 2026-11-12): «الرئيسية» (one search for an item, first screen), «المشتريات» in three
+// groups (نواقص: النواقص، الوارد، الترجمة / طلبيات: الطلبيات، الفواتير، قوايم المخازن / مخزون: المخزون، جرد المخزون),
+// «الحسابات» (العملاء، الموردين), «المبيعات» (الموقع، حركة البيع، البيع المؤقت) and «خدمة العملاء». Each section, and each group of
+// «المشتريات», remembers the small tab you were on. «حدّث النواقص دلوقتي» is gone (the list is sent every hour).
 const {run,assert}=require('./harness.cjs');
 const vis=(page,id)=>page.isVisible('#'+id);
-const chips=(page,place)=>page.$$eval(`.subbar[data-for="${place}"] [data-tab]`,b=>b.map(x=>x.textContent.trim()));
-run('bottom bar: three sections with small tabs, the stock search on top',async({page})=>{
- // the first screen: المشتريات, the shortages list, the stock search on top
- assert.deepEqual(await page.$$eval('.bottomnav button',b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim())),['المشتريات','الحسابات','المبيعات']);
- assert.ok(await vis(page,'gsQ'),'stock search on top');assert.ok(!(await vis(page,'gsOut')));
- assert.ok(await vis(page,'gwQ'),'the warehouses search under it');assert.ok(!(await vis(page,'gwOut')));
- assert.ok(await vis(page,'shortPanel'));assert.ok(!(await vis(page,'translatePanel')));assert.ok(!(await vis(page,'draftsPanel')));
- assert.ok(await page.isVisible('.subbar[data-for="purchases"]'));assert.ok(!(await page.isVisible('.subbar[data-for="accounts"]')));assert.ok(!(await page.isVisible('.subbar[data-for="sales"]')));
- assert.deepEqual(await chips(page,'purchases'),['النواقص','الوارد','الترجمة','الطلبيات','الفواتير','قوايم المخازن','المخزون']);
- assert.deepEqual(await chips(page,'accounts'),['العملاء','الموردين']);assert.deepEqual(await chips(page,'sales'),['الموقع','حركة البيع']);
- assert.equal(await page.$eval('.subbar[data-for="purchases"] .on',b=>b.textContent.trim()),'النواقص');
- assert.ok(!(await page.$eval('[data-group="purchases"]',b=>b.classList.contains('secondary'))));assert.ok(await page.$eval('[data-group="accounts"]',b=>b.classList.contains('secondary')));
- // small tabs of the same section
+const names=(page,sel)=>page.$$eval(sel,b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim()));
+run('bottom bar: five sections, «الرئيسية» first, «المشتريات» in three groups',async({page})=>{
+ assert.deepEqual(await names(page,'.bottomnav button'),['الرئيسية','المشتريات','الحسابات','المبيعات','خدمة العملاء']);
+ // the first screen: «الرئيسية» with its one search, no small tabs
+ assert.ok(await vis(page,'homePanel'));assert.ok(await vis(page,'hsQ'));assert.ok(!(await vis(page,'shortPanel')));
+ assert.ok(!(await page.isVisible('.subbar[data-for="purchases"]')));
+ assert.ok(!(await page.$eval('[data-group="home"]',b=>b.classList.contains('secondary'))));
+ assert.equal(await page.$('#rfBtn'),null,'no «حدّث النواقص دلوقتي» button any more');
+ assert.equal(await page.$('#gsQ'),null,'the old search boxes on top are gone');assert.equal(await page.$('#gwQ'),null);
+ // «المشتريات»: the three groups, «نواقص» open on «النواقص»
+ await page.click('[data-group="purchases"]');
+ assert.ok(await vis(page,'shortPanel'));assert.ok(!(await vis(page,'homePanel')));
+ assert.deepEqual(await names(page,'[data-pgroup]'),['نواقص','طلبيات','مخزون']);
+ assert.deepEqual(await names(page,'[data-pfor="short"] [data-tab]'),['النواقص','الوارد','الترجمة']);
+ assert.deepEqual(await names(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن']);
+ assert.deepEqual(await names(page,'[data-pfor="stock"] [data-tab]'),['المخزون','جرد المخزون']);
+ assert.ok(await page.isVisible('[data-pfor="short"]'));assert.ok(!(await page.isVisible('[data-pfor="orders"]')));
  await page.click('[data-tab="translate"]');assert.ok(await vis(page,'translatePanel'));assert.ok(!(await vis(page,'shortPanel')));
- await page.click('[data-tab="read"]');assert.ok(await vis(page,'readPanel'));assert.ok(!(await vis(page,'translatePanel')));
- await page.click('[data-tab="drafts"]');assert.ok(await vis(page,'draftsPanel'));assert.ok(!(await vis(page,'readPanel')));
- await page.click('[data-tab="docs"]');assert.ok(await vis(page,'docsPanel'));
- await page.click('[data-tab="suppliers"]');assert.ok(await vis(page,'suppliersPanel'));assert.ok(!(await vis(page,'docsPanel')));
- await page.click('[data-tab="stock"]');assert.ok(await vis(page,'stockPanel'));assert.ok(!(await vis(page,'suppliersPanel')));
- // another section: its first small tab, its own bar, the other bar is gone
- await page.click('[data-group="accounts"]');
- assert.ok(await vis(page,'customersPanel'));assert.ok(!(await vis(page,'stockPanel')));assert.ok(await page.isVisible('.subbar[data-for="accounts"]'));assert.ok(!(await page.isVisible('.subbar[data-for="purchases"]')));
- await page.click('[data-tab="vendors"]');assert.ok(await vis(page,'vendorsPanel'));assert.ok(!(await vis(page,'customersPanel')));
- await page.click('[data-group="sales"]');assert.ok(await vis(page,'storeOrdersPanel'));assert.ok(!(await vis(page,'vendorsPanel')));
- await page.click('[data-tab="sales"]');assert.ok(await vis(page,'salesPanel'));assert.ok(!(await vis(page,'storeOrdersPanel')));
- // a section remembers the small tab you were on
- await page.click('[data-group="purchases"]');assert.ok(await vis(page,'stockPanel'),'back on «المخزون»');assert.equal(await page.$eval('.subbar[data-for="purchases"] .on',b=>b.textContent.trim()),'المخزون');
- await page.click('[data-group="accounts"]');assert.ok(await vis(page,'vendorsPanel'),'back on «الموردين»');
- // typing in the top search hides the section until it is cleared; choosing a section leaves the search
- await page.fill('#gsQ','بانادول');assert.ok(await vis(page,'gsOut'));assert.ok(!(await vis(page,'vendorsPanel')));assert.ok(await vis(page,'gsClear'));
- await page.click('#gsClear');assert.ok(!(await vis(page,'gsOut')));assert.ok(await vis(page,'vendorsPanel'));assert.equal(await page.$eval('#gsQ',e=>e.value),'');
- await page.fill('#gsQ','بانادول');await page.click('[data-group="purchases"]');assert.ok(!(await vis(page,'gsOut')));assert.ok(await vis(page,'stockPanel'));
- // the whole page still fits the phone
- const wide=await page.evaluate(()=>{const W=document.documentElement.clientWidth;return [...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&(r.right>W+0.5||r.left<-0.5)}).map(e=>e.tagName+'#'+e.id+'.'+e.className).slice(0,8)});
- assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen; too wide: '+wide.join(' | '));
-});
+ // «طلبيات» opens on «الطلبيات»; «مخزون» on «المخزون»; «جرد المخزون» is coming
+ await page.click('[data-pgroup="orders"]');assert.ok(await vis(page,'draftsPanel'));assert.ok(await page.isVisible('[data-pfor="orders"]'));assert.ok(!(await page.isVisible('[data-pfor="short"]')));
+ await page.click('[data-tab="suppliers"]');assert.ok(await vis(page,'suppliersPanel'));assert.ok(!(await vis(page,'draftsPanel')));
+ await page.click('[data-pgroup="stock"]');assert.ok(await vis(page,'stockPanel'));
+ await page.click('[data-tab="count"]');assert.ok(await vis(page,'countPanel'));assert.ok(!(await vis(page,'stockPanel')));
+ // each group remembers its small tab
+ await page.click('[data-pgroup="short"]');assert.ok(await vis(page,'translatePanel'),'back on «الترجمة»');
+ await page.click('[data-pgroup="orders"]');assert.ok(await vis(page,'suppliersPanel'),'back on «قوايم المخازن»');
+ // the other sections
+ await page.click('[data-group="accounts"]');assert.ok(await vis(page,'customersPanel'));assert.ok(!(await page.isVisible('.subbar[data-for="purchases"]')));
+ await page.click('[data-group="sales"]');assert.ok(await vis(page,'storeOrdersPanel'));
+ assert.deepEqual(await names(page,'.subbar[data-for="sales"] [data-tab]'),['الموقع','حركة البيع','البيع المؤقت']);
+ await page.click('[data-tab="tempsale"]');assert.ok(await vis(page,'tempSalePanel'));assert.ok(!(await vis(page,'storeOrdersPanel')));
+ await page.click('[data-group="care"]');assert.ok(await vis(page,'carePanel'));assert.ok(!(await vis(page,'tempSalePanel')));
+ // «المشتريات» comes back where it was; «الرئيسية» comes back with its search
+ await page.click('[data-group="purchases"]');assert.ok(await vis(page,'suppliersPanel'));
+ await page.click('[data-group="home"]');assert.ok(await vis(page,'homePanel'));assert.ok(!(await vis(page,'suppliersPanel')));
+ // the whole page still fits the phone, in every section
+ for(const g of ['home','purchases','accounts','sales','care']){
+  await page.click(`[data-group="${g}"]`);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen in '+g);
+ }
+},{home:true});

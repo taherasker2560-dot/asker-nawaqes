@@ -11,14 +11,18 @@ function serve(){return new Promise(ok=>{const srv=http.createServer((q,r)=>{con
 // runs one after the other; any failure sets a failing exit code
 let queue=Promise.resolve();
 function run(name,fn,opts){queue=queue.then(()=>runOne(name,fn,opts)).catch(e=>{console.error('FAIL: '+name+'\n',e);process.exitCode=1});return queue}
-async function runOne(name,fn,{permissions=[]}={}){const srv=await serve(),base=`http://localhost:${srv.address().port}/`;
+// the page opens on «الرئيسية» (2026-11-12); most tests start in «المشتريات» ← «النواقص» like before (home:true keeps the first screen)
+async function runOne(name,fn,{permissions=[],home=false}={}){const srv=await serve(),base=`http://localhost:${srv.address().port}/`;
  const browser=await chromium.launch();const errs=[];
  try{const ctx=await browser.newContext({viewport:{width:412,height:915},permissions});
   await ctx.route(/^https?:\/\//,route=>{const u=new URL(route.request().url());
    if(u.hostname==='cdn.jsdelivr.net'&&u.pathname.includes('supabase'))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(FAKE)});
    if(u.hostname==='localhost')return route.continue();return route.abort()});
   const page=await ctx.newPage();page.on('pageerror',e=>errs.push(e.message));
+  // a reload opens «الرئيسية» again: tests that start in «المشتريات» go back there
+  if(!home){const reload0=page.reload.bind(page);page.reload=async(...a)=>{const r=await reload0(...a);await page.click('[data-group="purchases"]');return r}}
   await page.goto(base+'asker-nawaqes-arabic.html');await page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
+  if(!home)await page.click('[data-group="purchases"]');
   await fn({page,base,fixture:n=>path.join(FIX,n),table:t=>page.evaluate(t=>JSON.parse(JSON.stringify(window.__tables[t]||[])),t)});
   assert.deepEqual(errs,[],'no page errors');console.log('PASS: '+name)}
  finally{await browser.close();srv.close()}}

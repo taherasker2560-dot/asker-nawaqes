@@ -5,6 +5,8 @@ window.__tables=tables;window.__fakeWrites=[];window.__reads=[];let seq=1;
 // optional, set in localStorage by a test before reload: __fakeFail = a table whose reads fail (the connection is down); __fakeDelay = ms every read waits (a slow connection); __fakeNames = n extra Arabic names (the list's own names come last)
 {const n=+localStorage.getItem('__fakeNames')||0;if(n){const own=tables.ar_names.splice(0);for(let i=0;i<n;i++)tables.ar_names.push({name_key:'FILLER '+i,english_name:'FILLER '+i,arabic_name:'x',status:'suggested'});SH.forEach(s=>tables.ar_names.push({name_key:s.product_name,english_name:s.product_name,arabic_name:'ع '+s.id,status:'approved'}));tables.ar_names.push(...own)}}
 // optional: __fakeArNames = JSON array replacing ar_names; __fakeQty = JSON {s1:{suggested_qty,order_qty},...} for the list's rows
+// optional: __fakeTables = JSON {table: rows} replacing whole tables (e.g. ar_stock, ar_supplier_items, ar_orders)
+{const j=localStorage.getItem('__fakeTables');if(j){const m=JSON.parse(j);Object.keys(m).forEach(k=>{tables[k]=m[k]})}}
 {const j=localStorage.getItem('__fakeArNames');if(j)tables.ar_names=JSON.parse(j);const q=localStorage.getItem('__fakeQty');if(q){const m=JSON.parse(q);tables.ar_shortages.forEach(r=>Object.assign(r,m[r.id]||{}))}}
 function builder(table){let filters=[],op='select',payload=null,opts={},range=null,single=false,ret=false,lim=null;
  const run=()=>{const t=tables[table]||(tables[table]=[]);const match=r=>filters.every(f=>f(r));

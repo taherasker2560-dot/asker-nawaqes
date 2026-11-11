@@ -211,23 +211,37 @@
     await client.auth.signOut();
     refresh();
   };
-  // The bar at the bottom has three sections (owner's layout of 2026-11-10, (ب) «شريط تحت»): «المشتريات» (النواقص، الوارد،
-  // الترجمة، الطلبيات، الفواتير، قوايم المخازن، المخزون), «الحسابات» (العملاء، الموردين: coming) and «المبيعات» (الموقع، حركة البيع:
-  // coming). The stock search is always on top (ar/stock.js). Each section has its small tabs under the top strip (the .subbar
-  // for that section); a small tab is still a [data-tab], and a section remembers the small tab you were on.
+  // The bar at the bottom has five sections (owner 2026-11-12): «الرئيسية» (one search for an item, ar/home.js),
+  // «المشتريات» in three groups: نواقص (النواقص، الوارد، الترجمة)، طلبيات (الطلبيات، الفواتير، قوايم المخازن)، مخزون (المخزون،
+  // جرد المخزون), «الحسابات» (العملاء، الموردين: coming), «المبيعات» (الموقع، حركة البيع، البيع المؤقت: coming) and «خدمة
+  // العملاء» (coming). Each section has its small tabs under the top strip (the .subbar for that section); a small tab is still
+  // a [data-tab], and a section (and a group of «المشتريات») remembers the small tab you were on.
   const GROUP_OF = {
-    short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases',
-    customers: 'accounts', vendors: 'accounts', storeorders: 'sales', sales: 'sales',
+    home: 'home',
+    short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases',
+    customers: 'accounts', vendors: 'accounts', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
   };
-  const lastTab = { purchases: 'short', accounts: 'customers', sales: 'storeorders' };
+  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock' };
+  const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
+  const lastPTab = { short: 'short', orders: 'drafts', stock: 'stock' };
   function showTab(tab) {
     const group = GROUP_OF[tab] || 'purchases';
     lastTab[group] = tab;
+    const pgroup = PGROUP_OF[tab];
+    if (pgroup) lastPTab[pgroup] = tab;
     document.querySelectorAll('[data-group]').forEach((x) => x.classList.toggle('secondary', x.dataset.group !== group));
     document.querySelectorAll('.subbar').forEach((s) => (s.hidden = s.dataset.for !== group));
     document.querySelectorAll('.subbar [data-tab]').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+    document.querySelectorAll('[data-pgroup]').forEach((x) => x.classList.toggle('on', x.dataset.pgroup === pgroup));
+    document.querySelectorAll('[data-pfor]').forEach((x) => (x.hidden = x.dataset.pfor !== pgroup));
+    $('homePanel')?.classList.toggle('hidden', tab !== 'home');
+    if (tab === 'home') window.AskerHome?.open();
+    $('countPanel')?.classList.toggle('hidden', tab !== 'count');
+    $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
+    $('carePanel')?.classList.toggle('hidden', tab !== 'care');
     $('shortPanel').classList.toggle('hidden', tab !== 'short');
-    if (tab === 'short') { drawShort(); window.AskerRefresh?.open(); } // names may have changed in the other tabs
+    // names may have changed in the other tabs; never «0 صنف» before the list (saved or from the server) is there
+    if (tab === 'short' && (cacheReady || shortages.length)) drawShort();
     $('translatePanel').classList.toggle('hidden', tab !== 'translate');
     $('readPanel').classList.toggle('hidden', tab !== 'read');
     $('suppliersPanel')?.classList.toggle('hidden', tab !== 'suppliers');
@@ -243,10 +257,11 @@
     $('customersPanel')?.classList.toggle('hidden', tab !== 'customers');
     $('vendorsPanel')?.classList.toggle('hidden', tab !== 'vendors');
     $('salesPanel')?.classList.toggle('hidden', tab !== 'sales');
-    window.AskerStock?.closeSearch?.(); // choosing a place leaves the stock search
   }
   document.querySelectorAll('.subbar [data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-group]').forEach((b) => (b.onclick = () => showTab(lastTab[b.dataset.group])));
+  document.querySelectorAll('[data-pgroup]').forEach((b) => (b.onclick = () => showTab(lastPTab[b.dataset.pgroup])));
+  window.AskerApp.showTab = showTab;
   // «الوارد» has three small tabs: today (the automatic inbox), reading by hand, and the companies / phone link.
   // The status line, the results and the message to the company sit under the first two and are hidden under «الشركات».
   function showSub(name) {
@@ -1915,6 +1930,9 @@
   // shared with ar/order-drafts.js («الطلبيات»): open WhatsApp (Business when chosen) on a supplier's chat (its saved number;
   // no number = the owner picks the chat) with a ready message; an empty text opens the chat bare (the message was too long
   // for a link and is on the clipboard)
+  // «الرئيسية» (ar/home.js) reads what this page already loaded: the shortage list, every Arabic name and today's «اتطلب»
+  // (new arrays / maps after each reload, so home.js rebuilds its index when one of them is not the same object any more)
+  window.AskerApp.lookup = () => ({ shortages, knownNames, orders, nk });
   window.AskerApp.openWhatsApp = (text, phone) => {
     const t = text || '',
       ph = waPhone(phone || ''),

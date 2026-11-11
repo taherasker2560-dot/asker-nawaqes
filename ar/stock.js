@@ -165,5 +165,11 @@
     drawTop();
   });
   $('gsClear')?.addEventListener('click', () => { closeSearch(); $('gsQ').focus(); });
-  root.AskerStock = { open, closeSearch };
+  // «الرئيسية» (ar/home.js): the stock rows, loaded once (and again after 10 minutes)
+  async function ensure() {
+    if (!rows.length || Date.now() - loadedAt >= FRESH_MS) await open();
+    else if (loading) await loading;
+    return rows;
+  }
+  root.AskerStock = { open, closeSearch, ensure, rows: () => rows, age: () => ($('stAge') ? $('stAge').textContent : '') };
 })(typeof window === 'undefined' ? globalThis : window);
