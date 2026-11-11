@@ -1241,3 +1241,200 @@ button.small {
   height: 100%;
   object-fit: cover;
 }
+
+/* ---------- «الرئيسية»: one search for an item (ar/home.js, owner 2026-11-12) ---------- */
+.home {
+  margin: 4px 0 10px;
+}
+.home .search.home-q {
+  margin: 0;
+}
+.home .search.home-q input[type='search'] {
+  border: 2px solid var(--crimson) !important; /* the base input rule uses !important */
+}
+.hs-item {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.hs-item strong {
+  font-size: 16px;
+}
+.hs-en {
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: right;
+}
+.hs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 5px 0 3px;
+}
+.tag {
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  border-radius: 999px;
+  padding: 1px 10px;
+}
+.tag.good {
+  color: var(--good);
+  background: var(--good-bg);
+}
+.tag.none {
+  color: var(--muted);
+  background: var(--line);
+}
+.tag.bad {
+  color: var(--bad);
+  background: var(--bad-bg);
+}
+.tag.warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+.hs-offers {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--good);
+}
+.hs-h {
+  font-size: 15px;
+  margin: 14px 0 4px;
+  color: var(--crimson-ink);
+}
+
+/* ---------- «المشتريات»: three groups on top, the small tabs of the chosen group under them ---------- */
+.pgroups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: var(--rose);
+}
+.pgroups button {
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--crimson-ink);
+  font-weight: 700;
+  box-shadow: none;
+}
+.pgroups button.on {
+  background: var(--crimson);
+  color: #fff;
+}
+.subbar .chips[hidden] {
+  display: none;
+}
+
+/* ---------- five sections in the bottom bar ---------- */
+.bottomnav:has(> button:nth-child(5)) button {
+  margin: 0 1px;
+  padding: 4px 0;
+  font-size: 11.5px;
+}
+.bottomnav:has(> button:nth-child(5)) button svg {
+  padding: 3px 8px;
+}
+
+/* ---------- the settings sheet (ar/settings.js) ---------- */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(20, 10, 14, 0.45);
+}
+.sheet.hidden {
+  display: none;
+}
+.sheet-box {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--paper);
+  border-radius: 20px 20px 0 0;
+  padding: 16px max(16px, env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sheet-head h2 {
+  margin: 0;
+}
+.sheet-head .icon-btn {
+  color: var(--ink);
+  background: var(--line);
+}
+.accents {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.accent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  margin: 0;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+.accent span {
+  display: block;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+}
+.accent.on span {
+  box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink);
+}
+.accent:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ---------- «ليلي»: the whole page dark (ar/settings.js) ---------- */
+html.night {
+  --paper: #141217;
+  --card: #1d1b22;
+  --ink: #ece8f2;
+  --muted: #a39cad;
+  --line: #332f3b;
+  --good: #6fd3a0;
+  --good-bg: #183528;
+  --warn: #f0c060;
+  --warn-bg: #3a2e12;
+  --bad: #ff8fa3;
+  --bad-bg: #3d1a22;
+  --gold: #8f79c9;
+  color-scheme: dark;
+}
+html.night .bottomnav {
+  background: rgba(29, 27, 34, 0.96);
+}
+html.night input[type='text'],
+html.night input[type='email'],
+html.night input[type='password'],
+html.night input[type='search'],
+html.night select,
+html.night textarea {
+  background: var(--card);
+}

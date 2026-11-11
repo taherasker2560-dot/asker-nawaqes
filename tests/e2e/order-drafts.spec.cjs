@@ -17,7 +17,7 @@ const put=(page,o,saved=SAVED)=>page.evaluate(([o,saved])=>{window.__storage['or
 const msgOf=(page)=>page.inputValue('#odMsg');
 run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table})=>{
  await put(page,drafts());
- await page.click('[data-group="purchases"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
  await page.waitForSelector('#odChips [data-sup]');
  assert.ok(await page.isVisible('#draftsPanel'));assert.ok(!(await page.isVisible('#docsPanel')));assert.ok(!(await page.isVisible('#shortPanel')));
  assert.deepEqual(await page.$$eval('#odChips [data-sup]',b=>b.map(x=>x.textContent.trim())),['نيو سيتي · 2','AMG · 1','رضا عطية · 150'],'a supplier with no items has no chip');
@@ -91,7 +91,7 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
 },{permissions:['clipboard-read','clipboard-write']});
 run('orders tab: a supplier with no saved number, no file yet, an old file, a broken file',async({page})=>{
  await page.evaluate(()=>{window.__opened=[]});
- await page.click('[data-group="purchases"]');await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')),'nothing to show');
  await put(page,drafts(new Date(Date.now()-3*864e5).toISOString()),[]);
  await page.click('#odRefresh');await page.waitForSelector('#odChips [data-sup]');

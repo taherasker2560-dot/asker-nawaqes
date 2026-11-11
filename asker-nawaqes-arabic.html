@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=layout-20261110a" />
+    <link rel="stylesheet" href="ar/app.css?v=home-20261112a" />
   </head>
   <body>
     <header class="appbar">
@@ -20,6 +20,10 @@
         <h1>صيدلية عسكر</h1>
         <p>نواقص ووارد الشركات</p>
       </div>
+      <!-- settings (owner 2026-11-12: the bot's color, and later its language), ar/settings.js -->
+      <button id="settingsBtn" type="button" class="icon-btn" aria-label="الإعدادات" title="الإعدادات" aria-expanded="false" aria-controls="settingsPanel">
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
       <button id="logoutBtn" class="icon-btn hidden" aria-label="خروج" title="خروج">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -28,6 +32,23 @@
       <span class="row"><span class="dot" aria-hidden="true"></span><span id="dataAgeText"></span><small id="dataAgeAgo"></small></span>
       <span id="dataAgeMore" class="more hidden"></span>
     </button>
+    <!-- settings sheet (owner 2026-11-12: «خيار ما بين جميع الالوان … كل يوم اغيره بلون»; English comes later), ar/settings.js -->
+    <section id="settingsPanel" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="sheet-box">
+        <div class="sheet-head">
+          <h2 id="settingsTitle">الإعدادات</h2>
+          <button id="settingsClose" type="button" class="icon-btn" aria-label="اقفل الإعدادات">✕</button>
+        </div>
+        <h3>لغة البوت</h3>
+        <div class="tabs seg" role="group" aria-label="لغة البوت">
+          <button type="button" data-lang="ar">عربي</button
+          ><button type="button" data-lang="en" class="secondary" disabled>English (قريب)</button>
+        </div>
+        <h3>لون البوت</h3>
+        <div id="accentPick" class="accents" role="radiogroup" aria-label="لون البوت"></div>
+        <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
+      </div>
+    </section>
     <main>
       <section id="loginCard" class="card">
         <h2>تسجيل الدخول</h2>
@@ -39,26 +60,12 @@
       <div id="app" class="hidden">
         <p id="versionWarn" class="status bad hidden"></p>
         <div id="pendingOrder" class="status hidden"><span id="pendingText"></span> <button id="pendingYes" class="small">أيوه اتبعت</button> <button id="pendingNo" class="secondary small">لأ، متبعتتش</button></div>
-        <!-- the stock search sits on top of every screen (owner 2026-11-10: «عاوز البوت يفتح عالبحث بتاع المخزون فوق»);
-             typing shows the stock cards here and hides the place below until the box is cleared (ar/stock.js) -->
-        <div class="topsearch">
-          <div class="search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <input id="gsQ" type="search" autocomplete="off" aria-label="دوّر على صنف في المخزون" placeholder="دوّر على صنف في المخزون…" />
-            <button id="gsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
-          </div>
-          <!-- the warehouses' lists search under it (owner 2026-11-10: «تخرجلى بحث المخازن تحت بحث الصيدليه فى واجهه البوت»), ar/suppliers.js -->
-          <div class="search gw">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-5 9 5v10H3zM8 19v-6h8v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-            <input id="gwQ" type="search" autocomplete="off" aria-label="دوّر في قوايم المخازن" placeholder="دوّر في قوايم المخازن…" />
-            <button id="gwClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
-          </div>
-          <div id="gsOut" class="gs-out hidden"><p id="gsStatus" class="status"></p><div id="gsItems"></div></div>
-          <div id="gwOut" class="gs-out hidden"><p id="gwStatus" class="status"></p><div id="gwItems"></div></div>
-        </div>
-        <!-- the bottom bar: three sections (owner's layout of 2026-11-10, (ب) «شريط تحت»): المشتريات، الحسابات، المبيعات -->
+        <!-- the bottom bar: five sections (owner 2026-11-12): الرئيسية (the search), المشتريات، الحسابات، المبيعات، خدمة العملاء -->
         <nav class="bottomnav" aria-label="الأقسام">
-          <button data-group="purchases">
+          <button data-group="home">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4.2-4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span>الرئيسية</span></button
+          ><button data-group="purchases" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 10h10l2-7H7M10 19a1 1 0 1 0 0 .01M17 19a1 1 0 1 0 0 .01" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>المشتريات</span></button
           ><button data-group="accounts" class="secondary">
@@ -66,17 +73,33 @@
             <span>الحسابات</span></button
           ><button data-group="sales" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M7 16V10M12 16V6M17 16v-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
-            <span>المبيعات</span></button>
+            <span>المبيعات</span></button
+          ><button data-group="care" class="secondary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-2v-6h4M4 13v4a2 2 0 0 0 2 2h2v-6H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+            <span>خدمة العملاء</span></button>
         </nav>
-        <!-- the small tabs of each section (the panels below are unchanged) -->
-        <div class="subbar chips" data-for="purchases" role="group" aria-label="المشتريات">
-          <button type="button" class="chip on" data-tab="short">النواقص</button
-          ><button type="button" class="chip" data-tab="read">الوارد</button
-          ><button type="button" class="chip" data-tab="translate">الترجمة</button
-          ><button type="button" class="chip" data-tab="drafts">الطلبيات</button
-          ><button type="button" class="chip" data-tab="docs">الفواتير</button
-          ><button type="button" class="chip" data-tab="suppliers">قوايم المخازن</button
-          ><button type="button" class="chip" data-tab="stock">المخزون</button>
+        <!-- the small tabs of each section. «المشتريات» has three groups (owner 2026-11-12): نواقص (النواقص، الوارد، الترجمة)،
+             طلبيات (الطلبيات، الفواتير، قوايم المخازن)، مخزون (المخزون، جرد المخزون); each group remembers its small tab -->
+        <div class="subbar" data-for="purchases" hidden>
+          <div class="pgroups" role="group" aria-label="أقسام المشتريات">
+            <button type="button" data-pgroup="short" class="on">نواقص</button
+            ><button type="button" data-pgroup="orders">طلبيات</button
+            ><button type="button" data-pgroup="stock">مخزون</button>
+          </div>
+          <div class="chips" data-pfor="short" role="group" aria-label="نواقص">
+            <button type="button" class="chip on" data-tab="short">النواقص</button
+            ><button type="button" class="chip" data-tab="read">الوارد</button
+            ><button type="button" class="chip" data-tab="translate">الترجمة</button>
+          </div>
+          <div class="chips" data-pfor="orders" role="group" aria-label="طلبيات" hidden>
+            <button type="button" class="chip" data-tab="drafts">الطلبيات</button
+            ><button type="button" class="chip" data-tab="docs">الفواتير</button
+            ><button type="button" class="chip" data-tab="suppliers">قوايم المخازن</button>
+          </div>
+          <div class="chips" data-pfor="stock" role="group" aria-label="مخزون" hidden>
+            <button type="button" class="chip" data-tab="stock">المخزون</button
+            ><button type="button" class="chip" data-tab="count">جرد المخزون</button>
+          </div>
         </div>
         <div class="subbar chips" data-for="accounts" role="group" aria-label="الحسابات" hidden>
           <button type="button" class="chip on" data-tab="customers">العملاء</button
@@ -84,16 +107,29 @@
         </div>
         <div class="subbar chips" data-for="sales" role="group" aria-label="المبيعات" hidden>
           <button type="button" class="chip on" data-tab="storeorders">الموقع</button
-          ><button type="button" class="chip" data-tab="sales">حركة البيع</button>
+          ><button type="button" class="chip" data-tab="sales">حركة البيع</button
+          ><button type="button" class="chip" data-tab="tempsale">البيع المؤقت</button>
         </div>
 
-        <section id="shortPanel" class="card">
+        <!-- «الرئيسية» (owner 2026-11-12): ONE search for an item: the pharmacy's stock, the shortages and the warehouses'
+             lists together, one card per item with its marks (رصيد / ملوش رصيد / ناقص / اتطلب النهارده) and who sells it (ar/home.js) -->
+        <section id="homePanel" class="home">
+          <div class="search home-q">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="hsQ" type="search" autocomplete="off" aria-label="دوّر على صنف" placeholder="دوّر على صنف: المخزون والنواقص والمخازن…" />
+            <button id="hsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+          </div>
+          <p id="hsStatus" class="status">اكتب حرفين من اسم الصنف، عربي أو إنجليزي.</p>
+          <div id="hsItems"></div>
+          <div id="hsLinesBox" class="hidden">
+            <h3 class="hs-h">في قوايم المخازن بس (مش متسجّل عندنا)</h3>
+            <div id="hsLines"></div>
+          </div>
+        </section>
+
+        <section id="shortPanel" class="card hidden">
           <div class="grid short-stats" id="shStats"></div>
           <p id="shNote" class="status"></p>
-          <div id="rfBox" class="rf-box hidden">
-            <button id="rfBtn" type="button" class="rf-btn">حدّث النواقص دلوقتي</button>
-            <p id="rfStatus" class="status"></p>
-          </div>
           <div class="search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             <input id="shSearch" type="search" autocomplete="off" aria-label="دوّر في النواقص" placeholder="دوّر في النواقص (عربي أو إنجليزي)…" />
@@ -391,7 +427,19 @@
         </section>
         <section id="salesPanel" class="card hidden">
           <h2>حركة البيع اليومية</h2>
-          <p class="hint">قريب: هتتحدّث كل ساعتين، وهنصممها سوا.</p>
+          <p class="hint">قريب: هتتحدّث كل ساعة، وهنصممها سوا.</p>
+        </section>
+        <section id="tempSalePanel" class="card hidden">
+          <h2>البيع المؤقت</h2>
+          <p class="hint">قريب: وقت الزحمة تسجّل البيعة بسرعة من هنا، وتتدخل في فارمافلاي بعدين لما الشغل يهدى. هنصممها سوا.</p>
+        </section>
+        <section id="countPanel" class="card hidden">
+          <h2>جرد المخزون</h2>
+          <p class="hint">قريب: هنتفق الأول على طريقة الجرد، وبعدين نبنيها.</p>
+        </section>
+        <section id="carePanel" class="card hidden">
+          <h2>خدمة العملاء</h2>
+          <p class="hint">قريب: هنصمم القسم ده سوا.</p>
         </section>
 
         <section id="stockPanel" class="card hidden">
@@ -442,15 +490,17 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+    <script src="ar/settings.js?v=home-20261112a"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=layout-20261110a"></script>
-    <script src="ar/suppliers.js?v=layout-20261110a"></script>
+    <script src="ar/app.js?v=home-20261112a"></script>
+    <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=layout-20261110a"></script>
-    <script src="ar/refresh.js?v=nav-20261109a"></script>
+    <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=store-20261110a"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
-    <script src="ar/stock.js?v=layout-20261110a"></script>
+    <script src="ar/stock.js?v=home-20261112a"></script>
+    <script src="ar/home.js?v=home-20261112a"></script>
   </body>
 </html>

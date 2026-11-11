@@ -501,7 +501,8 @@
     $('gwQ').addEventListener('input', drawTopBox);
     $('gwClear')?.addEventListener('click', () => { $('gwQ').value = ''; drawTopBox(); $('gwQ').focus(); });
   }
-  root.AskerSuppliers = { open };
+  // «الرئيسية» (ar/home.js): every line of the warehouses' lists (read once, kept), and whether a line surely is that item
+  root.AskerSuppliers = { open, lines: () => loadAll(), sure, gen: () => allGen };
   const start = () => { bind(); bindTop(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
