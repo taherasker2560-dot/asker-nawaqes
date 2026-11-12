@@ -1241,4 +1241,9 @@ button.linklike.cu-add {
 .ts-acts button { flex: 1; margin: 0; }
 html.night .ts-warn { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
 html.night .ts-st.w { background: rgba(255, 180, 60, 0.15); color: #ffc46b; }
-html.night .ts-st.d { background: rgba(60, 200, 110, 0.15); color: #7fe0a2; }
+html.night .ts-st.d { background: rgba(60, 200, 110, 0.15); color: #7fe0a2; }.ts-types { margin: 10px 0 0; }
+.ts-types .chip { flex: 1; }
+.ts-return .ts-types .chip.on { background: linear-gradient(135deg, #c62828 0%, #8e1b1b 100%); }
+.ts-return .ts-save { background: #c62828; }
+.ts-st.r { background: #fdecee; color: #c62828; }
+html.night .ts-st.r { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }

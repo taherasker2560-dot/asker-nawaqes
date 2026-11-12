@@ -33,5 +33,11 @@ const assert=require('node:assert/strict');
  const pol=(await db.query(`SELECT cmd,qual,with_check FROM pg_policies WHERE tablename='ar_temp_sales'`)).rows;
  assert.equal(pol.length,1);assert.equal(pol[0].cmd,'ALL');assert.match(pol[0].qual,/ff6c33dc/);assert.match(pol[0].with_check,/ff6c33dc/);
  assert.ok((await db.query(`SELECT relrowsecurity FROM pg_class WHERE relname='ar_temp_sales'`)).rows[0].relrowsecurity);
+ // 202611130030: a sale or a return; the rows already there stay sales
+ const kind=fs.readFileSync('supabase/migrations/202611130030_ar_temp_sales_kind.sql','utf8');
+ await db.exec(kind);await db.exec(kind);
+ assert.deepEqual((await db.query(`SELECT DISTINCT kind FROM public.ar_temp_sales`)).rows,[{kind:'sale'}]);
+ await db.query(`INSERT INTO public.ar_temp_sales(id,sold_at,items,total,kind,paid) VALUES ('00000000-0000-4000-8000-000000000005',now(),'[{"c":1060,"n":"ITEM ONE","q":1,"u":"pack","p":10}]',10,'return',10)`);
+ await assert.rejects(()=>db.query(`UPDATE public.ar_temp_sales SET kind='swap' WHERE id=$1`,[B]),/check/);
  console.log('PASS: temp sales table: phone id keeps a sale once, number by itself, items 1-60, status/money checks, owner only');
 })().catch(e=>{console.error(e);process.exit(1)});

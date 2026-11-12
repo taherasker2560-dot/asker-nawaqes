@@ -6,6 +6,9 @@ const T=require('../ar/tempsale.js');
 assert.equal(T.stickerCode('101060'),1060);assert.equal(T.stickerCode('163070'),63070);assert.equal(T.stickerCode(' 104875\n'),4875);
 assert.equal(T.stickerCode('١٠١٠٦٠'),1060);assert.equal(T.stickerCode('1060'),1060);assert.equal(T.stickerCode('70595'),70595);
 assert.equal(T.stickerCode('6221234567890'),null,'a factory barcode is not a sticker');assert.equal(T.stickerCode(''),null);assert.equal(T.stickerCode('100000'),null);assert.equal(T.stickerCode('abc'),null);
+// from the camera only a whole sticker number counts: a short or long reading is never taken as a code
+assert.equal(T.stickerCode('101060',true),1060);assert.equal(T.stickerCode('9493',true),null);assert.equal(T.stickerCode('69423',true),null);
+assert.equal(T.stickerCode('1010600328',true),null);assert.equal(T.stickerCode('A101060',true),null);assert.equal(T.stickerCode(' 163070 ',true),63070);
 // price of one box, or one unit when the box splits
 assert.equal(T.priceOf(66.7,1,'unit'),66.7,'a box that does not split');assert.equal(T.priceOf(108,2,'unit'),54);assert.equal(T.priceOf(100,3,'unit'),33.33);assert.equal(T.priceOf(100,3,'pack'),100);
 // the bill: a tap adds one box, the same item again = one more; a unit changes the price
@@ -24,8 +27,10 @@ assert.equal(T.overLimit(c,230,200),null,'paid enough: no warning');
 assert.equal(T.overLimit({...c,credit_limit:0},99999,0),null,'no limit on the card');assert.equal(T.overLimit(null,500,0),null);
 // the row sent to the server
 const rec=T.record({id:'00000000-0000-4000-8000-000000000001',soldAt:'2026-11-12T19:42:00.000Z',lines,customer:c,paid:'50',note:'  بعد الضهر '});
-assert.deepEqual(rec,{id:'00000000-0000-4000-8000-000000000001',sold_at:'2026-11-12T19:42:00.000Z',customer_id:101,customer_name:'عميل تجربة',
+assert.deepEqual(rec,{id:'00000000-0000-4000-8000-000000000001',sold_at:'2026-11-12T19:42:00.000Z',kind:'sale',customer_id:101,customer_name:'عميل تجربة',
  items:[{c:1060,n:'ITEM ONE 14TAB',q:2,u:'unit',p:105},{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}],total:230,paid:50,note:'بعد الضهر',status:'pending'});
+// a return (مرتجع): its own bill; paid = what was given back (also to a cash customer)
+const back=T.record({id:'r',soldAt:'t',lines,customer:null,paid:'20',note:'',kind:'return'});assert.equal(back.kind,'return');assert.equal(back.total,230);assert.equal(back.paid,20);
 const cash=T.record({id:'x',soldAt:'t',lines,customer:null,paid:'40',note:''});assert.equal(cash.customer_id,null);assert.equal(cash.paid,null,'cash: no paid part');assert.equal(cash.note,null);
 // words and money
 assert.equal(T.qtyText(1,'pack'),'1 علبة');assert.equal(T.qtyText(3,'pack'),'3 علب');assert.equal(T.qtyText(4,'unit'),'4 وحدات');assert.equal(T.qtyText(12,'unit'),'12 وحدة');

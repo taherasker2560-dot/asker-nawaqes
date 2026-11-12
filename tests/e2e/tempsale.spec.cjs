@@ -27,11 +27,19 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.waitForSelector('#tsHits [data-ts-add="1060"]');
  await page.click('#tsHits [data-ts-add="1060"]');
  assert.equal(await page.inputValue('#tsQ'),'','the code box empties for the next one');
- // the camera's reading (the sticker barcode) adds the same way
+ // the camera's reading (the sticker barcode) counts only when the same number comes twice in a row
+ await page.evaluate(()=>window.AskerTempSale.scanned('169423'));
+ await page.evaluate(()=>window.AskerTempSale.scanned('101060'));
+ assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b'),'1','one reading alone adds nothing');
  await page.evaluate(()=>window.AskerTempSale.scanned('101060'));
  assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b'),'2');
- await page.evaluate(()=>window.AskerTempSale.scanned('6221234567890'));
- assert.match(await text(page,'#tsFind'),/مش ملصق فارمافلاي/);
+ assert.match(await text(page,'#tsFind'),/اتضاف: صنف تجربة \(الباركود 101060\)/,'the number read is shown');
+ // a short or long reading is never taken as a code; the number read is shown
+ await page.evaluate(()=>window.AskerTempSale.scanned('9493',true));
+ assert.match(await text(page,'#tsFind'),/الكاميرا قرت 9493: ده مش رقم ملصق فارمافلاي/);
+ await page.evaluate(()=>window.AskerTempSale.scanned('6221234567890',true));
+ assert.match(await text(page,'#tsFind'),/مش رقم ملصق فارمافلاي/);
+ assert.equal((await page.$$('#tsCart .ts-line')).length,2);
  // a box that splits: one unit = half the price
  await page.click('#tsCart .ts-line[data-i="1"] [data-ts-u="unit"]');
  assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-amt'),'210 ج');
@@ -80,5 +88,22 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.click('#tsSave');
  await page.waitForFunction(()=>/اتحفظت ✓/.test(document.getElementById('tsStatus').textContent));
  const cash=(await table('ar_temp_sales')).find(r=>r.status==='pending');
- assert.equal(cash.customer_id,null);assert.equal(cash.paid,null);assert.equal(cash.total,210);
+ assert.equal(cash.customer_id,null);assert.equal(cash.paid,null);assert.equal(cash.total,210);assert.equal(cash.kind,'sale');
+ // a return (مرتجع): its own bill, red; «رجّعتله كام فلوس؟» even for cash; marked in the list
+ await page.click('[data-ts-type="return"]');
+ assert.equal(await text(page,'#tsSave'),'احفظ المرتجع');
+ assert.ok(!(await page.$eval('#tsPaidRow',e=>e.classList.contains('hidden'))));
+ assert.equal(await text(page,'#tsPaidLbl'),'رجّعتله كام فلوس؟');
+ await page.fill('#tsQ','كريم');
+ await page.waitForSelector('#tsHits [data-ts-add="4875"]');
+ await page.click('#tsHits [data-ts-add="4875"]');
+ await page.fill('#tsPaid','20');
+ await page.click('#tsSave');
+ await page.waitForFunction(()=>/اتحفظت ✓/.test(document.getElementById('tsStatus').textContent));
+ const back=(await table('ar_temp_sales')).find(r=>r.kind==='return');
+ assert.equal(back.total,20);assert.equal(back.paid,20);assert.deepEqual(back.items,[{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}]);
+ assert.equal(await text(page,'#tsSave'),'احفظ البيعة','the next bill is a sale again');
+ await page.click('[data-ts-view="list"]');
+ await page.waitForFunction(()=>/مرتجع/.test(document.getElementById('tsRows').textContent));
+ assert.match(await text(page,'#tsRows'),/مرتجع[\s\S]*رجعله 20 ج/);
 });

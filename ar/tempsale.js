@@ -11,9 +11,13 @@
 
   // ---------- pure helpers (also used by tests/tempsale.cjs) ----------
   const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
-  // a scanned or typed sticker number -> the PharmaFly item code (null: not a sticker / not a code)
-  function stickerCode(raw) {
-    const d = String(raw || '').replace(/[٠-٩]/g, (c) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/\D/g, '');
+  // a typed code or sticker number -> the PharmaFly item code (null: not a sticker / not a code).
+  // From the camera (scanned = true) only a whole sticker number counts (6 digits, 1xxxxx): a shorter or longer reading is a
+  // misread or another barcode, never taken as a code (the owner: «الباركود ينطق اصناف غلط», 2026-11-13).
+  function stickerCode(raw, scanned) {
+    const s = String(raw || '').replace(/[٠-٩]/g, (c) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).trim();
+    if (scanned) return /^1\d{5}$/.test(s) ? Number(s) - 100000 || null : null;
+    const d = s.replace(/\D/g, '');
     if (/^1\d{5}$/.test(d)) return Number(d) - 100000 || null;
     if (/^\d{1,5}$/.test(d)) return Number(d) || null;
     return null;
@@ -46,15 +50,16 @@
     return lim > 0 && after > lim ? { bal: r2(bal), lim: r2(lim), after } : null;
   }
   // the row kept on the phone and sent to ar_temp_sales
-  function record({ id, soldAt, lines, customer, paid, note }) {
+  // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; paid = what was given back)
+  function record({ id, soldAt, lines, customer, paid, note, kind }) {
     const sum = total(lines);
     return {
-      id, sold_at: soldAt,
+      id, sold_at: soldAt, kind: kind === 'return' ? 'return' : 'sale',
       customer_id: customer ? Number(customer.id) : null,
       customer_name: customer ? String(customer.name || '').slice(0, 120) : null,
       items: lines.map((l) => ({ c: l.c, n: l.n, q: l.q, u: l.u, p: l.p })),
       total: sum,
-      paid: customer && Number(paid) > 0 ? r2(paid) : null,
+      paid: (customer || kind === 'return') && Number(paid) > 0 ? r2(paid) : null,
       note: String(note || '').trim().slice(0, 300) || null,
       status: 'pending',
     };
@@ -93,7 +98,7 @@
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v ?? d; } catch (e) { return d; } };
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
-  let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name';
+  let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name', kind = 'sale';
   let queue = load(QKEY, []), server = [], view = 'new', listKind = 'pending', openRow = '', flushing = false, ready = false;
 
   function say(id, text, kind) {
@@ -191,7 +196,8 @@
   }
 
   // ---------- the camera (the PharmaFly sticker's barcode) ----------
-  let stream = null, timer = null, detector = null, busy = false, lastRaw = '', lastAt = 0;
+  // a reading counts only when the same value comes twice in a row (one frame can misread a bar)
+  let stream = null, timer = null, detector = null, busy = false, lastRaw = '', lastAt = 0, seenRaw = '', seenAt = 0;
   async function startScan() {
     $('tsScanBox').classList.remove('hidden');
     if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -199,8 +205,9 @@
       return say('tsFind', 'الموبايل ده مش بيقرا الباركود من البوت. اكتب الرقم اللي فوق الباركود في «الكود».', 'bad');
     }
     try {
+      // the stickers' kinds only: itf / codabar / code_93 read pieces of other bars as numbers
       const all = await root.BarcodeDetector.getSupportedFormats();
-      const formats = all.filter((f) => /code_128|code_39|code_93|codabar|ean_13|ean_8|itf|upc_a|upc_e/.test(f));
+      const formats = all.filter((f) => /^(code_128|code_39|ean_13|ean_8|upc_a|upc_e)$/.test(f));
       detector = new root.BarcodeDetector(formats.length ? { formats } : undefined);
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       const v = $('tsVideo');
@@ -223,19 +230,22 @@
     } catch (e) {}
     busy = false;
   }
-  async function scanned(raw) {
+  // sure = the camera read the same value twice in a row (tests and a typed reading pass true)
+  async function scanned(raw, sure) {
+    raw = String(raw || '').trim();
     const now = Date.now();
-    if (!raw || (raw === lastRaw && now - lastAt < 2500)) return;
+    if (!raw) return;
+    if (!sure && !(raw === seenRaw && now - seenAt < 1500)) { seenRaw = raw; seenAt = now; return; }
+    seenRaw = '';
+    if (raw === lastRaw && now - lastAt < 2500) return;
     lastRaw = raw; lastAt = now;
-    const code = stickerCode(raw), it = code ? await itemByCode(code) : null;
-    if (!it) {
-      // kept for the next step (a factory barcode the bot will learn), never sent anywhere
-      keep('asker-ts-raw', [raw, ...load('asker-ts-raw', []).filter((x) => x !== raw)].slice(0, 20));
-      return say('tsFind', `الباركود ده (${raw}) مش ملصق فارمافلاي. اكتب الصنف بالاسم.`, 'bad');
-    }
+    // every reading is kept on this phone (the last 20), to learn the stickers' barcode; never sent anywhere
+    keep('asker-ts-raw', [raw, ...load('asker-ts-raw', []).filter((x) => x !== raw)].slice(0, 20));
+    const code = stickerCode(raw, true), it = code ? await itemByCode(code) : null;
+    if (!it) return say('tsFind', `الكاميرا قرت ${raw}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad');
     add(it);
     if (navigator.vibrate) navigator.vibrate(60);
-    say('tsFind', 'اتضاف: ' + nameOf(it), 'ok');
+    say('tsFind', `اتضاف: ${nameOf(it)} (الباركود ${raw})`, 'ok');
   }
   function stopScan() {
     clearInterval(timer); timer = null;
@@ -267,19 +277,22 @@
   function drawCust() {
     const box = $('tsCust');
     if (!box) return;
-    const paid = Number($('tsPaid').value) || 0, over = overLimit(cust, total(cart), paid);
+    const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, total(cart), paid);
     let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button><button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button></div>`;
     if (cust) {
       html += `<div class="ts-cust${over ? ' warn' : ''}"><strong class="notr">${esc(cust.name)}</strong> <small>كود ${esc(cust.id)}</small>
         <div class="hint">عليه ${esc(money(Math.max(0, Number(cust.balance) || 0)))}${Number(cust.credit_limit) ? ' · الحد ' + esc(money(cust.credit_limit)) : ''}</div>
         ${over ? `<div class="ts-warn">⚠️ هيبقى عليه ${esc(money(over.after))} والحد ${esc(money(over.lim))}: هيعدّي الحد بالبيعة دي</div>` : ''}
+        ${ret && cart.length ? `<div class="hint">المرتجع هيقلّل حسابه ${esc(money(Math.max(0, total(cart) - paid)))}</div>` : ''}
         <button type="button" class="linklike" data-ts-change>غيّر العميل</button></div>`;
     } else if (custOpen) {
       html += `<div class="search"><input id="tsCQ" type="search" autocomplete="off" aria-label="العميل" placeholder="اسم العميل أو الكود…" /></div><div id="tsCHits"></div>`;
     }
     const q = $('tsCQ') ? $('tsCQ').value : '';
     box.innerHTML = html;
-    $('tsPaidRow').classList.toggle('hidden', !cust);
+    // a credit customer: what he paid now; a return: what was given back to him (cash or credit)
+    $('tsPaidRow').classList.toggle('hidden', !cust && !ret);
+    $('tsPaidLbl').textContent = ret ? 'رجّعتله كام فلوس؟' : 'دفع كام؟';
     if ($('tsCQ')) { $('tsCQ').value = q; drawCustHits(); }
   }
   function drawCustHits() {
@@ -295,16 +308,24 @@
   const uuid = () => (root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => ((Math.random() * 16) | 0).toString(16)));
   async function save() {
     if (!cart.length) return say('tsStatus', 'ضيف صنف الأول', 'bad');
-    const rec = record({ id: uuid(), soldAt: new Date().toISOString(), lines: cart, customer: cust, paid: $('tsPaid').value, note: $('tsNote').value });
+    const rec = record({ id: uuid(), soldAt: new Date().toISOString(), lines: cart, customer: cust, paid: $('tsPaid').value, note: $('tsNote').value, kind });
     queue.push(rec);
     keep(QKEY, queue);
-    cart = []; cust = null; custOpen = false;
+    cart = []; cust = null; custOpen = false; setKind('sale');
     $('tsPaid').value = ''; $('tsNote').value = ''; $('tsQ').value = ''; $('tsHits').innerHTML = '';
     drawCart();
     drawBadge();
     say('tsStatus', 'اتحفظت على الموبايل…', 'ok');
     const left = await flush();
     say('tsStatus', left ? 'اتحفظت على الموبايل، وهتتبعت أول ما النت يرجع' : 'اتحفظت ✓', 'ok');
+  }
+  // «بيع» or «مرتجع» for the whole bill
+  function setKind(k) {
+    kind = k === 'return' ? 'return' : 'sale';
+    document.querySelectorAll('[data-ts-type]').forEach((b) => b.classList.toggle('on', b.dataset.tsType === kind));
+    $('tsNew').classList.toggle('ts-return', kind === 'return');
+    $('tsSave').textContent = kind === 'return' ? 'احفظ المرتجع' : 'احفظ البيعة';
+    drawCust();
   }
   // sends what is kept on the phone; returns how many are still waiting
   async function flush() {
@@ -346,11 +367,12 @@
   function saleRow(s) {
     const its = Array.isArray(s.items) ? s.items : [];
     const who = s.customer_id ? `<span class="notr">${esc(s.customer_name || '')}</span> (آجل)` : 'نقدي';
-    const tag = s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? '<span class="ts-st d">اتدخلت</span>' : '<span class="ts-st w">مستنية</span>';
+    const tag = (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
+      (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? '<span class="ts-st d">اتدخلت</span>' : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
       <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}</span>${tag}</button>
-      <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? ' · دفع ' + esc(money(s.paid)) : ''}</small>
+      <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
       ${open ? `<ul class="ts-items">${its.map((x) => `<li><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
         ${!s.queued && s.status === 'pending' ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}` : ''}
@@ -402,6 +424,7 @@
       if (!t || !panel.contains(t)) return;
       if (t.dataset.tsView) return showView(t.dataset.tsView);
       if (t.dataset.tsWay) return setWay(t.dataset.tsWay);
+      if (t.dataset.tsType) return setKind(t.dataset.tsType);
       if (t.dataset.tsAdd) {
         const it = await itemByCode(Number(t.dataset.tsAdd));
         if (it) { add(it); say('tsFind', 'اتضاف: ' + nameOf(it), 'ok'); }
