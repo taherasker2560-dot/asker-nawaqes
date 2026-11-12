@@ -119,7 +119,8 @@
   const AR = /[؀-ۿ]/;
   const L = M, R = PW - M;
   // columns, right to left: date | what | charged | paid | balance
-  const COL = { date: [R - 200, R], what: [L + 480, R - 200], debit: [L + 330, L + 480], paid: [L + 175, L + 330], bal: [L, L + 175] };
+  // the date column holds the whole date with the year (owner 2026-11-12: «التاريخ … مش باين السنة»)
+  const COL = { date: [R - 255, R], what: [L + 480, R - 255], debit: [L + 330, L + 480], paid: [L + 175, L + 330], bal: [L, L + 175] };
   function loadImage(src) {
     return new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
   }
@@ -204,7 +205,7 @@
           const label = m.kind === 'payment' ? 'دفعة' : m.kind === 'refund' ? 'رجّعناله فلوس' : m.kind === 'return' ? 'مرتجع' : 'فاتورة';
           const d = discountOf(m);
           const color = m.kind === 'payment' ? GREEN : m.kind === 'return' ? AMBER : '#14213d';
-          text(ctx, t ? `${pad(t.getDate())}/${pad(t.getMonth() + 1)} ${clock(t)}` : '', COL.date[1] - 10, y + 30, { size: 22, color: GREY });
+          text(ctx, t ? `${dateText(t)} ${clock(t)}` : '', COL.date[1] - 10, y + 30, { size: 21, color: GREY, w: COL.date[1] - COL.date[0] - 14 });
           text(ctx, label + (d ? ` (خصم ${money(d)})` : ''), COL.what[1] - 10, y + 30, { bold: true, size: 23, color, w: COL.what[1] - COL.what[0] - 20 });
           if (m.kind === 'sale' || m.kind === 'return') num2(m.total, COL.debit, color);
           if (num(m.paid)) num2(m.paid, COL.paid, GREEN);
