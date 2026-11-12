@@ -228,11 +228,11 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 // in the background; the row is filled in. Another error (not 5xx) is not tried again.
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
  const h=async(u,o)=>u.startsWith('https://generativelanguage')&&calls++<1?new Response('',{status:503}):g(u,o);
- const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,40]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
+ const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,40]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1',GEMINI_FALLBACK_MODELS:''},h);
  assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده');
  assert.equal(g.saved[0].status,'new');assert.equal(g.saved[0].error,null);assert.equal(g.saved[0].sure,1);assert.equal(calls,2);}
 {const g=fake();let calls=0;const h=async(u,o)=>u.startsWith('https://generativelanguage')?(calls++,new Response('',{status:500})):g(u,o);
- await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
+ await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1',GEMINI_FALLBACK_MODELS:''},h);
  assert.equal(g.saved[0].status,'error');assert.equal(calls,3,'first try + 2 retries, then it stays not read');}
 // a call notification is ignored, not kept
 {const g=fake();for(const x of ['\u200fمكالمة صوتية واردة','‏مكالمة صوتية فائتة','مكالمة فيديو فائتة','Missed voice call']){const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',x,'text/plain'),env,g);assert.equal(await r.text(),'');}

@@ -85,17 +85,35 @@ async function restAll<T>(env: Env, auth: Auth, fetchImpl: typeof fetch, path: s
   return out;
 }
 
+// Google busy (5xx) on the main model: the same request goes at once to these free models (they are busy less often).
+// GEMINI_FALLBACK_MODELS (comma separated) replaces the list; empty turns it off. A backup Google does not know (404)
+// is skipped.
+const FALLBACK_MODELS = 'gemini-flash-lite-latest';
+export function geminiModels(env: Env): string[] {
+  const main = (env.GEMINI_MODEL || DEFAULT_MODEL).trim();
+  const more = (env.GEMINI_FALLBACK_MODELS ?? FALLBACK_MODELS).split(',').map((m) => m.trim()).filter((m) => m && m !== main && /^[a-z0-9.\-]+$/i.test(m));
+  return [main, ...new Set(more)];
+}
+
 async function gemini(env: Env, fetchImpl: typeof fetch, parts: unknown[], schema: unknown, timeoutMs = GEMINI_TIMEOUT_MS): Promise<string> {
-  const model = (env.GEMINI_MODEL || DEFAULT_MODEL).trim();
+  const models = geminiModels(env);
   const deadline = AbortSignal.timeout(timeoutMs);
-  let res: Response | null = null;
-  for (const config of [{ responseSchema: schema, thinkingConfig: { thinkingBudget: 0 } }, { responseSchema: schema }, {}]) {
-    res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY as string },
-      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', ...config } }), signal: deadline,
-    });
-    if (res.status !== 400) break;
+  let res: Response | null = null, firstStatus = 0;
+  for (const [i, model] of models.entries()) {
+    for (const config of [{ responseSchema: schema, thinkingConfig: { thinkingBudget: 0 } }, { responseSchema: schema }, {}]) {
+      res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY as string },
+        body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', ...config } }), signal: deadline,
+      });
+      if (res.status !== 400) break;
+    }
+    if (i === 0) firstStatus = res?.status || 0;
+    // the main model answered (or refused for a reason a backup would share): no backup
+    if (!res || !(res.status >= 500 || (i > 0 && (res.status === 404 || res.status === 429)))) break;
   }
+  // a backup Google does not know or has no quota left: the main model's «busy» is the answer
+  if (res && (res.status === 404 || res.status === 429) && firstStatus >= 500) throw new Error('gemini ' + firstStatus);
+  if (res && res.ok && models.length > 1 && firstStatus >= 500) log('gemini-backup', Date.now(), { main: firstStatus });
   if (!res || res.status === 429) throw new Error('quota');
   if (!res.ok) throw new Error('gemini ' + res.status);
   const data = await res.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null;
@@ -642,6 +660,49 @@ async function handleDocs(req: Request, url: URL, fetchImpl: typeof fetch, c: Do
   if (r === 'company') return out(200, { ok: false, docs: true, company: true, say: '' }, say);
   return out(200, { ok: true, docs: true, duplicate: r === 'duplicate', say: '' }, say);
 }
+// ---------- the laptop's reader (Claude Code on the owner's own account) ----------
+// POST <function>?reader=list[&since=<ISO time>]   -> the photos/PDFs received since then (at most 3 days back, 50)
+// POST <function>?reader=file&id=<id>              -> that row's stored copy
+// POST <function>?reader=fill&id=<id>[&replace=1]  body {"rows":[{name,english,unclear}],"supplier":"","model":""}
+//   -> the rows are matched here like a phone's photo and saved: a row Google could not read is filled in (status new);
+//      a read row is replaced only with replace=1 (its status, company and «seen» stay). Nothing is said on the phone.
+// Same header as the phone (x-inbox-key).
+const READER_DAYS = 3;
+async function handleReader(what: string, url: URL, req: Request, env: Env, fetchImpl: typeof fetch, base: string, sh: Record<string, string>): Promise<Response> {
+  const t0 = Date.now(), id = url.searchParams.get('id') || '';
+  if (what === 'list') {
+    const floor = Date.now() - READER_DAYS * 864e5, asked = Date.parse(url.searchParams.get('since') || '');
+    const since = new Date(Number.isFinite(asked) ? Math.max(asked, floor) : Date.now() - 2 * 3600e3).toISOString();
+    const items = await restAll<Record<string, unknown>>(env, sh, fetchImpl, 'ar_inbox?select=id,received_at,kind,file_path,status,supplier,sure,review&kind=in.(image,pdf)&file_path=not.is.null&received_at=gte.' + encodeURIComponent(since) + '&order=received_at.desc');
+    return reply(200, { items: items.slice(0, 50) }, {});
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return reply(400, { error: 'id' }, {});
+  const [row] = await restAll<{ id: string; kind: string; file_path: string | null; status: string }>(env, sh, fetchImpl, 'ar_inbox?select=id,kind,file_path,status&id=eq.' + id);
+  if (!row || !row.file_path || !(row.kind === 'image' || row.kind === 'pdf')) return reply(404, { error: 'id' }, {});
+  if (what === 'file') {
+    const f = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${row.file_path}`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!f.ok) return reply(502, { error: 'file', status: f.status }, {});
+    return new Response(new Uint8Array(await f.arrayBuffer()), { status: 200, headers: { 'Content-Type': row.kind === 'pdf' ? 'application/pdf' : 'image/jpeg' } });
+  }
+  if (what === 'fill') {
+    const replace = url.searchParams.get('replace') === '1';
+    if (row.status !== 'error' && !replace) return reply(200, { ok: true, skipped: true }, {});
+    const read = parseRead(await req.text().catch(() => ''));
+    if (!read) return reply(400, { error: 'rows' }, {});
+    const s = await scoreInboxRows(env, sh, fetchImpl, read.rows);
+    const patch: Record<string, unknown> = { rows: s.list, sure: s.sureIds.size, review: s.review };
+    if (row.status === 'error') Object.assign(patch, { status: 'new', error: null });
+    // the row is written only while it is as it was read here (Google's background retry may fill it meanwhile)
+    const w = await fetchImpl(`${base}/rest/v1/ar_inbox?id=eq.${id}&status=eq.${encodeURIComponent(row.status)}`, {
+      method: 'PATCH', body: JSON.stringify(patch), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!w.ok) return reply(502, { error: 'save', status: w.status }, {});
+    log('reader-fill', t0, { kind: row.kind, was: row.status, rows: s.list.length, sure: s.sureIds.size, review: s.review });
+    return reply(200, { ok: true, rows: s.list.length, sure: s.sureIds.size, review: s.review }, {});
+  }
+  return reply(400, { error: 'reader' }, {});
+}
+
 export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
   const companies: string[] = [];
   const out = (status: number, body: Record<string, unknown>, say: boolean) => say
@@ -657,6 +718,8 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   if (!/^[0-9a-f]{32,128}$/.test(key)) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط' }, say);
   const keys = await restAll<{ key_hash: string }>(env, auth, fetchImpl, 'ar_inbox_keys?select=key_hash&key_hash=eq.' + await sha256Hex(key));
   if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
+  const reader = url.searchParams.get('reader');
+  if (reader) return handleReader(reader, url, req, env, fetchImpl, base, sh);
   // AutoNotification gives only the chat's name (no «(2 رسائل)»), so the phone adds the notification's time: «… ~w<ms>».
   // It changes with every new message and stays the same when WhatsApp shows the notification again.
   const rawFrom = String(url.searchParams.get('from') || ''), wm = rawFrom.match(/\s*~w(\S*)\s*$/);
