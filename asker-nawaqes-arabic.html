@@ -15,7 +15,7 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=buys-20261112c" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=look-20261112a" />
+    <link rel="stylesheet" href="ar/look.css?v=link-20261112a" />
   </head>
   <body>
     <header class="appbar">
@@ -504,6 +504,22 @@
         </section>
 
         <section id="storeOrdersPanel" class="card hidden">
+          <!-- رابط الموقع (ar/store-link.js): يفتحه، يبعته واتساب، ينسخه، أو يعمل كود QR للطباعة -->
+          <div id="storeLink" class="sl-box">
+            <h3>رابط الموقع</h3>
+            <p id="slUrl" class="sl-url" dir="ltr"></p>
+            <div class="sl-btns">
+              <button id="slOpen" type="button">افتح الموقع</button>
+              <button id="slWa" type="button" class="secondary">ابعته واتساب</button>
+              <button id="slCopy" type="button" class="secondary">انسخ الرابط</button>
+              <button id="slQr" type="button" class="secondary">كود QR للطباعة</button>
+            </div>
+            <div id="slQrBox" class="sl-qr hidden">
+              <img id="slQrImg" alt="كود QR لموقع صيدلية عسكر" width="240" height="290" />
+              <a id="slQrSave" download="asker-store-qr.png" href="#">حمّل صورة الكود</a>
+            </div>
+            <p id="slStatus" class="status"></p>
+          </div>
           <h2>طلبات الموقع</h2>
           <p class="hint">
             طلبات الزباين من موقع البيع (تجربة). «واتساب» بيفتح محادثة الزبون ومعاها رسالة تأكيد جاهزة: زوّد مصاريف التوصيل وابعتها
@@ -549,6 +565,7 @@
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=store-20261110a"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
+    <script src="ar/store-link.js?v=link-20261112a"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>
     <script src="ar/home.js?v=buys-20261112c"></script>
     <script src="ar/look.js?v=look-20261112a"></script>
