@@ -17,7 +17,15 @@
     const t = (s, n) => { const x = String(s || '').trim().slice(0, n); return x || null; };
     const wa = cleanPhone(v.whatsapp);
     if (wa === null) return { error: 'رقم الواتساب لازم يكون 11 رقم ويبدأ بـ 01' };
-    return { row: { is_open: !!v.is_open, closed_message: t(v.closed_message, 300), hero_title: t(v.hero_title, 120), hero_text: t(v.hero_text, 400), whatsapp: wa || null } };
+    const row = { is_open: !!v.is_open, closed_message: t(v.closed_message, 300), hero_title: t(v.hero_title, 120), hero_text: t(v.hero_text, 400), whatsapp: wa || null };
+    // the site's look for every customer (2026-11-12): a ready color id or «c:#rrggbb», and the night look
+    if (v.theme_color !== undefined) {
+      const c = String(v.theme_color || '').toLowerCase();
+      if (c && !/^[a-z]{2,12}$/.test(c) && !/^c:#[0-9a-f]{6}$/.test(c)) return { error: 'اللون مش مظبوط' };
+      row.theme_color = c || null;
+      row.theme_night = !!v.theme_night;
+    }
+    return { row };
   }
   const api = { cleanPhone, settingsRow };
   root.AskerStoreSettingsLib = api;
@@ -29,6 +37,18 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
   let found = [];
+  // the site's default look: the bot's 25 colors (ar/settings.js) + any color; the customer can still change it on his phone
+  let themeReady = false, themeColor = 'asker';
+  function drawTheme(color, night) {
+    const S = root.AskerSettings, box = $('ssThemePick');
+    if (!S || !box) return;
+    themeColor = color;
+    if (night !== undefined) $('ssThemeNight').checked = night;
+    box.innerHTML = S.PRESETS.map((p) => `<button type="button" role="radio" aria-checked="${p.id === color}" data-sscolor="${p.id}" class="accent${p.id === color ? ' on' : ''}"><span style="background:${S.palette(p.hex, false).main}"></span>${p.name}</button>`).join('');
+    const custom = /^c:#[0-9a-f]{6}$/.test(color);
+    $('ssThemeCustom').value = custom ? color.slice(2) : (S.PRESETS.find((p) => p.id === color) || S.PRESETS[0]).hex;
+    $('ssThemeCustomRow').classList.toggle('on', custom);
+  }
 
   function say(id, text, kind) {
     const el = $(id);
@@ -38,9 +58,13 @@
   }
   async function open() {
     if (!db() || !$('ssOpen')) return;
-    const { data, error } = await db().from('ar_store_settings').select('is_open,closed_message,hero_title,hero_text,whatsapp').eq('id', 1).maybeSingle();
+    // '*': theme_color / theme_night exist only after migration 202611120600
+    const { data, error } = await db().from('ar_store_settings').select('*').eq('id', 1).maybeSingle();
     if (error) return say('ssStatus', 'الإعدادات مش متاحة لسه: ' + error.message, 'bad');
     const s = data || { is_open: true };
+    themeReady = 'theme_color' in s;
+    if ($('ssThemeBox')) $('ssThemeBox').hidden = !themeReady;
+    if (themeReady) drawTheme(s.theme_color || 'asker', !!s.theme_night);
     $('ssOpen').checked = s.is_open !== false;
     $('ssClosedMsg').value = s.closed_message || '';
     $('ssHeroTitle').value = s.hero_title || '';
@@ -49,7 +73,9 @@
     say('ssStatus', '');
   }
   async function save() {
-    const r = settingsRow({ is_open: $('ssOpen').checked, closed_message: $('ssClosedMsg').value, hero_title: $('ssHeroTitle').value, hero_text: $('ssHeroText').value, whatsapp: $('ssWhatsapp').value });
+    const v = { is_open: $('ssOpen').checked, closed_message: $('ssClosedMsg').value, hero_title: $('ssHeroTitle').value, hero_text: $('ssHeroText').value, whatsapp: $('ssWhatsapp').value };
+    if (themeReady) { v.theme_color = themeColor; v.theme_night = $('ssThemeNight').checked; }
+    const r = settingsRow(v);
     if (r.error) return say('ssStatus', r.error, 'bad');
     $('ssSave').disabled = true;
     try {
@@ -109,6 +135,10 @@
       say('ssItemStatus', 'ماتغيّرش: ' + e.message, 'bad');
     }
   }
+  $('ssThemePick')?.addEventListener('click', (e) => { const b = e.target.closest('[data-sscolor]'); if (b) drawTheme(b.dataset.sscolor); });
+  const customPick = (e) => { if (/^#[0-9a-f]{6}$/i.test(e.target.value)) drawTheme('c:' + e.target.value.toLowerCase()); };
+  $('ssThemeCustom')?.addEventListener('input', customPick);
+  $('ssThemeCustom')?.addEventListener('change', customPick);
   $('ssSave')?.addEventListener('click', save);
   $('ssSearch')?.addEventListener('click', search);
   $('ssQ')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); } });
