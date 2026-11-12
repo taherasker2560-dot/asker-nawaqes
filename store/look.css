@@ -486,3 +486,13 @@ body.sheet-open { overflow: hidden; }
 .top .bot-btn { width: auto; gap: 4px; padding: 0 10px; font-weight: 700; font-size: 14px; text-decoration: none; }
 .top .bot-btn[hidden] { display: none; }
 
+
+/* English (store/i18n-en-store.js + ar/i18n.js): the language switch, and the Arabic item names hidden in English */
+.lang-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.lang-row button { flex: 1; min-height: 44px; border-radius: 12px; border: 1.5px solid var(--line, #d8e0ed); background: var(--card, #fff); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.lang-row button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+html[lang="en"] .item-text .ar, html[lang="en"] #shAr, html[lang="en"] .brand span[dir="ltr"] { display: none !important; }
+html[lang="en"] .item-text h3, html[lang="en"] #shName { text-align: left; }
+html[dir="ltr"] .back svg, html[dir="ltr"] .bot-btn svg { transform: scaleX(-1); }
+html[dir="ltr"] .sheet h2, html[dir="ltr"] .sheet h2#themeTitle, html[dir="ltr"] .accent, html[dir="ltr"] .item h3 { text-align: left; }
+html[dir="ltr"] .sheet h2#themeTitle { padding-right: 48px; }

@@ -84,7 +84,7 @@
   // their own text: a tag inside the row, like «لسه ماتترجمش», is still translated)
   const SKIP = 'script,style,textarea,[translate="no"],.notr';
   const NAMES = '.sr-ar,.hs-names > strong,.st-item > strong';
-  const ATTRS = ['placeholder', 'aria-label', 'title'];
+  const ATTRS = ['placeholder', 'aria-label', 'title', 'alt'];
   function attrs(el) {
     for (const a of ATTRS) {
       const v = el.getAttribute(a);
