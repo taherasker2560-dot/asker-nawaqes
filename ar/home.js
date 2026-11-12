@@ -26,15 +26,31 @@
     }
     return [...by.values()].sort((a, b) => (num(b.disc) ?? -1) - (num(a.disc) ?? -1));
   }
-  // src: { items: ar_store_items rows, stock: ar_stock rows, lines: ar_supplier_items rows, shortages: [{product_name}],
-  //        names: Map(name_key -> {arabic_name}), orders: [{name_key}], nk: name -> name_key, sure: line -> bool, fold }
+  // the suppliers' short codes (lists and purchases) as the owner says them
+  const SUP = { NEWCITY: 'نيو سيتي', NEWC: 'نيو سيتي', AMG: 'AMG', REDA: 'رضا عطية', SKY: 'رضا عطية', ELFATH: 'الفتح', ELFT: 'الفتح', PHARMA: 'فارما', PHAR: 'فارما', IBNSINA: 'ابن سينا', RAMA: 'صيدلية رمضان' };
+  const supName = (s) => SUP[String(s || '').toUpperCase()] || String(s || '');
+  // «9/11» this year, «9/11/25» before
+  function shortDate(d, now) {
+    const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '';
+    const y = (now || new Date()).getFullYear();
+    return `${+m[3]}/${+m[2]}` + (+m[1] === y ? '' : '/' + m[1].slice(2));
+  }
+  // «آخر شرا: الفتح 21% (9/11) · AMG 20% (3/10)» (the newest three)
+  function buysText(it, now) {
+    const b = (it.buys || []).slice().sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 3);
+    if (!b.length) return '';
+    return 'آخر شرا: ' + b.map((x) => supName(x.supplier) + (num(x.disc) != null ? ' ' + num(x.disc) + '%' : '') + (num(x.bonus) > 0 ? ' + بونص' : '') + ' (' + shortDate(x.date, now) + ')').join(' · ');
+  }
+  // src: { items: ar_store_items rows, stock: ar_stock rows, lines: ar_supplier_items rows, buys: ar_item_buys rows,
+  //        shortages: [{product_name}], names: Map(name_key -> {arabic_name}), orders: [{name_key}], nk, sure, fold }
   function buildIndex(src) {
     const nk = src.nk, fold = src.fold || ((s) => String(s || '').toLowerCase());
     const names = src.names || new Map();
     const arOf = (en, given) => String(given || '').trim() || String((names.get(nk(en)) || {}).arabic_name || '').trim();
     const byId = new Map(), byName = new Map(), items = [], extra = [];
     const add = (it) => { it.key = it.id != null ? 'i' + it.id : 's' + nk(it.en); items.push(it); if (it.id != null) byId.set(String(it.id), it); if (it.en) byName.set(nk(it.en), it); return it; };
-    const blank = (id, en, ar) => ({ id, en: String(en || ''), ar: arOf(en, ar), stock: null, price: null, offers: [], short: false, ordered: false });
+    const blank = (id, en, ar) => ({ id, en: String(en || ''), ar: arOf(en, ar), stock: null, price: null, offers: [], buys: [], short: false, ordered: false });
     for (const r of src.items || []) {
       if (!r || r.id == null) continue;
       const it = add(blank(r.id, r.name, r.arabic_name));
@@ -53,6 +69,12 @@
       let it = byId.get(String(l.item_id));
       if (!it) it = add(blank(l.item_id, l.pharmafly_name));
       it.offers.push({ supplier: l.supplier, disc: l.discount_pct, price: l.price, date: l.list_date });
+    }
+    // the last real purchase from each supplier (only for items the system knows)
+    for (const b of src.buys || []) {
+      if (!b || b.item_id == null) continue;
+      const it = byId.get(String(b.item_id));
+      if (it) it.buys.push({ supplier: b.supplier, date: b.last_date, disc: b.discount_pct, bonus: b.bonus });
     }
     for (const x of src.shortages || []) {
       if (!x || !x.product_name) continue;
@@ -80,12 +102,12 @@
     if (it.ordered) out.push({ text: 'اتطلب النهارده', kind: 'warn' });
     return out;
   }
-  // «عند: AMG 22% · REDA 20%» (the best three)
+  // «في القوايم: AMG 22% · رضا عطية 20%» (the best three)
   function offersText(it) {
-    const o = (it.offers || []).slice(0, 3).map((x) => x.supplier + (num(x.disc) != null ? ' ' + num(x.disc) + '%' : ''));
-    return o.length ? 'عند: ' + o.join(' · ') : '';
+    const o = (it.offers || []).slice(0, 3).map((x) => supName(x.supplier) + (num(x.disc) != null ? ' ' + num(x.disc) + '%' : ''));
+    return o.length ? 'في القوايم: ' + o.join(' · ') : '';
   }
-  const api = { buildIndex, marks, offersText, bestOffers };
+  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate };
   root.AskerHomeLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -100,6 +122,7 @@
   let index = null, built = null, timer = null, shown = new Map();
   let lines = null, linesLoading = null, linesFail = '';
   let catalog = null, catLoading = null, catFail = '';
+  let buys = null, buysLoading = null; // «آخر شرا» (ar_item_buys): quiet when the table is not there yet
 
   function say(text, kind) {
     const el = $('hsStatus');
@@ -107,9 +130,11 @@
     el.textContent = text || '';
     el.className = 'status' + (kind ? ' ' + kind : '');
   }
-  // every item of the system, 1000 a page, 4 pages at a time (read once, kept until the page is closed)
-  async function readCatalog() {
-    const page = (a, z, opts) => db().from('ar_store_items').select(ITEM_COLS, opts).order('id', { ascending: true }).range(a, z);
+  // a whole owner-only table, 1000 a page, 4 pages at a time (read once, kept until the page is closed)
+  async function readCatalog() { return readAll('ar_store_items', ITEM_COLS, 'id'); }
+  async function readAll(table, cols, orderBy) {
+    // a stable order (every key column), so pages never skip or repeat a row
+    const page = (a, z, opts) => orderBy.split(',').reduce((q, c) => q.order(c.trim(), { ascending: true }), db().from(table).select(cols, opts)).range(a, z);
     const first = await page(0, 999, { count: 'exact' });
     if (first.error) throw first.error;
     const out = [...(first.data || [])];
@@ -131,6 +156,13 @@
       .catch((e) => { catFail = 'أصناف السيستم ماتحمّلتش: ' + ((e && e.message) || e); })
       .finally(() => { catLoading = null; draw(); });
   }
+  function loadBuys() {
+    if (buys || buysLoading || !db()) return;
+    buysLoading = readAll('ar_item_buys', 'item_id,supplier,last_date,discount_pct,bonus', 'item_id,supplier')
+      .then((all) => { buys = all; })
+      .catch(() => { buys = []; }) // not there yet (before its migration) or not readable: the cards just have no «آخر شرا»
+      .finally(() => { buysLoading = null; draw(); });
+  }
   function loadLines() {
     if (lines || linesLoading || !root.AskerSuppliers || !root.AskerSuppliers.lines) return;
     linesLoading = root.AskerSuppliers.lines()
@@ -148,10 +180,10 @@
   function currentIndex() {
     const L = root.AskerApp && root.AskerApp.lookup ? root.AskerApp.lookup() : { shortages: [], knownNames: new Map(), orders: [], nk: (s) => String(s || '').toUpperCase().trim() };
     const stock = root.AskerStock ? root.AskerStock.rows() : [];
-    const src = [catalog, stock, lines, L.shortages, L.knownNames, L.orders];
+    const src = [catalog, stock, lines, buys, L.shortages, L.knownNames, L.orders];
     if (index && built && src.every((x, i) => x === built[i])) return index;
     built = src;
-    index = buildIndex({ items: catalog || [], stock, lines: lines || [], shortages: L.shortages, names: L.knownNames, orders: L.orders, nk: L.nk, sure: root.AskerSuppliers && root.AskerSuppliers.sure, fold: fz().fold });
+    index = buildIndex({ items: catalog || [], stock, lines: lines || [], buys: buys || [], shortages: L.shortages, names: L.knownNames, orders: L.orders, nk: L.nk, sure: root.AskerSuppliers && root.AskerSuppliers.sure, fold: fz().fold });
     return index;
   }
   const PEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -162,7 +194,7 @@
     const price = s && Number(s.price) > 0 ? Number(s.price) : it.price;
     const more = [s && lib.expText ? lib.expText(s.exp_near) : '', price > 0 ? Math.round(price * 100) / 100 + ' ج' : ''].filter(Boolean).join(' · ');
     const others = s && lib.otherText ? lib.otherText(s.other, s.parts).map((t) => `<div class="st-other">${esc(t)}</div>`).join('') : '';
-    const offers = offersText(it);
+    const offers = offersText(it), bought = buysText(it);
     return `<div class="hs-item" data-k="${esc(it.key)}">
       <div class="hs-top">
         <div class="hs-names"><strong>${esc(it.ar || it.en)}</strong>${it.ar && it.en ? `<div class="hs-en" dir="ltr">${esc(it.en)}</div>` : ''}</div>
@@ -171,6 +203,7 @@
       <div class="hs-tags">${tags}</div>
       ${others}
       ${more ? `<div class="hint">${esc(more)}</div>` : ''}
+      ${bought ? `<div class="hs-buys">${esc(bought)}</div>` : ''}
       ${offers ? `<div class="hs-offers">${esc(offers)}</div>` : ''}
     </div>`;
   }
@@ -198,7 +231,7 @@
     $('app')?.classList.toggle('searching', on);
     if (!on) { $('hsItems').innerHTML = ''; $('hsLinesBox').classList.add('hidden'); editing = null; return say(''); }
     if (editing && document.activeElement && document.activeElement.id === 'hsAr') return; // never wipe what is being typed
-    loadCatalog(); loadLines(); askStock();
+    loadCatalog(); loadLines(); loadBuys(); askStock();
     const ix = currentIndex();
     const hits = fz().rank(q, ix.items, (it) => it._h, 25);
     const extra = lines ? fz().rank(q, ix.extra, (l) => l._h, 10) : [];

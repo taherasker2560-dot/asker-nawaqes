@@ -2,7 +2,7 @@
 // (ar_store_items), the stock, the shortage list, today's «اتطلب» and the warehouses' lists; ✏️ fixes the Arabic name
 // (ar_store_owner_set_arabic + ar_names «approved»). Lines not surely one of our items are shown apart.
 const {run,assert}=require('./harness.cjs');
-const cards=(page)=>page.$$eval('#hsItems .hs-item',e=>e.map(x=>({name:x.querySelector('strong').textContent.trim(),tags:[...x.querySelectorAll('.tag')].map(t=>t.textContent.trim()),offers:(x.querySelector('.hs-offers')||{}).textContent||''})));
+const cards=(page)=>page.$$eval('#hsItems .hs-item',e=>e.map(x=>({name:x.querySelector('strong').textContent.trim(),tags:[...x.querySelectorAll('.tag')].map(t=>t.textContent.trim()),offers:(x.querySelector('.hs-offers')||{}).textContent||'',buys:(x.querySelector('.hs-buys')||{}).textContent||''})));
 const seed=(page)=>page.evaluate(()=>{
  const T={};
  T.ar_store_items=[
@@ -19,6 +19,7 @@ const seed=(page)=>page.evaluate(()=>{
  ];
  T.ar_names=[{name_key:'FLAGYL 125MG SYP',english_name:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ شراب',status:'approved'}];
  T.ar_orders=[{id:'o1',name_key:'FLAGYL 125MG SYP',product_name:'FLAGYL 125MG SYP',supplier:'AMG',ordered_at:new Date().toISOString()}];
+ T.ar_item_buys=[{item_id:201,supplier:'ELFATH',last_date:new Date().getFullYear()+'-11-09',discount_pct:21,bonus:0},{item_id:201,supplier:'AMG',last_date:'2025-10-03',discount_pct:19,bonus:2}];
  localStorage.setItem('__fakeTables',JSON.stringify(T));
 });
 const ready=(page)=>page.waitForFunction(()=>/\d/.test(document.getElementById('shStats')?.textContent||''));
@@ -37,10 +38,11 @@ run('search on top: every item of the system, one card each, with its marks',asy
  c=await cards(page);assert.deepEqual(c[0].tags,['ملوش رصيد']);
  // not in stock, on the shortage list, ordered today; best offer per warehouse = its newest list
  await page.fill('#hsQ','FLAGYL');
- await page.waitForFunction(()=>/فلاجيل ١٢٥ شراب/.test(document.getElementById('hsItems').textContent)&&/عند/.test(document.getElementById('hsItems').textContent));
+ await page.waitForFunction(()=>/فلاجيل ١٢٥ شراب/.test(document.getElementById('hsItems').textContent)&&/في القوايم/.test(document.getElementById('hsItems').textContent)&&/آخر شرا/.test(document.getElementById('hsItems').textContent));
  c=await cards(page);
  assert.equal(c[0].name,'فلاجيل ١٢٥ شراب');assert.deepEqual(c[0].tags,['ملوش رصيد','ناقص','اتطلب النهارده']);
- assert.equal(c[0].offers.trim(),'عند: AMG 22% · REDA 18%','AMG from its newest list (22%, not the older 25%)');
+ assert.equal(c[0].offers.trim(),'في القوايم: AMG 22% · رضا عطية 18%','AMG from its newest list (22%, not the older 25%)');
+ assert.equal(c[0].buys.trim(),'آخر شرا: الفتح 21% (9/11) · AMG 19% + بونص (3/10/25)','the newest real purchases first, with the bonus');
  // a warehouse line that is not one of our items is apart
  await page.fill('#hsQ','فلاجيل');
  await page.waitForFunction(()=>!document.getElementById('hsLinesBox').classList.contains('hidden'));
