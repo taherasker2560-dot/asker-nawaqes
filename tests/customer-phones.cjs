@@ -32,5 +32,18 @@ const assert=require('node:assert/strict');
  sp.forEach(p=>assert.match((p.qual||'')+(p.with_check||''),/ar-statements[\s\S]*ff6c33dc/));
  const re=new RegExp(/\^s\/\[0-9\]\{4\}-\[0-9\]\{2\}\/\[0-9a-f-\]\{20,40\}\\\.pdf\$/.source);
  assert.match(sp.find(p=>p.cmd==='INSERT').with_check,re);
+ // 202611121500: several numbers for one customer (up to 5); the saved ones stay
+ const many=fs.readFileSync('supabase/migrations/202611121500_ar_customer_phones_many.sql','utf8');
+ await db.exec(`DELETE FROM public.ar_customer_phones; INSERT INTO public.ar_customer_phones(customer_id,phone) VALUES (9001,'201012345678')`);
+ await db.exec(many);await db.exec(many); // applied twice: safe
+ assert.equal((await db.query(`SELECT count(*)::int n FROM public.ar_customer_phones`)).rows[0].n,1,'the saved number stays');
+ for(const p of ['201000000002','201000000003','201000000004','201000000005'])await db.query(`INSERT INTO public.ar_customer_phones(customer_id,phone) VALUES (9001,$1)`,[p]);
+ await assert.rejects(()=>db.query(`INSERT INTO public.ar_customer_phones(customer_id,phone) VALUES (9001,'201000000006')`),/max 5/);
+ await assert.rejects(()=>db.query(`INSERT INTO public.ar_customer_phones(customer_id,phone) VALUES (9001,'201000000002')`),/duplicate|unique/,'the same number twice');
+ // saving a known number again (its name) still works at 5
+ await db.query(`INSERT INTO public.ar_customer_phones(customer_id,phone,contact_name) VALUES (9001,'201000000002','جار') ON CONFLICT (customer_id,phone) DO UPDATE SET contact_name=excluded.contact_name`);
+ assert.equal((await db.query(`SELECT contact_name FROM public.ar_customer_phones WHERE phone='201000000002'`)).rows[0].contact_name,'جار');
+ // another customer can have the same number (a family)
+ await db.query(`INSERT INTO public.ar_customer_phones(customer_id,phone) VALUES (9002,'201012345678')`);
  console.log('customer-phones ok');
 })().catch(e=>{console.error(e);process.exit(1)});

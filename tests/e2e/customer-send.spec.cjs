@@ -33,20 +33,42 @@ run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is
  await page.click('[data-cu-phone-edit]');
  await page.click('[data-cu-pick]');
  await page.waitForSelector('[data-cu-tel]');
- assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0101 111 2222','+20222334455']);
+ assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0101 111 2222','+20222334455','ضيفهم كلهم']);
  await page.click('[data-cu-tel="0"]');
- await page.waitForFunction(()=>/0101 111 2222/.test(document.querySelector('#cuSt .cu-phone')?.textContent||''));
- assert.match(await text(page,'#cuSt .cu-phone'),/جار الصيدلية في الموبايل/);
- assert.deepEqual((await table('ar_customer_phones')).map(r=>[r.customer_id,r.phone,r.contact_name]),[[101,'201011112222','جار الصيدلية']]);
+ // several numbers a customer (owner: «رقم و2 و3»): the new one is added next to the first
+ await page.waitForFunction(()=>document.querySelectorAll('#cuSt .cu-phone [data-cu-phone-del]').length===2);
+ const rowsText=()=>page.$$eval('#cuSt .cu-phone',r=>r.map(x=>x.textContent.replace(/\s+/g,' ').trim()));
+ assert.deepEqual(await rowsText(),['📱 واتس: 0101 234 5678شيله','📱 واتس: 0101 111 2222جار الصيدلية في الموبايلشيله']);
+ assert.deepEqual((await table('ar_customer_phones')).map(r=>[r.customer_id,r.phone,r.contact_name]),[[101,'201012345678',null],[101,'201011112222','جار الصيدلية']]);
+ // «ضيفهم كلهم»: both numbers of the contact (one already there only gets updated)
+ await page.click('[data-cu-phone-edit]');await page.click('[data-cu-pick]');await page.waitForSelector('[data-cu-tel="all"]');
+ await page.click('[data-cu-tel="all"]');
+ await page.waitForFunction(()=>/اتحفظ 2 رقم/.test(document.getElementById('cuSt').textContent));
+ assert.deepEqual((await table('ar_customer_phones')).map(r=>r.phone),['201012345678','201011112222','20222334455']);
+ // remove one (asks first)
+ page.once('dialog',d=>{assert.match(d.message(),/تشيل الرقم ده من العميل؟ \+20222334455/);d.accept()});
+ await page.click('[data-cu-phone-del="20222334455"]');
+ await page.waitForFunction(()=>/اتشال الرقم/.test(document.getElementById('cuSt').textContent));
+ assert.deepEqual((await table('ar_customer_phones')).map(r=>r.phone),['201012345678','201011112222']);
+ // at 5 numbers it says to remove one first
+ await page.evaluate(()=>{for(const p of ['201000000003','201000000004','201000000005'])window.__tables.ar_customer_phones.push({customer_id:101,phone:p,contact_name:null})});
+ await page.click('[data-cu-back]');await page.waitForSelector('#cuListView:not(.hidden)');await page.evaluate(()=>window.AskerCustomers.load(true));
+ await page.click('#cuRows [data-cu="101"]');await page.waitForSelector('#cuSt:not(.hidden) .cu-mv');
+ assert.equal(await page.$('[data-cu-phone-edit]'),null,'no «ضيف رقم تاني» at 5');
+ await page.evaluate(()=>{window.__tables.ar_customer_phones.splice(2)});await page.click('[data-cu-back]');await page.waitForSelector('#cuListView:not(.hidden)');
+ await page.evaluate(()=>window.AskerCustomers.load(true));
  // the list shows who has a number
- await page.click('[data-cu-back]');await page.waitForSelector('#cuListView:not(.hidden)');
  assert.match(await text(page,'#cuRows [data-cu="101"] strong'),/📱/);
 });
 run('Statement on WhatsApp: from the payment he picks, a detailed PDF, WhatsApp opens on the customer\'s chat',async({page,table})=>{
- await setData(page,[{customer_id:101,phone:'201012345678',contact_name:'جار الصيدلية',last_sent_at:null,last_sent_from:null}]);
+ await setData(page,[{customer_id:101,phone:'201012345678',contact_name:'جار الصيدلية',last_sent_at:null,last_sent_from:null,updated_at:'2026-11-12T10:00:00Z'},
+  {customer_id:101,phone:'201099998888',contact_name:'ابنه',last_sent_at:'2026-11-10T10:00:00Z',last_sent_from:null,updated_at:'2026-11-12T11:00:00Z'}]);
  await openStatement(page);
  await page.click('[data-cu-send]');
  await page.waitForSelector('.cu-sendbox [data-cu-from]');
+ // two numbers: «ابعت على» chooses, the last one a statement went to first
+ assert.deepEqual(await page.$$eval('.cu-sendbox [data-cu-to]',b=>b.map(x=>(x.classList.contains('on')?'* ':'')+x.textContent)),['0101 234 5678','* 0109 999 8888']);
+ await page.click('.cu-sendbox [data-cu-to="201012345678"]');
  await page.waitForFunction(()=>!/بيجيب الحركات/.test(document.querySelector('.cu-sendbox')?.textContent||''));
  // the payments, newest first (the last one chosen), then «من أول الشهر ده»
  const opts=await page.$$eval('.cu-sendbox .cu-opt',b=>b.map(x=>(x.classList.contains('on')?'* ':'')+x.querySelector('span').firstChild.textContent));

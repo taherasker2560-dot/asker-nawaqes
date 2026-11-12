@@ -187,10 +187,12 @@
 
   async function loadPhones() {
     try {
-      const { data, error } = await db().from('ar_customer_phones').select('customer_id,phone,contact_name,last_sent_at,last_sent_from').range(0, 4999);
+      const { data, error } = await db().from('ar_customer_phones').select('customer_id,phone,contact_name,last_sent_at,last_sent_from,updated_at').range(0, 4999);
       if (error) throw new Error(error.message || String(error));
+      // several numbers a customer (owner 2026-11-12: «رقم و2 و3»), the first saved first
       const m = new Map();
-      (data || []).forEach((r) => m.set(String(r.customer_id), r));
+      [...(data || [])].sort((a, b) => String(a.updated_at || '').localeCompare(String(b.updated_at || '')))
+        .forEach((r) => { const k = String(r.customer_id); if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
       phones = m;
     } catch (e) {
       phones = null;
@@ -323,36 +325,70 @@
   // ---------- the customer's WhatsApp number and sending the statement (owner 2026-11-12) ----------
   const localIso = (d) => { const t = new Date(d); return isNaN(t) ? '' : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}T${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:00`; };
   const errText = (e) => (e && e.message) || String(e);
+  const MAX_NUMBERS = 5;
+  const numbersOf = (id) => (phones && phones.get(String(id))) || [];
+  // a text for a browser dialog (confirm) in the bot's language
+  const tr = (s) => (root.AskerI18n && root.AskerI18n.lang && root.AskerI18n.lang() === 'en' ? root.AskerI18n.translate(s) : s);
   function phoneHtml() {
     if (!phones) return ''; // the numbers' table is not on the server (yet)
-    const p = phones.get(String(st.c.id));
+    const list = numbersOf(st.c.id);
     const note = st.phoneMsg ? `<p class="status ${st.phoneBad ? 'bad' : 'good'}">${esc(st.phoneMsg)}</p>` : '';
-    if (p && !st.phoneEdit) {
-      return `<div class="cu-phone"><span>📱 واتس: <b dir="ltr">${esc(showPhone(p.phone))}</b>` +
-        (p.contact_name ? `<small><span class="notr">${esc(p.contact_name)}</span> في الموبايل</small>` : '') +
-        (p.last_sent_at ? `<small>آخر كشف اتبعت ${esc(whenText(localIso(p.last_sent_at), new Date()))}</small>` : '') + '</span>' +
-        '<button type="button" class="linklike" data-cu-phone-edit>غيّره</button></div>' +
+    const rows = list.map((p) => `<div class="cu-phone"><span>📱 واتس: <b dir="ltr">${esc(showPhone(p.phone))}</b>` +
+      (p.contact_name ? `<small><span class="notr">${esc(p.contact_name)}</span> في الموبايل</small>` : '') +
+      (p.last_sent_at ? `<small>آخر كشف اتبعت ${esc(whenText(localIso(p.last_sent_at), new Date()))}</small>` : '') + '</span>' +
+      `<button type="button" class="linklike" data-cu-phone-del="${esc(p.phone)}">شيله</button></div>`).join('');
+    if (list.length && !st.phoneEdit) {
+      return rows +
+        (list.length < MAX_NUMBERS ? '<button type="button" class="linklike cu-add" data-cu-phone-edit>+ ضيف رقم تاني</button>' : '') +
         (st.send ? '' : '<button type="button" class="cu-send" data-cu-send>ابعت كشف الحساب على الواتس</button>') + note;
     }
     const tels = st.tels && st.tels.length > 1
-      ? '<p class="hint">الاسم ده عليه أكتر من رقم، اختار رقم الواتس:</p><div class="cu-tels">' +
-        st.tels.map((t, i) => `<button type="button" class="secondary small" data-cu-tel="${i}" dir="ltr">${esc(showPhone(t))}</button>`).join('') + '</div>'
+      ? '<p class="hint">الاسم ده عليه أكتر من رقم، اختار اللي هتضيفه:</p><div class="cu-tels">' +
+        st.tels.map((t, i) => `<button type="button" class="secondary small" data-cu-tel="${i}" dir="ltr">${esc(showPhone(t))}</button>`).join('') +
+        '<button type="button" class="small" data-cu-tel="all">ضيفهم كلهم</button></div>'
       : '';
-    return `<div class="cu-phone"><span>${p ? '📱 غيّر رقم الواتس' : '📱 مالوش رقم واتس'}</span>` +
-      (p ? '<button type="button" class="linklike" data-cu-phone-cancel>لغي</button>' : '') + '</div>' +
+    return rows + `<div class="cu-phone"><span>${list.length ? '📱 رقم واتس جديد' : '📱 مالوش رقم واتس'}</span>` +
+      (list.length ? '<button type="button" class="linklike" data-cu-phone-cancel>لغي</button>' : '') + '</div>' +
       (canPick() ? '<button type="button" class="secondary cu-pick" data-cu-pick>اختار رقمه من أسامي الموبايل</button>' : '') +
       (canPaste() ? '<button type="button" class="secondary cu-pick" data-cu-paste>الصق الرقم اللي نسخته</button>' : '') + tels +
       `<div class="cu-phone-in"><input id="cuPhoneIn" type="tel" inputmode="tel" autocomplete="off" placeholder="${canPick() ? 'أو اكتب رقمه: 01xxxxxxxxx' : 'اكتب رقمه: 01xxxxxxxxx'}" value="${esc(st.phoneDraft || '')}" />` +
       '<button type="button" class="small" data-cu-phone-save>احفظ</button></div>' + note;
   }
-  async function savePhone(phone, name) {
+  // add a number (a number already there only gets its name updated)
+  async function savePhone(phone, name, quiet) {
     const me = st, p = intlPhone(phone);
-    if (!p) { me.phoneMsg = 'الرقم ده مش مظبوط. اكتبه زي 01012345678.'; me.phoneBad = true; drawStatement(); return; }
-    const row = { customer_id: me.c.id, phone: p, contact_name: name ? String(name).trim().slice(0, 120) : null, updated_at: new Date().toISOString() };
-    const { error } = await db().from('ar_customer_phones').upsert(row, { onConflict: 'customer_id' });
-    if (error) { me.phoneMsg = 'مقدرتش أحفظ الرقم: ' + errText(error); me.phoneBad = true; if (st === me) drawStatement(); return; }
-    phones.set(String(me.c.id), { ...(phones.get(String(me.c.id)) || {}), ...row });
-    Object.assign(me, { phoneEdit: false, tels: null, phoneDraft: '', phoneMsg: 'اتحفظ الرقم.', phoneBad: false });
+    if (!p) { me.phoneMsg = 'الرقم ده مش مظبوط. اكتبه زي 01012345678.'; me.phoneBad = true; drawStatement(); return false; }
+    const list = numbersOf(me.c.id), had = list.find((x) => x.phone === p);
+    if (!had && list.length >= MAX_NUMBERS) { me.phoneMsg = 'العميل ده عليه 5 أرقام، شيل واحد الأول.'; me.phoneBad = true; drawStatement(); return false; }
+    const row = { customer_id: me.c.id, phone: p, contact_name: name ? String(name).trim().slice(0, 120) : (had && had.contact_name) || null, updated_at: new Date().toISOString() };
+    const { error } = await db().from('ar_customer_phones').upsert(row, { onConflict: 'customer_id,phone' });
+    if (error) { me.phoneMsg = 'مقدرتش أحفظ الرقم: ' + errText(error); me.phoneBad = true; if (st === me) drawStatement(); return false; }
+    if (had) Object.assign(had, row);
+    else { if (!phones.has(String(me.c.id))) phones.set(String(me.c.id), []); phones.get(String(me.c.id)).push(row); }
+    if (!quiet) {
+      Object.assign(me, { phoneEdit: false, tels: null, phoneDraft: '', phoneMsg: had ? 'الرقم ده كان متسجل، اتحدّث.' : 'اتحفظ الرقم.', phoneBad: false });
+      if (st === me) drawStatement();
+    }
+    return true;
+  }
+  async function saveAll(tels, name) {
+    const me = st;
+    let n = 0;
+    me.phoneBad = false;
+    for (const t of tels) { if (await savePhone(t, name, true)) n++; if (st !== me) return; if (me.phoneBad) break; }
+    if (!me.phoneBad) Object.assign(me, { phoneEdit: false, tels: null, phoneDraft: '', phoneMsg: `اتحفظ ${n} رقم.`, phoneBad: false });
+    if (st === me) drawStatement();
+  }
+  async function deletePhone(phone) {
+    const me = st;
+    if (!root.confirm(tr('تشيل الرقم ده من العميل؟') + ' ' + showPhone(phone))) return;
+    const { error } = await db().from('ar_customer_phones').delete().eq('customer_id', me.c.id).eq('phone', phone);
+    if (error) { me.phoneMsg = 'مقدرتش أشيل الرقم: ' + errText(error); me.phoneBad = true; if (st === me) drawStatement(); return; }
+    const list = numbersOf(me.c.id), i = list.findIndex((x) => x.phone === phone);
+    if (i >= 0) list.splice(i, 1);
+    if (!list.length) phones.delete(String(me.c.id));
+    if (me.send && me.send.to === phone) me.send.to = null;
+    Object.assign(me, { phoneMsg: 'اتشال الرقم.', phoneBad: false });
     if (st === me) drawStatement();
   }
   // the phone's contacts list (owner 2026-11-12: «باختار الرقم وبدوس تم … ما بلاقيش الرقم اتسحب»): every outcome now says
@@ -428,7 +464,17 @@
     if (s.from == null) s.from = pays.length ? pays[0].id : monthId;
     const opt = (id, title, sub) => `<button type="button" class="cu-opt${String(s.from) === String(id) ? ' on' : ''}" data-cu-from="${esc(id)}"><span>${esc(title)}<small>${esc(sub)}</small></span><i></i></button>`;
     const after = (p) => `${dateText(parseAt(p.at))} · بعدها ${p.sales} فاتورة` + (p.returns ? ` و${p.returns} مرتجع` : '');
-    let html = '<div class="cu-sendbox"><h3>الكشف يبدأ من:</h3>';
+    // which number (when there are several): the last one a statement went to, else the first
+    const nums = numbersOf(st.c.id);
+    if (!s.to || !nums.some((x) => x.phone === s.to)) {
+      const last = [...nums].filter((x) => x.last_sent_at).sort((a, b) => String(b.last_sent_at).localeCompare(String(a.last_sent_at)))[0];
+      s.to = (last || nums[0] || {}).phone || null;
+    }
+    let html = '<div class="cu-sendbox">';
+    if (nums.length > 1) {
+      html += '<h3>ابعت على:</h3><div class="chips cu-to">' + nums.map((x) => `<button type="button" class="chip${x.phone === s.to ? ' on' : ''}" data-cu-to="${esc(x.phone)}" dir="ltr">${esc(showPhone(x.phone))}</button>`).join('') + '</div>';
+    }
+    html += '<h3>الكشف يبدأ من:</h3>';
     html += pays.slice(0, s.showAll ? 60 : 4).map((p, i) => opt(p.id, i === 0 ? `آخر دفعة: ${money(p.paid)} ج` : i === 1 ? `الدفعة اللي قبلها: ${money(p.paid)} ج` : `دفعة ${money(p.paid)} ج`, after(p))).join('');
     if (!pays.length && !st.busy) html += '<p class="hint">مفيش دفعات في حسابه.</p>';
     if ((pays.length > 4 && !s.showAll) || (!st.done && s.showAll)) html += '<button type="button" class="secondary small cu-more" data-cu-more-pays>دفعات أقدم</button>';
@@ -484,14 +530,14 @@
     }
   }
   function openWa() {
-    const me = st, s = me.send, p = phones && phones.get(String(me.c.id));
+    const me = st, s = me.send, p = s && numbersOf(me.c.id).find((x) => x.phone === s.to);
     if (!s || !s.msg || !p) return;
     const t = String(($('cuMsg') && $('cuMsg').value) || s.msg).trim();
     if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, p.phone);
     else root.open('https://wa.me/' + p.phone + '?text=' + encodeURIComponent(t), '_blank');
     s.sent = true;
     const at = new Date().toISOString();
-    db().from('ar_customer_phones').update({ last_sent_at: at, last_sent_from: s.stmt.from }).eq('customer_id', me.c.id)
+    db().from('ar_customer_phones').update({ last_sent_at: at, last_sent_from: s.stmt.from }).eq('customer_id', me.c.id).eq('phone', p.phone)
       .then(({ error }) => { if (!error) Object.assign(p, { last_sent_at: at, last_sent_from: s.stmt.from }); });
     drawStatement();
   }
@@ -579,8 +625,12 @@
       if (e.target.closest('[data-cu-pick]')) { keepDraft(); pickContact(); return; }
       if (e.target.closest('[data-cu-paste]')) { keepDraft(); pastePhone(); return; }
       const tel = e.target.closest('[data-cu-tel]');
-      if (tel && st.tels) { savePhone(st.tels[+tel.dataset.cuTel], st.pickName); return; }
+      if (tel && st.tels) { if (tel.dataset.cuTel === 'all') saveAll(st.tels, st.pickName); else savePhone(st.tels[+tel.dataset.cuTel], st.pickName); return; }
       if (e.target.closest('[data-cu-phone-save]')) { keepDraft(); savePhone(st.phoneDraft, ''); return; }
+      const del = e.target.closest('[data-cu-phone-del]');
+      if (del) { deletePhone(del.dataset.cuPhoneDel); return; }
+      const to = e.target.closest('[data-cu-to]');
+      if (to && st.send) { st.send.to = to.dataset.cuTo; st.send.sent = false; drawStatement(); return; }
       // sending the statement
       if (e.target.closest('[data-cu-send]')) { openSend(); return; }
       if (e.target.closest('[data-cu-send-close]')) { if (st.send && st.send.pdfUrl) URL.revokeObjectURL(st.send.pdfUrl); st.send = null; drawStatement(); return; }
