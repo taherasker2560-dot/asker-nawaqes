@@ -75,9 +75,13 @@ run('search on top: ✏️ fixes the Arabic name everywhere',async({page})=>{
  await page.click('#hsItems [data-edit]');await page.fill('#hsAr','ك');await page.click('#hsItems [data-save]');
  await page.waitForFunction(()=>/ماتحفظش/.test(document.getElementById('hsItems').textContent));
 },{home:true});
-run('settings: 24 colors, any color, the night look, kept after a reload',async({page})=>{
+run('settings: 25 colors (the logo blue first), any color, the night look, kept after a reload',async({page})=>{
+ // a new phone opens on the blue of the round logo (2026-11-12)
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.accent),'asker');
+ assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--crimson').trim()),'#0a4aa6');
  await page.click('#settingsBtn');assert.ok(await page.isVisible('#settingsPanel'));
- assert.equal(await page.$$eval('#accentPick [data-accent]',b=>b.length),24);
+ assert.equal(await page.$$eval('#accentPick [data-accent]',b=>b.length),25);
+ assert.equal(await page.$eval('#accentPick [data-accent]',b=>b.dataset.accent),'asker');
  await page.click('[data-accent="blue"]');
  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--crimson').trim()),'#1d4f91');
  // any color: a very light one is darkened so white text on it stays readable
@@ -88,7 +92,8 @@ run('settings: 24 colors, any color, the night look, kept after a reload',async(
  // the night look with any color
  await page.check('#nightMode');
  assert.ok(await page.evaluate(()=>document.documentElement.classList.contains('night')));
- assert.equal(await page.evaluate(()=>getComputedStyle(document.body).backgroundColor),'rgb(20, 18, 23)');
+ // the page goes dark (a dark breath of the chosen color)
+ assert.ok(await page.evaluate(()=>{const m=getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number);return m[0]<40&&m[1]<40&&m[2]<40;}),'dark page at night');
  await page.click('#settingsClose');assert.ok(!(await page.isVisible('#settingsPanel')));
  await page.reload();await ready(page);
  assert.equal(await page.evaluate(()=>document.documentElement.dataset.accent),'custom','the color stays after a reload');

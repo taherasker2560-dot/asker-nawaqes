@@ -5,9 +5,9 @@
   --ink: #1a1c1b;
   --muted: #5f6461;
   --line: #e8e6e0;
-  --accent: #8e1530;
-  --accent-deep: #6e0f24;
-  --accent-soft: #f8e6ea;
+  --accent: #0a4aa6; /* the blue of the round logo (2026-11-12); was #8e1530 with the red logo */
+  --accent-deep: #062e67;
+  --accent-soft: #ebf1f9;
   --ok: #0b5240;
   --ok-bg: #e3f1ec;
   --order: #8a4a0b;
@@ -52,7 +52,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 /* home */
 .top { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 12px; background: var(--card); }
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand img { width: 48px; height: 48px; border-radius: 24px; display: block; }
+.brand img { width: 48px; height: 48px; border-radius: 50%; display: block; object-fit: cover; box-shadow: 0 0 0 2px #fff, 0 6px 14px -6px rgba(6, 46, 103, 0.55); }
 .brand div { display: flex; flex-direction: column; line-height: 1.25; }
 .brand strong { font-size: 18px; font-weight: 800; }
 .brand span { font-size: 12px; color: var(--muted); letter-spacing: 0.5px; }
