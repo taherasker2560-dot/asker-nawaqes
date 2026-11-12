@@ -94,12 +94,12 @@ run('orders tab: a supplier with no saved number, no file yet, an old file, a br
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')),'nothing to show');
  await put(page,drafts(new Date(Date.now()-3*864e5).toISOString()),[]);
- await page.click('#odRefresh');await page.waitForSelector('#odChips [data-sup]');
+ await page.click('[data-tab="drafts"]');await page.waitForSelector('#odChips [data-sup]');
  assert.match(await text(page,'#odInfo'),/قديمة، اللاب لسه ما حدّثهاش/);assert.ok(await page.$eval('#odInfo',e=>e.classList.contains('bad')));
  assert.match(await text(page,'#odTo'),/مفيش رقم محفوظ للمورد ده، فالواتس هيتفتح من غير محادثة/);
  await page.click('#odCopy');await waitStatus(page,/الواتس اتفتح من غير محادثة/,'odStatus');
  assert.match(await page.evaluate(()=>window.__opened[0]),/^https:\/\/wa\.me\/\?text=/);
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({hello:1})});
- await page.click('#odRefresh');await waitStatus(page,/ملف الطلبيات شكله مش مظبوط/,'odStatus');
+ await page.click('[data-tab="drafts"]');await waitStatus(page,/ملف الطلبيات شكله مش مظبوط/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')));
 });

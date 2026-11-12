@@ -1527,3 +1527,9 @@ html.night textarea {
   margin-top: 10px;
   font-weight: 700;
 }
+/* «آخر شرا» in the search cards (ar/home.js, ar_item_buys) */
+.hs-buys {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--crimson-ink);
+}
