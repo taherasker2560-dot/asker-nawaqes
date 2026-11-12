@@ -44,4 +44,9 @@ const cams=[{deviceId:'f',label:'camera2 1, facing front'},{deviceId:'w',label:'
 assert.equal(T.mainBack(cams).deviceId,'m');
 assert.equal(T.mainBack([{deviceId:'a',label:'Back Camera'},{deviceId:'b',label:'Front Camera'}]).deviceId,'a','another naming: the first back one');
 assert.equal(T.mainBack([{deviceId:'x',label:''}]),null,'no names yet: the phone decides');
+// the thin camera strip (7 : 2): the centre band of a tall phone picture, or the centre of a very wide one
+assert.deepEqual(T.stripBox(1080,1920,3.5),{sx:0,sy:806,sw:1080,sh:309});
+assert.deepEqual(T.stripBox(1920,1080,3.5),{sx:0,sy:266,sw:1920,sh:549});
+assert.deepEqual(T.stripBox(4000,500,3.5),{sx:1125,sy:0,sw:1750,sh:500});
+assert.equal(T.stripBox(0,0,3.5),null);
 console.log('PASS: temp sale: sticker = 100000 + code, box/unit prices, the bill, the limit, the row, the list');

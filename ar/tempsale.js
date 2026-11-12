@@ -90,7 +90,15 @@
     const back = (list || []).filter((d) => /back|rear|environment|خلف/i.test(d.label || ''));
     return back.find((d) => /camera2?\s*0\b/i.test(d.label || '')) || back[0] || null;
   }
-  const api = { mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
+  // the part of the camera's picture shown in the thin strip (object-fit: cover, centred, width : height = a): the barcode
+  // is read only there, so what is read is what the owner sees (owner 2026-11-13: «7 في 2 … اخد بيها الباركود وخلاص»)
+  function stripBox(vw, vh, a) {
+    if (!vw || !vh) return null;
+    if (vw / vh > a) { const sw = Math.round(vh * a); return { sx: Math.round((vw - sw) / 2), sy: 0, sw, sh: vh }; }
+    const sh = Math.round(vw / a);
+    return { sx: 0, sy: Math.round((vh - sh) / 2), sw: vw, sh };
+  }
+  const api = { stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -274,11 +282,22 @@
     keep(CAMKEY, next.deviceId);
     await startScan(next.deviceId);
   }
+  const STRIP = 7 / 2;
+  let canvas = null;
+  // the strip's part of the picture, on a canvas (the whole picture when the camera has no size yet)
+  function stripOf(v) {
+    const b = stripBox(v.videoWidth, v.videoHeight, STRIP);
+    if (!b) return v;
+    canvas = canvas || document.createElement('canvas');
+    if (canvas.width !== b.sw || canvas.height !== b.sh) { canvas.width = b.sw; canvas.height = b.sh; }
+    canvas.getContext('2d').drawImage(v, b.sx, b.sy, b.sw, b.sh, 0, 0, b.sw, b.sh);
+    return canvas;
+  }
   async function tick() {
     if (busy || !detector || !stream) return;
     busy = true;
     try {
-      const found = await detector.detect($('tsVideo'));
+      const found = await detector.detect(stripOf($('tsVideo')));
       if (found && found.length) await scanned(String(found[0].rawValue || ''), false, found[0].format);
     } catch (e) {}
     busy = false;

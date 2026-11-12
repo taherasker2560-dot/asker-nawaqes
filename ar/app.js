@@ -245,6 +245,8 @@
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
     // «البيع المؤقت» (ar/tempsale.js, owner 2026-11-12); leaving it turns the camera off
     if (tab === 'tempsale') window.AskerTempSale?.open(); else window.AskerTempSale?.close();
+    // the sale (and later the stock count) takes the whole page: no search on top (owner 2026-11-13)
+    $('app')?.classList.toggle('focus', tab === 'tempsale' || tab === 'count');
     $('carePanel')?.classList.toggle('hidden', tab !== 'care');
     $('shortPanel').classList.toggle('hidden', tab !== 'short');
     // names may have changed in the other tabs; never «0 صنف» before the list (saved or from the server) is there

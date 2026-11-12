@@ -12,6 +12,11 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.click('[data-group="sales"]');
  await page.click('.subbar [data-tab="tempsale"]');
  await page.waitForSelector('#tempSalePanel:not(.hidden)');
+ // the sale takes the whole page: the search on top is gone here and back elsewhere
+ assert.equal(await page.$eval('.topsearch',e=>getComputedStyle(e).display),'none');
+ await page.click('.subbar [data-tab="storeorders"]');
+ assert.notEqual(await page.$eval('.topsearch',e=>getComputedStyle(e).display),'none');
+ await page.click('.subbar [data-tab="tempsale"]');
  assert.match(await text(page,'#tsCart'),/لسه مفيش أصناف/);
  // by name: a tap adds one box, another tap one more
  await page.fill('#tsQ','كريم');

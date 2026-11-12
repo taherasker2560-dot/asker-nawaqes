@@ -1247,4 +1247,7 @@ html.night .ts-st.d { background: rgba(60, 200, 110, 0.15); color: #7fe0a2; }.ts
 .ts-return .ts-save { background: #c62828; }
 .ts-st.r { background: #fdecee; color: #c62828; }
 html.night .ts-st.r { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }.ts-scan { position: relative; }
-.ts-cam { position: absolute; inset-inline-end: 8px; bottom: 8px; min-height: 36px; margin: 0; padding: 4px 12px; border-radius: 12px; background: rgba(0, 0, 0, 0.55); color: #fff; border: 0; font-size: 13px; font-weight: 700; }
+.ts-cam { position: absolute; inset-inline-end: 8px; bottom: 8px; min-height: 36px; margin: 0; padding: 4px 12px; border-radius: 12px; background: rgba(0, 0, 0, 0.55); color: #fff; border: 0; font-size: 13px; font-weight: 700; }/* the sale takes the whole page (owner 2026-11-13): no search on top; the camera is a thin strip (7 : 2) with an aim line */
+#app.focus .topsearch { display: none; }
+.ts-scan video { aspect-ratio: 7 / 2; height: auto; max-height: none; object-fit: cover; }
+.ts-scan::after { content: ''; position: absolute; inset-inline: 6%; top: 50%; height: 2px; background: rgba(229, 36, 59, 0.85); pointer-events: none; }
