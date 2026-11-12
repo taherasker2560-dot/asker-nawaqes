@@ -105,4 +105,13 @@ const mixed=S.cartAdd(tc,{id:5,name:'P',status:'available',price:10,needs_rx:fal
 assert.deepEqual(S.orderItems(mixed),[{text:'ابيمول شراب',qty:2},{id:5,qty:1}]);
 assert.equal(S.cartTotal(mixed),10,'typed lines have no price');
 assert.equal(S.cartLater(mixed),1);
+// «شفته قريب»: newest first, no repeats, 10 at most, only what the card needs
+let seenL=[];
+for(let i=1;i<=12;i++)seenL=S.rememberSeen(seenL,{id:i,name:'X'+i,price:i,status:'available',secret:'no'});
+assert.equal(seenL.length,S.MAX_SEEN);assert.equal(seenL[0].id,12);
+seenL=S.rememberSeen(seenL,{id:5,name:'X5'});assert.equal(seenL[0].id,5);assert.equal(seenL.filter(x=>x.id===5).length,1);
+assert.equal('secret' in seenL[1],false);
+assert.deepEqual(S.rememberSeen(null,null),[]);
+// «محتاج إيه النهارده؟»: every chip opens real store categories
+for(const n of S.NEEDS){assert.ok(n.key&&n.name&&n.cats.length);for(const c of n.cats)assert.ok(S.SECTIONS.some(s=>s.cats.includes(c)),c)}
 console.log('store ok');

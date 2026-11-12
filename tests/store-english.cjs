@@ -18,10 +18,11 @@ for(const m of h.matchAll(/>([^<]+)</g))check(m[1]);
 const S=require('../store/store.js');
 for(const v of Object.values(S.STATUS))check(v.label);
 for(const v of S.SECTIONS)check(v.name);
+for(const v of S.NEEDS)check(v.name);
 for(const v of Object.values(S.ORDER_STATUS))check(typeof v==='string'?v:v.label);
 for(const v of Object.values(S.ERRORS))check(v);
 // some built texts (numbers and names put in)
-for(const s of ['نتايج «PANADOL»','طلب رقم 12','طلبك رقم 12 وصلنا. الإجمالي 150 جنيه','اتضاف 3 صنف للسلة','470 ج للواحدة','تفاصيل PANADOL 500','في السلة (2)'])check(s);
+for(const s of ['نتايج «PANADOL»','طلب رقم 12','طلبك رقم 12 وصلنا. الإجمالي 150 جنيه','اتضاف 3 صنف للسلة','470 ج للواحدة','تفاصيل PANADOL 500','في السلة (2)','3 صنف في السلة · 470 ج','2 صنف في السلة + أصناف بالطلب','طلب رقم 12 · 4 صنف'])check(s);
 assert.deepEqual(bad,[],'Arabic texts without English in store/i18n-en-store.js:\n'+bad.join('\n'));
 // the colors use the bot's names
 assert.equal(T.translate('أزرق عسكر'),'Asker blue');
