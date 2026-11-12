@@ -15,7 +15,11 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=scope-20261112a" />
+    <link rel="stylesheet" href="ar/look.css?v=lang-20261112a" />
+    <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
+         first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
+    <script src="ar/i18n-en.js?v=lang-20261112a"></script>
+    <script src="ar/i18n.js?v=lang-20261112a"></script>
   </head>
   <body>
     <header class="appbar">
@@ -46,8 +50,9 @@
         <h3>لغة البوت</h3>
         <div class="tabs seg" role="group" aria-label="لغة البوت">
           <button type="button" data-lang="ar">عربي</button
-          ><button type="button" data-lang="en" class="secondary" disabled>English (قريب)</button>
+          ><button type="button" data-lang="en" class="secondary">English</button>
         </div>
+        <p class="hint">الصوت ورسايل الواتس للمخازن بتفضل عربي في اللغتين.</p>
         <h3>لون البوت</h3>
         <div id="accentPick" class="accents" role="radiogroup" aria-label="لون البوت"></div>
         <div id="accentCustomRow" class="accent-custom">

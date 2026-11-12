@@ -662,3 +662,41 @@ html.night .qa button svg {
 .sl-qr { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .sl-qr img { width: 240px; height: auto; border-radius: 16px; background: #fff; box-shadow: var(--sh-2); }
 .sl-qr a { font-weight: 700; }
+/* ---------- English (ar/i18n.js, owner 2026-11-12 «أ»): left to right, and the item's English name first and big ---------- */
+html[dir='ltr'] .en,
+html[dir='ltr'] .hs-en,
+html[dir='ltr'] .sr-en,
+html[dir='ltr'] .st-en {
+  text-align: left;
+}
+html[lang='en'] .hs-names,
+html[lang='en'] .sr-main {
+  display: flex;
+  flex-direction: column-reverse;
+}
+html[lang='en'] .hs-names .hs-en,
+html[lang='en'] .sr-main .sr-en {
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 700;
+}
+html[lang='en'] .hs-names > strong,
+html[lang='en'] .sr-main .sr-ar {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+html[lang='en'] .st-item .st-en {
+  order: -1;
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 700;
+}
+html[lang='en'] .st-item > strong {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+html[dir='ltr'] button {
+  margin: 6px 6px 0 0;
+}
