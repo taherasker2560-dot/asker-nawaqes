@@ -28,9 +28,9 @@ assert.equal(S.canAdd({status:'available',price:75,needs_rx:false}),true);
 assert.equal(S.canAdd({status:'available',price:null,needs_rx:false}),false,'no price');
 assert.equal(S.canAdd({status:'on_order',price:null,needs_rx:false}),true,'on order: asked for, priced on the order day');
 assert.equal(S.canAdd({status:'on_order',price:null,needs_rx:true}),false,'on order but prescription');
-assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:false}),true,'«صعب طلبه»: ordered without a price too (owner 2026-11-12)');
+assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:false}),false,'on the shortages list: «غير متوفر», not ordered (owner 2026-11-12)');
 assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:true}),false,'but not a prescription item');
-assert.equal(S.onOrder({status:'unavailable'}),true);
+assert.equal(S.onOrder({status:'unavailable'}),false);assert.equal(S.STATUS.unavailable.label,'غير متوفر');
 {let o=S.cartAdd([],{id:7,name:'L',status:'on_order',price:null});o=S.cartAdd(o,{id:8,name:'M',status:'available',price:4});
  assert.equal(o[0].price,null);assert.equal(o[0].on_order,true);assert.equal(o[1].on_order,undefined);assert.equal(S.cartTotal(o),4,'on-order lines add nothing to the total');assert.equal(S.cartLater(o),1);}
 assert.equal(S.canAdd({status:'available',price:75,needs_rx:true}),false,'prescription');

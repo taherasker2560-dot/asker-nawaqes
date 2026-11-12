@@ -15,15 +15,18 @@ const assert=require('node:assert/strict');
  CREATE TABLE public.ar_store_orders(id bigserial PRIMARY KEY, customer_name text, phone text, address text, notes text, items jsonb, total numeric, rx_paths text[], created_at timestamptz DEFAULT now());`);
  const sql=fs.readFileSync('supabase/migrations/202611120600_ar_store_any_item_theme.sql','utf8');
  await db.exec(sql);await db.exec(sql); // applied twice: safe
+ const sql2=fs.readFileSync('supabase/migrations/202611120700_ar_store_unavailable_not_ordered.sql','utf8');
+ await db.exec(sql2); // «غير متوفر» (shortages) is not ordered again
  let phone=10;
  const order=async(items)=>(await db.query(`SELECT public.ar_store_place_order('Ahmed',$1,'12 street, Cairo',null,$2::jsonb) AS r`,['010000000'+(phone++),JSON.stringify(items)])).rows[0].r;
- // available + on_order + «صعب طلبه» + typed: one order, the total counts the priced item only
- let r=await order([{id:1,qty:2},{id:2,qty:1},{id:3,qty:1},{text:'  ابيمول   شراب ',qty:3}]);
+ // available + on_order + typed: one order, the total counts the priced item only
+ let r=await order([{id:1,qty:2},{id:2,qty:1},{text:'  ابيمول   شراب ',qty:3}]);
  assert.equal(r.ok,true);assert.equal(Number(r.total),100);
- assert.deepEqual(r.items.map(x=>[x.name,x.qty,x.price,!!x.on_order,!!x.free_text]),[['PANADOL',2,50,false,false],['CONGESTAL',1,null,true,false],['CETAL COLD & FLU 20CAP',1,null,true,false],['ابيمول شراب',3,null,true,true]]);
+ assert.deepEqual(r.items.map(x=>[x.name,x.qty,x.price,!!x.on_order,!!x.free_text]),[['PANADOL',2,50,false,false],['CONGESTAL',1,null,true,false],['ابيمول شراب',3,null,true,true]]);
  // only typed lines
  r=await order([{text:'دوا مش موجود'}]);assert.equal(r.ok,true);assert.equal(Number(r.total),0);assert.equal(r.items[0].qty,1);
  // refused: hidden item, Rx item, too short / long text, a line with neither id nor text, more than 10 typed lines
+ assert.equal((await order([{id:3}])).error,'item_not_available','«غير متوفر» = on the shortages list');
  assert.equal((await order([{id:4}])).error,'item_not_available');
  assert.equal((await order([{id:5}])).error,'item_not_available');
  assert.equal((await order([{text:'x'}])).error,'bad_text');
