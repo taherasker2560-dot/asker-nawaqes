@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
-    <link rel="stylesheet" href="store/look.css?v=theme-20261112a" />
+    <link rel="stylesheet" href="store/look.css?v=back-20261112a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=look-20261112a"></script>
     <script src="store/theme.js?v=theme-20261112a"></script>
@@ -29,6 +29,10 @@
           <div><strong>صيدلية عسكر</strong><span dir="ltr">Asker Pharmacy</span></div>
         </div>
         <div class="top-btns">
+          <a href="asker-nawaqes-arabic.html" id="botBtn" class="cart-btn bot-btn" hidden aria-label="رجوع للبوت">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 14l-5-5 5-5" /><path d="M4 9h10a6 6 0 0 1 0 12h-3" /></svg>
+            <span>البوت</span>
+          </a>
           <button type="button" id="themeBtn" class="cart-btn" aria-label="الألوان والوضع الليلي" aria-expanded="false" aria-controls="themeSheet">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></svg>
           </button>
@@ -217,5 +221,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="store/store.js?v=short-20261112a"></script>
+    <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>
 </html>

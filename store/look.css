@@ -481,3 +481,8 @@ body.sheet-open { overflow: hidden; }
   .sheet-card { border-radius: 28px; max-height: 88vh; }
   .sh-pic { height: 320px; }
 }
+
+/* «رجوع للبوت» (store/from-bot.js): only when the store was opened from the bot */
+.top .bot-btn { width: auto; gap: 4px; padding: 0 10px; font-weight: 700; font-size: 14px; text-decoration: none; }
+.top .bot-btn[hidden] { display: none; }
+
