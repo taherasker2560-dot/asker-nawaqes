@@ -212,6 +212,16 @@
         }
         list = rows; failed = ''; loadedAt = Date.now();
         await loadPhones();
+        // the bot was closed and reopened while the phone's contacts list was open: back to that customer, and say so
+        const pp = pendingPick();
+        if (pp && !st && phones) {
+          forgetPick();
+          if (list.some((x) => String(x.id) === String(pp.id))) {
+            openStatement(pp.id);
+            Object.assign(st, { phoneEdit: true, phoneBad: true,
+              phoneMsg: 'البوت اتقفل واتفتح تاني وانت في أسامي الموبايل، فالرقم ماوصلش. انسخ الرقم من الموبايل ودوس «الصق الرقم»، أو جرّب أسامي الموبايل تاني.' });
+          }
+        }
       } catch (e) {
         failed = (e && e.message) || String(e);
       } finally {
@@ -330,7 +340,8 @@
       : '';
     return `<div class="cu-phone"><span>${p ? '📱 غيّر رقم الواتس' : '📱 مالوش رقم واتس'}</span>` +
       (p ? '<button type="button" class="linklike" data-cu-phone-cancel>لغي</button>' : '') + '</div>' +
-      (canPick() ? '<button type="button" class="secondary cu-pick" data-cu-pick>اختار رقمه من أسامي الموبايل</button>' : '') + tels +
+      (canPick() ? '<button type="button" class="secondary cu-pick" data-cu-pick>اختار رقمه من أسامي الموبايل</button>' : '') +
+      (canPaste() ? '<button type="button" class="secondary cu-pick" data-cu-paste>الصق الرقم اللي نسخته</button>' : '') + tels +
       `<div class="cu-phone-in"><input id="cuPhoneIn" type="tel" inputmode="tel" autocomplete="off" placeholder="${canPick() ? 'أو اكتب رقمه: 01xxxxxxxxx' : 'اكتب رقمه: 01xxxxxxxxx'}" value="${esc(st.phoneDraft || '')}" />` +
       '<button type="button" class="small" data-cu-phone-save>احفظ</button></div>' + note;
   }
@@ -344,21 +355,70 @@
     Object.assign(me, { phoneEdit: false, tels: null, phoneDraft: '', phoneMsg: 'اتحفظ الرقم.', phoneBad: false });
     if (st === me) drawStatement();
   }
+  // the phone's contacts list (owner 2026-11-12: «باختار الرقم وبدوس تم … ما بلاقيش الرقم اتسحب»): every outcome now says
+  // something, and if the phone closes and reopens the bot while the list is open (the pick is lost), the bot comes back to
+  // that customer and says so
+  const PICK_KEY = 'asker-cu-pick';
+  function rememberPick(id) { try { localStorage.setItem(PICK_KEY, JSON.stringify({ id, at: Date.now() })); } catch (e) {} }
+  function forgetPick() { try { localStorage.removeItem(PICK_KEY); } catch (e) {} }
+  function pendingPick() {
+    try { const x = JSON.parse(localStorage.getItem(PICK_KEY) || 'null'); return x && x.id != null && Date.now() - x.at < 10 * 60e3 ? x : null; } catch (e) { return null; }
+  }
   async function pickContact() {
     const me = st;
+    rememberPick(me.c.id);
+    Object.assign(me, { phoneMsg: 'اختار الاسم من القايمة ودوس «تم»…', phoneBad: false, tels: null });
+    drawStatement();
+    let got;
     try {
-      const got = await navigator.contacts.select(['name', 'tel'], { multiple: false });
-      const c = got && got[0];
-      if (!c) return;
-      const name = (c.name && c.name[0]) || '';
-      const tels = [...new Set((c.tel || []).map(intlPhone).filter(Boolean))];
-      if (!tels.length) { me.phoneMsg = 'الاسم ده مالوش رقم موبايل ينفع للواتس.'; me.phoneBad = true; drawStatement(); return; }
-      me.pickName = name;
-      if (tels.length === 1) { await savePhone(tels[0], name); return; }
-      me.tels = tels; me.phoneMsg = ''; drawStatement();
+      got = await navigator.contacts.select(['name', 'tel'], { multiple: false });
     } catch (e) {
-      me.phoneMsg = 'مقدرتش أفتح أسامي الموبايل: ' + errText(e); me.phoneBad = true; drawStatement();
+      forgetPick();
+      Object.assign(me, { phoneMsg: 'مقدرتش أفتح أسامي الموبايل: ' + errText(e) + '. انسخ الرقم ودوس «الصق الرقم».', phoneBad: true });
+      if (st === me) drawStatement();
+      return;
     }
+    forgetPick();
+    const c = got && got[0];
+    if (!c) {
+      Object.assign(me, { phoneMsg: 'ماوصلش أي اسم من القايمة. علّم على الاسم ودوس «تم»، أو انسخ الرقم ودوس «الصق الرقم».', phoneBad: true });
+      if (st === me) drawStatement();
+      return;
+    }
+    const name = (c.name && c.name[0]) || '';
+    const raw = (c.tel || []).filter((t) => String(t || '').trim());
+    const tels = [...new Set(raw.map(intlPhone).filter(Boolean))];
+    if (!tels.length) {
+      me.phoneMsg = raw.length
+        ? `الرقم اللي وصل (${raw[0]}) مش رقم ينفع للواتس. انسخ الرقم الصح ودوس «الصق الرقم».`
+        : 'الاسم وصل من غير رقم. في قايمة الأسامي خلّي «أرقام التليفون» متعلّمة وجرّب تاني، أو انسخ الرقم ودوس «الصق الرقم».';
+      me.phoneBad = true;
+      if (st === me) drawStatement();
+      return;
+    }
+    me.pickName = name;
+    if (tels.length === 1) { await savePhone(tels[0], name); return; }
+    me.tels = tels; me.phoneMsg = ''; if (st === me) drawStatement();
+  }
+  // the number copied on the phone (from the contacts app or a WhatsApp chat): one tap
+  const canPaste = () => !!(navigator.clipboard && navigator.clipboard.readText);
+  async function pastePhone() {
+    const me = st;
+    let t = '';
+    try {
+      t = await navigator.clipboard.readText();
+    } catch (e) {
+      Object.assign(me, { phoneMsg: 'مقدرتش أقرا اللي متنسخ. الصقه في الخانة ودوس «احفظ».', phoneBad: true });
+      if (st === me) drawStatement();
+      return;
+    }
+    const p = intlPhone(t);
+    if (!p) {
+      Object.assign(me, { phoneDraft: String(t || '').trim().slice(0, 40), phoneMsg: 'اللي متنسخ مش رقم تليفون. انسخ الرقم نفسه وجرّب تاني.', phoneBad: true });
+      if (st === me) drawStatement();
+      return;
+    }
+    await savePhone(p, '');
   }
   function sendHtml() {
     const s = st.send, L2 = S();
@@ -517,6 +577,7 @@
       if (e.target.closest('[data-cu-phone-edit]')) { Object.assign(st, { phoneEdit: true, phoneMsg: '', tels: null }); drawStatement(); return; }
       if (e.target.closest('[data-cu-phone-cancel]')) { Object.assign(st, { phoneEdit: false, phoneMsg: '', tels: null, phoneDraft: '' }); drawStatement(); return; }
       if (e.target.closest('[data-cu-pick]')) { keepDraft(); pickContact(); return; }
+      if (e.target.closest('[data-cu-paste]')) { keepDraft(); pastePhone(); return; }
       const tel = e.target.closest('[data-cu-tel]');
       if (tel && st.tels) { savePhone(st.tels[+tel.dataset.cuTel], st.pickName); return; }
       if (e.target.closest('[data-cu-phone-save]')) { keepDraft(); savePhone(st.phoneDraft, ''); return; }
@@ -536,6 +597,8 @@
     $('cuClear')?.addEventListener('click', () => { query = ''; $('cuQ').value = ''; drawList(); $('cuQ').focus(); });
     // the phone's back button closes the statement
     window.addEventListener('popstate', () => { if (st) closeStatement(); });
+    // reopened while picking from the contacts: go to the customers (the list's load then opens that customer)
+    if (pendingPick()) setTimeout(() => { if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('customers'); }, 800);
   }
   root.AskerCustomers = {
     open: () => loadList(false),

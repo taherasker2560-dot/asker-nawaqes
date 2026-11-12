@@ -81,6 +81,41 @@ run('Statement on WhatsApp: from the payment he picks, a detailed PDF, WhatsApp 
  await page.click('[data-cu-send-close]');
  assert.equal(await page.$('.cu-sendbox'),null);
 });
+run('Statement on WhatsApp: every outcome of the contacts list says something; paste; reopened while picking',async({page,table})=>{
+ await setData(page);
+ const contacts=(answer)=>page.evaluate((a)=>{window.ContactsManager=function(){};Object.defineProperty(navigator,'contacts',{value:{select:async()=>{if(a==='throw')throw new Error('no');return a}},configurable:true})},answer);
+ await openStatement(page);
+ // nothing came back (the owner tapped «تم» without a ticked name): it says so
+ await contacts([]);await page.click('[data-cu-phone-save]');await page.evaluate(()=>window.AskerCustomers.statement('101'));await page.waitForSelector('[data-cu-pick]');
+ await page.click('[data-cu-pick]');
+ await page.waitForFunction(()=>/ماوصلش أي اسم من القايمة/.test(document.getElementById('cuSt').textContent));
+ // a name without its number (the «أرقام التليفون» switch off in the list)
+ await contacts([{name:['جار الصيدلية'],tel:[]}]);await page.click('[data-cu-pick]');
+ await page.waitForFunction(()=>/الاسم وصل من غير رقم/.test(document.getElementById('cuSt').textContent));
+ // a number that is not one
+ await contacts([{name:['X'],tel:['123']}]);await page.click('[data-cu-pick]');
+ await page.waitForFunction(()=>/الرقم اللي وصل \(123\) مش رقم ينفع للواتس/.test(document.getElementById('cuSt').textContent));
+ // the list could not open
+ await contacts('throw');await page.click('[data-cu-pick]');
+ await page.waitForFunction(()=>/مقدرتش أفتح أسامي الموبايل/.test(document.getElementById('cuSt').textContent));
+ assert.deepEqual(await table('ar_customer_phones'),[],'nothing saved by a failed pick');
+ // paste: something that is not a number, then the number copied on the phone
+ await page.evaluate(()=>{window.__clip='مش رقم';Object.defineProperty(navigator,'clipboard',{value:{readText:async()=>window.__clip},configurable:true})});
+ await page.click('[data-cu-paste]');
+ await page.waitForFunction(()=>/اللي متنسخ مش رقم تليفون/.test(document.getElementById('cuSt').textContent));
+ await page.evaluate(()=>{window.__clip='+20 101 234 5678'});
+ await page.click('[data-cu-paste]');
+ await page.waitForFunction(()=>/0101 234 5678/.test(document.querySelector('#cuSt .cu-phone')?.textContent||''));
+ assert.deepEqual((await table('ar_customer_phones')).map(r=>[r.customer_id,r.phone]),[[101,'201012345678']]);
+ // the phone closed and reopened the bot while the contacts list was open: back on that customer, saying so
+ await page.evaluate(()=>{window.__tables.ar_customer_phones=[];localStorage.setItem('asker-cu-pick',JSON.stringify({id:101,at:Date.now()}))});
+ await page.evaluate(([c,m])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[]})),[CUSTOMERS,MOVES]);
+ await page.reload();
+ await page.waitForFunction(()=>/البوت اتقفل واتفتح تاني وانت في أسامي الموبايل/.test(document.getElementById('cuSt')?.textContent||''),null,{timeout:15000});
+ assert.equal(await text(page,'#cuSt .cu-name strong'),'أحمد محمود');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker-cu-pick')),null,'said once');
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+});
 run('Statement on WhatsApp: no numbers table on the server yet = nothing shown',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('__fakeFail','ar_customer_phones'));
  await page.reload();await page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
