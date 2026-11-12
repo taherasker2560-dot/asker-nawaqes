@@ -1,0 +1,633 @@
+/* The modern look (owner 2026-11-12, with the new round logo: «عايزه عصري لأبعد الحدود ومتكامل لأقصى الحدود»).
+   Loaded after ar/app.css and only restyles: the same ids and classes, no code moves. Taking its <link> out of the page
+   brings the old look back. The colors still come from ar/settings.js: --crimson = the chosen color (the name stayed from
+   the first look), --crimson-deep its dark end, --tint the page behind the cards, --glow the color as «r, g, b» for shadows.
+   The bottom bar is drawn down to the phone's edge (viewport-fit=cover), so on Chrome 135+ the strip under it (the phone's
+   own bar) shows the bot's color and changes with it. */
+:root {
+  --tint: #f3f6fc;
+  --tint-2: #e6edf9;
+  --glow: 10, 74, 166;
+  --card: #ffffff;
+  --ink: #131a27;
+  --muted: #5b6475;
+  --line: #e3e8f1;
+  --radius: 22px;
+  --nav-h: 66px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --sh-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --sh-2: 0 12px 32px -14px rgba(15, 23, 42, 0.2), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
+  --sh-acc: 0 10px 22px -10px rgba(var(--glow), 0.65);
+  --grad: linear-gradient(135deg, var(--crimson) 0%, var(--crimson-deep) 100%);
+  /* the phone's bottom strip: its full height, known up front (Chrome's recommended pattern, no jumping while it moves) */
+  --safe-b: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+html.night {
+  --paper: var(--tint);
+  --card: var(--tint-2);
+  --line: rgba(255, 255, 255, 0.09);
+  --ink: #e9edf5;
+  --muted: #9aa3b5;
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-2: 0 14px 34px -16px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+/* ---------- page ---------- */
+body {
+  background: var(--tint);
+  padding-bottom: calc(var(--nav-h) + var(--safe-b) + 22px);
+  -webkit-font-smoothing: antialiased;
+}
+/* two soft glows of the color behind everything (fixed layer: no repaint while scrolling) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 105% -8%, rgba(var(--glow), 0.13), transparent 62%),
+    radial-gradient(760px 480px at -12% 108%, rgba(var(--glow), 0.09), transparent 60%);
+}
+main {
+  padding: 14px 16px 16px;
+}
+
+/* ---------- header: the color, the round logo, where you are ---------- */
+.appbar {
+  gap: 12px;
+  padding: 12px 16px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  color: #fff;
+  border-bottom: 0;
+  border-radius: 0 0 26px 26px;
+  background:
+    radial-gradient(120% 150% at 100% 0%, rgba(255, 255, 255, 0.2), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 40' preserveAspectRatio='none'%3E%3Cpath d='M0 24 C 80 6 170 42 250 22 S 360 10 400 20 L400 40 L0 40 Z' fill='white' fill-opacity='.09'/%3E%3Cpath d='M0 31 C 110 14 190 46 290 27 S 372 22 400 29' fill='none' stroke='white' stroke-opacity='.32' stroke-width='1.4'/%3E%3C/svg%3E")
+      bottom / 100% 38px no-repeat,
+    var(--grad);
+  box-shadow: 0 14px 30px -16px rgba(var(--glow), 0.75);
+}
+.appbar .mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 8px 18px -6px rgba(0, 0, 0, 0.45);
+}
+.brand h1 {
+  font-size: 19px;
+  letter-spacing: 0;
+}
+.brand p {
+  font-size: 12.5px;
+  font-weight: 500;
+  opacity: 0.88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.icon-btn {
+  width: 42px;
+  min-height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: none;
+}
+.icon-btn:active {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* ---------- «داتا الصيدلية» line: a small floating pill instead of a strip ---------- */
+.dataage {
+  width: calc(100% - 32px);
+  max-width: 688px;
+  margin: 12px auto 0;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--sh-1);
+  font-size: 14px;
+}
+.dataage .dot {
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 18%, transparent);
+}
+.dataage.good .dot {
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, currentColor 6%, transparent);
+  }
+}
+
+/* ---------- cards ---------- */
+.card {
+  border: 0;
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  background: var(--card);
+  box-shadow: var(--sh-2);
+}
+html.night .card {
+  border: 1px solid var(--line);
+}
+section.card:not(.hidden) {
+  animation: rise 0.32s var(--ease) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+h2 {
+  font-size: 19.5px;
+  letter-spacing: 0;
+}
+h3 {
+  color: var(--crimson-ink);
+}
+.hint {
+  color: var(--muted);
+}
+
+/* ---------- buttons ---------- */
+button {
+  border-radius: 14px;
+  font-weight: 600;
+  background: var(--grad);
+  transition: transform 0.12s var(--ease), box-shadow 0.2s, filter 0.2s, background-color 0.2s;
+}
+button:not([class]),
+#loginBtn {
+  box-shadow: var(--sh-acc);
+}
+button:active {
+  transform: scale(0.97);
+}
+button.secondary {
+  background: var(--rose);
+  color: var(--crimson-ink);
+  box-shadow: none;
+}
+button:disabled {
+  box-shadow: none;
+  filter: saturate(0.4);
+}
+button:focus-visible,
+summary:focus-visible {
+  outline: 3px solid rgba(var(--glow), 0.45);
+  outline-offset: 2px;
+}
+
+/* ---------- fields ---------- */
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='search'],
+input[type='date'],
+select,
+textarea {
+  border: 1.5px solid var(--line) !important;
+  border-radius: 14px !important;
+  background: var(--card);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--crimson) !important;
+  box-shadow: 0 0 0 4px rgba(var(--glow), 0.14);
+}
+input[type='file'] {
+  border-color: var(--rose-line);
+  border-radius: 14px;
+  background: var(--tint);
+}
+label.check input,
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--crimson);
+}
+
+/* ---------- the search on top: a floating pill ---------- */
+.topsearch {
+  margin: 2px 0 14px;
+}
+.topsearch .search input[type='search'],
+.home .search.home-q input[type='search'] {
+  min-height: 54px;
+  padding-inline: 50px 48px;
+  border: 1.5px solid transparent !important;
+  border-radius: 999px !important;
+  background: var(--card);
+  box-shadow: var(--sh-2);
+  font-size: 16px;
+}
+.topsearch .search input[type='search']:focus {
+  border-color: var(--crimson) !important;
+  box-shadow: var(--sh-2), 0 0 0 4px rgba(var(--glow), 0.14);
+}
+.topsearch .search svg {
+  inset-inline-start: 18px;
+  width: 22px;
+  height: 22px;
+  color: var(--crimson);
+}
+html.night .topsearch .search svg {
+  color: var(--crimson-ink);
+}
+.search .search-clear {
+  border-radius: 50%;
+  box-shadow: none;
+}
+.topsearch .search .search-clear {
+  inset-inline-end: 9px;
+}
+
+/* ---------- chips, the three groups of «المشتريات», segmented tabs ---------- */
+.chips .chip {
+  min-height: 38px;
+  padding: 6px 16px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+  font-weight: 600;
+}
+.chips .chip.on {
+  background: var(--grad);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--sh-acc);
+}
+.pgroups {
+  gap: 5px;
+  padding: 5px;
+  margin-bottom: 10px;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--sh-1);
+}
+.pgroups button {
+  min-height: 42px;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--muted);
+}
+.pgroups button.on {
+  background: var(--grad);
+  color: #fff;
+  box-shadow: var(--sh-acc);
+}
+.tabs.seg {
+  gap: 4px;
+  padding: 5px;
+  border-radius: 16px;
+  background: var(--tint-2);
+}
+.tabs.seg button {
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--crimson-ink);
+  box-shadow: var(--sh-1);
+}
+.tabs.seg button.secondary {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+/* ---------- numbers, rows, tags ---------- */
+.stat {
+  border: 0;
+  border-radius: 16px;
+  background: var(--tint);
+}
+.stat strong {
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--crimson-ink);
+}
+.qty {
+  background: var(--rose);
+}
+.sr-letter {
+  background: var(--card);
+  border-bottom-color: var(--rose-line);
+}
+.tag,
+.pill {
+  font-weight: 600;
+}
+.hs-item,
+.st-item {
+  border: 0;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: var(--card);
+  box-shadow: var(--sh-2);
+}
+.hs-pen {
+  border-radius: 50%;
+  border: 0;
+}
+.inbox,
+.tools,
+.msg-to,
+#msgBox {
+  border-radius: 18px;
+}
+.tools {
+  background: var(--tint);
+}
+.dc-pick,
+.od-edit {
+  border-radius: 18px;
+  box-shadow: 0 10px 22px -12px rgba(160, 120, 0, 0.6);
+}
+.dc-thumb,
+.so-rx,
+.od-thumb {
+  border-radius: 14px;
+}
+
+/* ---------- bottom bar: the color down to the phone's edge ---------- */
+.bottomnav {
+  height: calc(var(--nav-h) + var(--safe-b));
+  padding: 7px 8px var(--safe-b);
+  bottom: calc(env(safe-area-inset-bottom, 0px) - var(--safe-b));
+  background: linear-gradient(180deg, var(--crimson) 0%, var(--crimson-deep) 100%);
+  border-top: 0;
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -12px 30px -14px rgba(var(--glow), 0.6);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.bottomnav button,
+.bottomnav button.secondary {
+  gap: 3px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.76);
+  font-weight: 600;
+  box-shadow: none;
+}
+.bottomnav button svg,
+.bottomnav:has(> button:nth-child(5)) button svg {
+  width: 24px;
+  height: 24px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 0.2s, color 0.2s, transform 0.25s var(--ease);
+}
+.bottomnav button:not(.secondary) {
+  color: #fff;
+  font-weight: 700;
+}
+.bottomnav button:not(.secondary) svg,
+.bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg {
+  background: #fff;
+  color: var(--crimson);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.45);
+}
+html.night .bottomnav {
+  background: linear-gradient(180deg, var(--tint-2) 0%, var(--tint) 100%);
+  box-shadow: 0 -1px 0 var(--line), 0 -12px 30px -16px rgba(0, 0, 0, 0.8);
+}
+html.night .bottomnav button.secondary {
+  color: var(--muted);
+}
+html.night .bottomnav button:not(.secondary) svg,
+html.night .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg {
+  background: var(--crimson);
+  color: #fff;
+}
+
+/* ---------- settings sheet ---------- */
+.sheet {
+  background: rgba(8, 12, 24, 0.45);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  animation: fade 0.2s ease both;
+}
+.sheet-box {
+  padding-top: 10px;
+  border-radius: 28px 28px 0 0;
+  background: var(--card);
+  box-shadow: 0 -24px 60px -24px rgba(0, 0, 0, 0.45);
+  animation: sheetup 0.32s var(--ease) both;
+}
+.sheet-box::before {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 12px;
+  border-radius: 3px;
+  background: var(--line);
+}
+.sheet-head .icon-btn {
+  color: var(--ink);
+  background: var(--tint-2);
+  border: 0;
+}
+.accent.on span {
+  box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--crimson);
+}
+.accent span {
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sheetup {
+  from {
+    transform: translateY(40px);
+    opacity: 0.6;
+  }
+}
+
+/* ---------- sign in: the round logo on top ---------- */
+.login-head {
+  text-align: center;
+  margin-bottom: 6px;
+}
+.login-badge {
+  display: block;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(var(--glow), 0.1), 0 22px 40px -18px rgba(var(--glow), 0.8);
+}
+.login-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+#loginCard h2 {
+  margin-bottom: 2px;
+}
+
+/* ---------- «الرئيسية»: greeting, three numbers, quick ways in (ar/look.js) ---------- */
+.card.home {
+  padding: 14px;
+}
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px 20px;
+  border-radius: 18px;
+  color: #fff;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 120% at 0% 0%, rgba(255, 255, 255, 0.2), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 60' preserveAspectRatio='none'%3E%3Cpath d='M0 34 C 90 10 180 62 270 30 S 370 18 400 28 L400 60 L0 60 Z' fill='white' fill-opacity='.1'/%3E%3Cpath d='M0 46 C 110 24 200 66 300 38 S 380 34 400 40' fill='none' stroke='white' stroke-opacity='.35' stroke-width='1.6'/%3E%3C/svg%3E")
+      bottom / 100% 54px no-repeat,
+    var(--grad);
+  box-shadow: var(--sh-acc);
+}
+.hero-badge {
+  flex: none;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 12px 24px -10px rgba(0, 0, 0, 0.55);
+}
+.hero-text {
+  min-width: 0;
+}
+.hero .hello {
+  margin: 0;
+  font-size: 13.5px;
+  opacity: 0.9;
+}
+.hero h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1.35;
+}
+.hero .since {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  opacity: 0.85;
+}
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-height: 78px;
+  margin: 0;
+  padding: 8px 4px;
+  border-radius: 16px;
+  background: var(--tint);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: none;
+}
+.kpi strong {
+  color: var(--crimson-ink);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.kpi small {
+  font-size: 11px;
+  opacity: 0.85;
+}
+.qa-h {
+  margin: 16px 4px 8px;
+  font-size: 15px;
+}
+.qa {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.qa button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 92px;
+  margin: 0;
+  padding: 12px 4px 10px;
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.qa button svg {
+  width: 26px;
+  height: 26px;
+  padding: 9px;
+  box-sizing: content-box;
+  border-radius: 14px;
+  background: var(--rose);
+  color: var(--crimson);
+}
+.qa button:active svg {
+  background: var(--grad);
+  color: #fff;
+}
+html.night .qa button svg {
+  color: var(--crimson-ink);
+}
+.home-help {
+  margin: 14px 4px 2px;
+}
+.home-help > summary {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+}
+.home-help p {
+  margin: 4px 0 0;
+}
+
+@media (min-width: 560px) {
+  .qa {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  section.card:not(.hidden),
+  .sheet,
+  .sheet-box,
+  .dataage.good .dot {
+    animation: none;
+  }
+}

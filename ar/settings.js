@@ -5,8 +5,9 @@
    the color's text on the page stay readable. Loaded first, so the color is right before anything shows. */
 (function (root) {
   'use strict';
+  // «أزرق عسكر» first: the blue of the new round logo (owner 2026-11-12), the bot's color unless he picks another one
   const PRESETS = [
-    ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
+    ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
     ['purple', 'بنفسجي', '#5b3a8c'], ['violet', 'موف غامق', '#4527a0'], ['indigo', 'نيلي', '#283593'], ['blue', 'أزرق', '#1d4f91'],
     ['sky', 'لبني', '#0277bd'], ['cyan', 'سماوي', '#00838f'], ['teal', 'تركواز', '#0e6b72'], ['emerald', 'زمردي', '#00796b'],
     ['green', 'أخضر', '#1d6f48'], ['leaf', 'أخضر زرعي', '#2e7d32'], ['olive', 'زيتوني', '#556b2f'], ['lime', 'ليموني غامق', '#827717'],
@@ -47,22 +48,31 @@
     let main = hslToHex(h, s, l);
     while (contrast(main, '#ffffff') < 4.6 && l > 4) { l -= 2; main = hslToHex(h, s, l); }
     const deep = hslToHex(h, s, Math.max(l - 13, 6));
-    if (night) return { main, deep, ink: hslToHex(h, Math.min(s, 80), 80), soft: hslToHex(h, Math.min(s, 30), 19), line: hslToHex(h, Math.min(s, 22), 30) };
+    // tint / tint2: the page behind the cards and the quiet surfaces, a breath of the color (the modern look, ar/look.css)
+    if (night) return { main, deep, ink: hslToHex(h, Math.min(s, 80), 80), soft: hslToHex(h, Math.min(s, 30), 19), line: hslToHex(h, Math.min(s, 22), 30), tint: hslToHex(h, Math.min(s, 28), 7), tint2: hslToHex(h, Math.min(s, 22), 12) };
     let il = Math.min(l - 4, 32), ink = hslToHex(h, s, il);
     while (contrast(ink, '#fbf8f8') < 7 && il > 4) { il -= 2; ink = hslToHex(h, s, il); }
-    return { main, deep, ink, soft: hslToHex(h, Math.min(s, 55), 95), line: hslToHex(h, Math.min(s, 40), 86) };
+    return { main, deep, ink, soft: hslToHex(h, Math.min(s, 55), 95), line: hslToHex(h, Math.min(s, 40), 86), tint: hslToHex(h, Math.min(s, 45), 97), tint2: hslToHex(h, Math.min(s, 40), 93) };
   }
 
   // ---------- kept on the phone ----------
   function read(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } }
   function write(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  // the stored choice: a ready color's id, or «c:#rrggbb» (any color); the old «night» color (8-color version) = purple at night
+  // the stored choice: a ready color's id, or «c:#rrggbb» (any color); the old «night» color (8-color version) = purple at night.
+  // The new logo is blue (2026-11-12): once, a phone still on the old default (crimson, the old red logo's color) or on
+  // nothing moves to «أزرق عسكر»; any other color he picked stays.
+  const LOOK = 'asker-look-2';
   function choice() {
-    let a = read(KEY, 'crimson'), night = read(NIGHT, '') === '1';
+    if (read(LOOK, '') !== '1') {
+      const was = read(KEY, '');
+      if (!was || was === 'crimson') write(KEY, 'asker');
+      write(LOOK, '1');
+    }
+    let a = read(KEY, 'asker'), night = read(NIGHT, '') === '1';
     if (a === 'night') { a = 'purple'; night = true; write(KEY, a); write(NIGHT, '1'); }
     const p = PRESETS.find((x) => x.id === a);
     const hex = p ? p.hex : /^c:#[0-9a-f]{6}$/i.test(a) ? a.slice(2) : PRESETS[0].hex;
-    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : 'crimson', hex, night };
+    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : 'asker', hex, night };
   }
   function apply() {
     const c = choice(), t = palette(c.hex, c.night), s = document.documentElement.style;
@@ -71,10 +81,14 @@
     s.setProperty('--crimson-ink', t.ink);
     s.setProperty('--rose', t.soft);
     s.setProperty('--rose-line', t.line);
+    s.setProperty('--tint', t.tint);
+    s.setProperty('--tint-2', t.tint2);
+    s.setProperty('--glow', hexToRgb(t.main).join(', ')); // for soft colored shadows: rgba(var(--glow), .5)
     document.documentElement.dataset.accent = c.id;
     document.documentElement.classList.toggle('night', c.night);
+    // the phone's top bar = the top of the header (the main color); at night the dark page
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? '#141217' : t.main);
+    if (meta) meta.setAttribute('content', c.night ? t.tint : t.main);
     return c;
   }
   root.AskerSettings = { PRESETS, palette, contrast, apply, choice };

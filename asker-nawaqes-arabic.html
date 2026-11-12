@@ -2,23 +2,27 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover: the bottom bar is drawn down to the phone's edge, so the phone's own bottom strip shows the bot's
+         color and follows it (Chrome 135+, owner 2026-11-12: «الشريط … شوفلك حل تخليه يتغير مع الالوان») -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="manifest" href="manifest-arabic.json" />
-    <meta name="theme-color" content="#7d1028" />
+    <meta name="theme-color" content="#0a4aa6" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="icon" href="icons/arabic-192.png?v=logo1" />
-    <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" href="icons/arabic-192.png?v=logo2" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-180.png?v=logo2" />
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=buys-20261112c" />
+    <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
+    <link rel="stylesheet" href="ar/look.css?v=look-20261112a" />
   </head>
   <body>
     <header class="appbar">
-      <img class="mark" src="icons/arabic-192.png?v=logo1" alt="" width="40" height="40" />
+      <img class="mark" src="icons/arabic-192.png?v=logo2" alt="" width="46" height="46" />
       <div class="brand">
         <h1>صيدلية عسكر</h1>
-        <p>نواقص ووارد الشركات</p>
+        <p>الرئيسية</p>
       </div>
       <!-- settings (owner 2026-11-12: the bot's color, and later its language), ar/settings.js -->
       <button id="settingsBtn" type="button" class="icon-btn" aria-label="الإعدادات" title="الإعدادات" aria-expanded="false" aria-controls="settingsPanel">
@@ -48,7 +52,7 @@
         <div id="accentPick" class="accents" role="radiogroup" aria-label="لون البوت"></div>
         <div id="accentCustomRow" class="accent-custom">
           <label for="accentCustom">لون من اختيارك (أي لون)</label>
-          <input id="accentCustom" type="color" value="#7d1028" />
+          <input id="accentCustom" type="color" value="#0a4aa6" />
         </div>
         <label class="check night-row"><input id="nightMode" type="checkbox" /> الوضع الليلي (البوت كله غامق، مع أي لون)</label>
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
@@ -56,7 +60,11 @@
     </section>
     <main>
       <section id="loginCard" class="card">
-        <h2>تسجيل الدخول</h2>
+        <div class="login-head">
+          <img class="login-badge" src="icons/arabic-512.png?v=logo2" alt="لوجو صيدلية عسكر" width="132" height="132" />
+          <h2>تسجيل الدخول</h2>
+          <p>صحتك أولوية · من 1981</p>
+        </div>
         <label for="email">الإيميل</label><input id="email" type="email" autocomplete="username" /><label for="password"
           >كلمة السر</label
         ><input id="password" type="password" autocomplete="current-password" /><button id="loginBtn">دخول</button>
@@ -86,7 +94,7 @@
         <!-- the bottom bar: five sections (owner 2026-11-12): الرئيسية، المشتريات، الحسابات، المبيعات، خدمة العملاء -->
         <nav class="bottomnav" aria-label="الأقسام">
           <button data-group="home">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4.2-4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5M6 9.5V19a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>الرئيسية</span></button
           ><button data-group="purchases" class="secondary">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 10h10l2-7H7M10 19a1 1 0 1 0 0 .01M17 19a1 1 0 1 0 0 .01" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
@@ -135,13 +143,38 @@
         </div>
 
         <!-- «الرئيسية»: the first screen under the search -->
+        <!-- the modern home (2026-11-12): greeting with the logo, three numbers, quick ways into the sections (ar/look.js) -->
         <section id="homePanel" class="card home">
-          <h2>دوّر على أي صنف من فوق</h2>
-          <p class="hint">
-            البحث بيدوّر في كل أصناف السيستم (حوالي 32 ألف صنف) وقوايم المخازن مرة واحدة. كل صنف بيطلع في كارت واحد: الرصيد أو
-            «ملوش رصيد»، و«ناقص» لو في النواقص، و«اتطلب النهارده»، ومين عنده بأحسن خصم. القلم ✏️ بيصلّح الاسم العربي، والتصليح بيظهر
-            في النواقص والمخزون والموقع.
-          </p>
+          <div class="hero">
+            <img class="hero-badge" src="icons/arabic-192.png?v=logo2" alt="" width="68" height="68" />
+            <div class="hero-text">
+              <p id="hello" class="hello">أهلًا بيك</p>
+              <h2>صيدلية عسكر</h2>
+              <p class="since">صحتك أولوية · من 1981</p>
+            </div>
+          </div>
+          <div class="kpis">
+            <button type="button" class="kpi" data-go="short"><strong id="kShort">—</strong><span>صنف ناقص</span></button>
+            <button type="button" class="kpi" data-go="drafts"><strong id="kOrdered">—</strong><span>اتطلب النهارده</span></button>
+            <div class="kpi"><strong id="kAge">—</strong><small id="kAgo">آخر داتا</small></div>
+          </div>
+          <h3 class="qa-h">ادخل على طول</h3>
+          <div class="qa">
+            <button type="button" data-go="short"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>النواقص</button>
+            <button type="button" data-go="read"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 13h5l1 2h4l1-2h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>الوارد</button>
+            <button type="button" data-go="drafts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 10h10l2-7H7M10 19a1 1 0 1 0 0 .01M17 19a1 1 0 1 0 0 .01" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>الطلبيات</button>
+            <button type="button" data-go="docs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>الفواتير</button>
+            <button type="button" data-go="suppliers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12M7 21v-7h10v7M7 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>قوايم المخازن</button>
+            <button type="button" data-go="stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>المخزون</button>
+          </div>
+          <details class="home-help">
+            <summary>البحث اللي فوق بيدوّر في إيه؟</summary>
+            <p class="hint">
+              في كل أصناف السيستم (حوالي 32 ألف صنف) وقوايم المخازن مرة واحدة. كل صنف بيطلع في كارت واحد: الرصيد أو «ملوش رصيد»،
+              و«ناقص» لو في النواقص، و«اتطلب النهارده»، ومين عنده بأحسن خصم، و«آخر شرا». القلم ✏️ بيصلّح الاسم العربي، والتصليح
+              بيظهر في النواقص والمخزون والموقع.
+            </p>
+          </details>
         </section>
 
         <section id="shortPanel" class="card hidden">
@@ -506,7 +539,7 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="ar/settings.js?v=colors-20261112b"></script>
+    <script src="ar/settings.js?v=look-20261112a"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
     <script src="ar/app.js?v=search-20261112b"></script>
@@ -518,5 +551,6 @@
     <script src="ar/store-settings.js?v=store-20261109b"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>
     <script src="ar/home.js?v=buys-20261112c"></script>
+    <script src="ar/look.js?v=look-20261112a"></script>
   </body>
 </html>
