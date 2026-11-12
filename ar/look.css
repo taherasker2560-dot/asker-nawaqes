@@ -1036,6 +1036,121 @@ html.night .k-r .cu-k {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+/* the customer's WhatsApp number and sending the statement (ar/customers.js + ar/statement-pdf.js) */
+.cu-phone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--tint);
+  font-size: 14px;
+}
+.cu-phone b {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.cu-phone small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.cu-phone .linklike,
+.cu-sendbox .linklike {
+  min-height: 0;
+  margin: 0;
+  padding: 0 4px;
+  background: none;
+  color: var(--crimson-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+}
+button.cu-send {
+  width: 100%;
+  margin: 10px 0 0;
+  background: #1fa855;
+  color: #fff;
+  font-weight: 700;
+}
+button.cu-pick {
+  width: 100%;
+  margin: 10px 0 0;
+}
+.cu-phone-in {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cu-phone-in input {
+  flex: 1;
+  min-width: 0;
+  direction: ltr;
+  text-align: right;
+}
+.cu-phone-in button {
+  flex: none;
+  min-height: 44px;
+}
+.cu-tels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cu-sendbox {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 2px solid #1fa855;
+}
+.cu-sendbox h3 {
+  margin: 0 0 4px;
+  font-size: 15.5px;
+}
+.cu-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  margin: 7px 0 0;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  text-align: start;
+  font-weight: 600;
+  font-size: 14px;
+}
+.cu-opt small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.cu-opt i {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+}
+.cu-opt.on {
+  border: 2px solid var(--crimson);
+}
+.cu-opt.on i {
+  border: 6px solid var(--crimson);
+}
+.cu-sendbox textarea {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 13.5px;
+}
 /* a sound per section in ⚙️ */
 .ns-list {
   display: grid;

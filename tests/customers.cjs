@@ -69,4 +69,15 @@ assert.equal(L.whenText('2026-11-12T16:32:00',now),'النهارده 4:32 م');
 assert.equal(L.whenText('2026-11-11T09:10:00',now),'امبارح 9:10 ص');
 assert.equal(L.whenText('2026-11-02T12:00:00',now),'02/11/2026');
 assert.equal(L.whenText(null,now),'');
+// WhatsApp numbers: kept with the country code, shown the local way
+assert.equal(L.intlPhone('01012345678'),'201012345678');
+assert.equal(L.intlPhone('٠١٠١٢٣٤٥٦٧٨'),'201012345678');
+assert.equal(L.intlPhone('+20 101 234 5678'),'201012345678');
+assert.equal(L.intlPhone('0020 101-234-5678'),'201012345678');
+assert.equal(L.intlPhone('1012345678'),'201012345678');
+assert.equal(L.intlPhone('0222334455'),'20222334455','a Cairo landline');
+assert.equal(L.intlPhone('+966 50 123 4567'),'966501234567','another country stays');
+assert.equal(L.intlPhone('123'),'');assert.equal(L.intlPhone(''),'');
+assert.equal(L.showPhone('201012345678'),'0101 234 5678');
+assert.equal(L.showPhone('966501234567'),'+966501234567');
 console.log('customers ok');

@@ -148,7 +148,22 @@
     return moves;
   }
   const sortMoves = (list) => list.sort((a, b) => String(b.at).localeCompare(String(a.at)) || num(b.id) - num(a.id));
-  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD };
+  // a WhatsApp number as it is kept: digits with the country code (Egyptian 01xxxxxxxxx -> 201xxxxxxxxx); '' if it is not one
+  function intlPhone(s) {
+    let d = String(s || '').replace(/[٠-٩]/g, (c) => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[^\d+]/g, '');
+    if (d.startsWith('+')) d = d.slice(1);
+    if (d.startsWith('00')) d = d.slice(2);
+    if (/^0[1-9]\d{7,9}$/.test(d)) d = '20' + d.slice(1); // an Egyptian number written the local way (01…, 02…)
+    else if (/^1\d{9}$/.test(d)) d = '20' + d;
+    return /^\d{8,15}$/.test(d) ? d : '';
+  }
+  // as people read it: 201012345678 -> «0101 234 5678»
+  function showPhone(p) {
+    const d = String(p || '');
+    if (/^20\d{10}$/.test(d)) { const l = '0' + d.slice(2); return `${l.slice(0, 4)} ${l.slice(4, 7)} ${l.slice(7)}`; }
+    return d ? '+' + d : '';
+  }
+  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -163,8 +178,24 @@
   };
   let list = null, loading = null, loadedAt = 0, failed = '';
   let view = null, query = '', shown = SHOW;
+  // the customers' WhatsApp numbers (ar_customer_phones, owner 2026-11-12); null = not there (the send part stays hidden)
+  let phones = null;
   // the open statement
-  let st = null;   // { c, moves, done, filter, open: Set, busy, error }
+  let st = null;   // { c, moves, done, filter, open: Set, busy, error, phoneEdit, tels, send }
+  const canPick = () => !!(navigator.contacts && navigator.contacts.select && root.ContactsManager);
+  const S = () => root.AskerStatementLib;
+
+  async function loadPhones() {
+    try {
+      const { data, error } = await db().from('ar_customer_phones').select('customer_id,phone,contact_name,last_sent_at,last_sent_from').range(0, 4999);
+      if (error) throw new Error(error.message || String(error));
+      const m = new Map();
+      (data || []).forEach((r) => m.set(String(r.customer_id), r));
+      phones = m;
+    } catch (e) {
+      phones = null;
+    }
+  }
 
   async function loadList(force) {
     if (!db()) return list;
@@ -180,6 +211,7 @@
           if (!data || data.length < PAGE) break;
         }
         list = rows; failed = ''; loadedAt = Date.now();
+        await loadPhones();
       } catch (e) {
         failed = (e && e.message) || String(e);
       } finally {
@@ -196,7 +228,7 @@
     const pct = lim ? Math.max(0, Math.min(100, Math.round(100 * num(c.balance) / lim))) : 0;
     const last = c.last_at ? `<small>آخر حركة ${esc(whenText(c.last_at, new Date()))} (${esc(KIND_WORD[c.last_kind] || 'بيع')})</small>` : '<small>مفيش حركات</small>';
     return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}" data-cu="${esc(c.id)}">` +
-      `<span class="cu-main"><strong class="notr">${esc(c.name)}</strong>${last}` +
+      `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}</strong>${last}` +
       (lim && owes(c) ? `<i class="cu-bar"><b class="${isOver(c) ? 'r' : ''}" style="width:${pct}%"></b></i>` : '') + '</span>' +
       `<span class="cu-amt ${b.cls}">${esc(b.text)}${lim ? `<small>الحد ${esc(money(lim))}</small>` : ''}</span></button>`;
   }
@@ -230,11 +262,13 @@
   }
 
   // ---------- the statement ----------
-  async function loadMoves() {
+  const payCount = (s) => s.moves.filter((m) => m.kind === 'payment').length;
+  // needPays: keep loading until that many payments are there (the send box offers them), else the usual pages
+  async function loadMoves(needPays) {
     if (!st || st.busy || st.done) return;
     st.busy = true; st.error = '';
     drawStatement();
-    const me = st;
+    const me = st, wasMonthDone = me.monthDone;
     try {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       // the first time: pages until this month is complete (for its sums), then 100 more each tap on «اعرض أقدم»
@@ -248,7 +282,9 @@
         sortMoves(me.moves);
         if (!data || data.length < MOVES_PAGE) { me.done = true; break; }
         const oldest = parseAt(me.moves[me.moves.length - 1].at);
-        if (me.monthDone || !oldest || oldest < monthStart) { me.monthDone = true; break; }
+        if (!oldest || oldest < monthStart) me.monthDone = true;
+        if (needPays) { if (payCount(me) >= needPays && me.monthDone) break; continue; }
+        if (wasMonthDone || me.monthDone) break;
       }
       if (me.done) me.monthDone = true;
     } catch (e) {
@@ -273,6 +309,131 @@
       : '';
     return `<div class="cu-mv k-${t.cls}"><div class="cu-mv-l"><span class="cu-k">${esc(t.text)}</span><span class="cu-after">${esc(afterText(m.balance))}</span></div>` +
       `<div class="cu-mv-d">${bits.filter(Boolean).join(' · ')}</div>${lines}</div>`;
+  }
+  // ---------- the customer's WhatsApp number and sending the statement (owner 2026-11-12) ----------
+  const localIso = (d) => { const t = new Date(d); return isNaN(t) ? '' : `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}T${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:00`; };
+  const errText = (e) => (e && e.message) || String(e);
+  function phoneHtml() {
+    if (!phones) return ''; // the numbers' table is not on the server (yet)
+    const p = phones.get(String(st.c.id));
+    const note = st.phoneMsg ? `<p class="status ${st.phoneBad ? 'bad' : 'good'}">${esc(st.phoneMsg)}</p>` : '';
+    if (p && !st.phoneEdit) {
+      return `<div class="cu-phone"><span>📱 واتس: <b dir="ltr">${esc(showPhone(p.phone))}</b>` +
+        (p.contact_name ? `<small><span class="notr">${esc(p.contact_name)}</span> في الموبايل</small>` : '') +
+        (p.last_sent_at ? `<small>آخر كشف اتبعت ${esc(whenText(localIso(p.last_sent_at), new Date()))}</small>` : '') + '</span>' +
+        '<button type="button" class="linklike" data-cu-phone-edit>غيّره</button></div>' +
+        (st.send ? '' : '<button type="button" class="cu-send" data-cu-send>ابعت كشف الحساب على الواتس</button>') + note;
+    }
+    const tels = st.tels && st.tels.length > 1
+      ? '<p class="hint">الاسم ده عليه أكتر من رقم، اختار رقم الواتس:</p><div class="cu-tels">' +
+        st.tels.map((t, i) => `<button type="button" class="secondary small" data-cu-tel="${i}" dir="ltr">${esc(showPhone(t))}</button>`).join('') + '</div>'
+      : '';
+    return `<div class="cu-phone"><span>${p ? '📱 غيّر رقم الواتس' : '📱 مالوش رقم واتس'}</span>` +
+      (p ? '<button type="button" class="linklike" data-cu-phone-cancel>لغي</button>' : '') + '</div>' +
+      (canPick() ? '<button type="button" class="secondary cu-pick" data-cu-pick>اختار رقمه من أسامي الموبايل</button>' : '') + tels +
+      `<div class="cu-phone-in"><input id="cuPhoneIn" type="tel" inputmode="tel" autocomplete="off" placeholder="${canPick() ? 'أو اكتب رقمه: 01xxxxxxxxx' : 'اكتب رقمه: 01xxxxxxxxx'}" value="${esc(st.phoneDraft || '')}" />` +
+      '<button type="button" class="small" data-cu-phone-save>احفظ</button></div>' + note;
+  }
+  async function savePhone(phone, name) {
+    const me = st, p = intlPhone(phone);
+    if (!p) { me.phoneMsg = 'الرقم ده مش مظبوط. اكتبه زي 01012345678.'; me.phoneBad = true; drawStatement(); return; }
+    const row = { customer_id: me.c.id, phone: p, contact_name: name ? String(name).trim().slice(0, 120) : null, updated_at: new Date().toISOString() };
+    const { error } = await db().from('ar_customer_phones').upsert(row, { onConflict: 'customer_id' });
+    if (error) { me.phoneMsg = 'مقدرتش أحفظ الرقم: ' + errText(error); me.phoneBad = true; if (st === me) drawStatement(); return; }
+    phones.set(String(me.c.id), { ...(phones.get(String(me.c.id)) || {}), ...row });
+    Object.assign(me, { phoneEdit: false, tels: null, phoneDraft: '', phoneMsg: 'اتحفظ الرقم.', phoneBad: false });
+    if (st === me) drawStatement();
+  }
+  async function pickContact() {
+    const me = st;
+    try {
+      const got = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+      const c = got && got[0];
+      if (!c) return;
+      const name = (c.name && c.name[0]) || '';
+      const tels = [...new Set((c.tel || []).map(intlPhone).filter(Boolean))];
+      if (!tels.length) { me.phoneMsg = 'الاسم ده مالوش رقم موبايل ينفع للواتس.'; me.phoneBad = true; drawStatement(); return; }
+      me.pickName = name;
+      if (tels.length === 1) { await savePhone(tels[0], name); return; }
+      me.tels = tels; me.phoneMsg = ''; drawStatement();
+    } catch (e) {
+      me.phoneMsg = 'مقدرتش أفتح أسامي الموبايل: ' + errText(e); me.phoneBad = true; drawStatement();
+    }
+  }
+  function sendHtml() {
+    const s = st.send, L2 = S();
+    if (!s || !L2 || !phones) return '';
+    const pays = L2.paymentChoices(st.moves);
+    const monthId = L2.monthStartId(st.moves, new Date());
+    if (s.from == null) s.from = pays.length ? pays[0].id : monthId;
+    const opt = (id, title, sub) => `<button type="button" class="cu-opt${String(s.from) === String(id) ? ' on' : ''}" data-cu-from="${esc(id)}"><span>${esc(title)}<small>${esc(sub)}</small></span><i></i></button>`;
+    const after = (p) => `${dateText(parseAt(p.at))} · بعدها ${p.sales} فاتورة` + (p.returns ? ` و${p.returns} مرتجع` : '');
+    let html = '<div class="cu-sendbox"><h3>الكشف يبدأ من:</h3>';
+    html += pays.slice(0, s.showAll ? 60 : 4).map((p, i) => opt(p.id, i === 0 ? `آخر دفعة: ${money(p.paid)} ج` : i === 1 ? `الدفعة اللي قبلها: ${money(p.paid)} ج` : `دفعة ${money(p.paid)} ج`, after(p))).join('');
+    if (!pays.length && !st.busy) html += '<p class="hint">مفيش دفعات في حسابه.</p>';
+    if ((pays.length > 4 && !s.showAll) || (!st.done && s.showAll)) html += '<button type="button" class="secondary small cu-more" data-cu-more-pays>دفعات أقدم</button>';
+    if (monthId != null && !pays.some((p) => String(p.id) === String(monthId))) {
+      const n = st.moves.filter((m) => String(m.at) >= String(st.moves.find((x) => String(x.id) === String(monthId)).at)).length;
+      html += opt(monthId, 'من أول الشهر ده', `${n} حركة`);
+    }
+    if (st.busy) html += '<p class="status">بيجيب الحركات…</p>';
+    if (s.busy) html += '<p class="status">بيعمل الكشف…</p>';
+    if (s.error) html += `<p class="status bad">مقدرتش أعمل الكشف: ${esc(s.error)}</p>`;
+    if (!s.msg) {
+      html += (s.from != null && !s.busy ? '<button type="button" class="cu-send" data-cu-make>جهّز الكشف والرسالة</button>' : '') +
+        '<button type="button" class="secondary cu-more" data-cu-send-close>لغي</button>';
+    } else {
+      html += `<p class="status good">الكشف جاهز: ${s.pages} صفحة. <button type="button" class="linklike" data-cu-pdf>اتفرّج عليه</button></p>` +
+        `<textarea id="cuMsg" rows="7">${esc(s.msg)}</textarea>` +
+        '<button type="button" class="cu-send" data-cu-wa>افتح محادثته في الواتس وابعت</button>' +
+        (s.sent ? '<p class="status good">اتفتحت محادثته في الواتس: دوس إرسال هناك.</p>' : '') +
+        '<button type="button" class="secondary cu-more" data-cu-send-close>لغي</button>';
+    }
+    return html + '</div>';
+  }
+  async function openSend() {
+    st.send = { from: null };
+    drawStatement();
+    // enough history for a few payments to choose from
+    if (!st.done && payCount(st) < 4) await loadMoves(4);
+  }
+  async function makeStatement() {
+    const me = st, s = me && me.send, L2 = S();
+    if (!s || s.busy || !L2 || !root.AskerStatement) return;
+    const stmt = L2.statementFrom(me.moves, s.from);
+    if (!stmt) return;
+    s.busy = true; s.error = ''; drawStatement();
+    try {
+      const now = new Date();
+      const pdf = await root.AskerStatement.makePdf(stmt, { name: me.c.name, id: me.c.id, now });
+      const rand = (root.crypto && root.crypto.randomUUID && root.crypto.randomUUID()) || Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const key = L2.fileKey(now, rand);
+      const up = await db().storage.from('ar-statements').upload(key, pdf.blob, { contentType: 'application/pdf', upsert: false });
+      if (up && up.error) throw new Error(up.error.message || String(up.error));
+      const sg = await db().storage.from('ar-statements').createSignedUrls([key], 30 * 86400);
+      const link = sg && !sg.error && sg.data && sg.data[0] && sg.data[0].signedUrl;
+      if (!link) throw new Error((sg && sg.error && sg.error.message) || 'مفيش لينك');
+      if (s.pdfUrl) URL.revokeObjectURL(s.pdfUrl);
+      Object.assign(s, { stmt, link, pages: pdf.pages, pdfUrl: URL.createObjectURL(pdf.blob), sent: false });
+      s.msg = L2.messageText({ name: me.c.name, from: stmt.from, balance: stmt.closing, link });
+    } catch (e) {
+      s.error = errText(e);
+    } finally {
+      s.busy = false;
+      if (st === me) drawStatement();
+    }
+  }
+  function openWa() {
+    const me = st, s = me.send, p = phones && phones.get(String(me.c.id));
+    if (!s || !s.msg || !p) return;
+    const t = String(($('cuMsg') && $('cuMsg').value) || s.msg).trim();
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, p.phone);
+    else root.open('https://wa.me/' + p.phone + '?text=' + encodeURIComponent(t), '_blank');
+    s.sent = true;
+    const at = new Date().toISOString();
+    db().from('ar_customer_phones').update({ last_sent_at: at, last_sent_from: s.stmt.from }).eq('customer_id', me.c.id)
+      .then(({ error }) => { if (!error) Object.assign(p, { last_sent_at: at, last_sent_from: s.stmt.from }); });
+    drawStatement();
   }
   function drawStatement() {
     const box = $('cuSt');
@@ -299,7 +460,9 @@
       `<div class="cu-head"><div class="cu-name"><strong class="notr">${esc(c.name)}</strong> <span class="hint">كود ${esc(c.id)}</span></div>` +
       `<div class="cu-bal ${b.cls}">${esc(b.text)}</div><div class="hint">${esc(limLine)}</div>` +
       (st.monthDone ? `<div class="cu-sum"><div>اشترى الشهر ده<b>${esc(money(sums.bought))} ج</b></div><div>دفع الشهر ده<b class="paid">${esc(money(sums.paid))} ج</b></div></div>` : '') +
+      phoneHtml() +
       '</div>' +
+      sendHtml() +
       `<div class="chips cu-filter" role="group" aria-label="نوع الحركة">${chip('all', 'الكل')}${chip('sales', 'المبيعات')}${chip('payments', 'المدفوعات')}</div>` +
       `<div id="cuMoves">${body}</div>` +
       (st.error ? `<p class="status bad">مقدرتش أجيب الحركات: ${esc(st.error)}</p>` : '') +
@@ -347,8 +510,28 @@
         if (id != null) { if (st.open.has(id)) st.open.delete(id); else st.open.add(id); drawStatement(); }
         return;
       }
-      if (e.target.closest('[data-cu-older]')) loadMoves();
+      if (e.target.closest('[data-cu-older]')) { loadMoves(); return; }
+      // the customer's WhatsApp number
+      if (!st) return;
+      const keepDraft = () => { const i = $('cuPhoneIn'); if (i) st.phoneDraft = i.value; };
+      if (e.target.closest('[data-cu-phone-edit]')) { Object.assign(st, { phoneEdit: true, phoneMsg: '', tels: null }); drawStatement(); return; }
+      if (e.target.closest('[data-cu-phone-cancel]')) { Object.assign(st, { phoneEdit: false, phoneMsg: '', tels: null, phoneDraft: '' }); drawStatement(); return; }
+      if (e.target.closest('[data-cu-pick]')) { keepDraft(); pickContact(); return; }
+      const tel = e.target.closest('[data-cu-tel]');
+      if (tel && st.tels) { savePhone(st.tels[+tel.dataset.cuTel], st.pickName); return; }
+      if (e.target.closest('[data-cu-phone-save]')) { keepDraft(); savePhone(st.phoneDraft, ''); return; }
+      // sending the statement
+      if (e.target.closest('[data-cu-send]')) { openSend(); return; }
+      if (e.target.closest('[data-cu-send-close]')) { if (st.send && st.send.pdfUrl) URL.revokeObjectURL(st.send.pdfUrl); st.send = null; drawStatement(); return; }
+      const fr = e.target.closest('[data-cu-from]');
+      if (fr && st.send) { if (String(st.send.from) !== fr.dataset.cuFrom) Object.assign(st.send, { from: fr.dataset.cuFrom, msg: '', link: '', sent: false, error: '' }); drawStatement(); return; }
+      if (e.target.closest('[data-cu-more-pays]') && st.send) { st.send.showAll = true; drawStatement(); if (!st.done) loadMoves(payCount(st) + 6); return; }
+      if (e.target.closest('[data-cu-make]')) { makeStatement(); return; }
+      if (e.target.closest('[data-cu-pdf]') && st.send && st.send.pdfUrl) { root.open(st.send.pdfUrl, '_blank'); return; }
+      if (e.target.closest('[data-cu-wa]')) { openWa(); return; }
     });
+    // the message can be changed before sending; a redraw keeps the change
+    panel.addEventListener('input', (e) => { if (e.target.id === 'cuMsg' && st && st.send) st.send.msg = e.target.value; });
     $('cuQ')?.addEventListener('input', (e) => { query = e.target.value; shown = SHOW; drawList(); });
     $('cuClear')?.addEventListener('click', () => { query = ''; $('cuQ').value = ''; drawList(); $('cuQ').focus(); });
     // the phone's back button closes the statement
