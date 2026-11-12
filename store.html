@@ -15,11 +15,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
     <link rel="stylesheet" href="store/look.css?v=en-20261112d" />
-    <link rel="stylesheet" href="store/polish.css?v=look-20261112c" />
+    <link rel="stylesheet" href="store/polish.css?v=home-20261112b" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=look-20261112a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=en-20261112b"></script>
+    <script src="store/i18n-en-store.js?v=home-20261112a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=theme-20261112a"></script>
   </head>
@@ -52,19 +52,61 @@
         <input id="homeSearch" type="search" placeholder="دوّر على دوا أو منتج…" autocomplete="off" readonly />
       </div>
       <p class="closed-note" hidden></p>
-      <section class="hero">
-        <h1 id="heroTitle">اطلب من صيدليتك وهي توصلك</h1>
-        <p id="heroText">اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
-        <div class="hero-actions">
-          <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
-          <a href="#cart" class="hero-btn ghost" id="heroRx">صوّر الروشتة وابعتها</a>
-        </div>
-      </section>
+      <!-- the home's selling parts (owner 2026-11-12): slides that turn by themselves, why order from us, your cart, your
+           last order, «محتاج إيه النهارده؟», best sellers, what you looked at, «مش لاقي دواك؟», and WhatsApp the pharmacist -->
+      <div class="slides" id="slides" aria-roledescription="carousel">
+        <section class="hero slide">
+          <h1 id="heroTitle">اطلب من صيدليتك وهي توصلك</h1>
+          <p id="heroText">اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
+          <div class="hero-actions">
+            <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
+            <a href="#cart" class="hero-btn ghost" id="heroRx">صوّر الروشتة وابعتها</a>
+          </div>
+        </section>
+        <section class="hero slide s-rx">
+          <h2>معاك روشتة؟</h2>
+          <p>صوّرها من موبايلك وابعتها، والصيدلي يقراها ويكلمك بالأسعار والبدايل قبل ما نجهّز طلبك.</p>
+          <div class="hero-actions"><a href="#cart" class="hero-btn">صوّر الروشتة دلوقتي</a></div>
+        </section>
+        <section class="hero slide s-find">
+          <h2>مش لاقي دواك؟</h2>
+          <p>اكتب اسمه وضيفه لطلبك من غير سعر، وإحنا ندوّر عليه ونكلمك بسعره وميعاده.</p>
+          <div class="hero-actions"><a href="#search" class="hero-btn">اكتب اسم الدوا</a></div>
+        </section>
+        <section class="hero slide s-wa" id="slideWa" hidden>
+          <h2>اسأل الصيدلي</h2>
+          <p>عندك سؤال عن دوا أو جرعة أو بديل؟ ابعتلنا على واتساب ونرد عليك.</p>
+          <div class="hero-actions"><a href="#" class="hero-btn" id="slideWaBtn" target="_blank" rel="noopener">كلّم الصيدلي واتساب</a></div>
+        </section>
+      </div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+
+      <ul class="trust" aria-label="ليه تطلب مننا">
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span>صيدلية من 1981</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M15 15l2 2 3-3"/></svg><span>صيدلي بيراجع طلبك</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg><span>الدفع عند الاستلام</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.5"/><circle cx="17" cy="17.5" r="1.5"/></svg><span>توصيل لحد البيت</span></li>
+      </ul>
+
+      <a href="#cart" class="home-card cart-card" id="cartCard" hidden>
+        <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg></span>
+        <span class="hc-text"><strong>كمّل طلبك</strong><span id="cartCardText"></span></span>
+        <span class="hc-go">السلة</span>
+      </a>
+      <div class="home-card again-card" id="againCard" hidden>
+        <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg></span>
+        <span class="hc-text"><strong>اطلب طلبك اللي فات تاني</strong><span id="againText"></span></span>
+        <button type="button" class="hc-go" id="againBtn">اطلبه</button>
+      </div>
       <div id="installBox" class="install" hidden>
         <img src="icons/arabic-96.png?v=logo2" alt="" width="44" height="44" loading="lazy" />
         <div><strong>نزّل الصيدلية على موبايلك</strong><span>تفتحها من الشاشة الرئيسية زي أي تطبيق</span></div>
         <button id="installBtn" type="button">نزّل</button>
       </div>
+      <section class="block">
+        <h2>محتاج إيه النهارده؟</h2>
+        <div id="needs" class="needs"></div>
+      </section>
       <section class="block">
         <h2>الأقسام</h2>
         <div id="sections" class="sections"></div>
@@ -73,6 +115,17 @@
         <h2>الأكثر طلبًا</h2>
         <div id="popular" class="list flush"></div>
       </section>
+      <section id="seenBox" class="block popular-block" hidden>
+        <h2>شفته قريب</h2>
+        <div id="seen" class="list flush"></div>
+      </section>
+      <a href="#search" class="promo">
+        <span><strong>مش لاقي اللي بتدوّر عليه؟</strong><span>اكتب اسمه وإحنا نجيبهولك ونكلمك بسعره</span></span>
+        <span class="promo-go" aria-hidden="true">←</span>
+      </a>
+      <a href="#" class="wa-fab" id="waFab" target="_blank" rel="noopener" hidden aria-label="اسأل الصيدلي على واتساب">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1c-1-.4-2.1-1.5-2.5-2.5l1-1-1-2z"/></svg>
+      </a>
       <p id="contact" class="foot" hidden>عندك سؤال؟ كلمنا واتساب: <a id="waLink" href="#" target="_blank" rel="noopener" dir="ltr"><span id="waNumber"></span></a></p>
       <p class="foot">الأسعار والمتوفر بيتحدثوا من الصيدلية كل كام ساعة.</p>
     </div>
@@ -228,7 +281,7 @@
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="store/store.js?v=speed-20261112a"></script>
+    <script src="store/store.js?v=home-20261112b"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>
 </html>

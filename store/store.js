@@ -20,6 +20,23 @@
     { key: 'baby', name: 'الأم والطفل', mark: 'ط', cats: ['baby'] },
     { key: 'supplies', name: 'مستلزمات طبية', mark: 'م', cats: ['supplies_devices'] },
   ];
+  // «محتاج إيه النهارده؟» على الرئيسية (2026-11-12): شكاوى شائعة ← أنواع التصنيف بتاعتها (المتوفر بس)
+  const NEEDS = [
+    { key: 'n-cold', name: 'برد وكحة', cats: ['cold_allergy'] },
+    { key: 'n-pain', name: 'صداع ووجع', cats: ['pain_fever'] },
+    { key: 'n-stomach', name: 'معدة وهضم', cats: ['stomach_simple'] },
+    { key: 'n-skin', name: 'بشرة وشعر', cats: ['skin_drug', 'cosmetic'] },
+    { key: 'n-eye', name: 'عين وأنف وودن', cats: ['eye_ear_nose_simple'] },
+    { key: 'n-kids', name: 'أطفال ورضّع', cats: ['baby'] },
+    { key: 'n-vit', name: 'فيتامينات ومناعة', cats: ['vitamins_supplements'] },
+  ];
+  // «شفته قريب»: آخر الأصناف اللي الزبون فتحها على الموبايل ده (أحدث واحد الأول، 10 بالكتير)
+  const MAX_SEEN = 10;
+  function rememberSeen(list, it) {
+    if (!it || it.id == null) return Array.isArray(list) ? list : [];
+    const keep = { id: it.id, name: it.name, arabic_name: it.arabic_name || null, status: it.status, price: it.price, cat: it.cat, needs_rx: !!it.needs_rx };
+    return [keep].concat((Array.isArray(list) ? list : []).filter((x) => x && x.id !== it.id)).slice(0, MAX_SEEN);
+  }
   const ERRORS = {
     bad_phone: 'رقم الموبايل لازم يكون 11 رقم ويبدأ بـ 01',
     bad_name: 'اكتب اسمك',
@@ -176,7 +193,7 @@
     const pr = it.status === 'available' && Number(it.price) > 0 ? ` بـ ${money(it.price)} جنيه` : '';
     return `${nm}${pr} من صيدلية عسكر، اطلبه من هنا: ${link}`;
   }
-  const api = { cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -199,6 +216,9 @@
   if (!Array.isArray(cart)) cart = [];
   let myOrders = store.get('asker_store_orders', []);
   if (!Array.isArray(myOrders)) myOrders = [];
+  let seen = store.get('asker_store_seen', []);
+  if (!Array.isArray(seen)) seen = [];
+  let cartShown = null; // the cart number already on screen (null = page just opened: no jump)
   let shown = [], popular = [], lastQuery = null, offset = 0, seq = 0, sending = false;
   // البدايل: {id الصنف اللي مش متوفر: [أصناف متوفرة بنفس المادة الفعالة والتركيز والشكل]} (ar_store_alternatives، 2026-11-11)
   let alts = {};
@@ -240,12 +260,15 @@
   function saveCart() {
     store.set('asker_store_cart', cart);
     const n = cartCount(cart);
+    // a jump of the cart number (and the cart button) when something is added, the first item included
+    const up = cartShown !== null && n > cartShown;
+    cartShown = n;
     document.querySelectorAll('.cart-n').forEach((el) => {
-      const up = n > (Number(el.textContent) || 0) && !el.hidden;
       el.textContent = n; el.hidden = !n;
-      // a small jump of the cart number when something is added
       if (up) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
     });
+    if (up) document.querySelectorAll('a.cart-btn[href="#cart"], .tabbar a[data-go="cart"]').forEach((el) => { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); });
+    drawHomeCards();
   }
   function view(name) {
     document.querySelectorAll('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== name));
@@ -308,6 +331,47 @@
   function drawPopular() {
     $('popularBox').hidden = !popular.length;
     $('popular').innerHTML = popular.map(row).join('');
+    drawSeen();
+  }
+  // «شفته قريب» (السعر والحالة من آخر مرة اتفتح فيها؛ السيرفر بيحسب السعر الصح وقت الطلب)
+  function drawSeen() {
+    const list = seen.filter((x) => !popular.some((p) => p.id === x.id)).slice(0, MAX_SEEN);
+    $('seenBox').hidden = list.length < 2;
+    $('seen').innerHTML = list.length < 2 ? '' : list.map(row).join('');
+  }
+  // كروت الرئيسية: «كمّل طلبك» لما السلة فيها حاجة، و«اطلب طلبك اللي فات تاني»
+  function drawHomeCards() {
+    const n = cartCount(cart);
+    $('cartCard').hidden = !n;
+    if (n) {
+      const t = cartTotal(cart), later = cart.filter((x) => x.on_order).length;
+      $('cartCardText').textContent = `${n} صنف في السلة` + (t > 0 ? ` · ${money(t)} ج` : '') + (later ? ' + أصناف بالطلب' : '');
+    }
+    const last = myOrders.find((o) => (o.items || []).length);
+    $('againCard').hidden = !last || !!n;
+    if (last && !n) {
+      $('againText').textContent = `طلب رقم ${last.id} · ${last.items.length} صنف`;
+      $('againBtn').dataset.again = last.id;
+    }
+  }
+  // الشرايح اللي فوق: بتلف لوحدها كل 5 ثواني، وبتتسحب بالصباع
+  function startSlides() {
+    const box = $('slides'), dots = $('dots');
+    const slides = () => [...box.querySelectorAll('.slide:not([hidden])')];
+    const drawDots = () => { dots.innerHTML = slides().map(() => '<i></i>').join(''); mark(); };
+    const at = () => Math.round(Math.abs(box.scrollLeft) / Math.max(1, box.clientWidth));
+    const mark = () => { const i = at(); [...dots.children].forEach((d, k) => d.classList.toggle('on', k === i)); };
+    box.addEventListener('scroll', () => { clearTimeout(box._t); box._t = setTimeout(mark, 60); }, { passive: true });
+    let paused = false;
+    box.addEventListener('pointerdown', () => { paused = true; setTimeout(() => { paused = false; }, 8000); });
+    setInterval(() => {
+      if (paused || document.hidden || box.closest('[hidden]')) return;
+      const n = slides().length; if (n < 2) return;
+      const next = (at() + 1) % n, dir = getComputedStyle(box).direction === 'rtl' ? -1 : 1;
+      box.scrollTo({ left: dir * next * box.clientWidth, behavior: 'smooth' });
+    }, 5000);
+    drawDots();
+    startSlides.redraw = drawDots;
   }
   const skel = (n) => Array.from({ length: n }, () => '<article class="item skel" aria-hidden="true"><div class="thumb"></div><i></i><i></i><i class="s"></i></article>').join('');
   async function loadPopular() {
@@ -326,8 +390,11 @@
   async function loadSettings() {
     const cached = store.get('asker_store_settings', null);
     if (cached && typeof cached === 'object') applySettings(cached);
-    // '*': the color columns (theme_color, theme_night) exist only after migration 202611120600
-    const { data, error } = await client.from('ar_store_settings').select('*').limit(1);
+    // the visitor may read only some columns (column grants): with the colors first, and if the colors are not readable
+    // (no grant yet), without them. Never '*': one column without a grant makes the whole answer fail (401).
+    const BASE = 'is_open,closed_message,hero_title,hero_text,whatsapp';
+    let { data, error } = await client.from('ar_store_settings').select(BASE + ',theme_color,theme_night').limit(1);
+    if (error) ({ data, error } = await client.from('ar_store_settings').select(BASE).limit(1));
     if (error || !data || !data[0]) return;
     store.set('asker_store_settings', data[0]);
     applySettings(data[0]);
@@ -350,6 +417,11 @@
     });
     $('sendBtn').disabled = closed;
     if (settings.whatsapp) {
+      // «اسأل الصيدلي»: شريحة فوق وزرار واتساب عايم
+      const wa = 'https://wa.me/2' + settings.whatsapp + '?text=' + encodeURIComponent('عندي سؤال للصيدلي');
+      $('slideWaBtn').href = wa; $('waFab').href = wa;
+      $('slideWa').hidden = false; $('waFab').hidden = false;
+      if (startSlides.redraw) startSlides.redraw();
       $('contact').hidden = false;
       $('waNumber').textContent = settings.whatsapp;
       $('waLink').href = 'https://wa.me/2' + settings.whatsapp;
@@ -384,9 +456,10 @@
 
   // ---------- صفحة الصنف (sheet) ----------
   let sheetItem = null, sheetQty = 1, sheetFromLink = false;
-  const known = () => shown.concat(popular, sheetItem ? [sheetItem] : [], ...Object.values(alts));
+  const known = () => shown.concat(popular, seen, sheetItem ? [sheetItem] : [], ...Object.values(alts));
   function openItem(it, fromLink) {
     sheetItem = it; sheetQty = 1; sheetFromLink = !!fromLink;
+    seen = rememberSeen(seen, it); store.set('asker_store_seen', seen); drawSeen();
     $('shNote').textContent = '';
     if (!canAdd(it) || it.status !== 'available') loadAlts([it.id]);
     drawSheet();
@@ -462,7 +535,7 @@
     runQuery(lastQuery, false);
   }
   function openSection(key) {
-    const s = SECTIONS.find((x) => x.key === key);
+    const s = SECTIONS.find((x) => x.key === key) || NEEDS.find((x) => x.key === key);
     if (!s) return;
     lastQuery = { cats: s.cats, title: s.name + ' (المتوفر)' };
     offset = 0;
@@ -653,7 +726,7 @@
     }
     const add = e.target.closest('[data-add]');
     if (add) {
-      const it = shown.concat(popular, ...Object.values(alts)).find((x) => String(x.id) === add.dataset.add);
+      const it = shown.concat(popular, seen, ...Object.values(alts)).find((x) => String(x.id) === add.dataset.add);
       if (it && canAdd(it)) {
         if (cart.length >= MAX_LINES && !cart.find((x) => x.id === it.id)) { $('resNote').textContent = 'السلة فيها 30 صنف، ودي أقصى حاجة في الطلب الواحد'; return; }
         cart = cartAdd(cart, it); saveCart(); drawList(!$('more').hidden);
@@ -714,6 +787,8 @@
     installEvt = null; $('installBox').hidden = true;
   });
 
+  $('needs').innerHTML = NEEDS.map((s) => `<a href="#search" data-section="${s.key}" class="need">${s.name}</a>`).join('');
+  startSlides();
   $('sections').innerHTML = SECTIONS.map((s) => `<a href="#search" data-section="${s.key}" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true">${SEC_ICONS[s.key] || ''}</svg></span><span>${s.name}</span></a>`).join('')
     + '<a href="#search" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span><span>كل الأصناف</span></a>';
   const me = store.get('asker_store_me', null);
