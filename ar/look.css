@@ -1099,6 +1099,9 @@ button.cu-pick {
   flex-wrap: wrap;
   gap: 6px;
 }
+.cu-note {
+  white-space: pre-line;
+}
 button.linklike.cu-add {
   display: block;
   min-height: 0;

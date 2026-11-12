@@ -15,6 +15,18 @@ const MOVES=[
 ];
 const setData=(page,phones=[])=>page.evaluate(([c,m,p])=>{window.__tables.ar_customers=c;window.__tables.ar_customer_moves=m;window.__tables.ar_customer_phones=p;window.__opened=[];window.open=(u)=>{window.__opened.push(u);return null}},[CUSTOMERS,MOVES,phones]);
 const openStatement=async(page)=>{await page.click('[data-group="accounts"]');await page.waitForSelector('#cuBox:not(.hidden)');await page.click('#cuChips [data-cu-view="all"]');await page.click('#cuRows [data-cu="101"]');await page.waitForSelector('#cuSt:not(.hidden) .cu-mv')};
+// a contact shared from the phone's contacts app: what the service worker keeps (ar/sw.js), then the bot opened on ?share=<id>
+const shareContact=async(page,text,file)=>{
+ const id=await page.evaluate(async([t,f])=>{
+  localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:window.__tables.ar_customers,ar_customer_moves:window.__tables.ar_customer_moves,ar_customer_phones:window.__tables.ar_customer_phones}));
+  const c=await caches.open('ar-share'),id='t'+Date.now(),u=(k)=>new URL(k,location.href).href,files=[];
+  if(f){files.push({key:`ar-share/${id}/0`,name:f.name,type:f.type});await c.put(u(`ar-share/${id}/0`),new Response(new Blob([f.body],{type:f.type})))}
+  await c.put(u(`ar-share/${id}/meta`),new Response(JSON.stringify({text:t,files}),{headers:{'content-type':'application/json'}}));
+  return id},[text,file||null]);
+ await page.goto(new URL('asker-nawaqes-arabic.html?share='+id,page.url()).href);
+ await page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+};
 run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is kept on the customer',async({page,table})=>{
  await setData(page);
  await openStatement(page);
@@ -28,11 +40,15 @@ run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is
  await page.waitForSelector('[data-cu-send]');
  assert.match(await text(page,'#cuSt .cu-phone'),/📱 واتس: 0101 234 5678/);
  assert.deepEqual((await table('ar_customer_phones')).map(r=>[r.customer_id,r.phone,r.contact_name]),[[101,'201012345678',null]]);
- // from the phone's contacts: a contact with two numbers asks which one (the same number written twice counts once)
- await page.evaluate(()=>{window.ContactsManager=function(){};Object.defineProperty(navigator,'contacts',{value:{select:async()=>[{name:['جار الصيدلية'],tel:['+20 101 111 2222','0101 111 2222','0222334455']}]},configurable:true})});
+ // from the phone's contacts app: «هات رقمه من أسامي الموبايل», then the contacts app → «مشاركة» → «نواقص عربي»
+ assert.equal(await page.$('[data-cu-pick]'),null,'Chrome\'s own list is not offered (it answered empty on the owner\'s phone)');
  await page.click('[data-cu-phone-edit]');
- await page.click('[data-cu-pick]');
- await page.waitForSelector('[data-cu-tel]');
+ await page.click('[data-cu-share-pick]');
+ assert.match(await text(page,'#cuSt .cu-note'),/دوس «مشاركة»/);
+ await shareContact(page,'جار الصيدلية\n+20 101 111 2222\n0101 111 2222\n0222334455');
+ await page.waitForSelector('#cuSt:not(.hidden) [data-cu-tel]');
+ assert.equal(await text(page,'#cuSt .cu-name strong'),'أحمد محمود');
+ // two numbers came (the same number written twice counts once): it asks which
  assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0101 111 2222 جار الصيدلية','+20222334455 جار الصيدلية','ضيفهم كلهم']);
  await page.click('[data-cu-tel="0"]');
  // several numbers a customer (owner: «رقم و2 و3»): the new one is added next to the first
@@ -41,20 +57,29 @@ run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is
  assert.deepEqual(await rowsText(),['📱 واتس: 0101 234 5678شيله','📱 واتس: 0101 111 2222جار الصيدلية في الموبايلشيله']);
  assert.deepEqual((await table('ar_customer_phones')).map(r=>[r.customer_id,r.phone,r.contact_name]),[[101,'201012345678',null],[101,'201011112222','جار الصيدلية']]);
  // «ضيفهم كلهم»: both numbers of the contact (one already there only gets updated)
- await page.click('[data-cu-phone-edit]');await page.click('[data-cu-pick]');await page.waitForSelector('[data-cu-tel="all"]');
+ await page.click('[data-cu-phone-edit]');await page.click('[data-cu-share-pick]');
+ await shareContact(page,'جار الصيدلية\n+20 101 111 2222\n0222334455');
+ await page.waitForSelector('[data-cu-tel="all"]');
  await page.click('[data-cu-tel="all"]');
  await page.waitForFunction(()=>/اتحفظ 2 رقم/.test(document.getElementById('cuSt').textContent));
  assert.deepEqual((await table('ar_customer_phones')).map(r=>r.phone),['201012345678','201011112222','20222334455']);
- // two names ticked in the list: the numbers of both, each with its own name
- await page.evaluate(()=>{Object.defineProperty(navigator,'contacts',{value:{select:async(props,opts)=>{window.__pickOpts=opts;return [{name:['الأب'],tel:['01022223333']},{name:['الابن'],tel:['01044445555','0102 222 3333']}]}},configurable:true})});
- await page.click('[data-cu-phone-edit]');await page.click('[data-cu-pick]');await page.waitForSelector('[data-cu-tel="all"]');
- assert.deepEqual(await page.evaluate(()=>window.__pickOpts),{multiple:true},'the tick-box list');
- assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0102 222 3333 الأب','0104 444 5555 الابن','ضيفهم كلهم']);
- await page.click('[data-cu-tel="1"]');
+ // a contact card (vCard file, the Arabic name quoted-printable) with one number: saved at once, with its name
+ await page.click('[data-cu-phone-edit]');await page.click('[data-cu-share-pick]');
+ await shareContact(page,'',{name:'contact.vcf',type:'text/x-vcard',body:'BEGIN:VCARD\r\nVERSION:2.1\r\nFN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=D8=A7=D9=84=D8=A7=D8=A8=D9=86\r\nTEL;CELL:010-4444-5555\r\nEND:VCARD\r\n'});
  await page.waitForFunction(()=>window.__tables.ar_customer_phones.some(r=>r.phone==='201044445555'));
  assert.equal((await table('ar_customer_phones')).find(r=>r.phone==='201044445555').contact_name,'الابن');
+ await page.waitForFunction(()=>/اتحفظ الرقم/.test(document.getElementById('cuSt')?.textContent||''));
  page.once('dialog',d=>d.accept());await page.click('[data-cu-phone-del="201044445555"]');
  await page.waitForFunction(()=>!window.__tables.ar_customer_phones.some(r=>r.phone==='201044445555'));
+ // something shared with no number in it, while waiting: it says so on that customer
+ await page.click('[data-cu-phone-edit]');await page.click('[data-cu-share-pick]');
+ await shareContact(page,'جار الصيدلية');
+ await page.waitForFunction(()=>/اللي اتشارك من الأسامي مافيهوش رقم/.test(document.getElementById('cuSt')?.textContent||''));
+ // shared when no customer is waiting: it goes to «الوارد» as before
+ await shareContact(page,'بانادول اكسترا 2');
+ await page.waitForFunction(()=>document.getElementById('pasteText')?.value==='بانادول اكسترا 2');
+ assert.equal((await table('ar_customer_phones')).length,3,'no number saved');
+ await page.evaluate(()=>window.AskerApp.showTab('customers'));await page.waitForSelector('#cuBox:not(.hidden)');await page.click('#cuChips [data-cu-view="all"]');await page.click('#cuRows [data-cu="101"]');await page.waitForSelector('#cuSt:not(.hidden) .cu-mv');
  // remove one (asks first)
  page.once('dialog',d=>{assert.match(d.message(),/تشيل الرقم ده من العميل؟ \+20222334455/);d.accept()});
  await page.click('[data-cu-phone-del="20222334455"]');
@@ -115,22 +140,7 @@ run('Statement on WhatsApp: from the payment he picks, a detailed PDF, WhatsApp 
 });
 run('Statement on WhatsApp: every outcome of the contacts list says something; paste; reopened while picking',async({page,table})=>{
  await setData(page);
- const contacts=(answer)=>page.evaluate((a)=>{window.ContactsManager=function(){};Object.defineProperty(navigator,'contacts',{value:{select:async()=>{if(a==='throw')throw new Error('no');return a}},configurable:true})},answer);
  await openStatement(page);
- // nothing came back (the owner tapped «تم» without a ticked name): it says so
- await contacts([]);await page.click('[data-cu-phone-save]');await page.evaluate(()=>window.AskerCustomers.statement('101'));await page.waitForSelector('[data-cu-pick]');
- await page.click('[data-cu-pick]');
- await page.waitForFunction(()=>/ماوصلش أي اسم من القايمة/.test(document.getElementById('cuSt').textContent));
- // a name without its number (the «أرقام التليفون» switch off in the list)
- await contacts([{name:['جار الصيدلية'],tel:[]}]);await page.click('[data-cu-pick]');
- await page.waitForFunction(()=>/الاسم وصل من غير رقم/.test(document.getElementById('cuSt').textContent));
- // a number that is not one
- await contacts([{name:['X'],tel:['123']}]);await page.click('[data-cu-pick]');
- await page.waitForFunction(()=>/الرقم اللي وصل \(123\) مش رقم ينفع للواتس/.test(document.getElementById('cuSt').textContent));
- // the list could not open
- await contacts('throw');await page.click('[data-cu-pick]');
- await page.waitForFunction(()=>/مقدرتش أفتح أسامي الموبايل/.test(document.getElementById('cuSt').textContent));
- assert.deepEqual(await table('ar_customer_phones'),[],'nothing saved by a failed pick');
  // paste: something that is not a number, then the number copied on the phone
  await page.evaluate(()=>{window.__clip='مش رقم';Object.defineProperty(navigator,'clipboard',{value:{readText:async()=>window.__clip},configurable:true})});
  await page.click('[data-cu-paste]');

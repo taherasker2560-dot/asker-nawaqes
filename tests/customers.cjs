@@ -80,4 +80,10 @@ assert.equal(L.intlPhone('+966 50 123 4567'),'966501234567','another country sta
 assert.equal(L.intlPhone('123'),'');assert.equal(L.intlPhone(''),'');
 assert.equal(L.showPhone('201012345678'),'0101 234 5678');
 assert.equal(L.showPhone('966501234567'),'+966501234567');
+// what a phone's contacts app shares: plain text, or a contact card (vCard, the Arabic name quoted-printable)
+assert.deepEqual(L.numbersIn('جار الصيدلية\n+20 101 111 2222\nموبايل: 0101 111 2222\n0222334455'),[{p:'201011112222',name:'جار الصيدلية'},{p:'20222334455',name:'جار الصيدلية'}]);
+assert.deepEqual(L.numbersIn('BEGIN:VCARD\r\nVERSION:2.1\r\nFN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=D8=A7=D9=84=D8=A7=D8=A8=D9=86\r\nTEL;CELL:010-4444-5555\r\nitem1.TEL;TYPE=WORK:+20 2 2233 4455\r\nEND:VCARD'),[{p:'201044445555',name:'الابن'},{p:'20222334455',name:'الابن'}]);
+assert.deepEqual(L.numbersIn('BEGIN:VCARD\nFN:A\nTEL:01011112222\nEND:VCARD\nBEGIN:VCARD\nFN:B\nTEL:01033334444\nEND:VCARD').map(x=>x.name+x.p),['A201011112222','B201033334444']);
+assert.deepEqual(L.numbersIn('جار الصيدلية'),[]);
+assert.deepEqual(L.numbersIn(''),[]);
 console.log('customers ok');

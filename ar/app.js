@@ -2025,26 +2025,34 @@
     if (!id) return;
     pendingShare = null;
     history.replaceState(null, '', location.pathname);
+    // read what was shared first (the cache), then decide where it goes
+    let meta = null;
+    const files = [];
+    if (id !== 'error' && 'caches' in window) {
+      const c = await caches.open('ar-share'),
+        base = new URL('ar-share/' + id + '/', location.href).href,
+        metaRes = await c.match(base + 'meta');
+      if (metaRes) {
+        meta = await metaRes.json();
+        for (const f of meta.files) {
+          const r = await c.match(new URL(f.key, location.href).href);
+          if (r) files.push(new File([await r.blob()], f.name, { type: f.type || r.headers.get('content-type') || '' }));
+        }
+        for (const k of await c.keys()) if (k.url.startsWith(base)) await c.delete(k);
+      }
+    }
+    // a contact shared from the phone's contacts app for a customer's number (ar/customers.js, owner 2026-11-12)
+    if (window.AskerCustomers && window.AskerCustomers.takeContactShare && (await window.AskerCustomers.takeContactShare(meta ? meta.text : '', files))) return;
     document.querySelector('[data-tab="read"]').click();
     showSub('manual');
     if (id === 'error' || !('caches' in window)) {
       status('readStatus', 'الملفات اللي اتشاركت ماوصلتش؛ شاركها تاني أو اختارها من هنا.', 'bad');
       return;
     }
-    const c = await caches.open('ar-share'),
-      base = new URL('ar-share/' + id + '/', location.href).href,
-      metaRes = await c.match(base + 'meta');
-    if (!metaRes) {
+    if (!meta) {
       status('readStatus', 'الملفات اللي اتشاركت ماوصلتش؛ شاركها تاني.', 'bad');
       return;
     }
-    const meta = await metaRes.json(),
-      files = [];
-    for (const f of meta.files) {
-      const r = await c.match(new URL(f.key, location.href).href);
-      if (r) files.push(new File([await r.blob()], f.name, { type: f.type || r.headers.get('content-type') || '' }));
-    }
-    for (const k of await c.keys()) if (k.url.startsWith(base)) await c.delete(k);
     $('supplier').value = '';
     $('supplierPhone').value = '';
     const sheets = files.filter((f) => /\.(xlsx|xls|csv)$/i.test(f.name) || /sheet|excel|csv/i.test(f.type)),

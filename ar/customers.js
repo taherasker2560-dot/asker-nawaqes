@@ -157,13 +157,43 @@
     else if (/^1\d{9}$/.test(d)) d = '20' + d;
     return /^\d{8,15}$/.test(d) ? d : '';
   }
+  // the numbers in what a phone's contacts app shares: a contact card (vCard: TEL lines, the name from FN, Arabic names often
+  // quoted-printable) or plain text (the first line without digits is the name); each number once
+  function numbersIn(text) {
+    let s = String(text || '').replace(/\r?\n[ \t]/g, '');
+    const out = [], seen = new Set();
+    const add = (raw, name) => { const p = intlPhone(raw); if (p && !seen.has(p)) { seen.add(p); out.push({ p, name: String(name || '').trim().slice(0, 120) }); } };
+    const qp = (v) => {
+      try {
+        const b = [];
+        for (let i = 0; i < v.length; i++) {
+          if (v[i] === '=' && /^[0-9A-Fa-f]{2}$/.test(v.substr(i + 1, 2))) { b.push(parseInt(v.substr(i + 1, 2), 16)); i += 2; } else b.push(v.charCodeAt(i) & 255);
+        }
+        return new TextDecoder().decode(new Uint8Array(b));
+      } catch (e) { return v; }
+    };
+    if (/BEGIN:VCARD/i.test(s)) {
+      s = s.replace(/=\r?\n/g, '');
+      for (const card of s.split(/BEGIN:VCARD/i).slice(1)) {
+        const fn = /^FN([^:]*):(.*)$/im.exec(card);
+        const name = fn ? (/QUOTED-PRINTABLE/i.test(fn[1]) ? qp(fn[2]) : fn[2]).replace(/\\,/g, ',') : '';
+        for (const m of card.matchAll(/^(?:item\d+\.)?TEL[^:]*:(.*)$/gim)) add(m[1], name);
+      }
+      return out;
+    }
+    const lines = s.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    const name = lines.find((l) => !/[\d٠-٩]/.test(l)) || '';
+    // a number never runs over a line break (one number a line)
+    for (const m of s.matchAll(/(?:\+|00)?[\d٠-٩][\d٠-٩ \t\-().]{6,}[\d٠-٩]/g)) add(m[0], name);
+    return out;
+  }
   // as people read it: 201012345678 -> «0101 234 5678»
   function showPhone(p) {
     const d = String(p || '');
     if (/^20\d{10}$/.test(d)) { const l = '0' + d.slice(2); return `${l.slice(0, 4)} ${l.slice(4, 7)} ${l.slice(7)}`; }
     return d ? '+' + d : '';
   }
-  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone };
+  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -214,6 +244,8 @@
         }
         list = rows; failed = ''; loadedAt = Date.now();
         await loadPhones();
+        // a contact shared from the phone's contacts app for a customer (takeContactShare)
+        if (shared) { applyShared(); return list; }
         // the bot was closed and reopened while the phone's contacts list was open: back to that customer, and say so
         const pp = pendingPick();
         if (pp && !st && phones) {
@@ -332,7 +364,7 @@
   function phoneHtml() {
     if (!phones) return ''; // the numbers' table is not on the server (yet)
     const list = numbersOf(st.c.id);
-    const note = st.phoneMsg ? `<p class="status ${st.phoneBad ? 'bad' : 'good'}">${esc(st.phoneMsg)}</p>` : '';
+    const note = st.phoneMsg ? `<p class="status cu-note ${st.phoneBad ? 'bad' : 'good'}">${esc(st.phoneMsg)}</p>` : '';
     const rows = list.map((p) => `<div class="cu-phone"><span>📱 واتس: <b dir="ltr">${esc(showPhone(p.phone))}</b>` +
       (p.contact_name ? `<small><span class="notr">${esc(p.contact_name)}</span> في الموبايل</small>` : '') +
       (p.last_sent_at ? `<small>آخر كشف اتبعت ${esc(whenText(localIso(p.last_sent_at), new Date()))}</small>` : '') + '</span>' +
@@ -350,7 +382,8 @@
       : '';
     return rows + `<div class="cu-phone"><span>${list.length ? '📱 رقم واتس جديد' : '📱 مالوش رقم واتس'}</span>` +
       (list.length ? '<button type="button" class="linklike" data-cu-phone-cancel>لغي</button>' : '') + '</div>' +
-      (canPick() ? '<button type="button" class="secondary cu-pick" data-cu-pick>اختار رقمه من أسامي الموبايل</button>' : '') +
+      // from the phone's contacts app by «مشاركة» → «نواقص عربي» (Chrome's own contacts list answered empty on the owner's phone)
+      '<button type="button" class="secondary cu-pick" data-cu-share-pick>هات رقمه من أسامي الموبايل</button>' +
       (canPaste() ? '<button type="button" class="secondary cu-pick" data-cu-paste>الصق الرقم اللي نسخته</button>' : '') + tels +
       `<div class="cu-phone-in"><input id="cuPhoneIn" type="tel" inputmode="tel" autocomplete="off" placeholder="${canPick() ? 'أو اكتب رقمه: 01xxxxxxxxx' : 'اكتب رقمه: 01xxxxxxxxx'}" value="${esc(st.phoneDraft || '')}" />` +
       '<button type="button" class="small" data-cu-phone-save>احفظ</button></div>' + note;
@@ -395,6 +428,45 @@
   // the phone's contacts list (owner 2026-11-12: «باختار الرقم وبدوس تم … ما بلاقيش الرقم اتسحب»): every outcome now says
   // something, and if the phone closes and reopens the bot while the list is open (the pick is lost), the bot comes back to
   // that customer and says so
+  // the contact shared from the phone's contacts app (owner 2026-11-12: Chrome's contacts list came back empty on his phone
+  // every time): «هات رقمه من أسامي الموبايل» remembers the customer for 30 minutes; the contacts app → «مشاركة» → «نواقص عربي»
+  // opens the bot with what was shared (ar/app.js takeShare), and its numbers are saved on that customer
+  const SHARE_KEY = 'asker-cu-share';
+  let shared = null; // { id, tels: [{ p, name }] }
+  function rememberShare(id) { try { localStorage.setItem(SHARE_KEY, JSON.stringify({ id, at: Date.now() })); } catch (e) {} }
+  function forgetShare() { try { localStorage.removeItem(SHARE_KEY); } catch (e) {} }
+  function waitingShare() {
+    try { const x = JSON.parse(localStorage.getItem(SHARE_KEY) || 'null'); return x && x.id != null && Date.now() - x.at < 30 * 60e3 ? x : null; } catch (e) { return null; }
+  }
+  async function takeContactShare(text, files) {
+    const w = waitingShare();
+    if (!w) return false;
+    forgetShare();
+    let body = String(text || '');
+    for (const f of files || []) {
+      if (/vcard|vcf/i.test(String(f.type || '') + ' ' + String(f.name || ''))) { try { body += '\n' + (await f.text()); } catch (e) {} }
+    }
+    shared = { id: w.id, tels: numbersIn(body) };
+    if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('customers');
+    if (list && phones) applyShared(); else loadList(true);
+    return true;
+  }
+  function applyShared() {
+    if (!shared || !list || !phones) return;
+    const sh = shared;
+    shared = null;
+    if (!list.some((x) => String(x.id) === String(sh.id))) return;
+    if (!st || String(st.c.id) !== String(sh.id)) openStatement(sh.id);
+    st.phoneEdit = true;
+    if (!sh.tels.length) {
+      Object.assign(st, { phoneMsg: 'اللي اتشارك من الأسامي مافيهوش رقم موبايل. شارك الاسم تاني (واختار «نص» لو سألك)، أو انسخ الرقم ودوس «الصق الرقم».', phoneBad: true });
+      drawStatement();
+      return;
+    }
+    if (sh.tels.length === 1) { savePhone(sh.tels[0].p, sh.tels[0].name); return; }
+    Object.assign(st, { tels: sh.tels, phoneMsg: '', phoneBad: false });
+    drawStatement();
+  }
   const PICK_KEY = 'asker-cu-pick';
   function rememberPick(id) { try { localStorage.setItem(PICK_KEY, JSON.stringify({ id, at: Date.now() })); } catch (e) {} }
   function forgetPick() { try { localStorage.removeItem(PICK_KEY); } catch (e) {} }
@@ -633,6 +705,14 @@
       if (e.target.closest('[data-cu-phone-edit]')) { Object.assign(st, { phoneEdit: true, phoneMsg: '', tels: null }); drawStatement(); return; }
       if (e.target.closest('[data-cu-phone-cancel]')) { Object.assign(st, { phoneEdit: false, phoneMsg: '', tels: null, phoneDraft: '' }); drawStatement(); return; }
       if (e.target.closest('[data-cu-pick]')) { keepDraft(); pickContact(); return; }
+      if (e.target.closest('[data-cu-share-pick]')) {
+        keepDraft();
+        rememberShare(st.c.id);
+        Object.assign(st, { phoneBad: false, tels: null,
+          phoneMsg: 'دلوقتي من الموبايل:\n1) افتح «الأسماء» وافتح اسم العميل.\n2) دوس «مشاركة» (ولو سألك اختار «نص»).\n3) اختار «نواقص عربي».\nالبوت هيفتح هنا والرقم متسجل.' });
+        drawStatement();
+        return;
+      }
       if (e.target.closest('[data-cu-paste]')) { keepDraft(); pastePhone(); return; }
       const tel = e.target.closest('[data-cu-tel]');
       if (tel && st.tels) { if (tel.dataset.cuTel === 'all') saveAll(st.tels); else { const t = st.tels[+tel.dataset.cuTel]; if (t) savePhone(t.p, t.name); } return; }
@@ -666,6 +746,8 @@
     list: () => list,
     show: (v) => { if (v) view = v; if (st) closeStatement(); else drawList(); },
     statement: (id) => openStatement(id),
+    // ar/app.js takeShare: a contact shared for a customer's number (true = taken here)
+    takeContactShare,
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
