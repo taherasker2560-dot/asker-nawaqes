@@ -243,6 +243,8 @@
     // the customers' accounts and statements (ar/customers.js, owner 2026-11-12)
     if (tab === 'customers') window.AskerCustomers?.open();
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
+    // «البيع المؤقت» (ar/tempsale.js, owner 2026-11-12); leaving it turns the camera off
+    if (tab === 'tempsale') window.AskerTempSale?.open(); else window.AskerTempSale?.close();
     $('carePanel')?.classList.toggle('hidden', tab !== 'care');
     $('shortPanel').classList.toggle('hidden', tab !== 'short');
     // names may have changed in the other tabs; never «0 صنف» before the list (saved or from the server) is there

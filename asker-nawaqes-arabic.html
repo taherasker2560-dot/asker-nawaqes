@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=share-20261112a" />
+    <link rel="stylesheet" href="ar/look.css?v=tempsale-20261112a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=share-20261112a"></script>
+    <script src="ar/i18n-en.js?v=tempsale-20261112a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -521,9 +521,46 @@
           <h2>حركة البيع اليومية</h2>
           <p class="hint">قريب: هتتحدّث كل ساعة، وهنصممها سوا.</p>
         </section>
+        <!-- «البيع المؤقت» (owner 2026-11-12, ar/tempsale.js): a sale in seconds at rush hour (sticker barcode / name / code),
+             kept on the phone with no internet, entered into PharmaFly later -->
         <section id="tempSalePanel" class="card hidden">
-          <h2>البيع المؤقت</h2>
-          <p class="hint">قريب: وقت الزحمة تسجّل البيعة بسرعة من هنا، وتتدخل في فارمافلاي بعدين لما الشغل يهدى. هنصممها سوا.</p>
+          <div class="ts-top">
+            <h2>البيع المؤقت</h2>
+            <div class="tabs seg" role="group" aria-label="البيع المؤقت">
+              <button type="button" data-ts-view="new">بيعة جديدة</button
+              ><button type="button" class="secondary" data-ts-view="list">البيعات <span id="tsPendN" class="ts-badge hidden"></span></button>
+            </div>
+          </div>
+          <div id="tsNew">
+            <div class="chips ts-ways" role="group" aria-label="تدخّل الصنف إزاي">
+              <button type="button" class="chip" data-ts-way="scan">📷 باركود</button
+              ><button type="button" class="chip on" data-ts-way="name">🔎 الاسم</button
+              ><button type="button" class="chip" data-ts-way="code"># الكود</button>
+            </div>
+            <div id="tsScanBox" class="ts-scan hidden"><video id="tsVideo" playsinline muted></video></div>
+            <div id="tsSearch" class="search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input id="tsQ" type="search" autocomplete="off" aria-label="الصنف" placeholder="اكتب حرفين من اسم الصنف…" />
+              <button id="tsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+            </div>
+            <p id="tsFind" class="status"></p>
+            <div id="tsHits"></div>
+            <h3 class="ts-h">الفاتورة</h3>
+            <div id="tsCart"></div>
+            <h3 class="ts-h">الزبون</h3>
+            <div id="tsCust"></div>
+            <label id="tsPaidRow" class="ts-field hidden">دفع كام؟ <input id="tsPaid" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0" /></label>
+            <label class="ts-field">ملاحظة <input id="tsNote" type="text" maxlength="300" placeholder="اختياري" /></label>
+            <button id="tsSave" type="button" class="ts-save">احفظ البيعة</button>
+            <p id="tsStatus" class="status"></p>
+            <p class="hint">بتتحفظ على الموبايل حتى لو النت قاطع، وتتبعت أول ما يرجع. فارمافلاي مش بيتلمس من هنا.</p>
+          </div>
+          <div id="tsList" class="hidden">
+            <div id="tsChips" class="chips" role="group" aria-label="البيعات"></div>
+            <p id="tsListStatus" class="status"></p>
+            <div id="tsRows"></div>
+            <p class="hint">«مستنية» = لسه ما اتدخلتش في فارمافلاي. لما تدخّلها دوس عليها وبعدين «اتدخلت في فارمافلاي».</p>
+          </div>
         </section>
         <section id="countPanel" class="card hidden">
           <h2>جرد المخزون</h2>
@@ -619,7 +656,7 @@
     <script src="ar/settings.js?v=look-20261112a"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=share-20261112a"></script>
+    <script src="ar/app.js?v=tempsale-20261112a"></script>
     <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>
@@ -634,6 +671,7 @@
     <script src="ar/alerts.js?v=alerts-20261112a"></script>
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
     <script src="ar/customers.js?v=share-20261112a"></script>
+    <script src="ar/tempsale.js?v=tempsale-20261112a"></script>
     <script src="ar/notify.js?v=alerts-20261112a"></script>
   </body>
 </html>
