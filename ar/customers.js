@@ -252,7 +252,8 @@
   }
   function moveHtml(m) {
     const t = moveTitle(m), at = parseAt(m.at);
-    const items = Array.isArray(m.items) ? m.items : [];
+    // only a sale or a return has items (a payment ticket in PharmaFly carries a placeholder line «أصناف متنوعة» at 0)
+    const items = (m.kind === 'sale' || m.kind === 'return') && Array.isArray(m.items) ? m.items : [];
     const open = st.open.has(m.id);
     const bits = [at ? clock(at) : ''];
     if (items.length) bits.push(`<button type="button" class="linklike" data-cu-items="${esc(m.id)}">${esc(itemsWord(items.length))} ${open ? '▾' : '▸'}</button>`);

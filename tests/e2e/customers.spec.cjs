@@ -13,7 +13,7 @@ const CUSTOMERS=[
  {id:105,name:'منى فتحي',credit_limit:10000,balance:0.27,last_at:null,last_kind:null,moves:0},
 ];
 const MOVES=[
- {id:-7,customer_id:101,at:at(old,13,7),kind:'payment',total:0,paid:500,balance:6800,items:null},
+ {id:-7,customer_id:101,at:at(old,13,7),kind:'payment',total:0,paid:500,balance:6800,items:[{n:'أصناف متنوعة',p:1,u:0,k:1,s:0,d:0}]},
  {id:11,customer_id:101,at:at(today,9,0),kind:'sale',total:166.7,paid:0,balance:6966.7,items:[{n:'PANADOL EXTRA 24 TAB',p:1,u:0,k:1,s:66.7,d:0},{n:'VITACID C 1000',p:0,u:2,k:2,s:100,d:0}]},
  {id:12,customer_id:101,at:at(today,10,0),kind:'return',total:-54,paid:0,balance:6912.7,items:[{n:'OMEZ 40 20 CAP',p:0,u:1,k:2,s:108,d:0}]},
  {id:13,customer_id:101,at:at(today,11,0),kind:'sale',total:261.8,paid:0,balance:7174.5,items:[{n:'لزق جروح طويل',p:5,u:0,k:1,s:0.5,d:0},{n:'B',p:1,u:0,k:1,s:259.3,d:0}]},
@@ -71,8 +71,9 @@ run('Customers: the statement (sales with items, returns, payments, the balance 
  const days=await page.$$eval('#cuMoves .cu-day',d=>d.map(x=>x.textContent));
  assert.equal(days[0],'النهارده');assert.equal(days.length,2);
  assert.match(await text(page,'#cuSt'),/ده كل حسابه: 4 حركة من أول/);
- // a sale's items open with a tap
+ // a sale's items open with a tap; a payment has none (PharmaFly's placeholder line is not shown)
  assert.equal(await page.$('#cuMoves .cu-items'),null);
+ assert.equal(await page.$('#cuMoves [data-cu-items="-7"]'),null);
  await page.click('#cuMoves [data-cu-items="11"]');
  assert.deepEqual(await page.$$eval('#cuMoves .cu-items div',d=>d.map(x=>x.textContent.replace(/\s+/g,' ').trim())),['PANADOL EXTRA 24 TAB1 علبة · 66.70 ج','VITACID C 10002 وحدة · 100 ج']);
  assert.match(await text(page,'#cuMoves [data-cu-items="11"]'),/صنفين ▾/);
