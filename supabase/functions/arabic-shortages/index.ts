@@ -987,6 +987,18 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: spoken }, say);
 }
 
+// which section a page action belongs to, for a staff member (ar_staff.perms)
+const STAFF_PERM: Record<string, string> = { read: 'read', lines: 'read', match: 'read', reread: 'read', translate: 'translate' };
+async function staffMay(env: Env, fetchImpl: typeof fetch, id: string | undefined, perm: string | undefined): Promise<boolean> {
+  const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!id || !perm || !service || !/^[0-9a-f-]{36}$/i.test(id)) return false;
+  try {
+    const r = await fetchImpl(`${env.SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/ar_staff?select=perms&active=is.true&user_id=eq.${id}&limit=1`, { headers: serviceHeaders(service), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const rows = r.ok ? await r.json() as { perms?: string[] }[] : [];
+    return Array.isArray(rows) && !!rows[0] && Array.isArray(rows[0].perms) && rows[0].perms.includes(perm);
+  } catch { return false; }
+}
+
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): Promise<Response> {
   if (req.headers.get('x-inbox-key') !== null) return handleInbox(req, env, fetchImpl);
   const headers = cors(req.headers.get('origin'), env, req.headers.get('access-control-request-headers'));
@@ -997,16 +1009,19 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   if (!env.GEMINI_API_KEY || !allowedEmails.length || !env.SUPABASE_URL) return reply(503, { error: 'not-configured', message: 'الإعدادات ناقصة على Supabase.' }, headers);
   const auth = req.headers.get('authorization') || '';
   if (!/^Bearer\s+\S+$/.test(auth)) return reply(401, { error: 'auth', message: 'سجّل الدخول الأول.' }, headers);
-  let user: { email?: string } | null = null;
+  let user: { id?: string; email?: string } | null = null;
   try {
     const r = await fetchImpl(env.SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/user', { headers: { Authorization: auth, apikey: env.SUPABASE_ANON_KEY || env.SUPABASE_PUBLISHABLE_KEY || '' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!r.ok) return reply(401, { error: 'auth', message: 'الجلسة انتهت؛ سجّل الدخول تاني.' }, headers);
     user = await r.json().catch(() => null);
   } catch { return reply(504, { error: 'auth-timeout', message: 'التأكد من تسجيل الدخول اتأخر؛ جرّب تاني.' }, headers); }
-  if (!user?.email || !allowedEmails.includes(user.email.toLowerCase())) return reply(403, { error: 'forbidden', message: 'الحساب ده مش مسموح له.' }, headers);
 
   let body: { action?: unknown; lines?: unknown; limit?: unknown; image?: unknown; mimeType?: unknown; name?: unknown; english?: unknown; read?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
+  // the owner, or a staff member the owner opened that section for (owner 2026-11-13, migration 202611130200): «الوارد»
+  // reads and matches, «الترجمة» translates. The tables are then read with the person's own session (the staff policies).
+  const owner = !!user?.email && allowedEmails.includes(user.email.toLowerCase());
+  if (!owner && !(await staffMay(env, fetchImpl, user?.id, STAFF_PERM[String(body.action)]))) return reply(403, { error: 'forbidden', message: 'الحساب ده مش مسموح له.' }, headers);
   const t0 = Date.now();
   try {
     if (body.action === 'translate') {

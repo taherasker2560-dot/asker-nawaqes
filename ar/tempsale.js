@@ -395,11 +395,15 @@
     }
     drawCust();
   }
+  // a staff member (ar/staff.js): «مرتجع» and credit customers only when the owner opened them; the owner always
+  const can = (p) => !root.AskerStaff || root.AskerStaff.can(p);
+  const staffNow = () => !!(root.AskerStaff && root.AskerStaff.isStaff());
   function drawCust() {
     const box = $('tsCust');
     if (!box) return;
+    if (!can('credit')) { cust = null; custOpen = false; }
     const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, total(cart), paid);
-    let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button><button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button></div>`;
+    let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button>${can('credit') ? `<button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button>` : ''}</div>`;
     if (cust) {
       html += `<div class="ts-cust${over ? ' warn' : ''}"><strong class="notr">${esc(cust.name)}</strong> <small>كود ${esc(cust.id)}</small>
         <div class="hint">عليه ${esc(money(Math.max(0, Number(cust.balance) || 0)))}${Number(cust.credit_limit) ? ' · الحد ' + esc(money(cust.credit_limit)) : ''}</div>
@@ -471,7 +475,7 @@
     if (db()) {
       try {
         const since = new Date(Date.now() - 7 * 864e5).toISOString();
-        const { data, error } = await db().from('ar_temp_sales').select('id,no,sold_at,customer_id,customer_name,items,total,paid,note,status,entered_ticket')
+        const { data, error } = await db().from('ar_temp_sales').select('id,no,sold_at,kind,customer_id,customer_name,items,total,paid,note,status,entered_ticket,created_by')
           .gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299);
         if (!error) server = data || [];
       } catch (e) {}
@@ -491,12 +495,14 @@
     const tag = (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
       (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? '<span class="ts-st d">اتدخلت</span>' : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
+    // the owner sees who recorded it (a staff member's name; nothing for his own)
+    const seller = !staffNow() && s.created_by && root.AskerStaff ? root.AskerStaff.nameOf(s.created_by) : '';
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
-      <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}</span>${tag}</button>
+      <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· باعها <span class="notr">${esc(seller)}</span></span>` : ''}</span>${tag}</button>
       <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
       ${open ? `<ul class="ts-items">${its.map((x) => `<li><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
-        ${!s.queued && s.status === 'pending' ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}` : ''}
+        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}` : ''}
     </div>`;
   }
   function drawList() {
@@ -575,9 +581,13 @@
       ready = true;
       drawCart();
       say('tsFind', 'بيحمّل الأصناف…');
-      await Promise.all([loadItems(), db() ? loadCustomers() : Promise.resolve()]);
+      await Promise.all([loadItems(), db() && can('credit') ? loadCustomers() : Promise.resolve()]);
       if (!$('tsQ').value) say('tsFind', items.length ? '' : 'الأصناف لسه ما اتحمّلتش. جرّب تاني لما النت يرجع.', items.length ? '' : 'bad');
     }
+    // «مرتجع» only when it is open for him
+    const ret = document.querySelector('[data-ts-type="return"]');
+    if (ret) ret.classList.toggle('hidden', !can('return'));
+    if (!can('return') && kind === 'return') setKind('sale');
     drawBadge();
     flush();
   }

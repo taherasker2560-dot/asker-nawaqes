@@ -74,7 +74,9 @@
     if (data && !force && Date.now() - loadedAt < 5 * 60e3) return data;
     loading = (async () => {
       try {
-        const { data: blob, error } = await db().storage.from('asker-private').download(PATH);
+        // a staff member with «الصلاحيات» but not «العملاء» reads the same alerts without the customers (owner 2026-11-13)
+        const st = root.AskerStaff, path = st && st.isStaff() && !st.can('customers') ? 'alerts/expiry.json' : PATH;
+        const { data: blob, error } = await db().storage.from('asker-private').download(path);
         if (error || !blob) { failed = 'لسه مفيش تنبيهات: اللاب بيجهزها مع كل تحديث، كل ساعة.'; return data; }
         const p = parse(JSON.parse(await blob.text()));
         if (!p) { failed = 'ملف التنبيهات شكله مش مظبوط، استنى التحديث الجاي.'; return data; }

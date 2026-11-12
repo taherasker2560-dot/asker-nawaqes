@@ -149,6 +149,10 @@
     const uid = data.session.user.id;
     if (loadedFor === uid || loadingFor === uid) return;
     loadingFor = currentUid = uid;
+    // the owner, or a staff member and the sections open for him (ar/staff.js, owner 2026-11-13); first, so a staff member
+    // never sees the owner's screens while the rest loads
+    if (document.readyState === 'loading') await new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true }));
+    if (window.AskerStaff) { await window.AskerStaff.check(uid); if (window.AskerStaff.isStaff()) showTab('home'); }
     const ok = await loadAll(uid);
     if (loadingFor === uid) loadingFor = null;
     if (ok && currentUid === uid) loadedFor = uid;
@@ -225,7 +229,10 @@
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
   const lastPTab = { short: 'short', orders: 'drafts', stock: 'stock' };
   function showTab(tab) {
+    // a staff member only reaches the sections open for him (the database refuses the rest anyway)
+    if (window.AskerStaff && window.AskerStaff.fixTab) tab = window.AskerStaff.fixTab(tab);
     const group = GROUP_OF[tab] || 'purchases';
+    $('staffHomePanel')?.classList.toggle('hidden', !(tab === 'home' && window.AskerStaff?.isStaff()));
     lastTab[group] = tab;
     const pgroup = PGROUP_OF[tab];
     if (pgroup) lastPTab[pgroup] = tab;
