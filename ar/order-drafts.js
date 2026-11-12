@@ -142,6 +142,35 @@
     return p > 0 ? p * (1 - d / 100) : (Number(i.est_cost) || 0) / (Number(i.qty) || 1);
   };
   const totalOf = (p) => p.reduce((s, x) => s + unitCost(x.item) * x.qty, 0);
+  // An order sent to ANOTHER supplier is priced with that supplier's own discount (owner 2026-11-12, choice «أ»): the laptop
+  // writes every supplier's discount per item (offers, same rule as the order: the list while it is fresh, or the last real
+  // purchase when newer). A supplier with nothing known for the item = the public price, and the item is marked.
+  // own = the supplier the order was made for (its discount is the item's own).
+  function offerAt(i, supId, own) {
+    if (!supId || supId === own) return { discount: Number(i.discount) || 0, source: i.source, date: i.source_date, stale: !!i.stale, bonus: Number(i.bonus) || 0, name_supplier: i.name_supplier || null };
+    const o = i.offers && i.offers[supId];
+    return o && Number.isFinite(Number(o.discount)) ? { ...o, discount: Number(o.discount) } : null;
+  }
+  // the file knows the other suppliers' discounts (files written before 2026-11-12 do not)
+  const knowsOffers = (sup) => ((sup && sup.items) || []).some((i) => i && i.offers && typeof i.offers === 'object');
+  function unitCostAt(i, supId, own) {
+    const p = Number(i.public_price) || 0, o = offerAt(i, supId, own);
+    if (p > 0) return p * (1 - (o ? o.discount : 0) / 100);
+    return unitCost(i); // no public price: the laptop's own estimate
+  }
+  const totalAt = (p, supId, own) => p.reduce((s, x) => s + unitCostAt(x.item, supId, own) * x.qty, 0);
+  const unknownAt = (p, supId, own) => p.filter((x) => !offerAt(x.item, supId, own)).length;
+  // «أغلى بـ 200 ج» / «أرخص بـ 150 ج» / «نفس السعر»
+  function diffWords(d) {
+    const r = Math.round(d);
+    return r > 0 ? `أغلى بـ ${money(r)} ج` : r < 0 ? `أرخص بـ ${money(-r)} ج` : 'نفس السعر';
+  }
+  // «عند AMG: 19% (قايمة 10/11)» under each item when the order goes to another supplier
+  function atNote(i, supId, own, label) {
+    const o = offerAt(i, supId, own);
+    if (!o) return `عند ${label}: مالوش خصم معروف، محسوب بسعر الجمهور`;
+    return `عند ${label}: ${pct(o.discount)}% (${o.source === 'list' ? 'قايمة' : 'آخر شرا'} ${dm(o.date)}${o.bonus > 0 ? '، فيه بونص' : ''}${o.stale ? '، قديم' : ''})`;
+  }
   // WhatsApp link: with the number (opens that supplier's chat) and the text when it fits, otherwise without the text (it is on the clipboard)
   const urlText = (t) => (encodeURIComponent(t).length <= MAX_URL_TEXT ? t : '');
   // Egyptian mobile written 01xxxxxxxxx -> 201xxxxxxxxx (WhatsApp needs the country code); same as ar/app.js
@@ -161,12 +190,17 @@
     const own = new Map(((d && d.suppliers) || []).map((s) => [s.id, s.label]));
     return Object.keys(LABELS).map((id) => ({ id, label: own.get(id) || LABELS[id] }));
   }
-  // the message of an order sent to another supplier: the PharmaFly names only (the other warehouse's own names do not fit)
+  // the message of an order sent to another supplier: that warehouse's own name from its list when known (+ PharmaFly name),
+  // else the PharmaFly name only (the first warehouse's names do not fit the other one)
   function buildMessageTo(sup, st, toId) {
     if (!toId || toId === sup.id) return buildMessage(sup, st);
     const p = picked(sup, st);
     if (!p.length) return '';
-    return ['السلام عليكم', 'محتاج الأصناف دي:', ...p.map((x) => `• ${x.item.name_pf} × ${x.qty}`), 'شكرًا'].join('\n');
+    const nameTo = (i) => {
+      const o = offerAt(i, toId, sup.id);
+      return DIST.indexOf(toId) < 0 && o && o.name_supplier ? `${o.name_supplier} (${i.name_pf})` : i.name_pf;
+    };
+    return ['السلام عليكم', 'محتاج الأصناف دي:', ...p.map((x) => `• ${nameTo(x.item)} × ${x.qty}`), 'شكرًا'].join('\n');
   }
   function contactsFor(supId, saved) {
     const keys = KEYS[supId] || [];
@@ -192,7 +226,7 @@
     if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
     return 'box';
   }
-  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, orderItems, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, sendOptions, buildMessageTo };
+  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, orderItems, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, offerAt, knowsOffers, unitCostAt, totalAt, unknownAt, diffWords, atNote, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, sendOptions, buildMessageTo };
   root.AskerOrderDraftsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -263,10 +297,14 @@
   }
   function row(i, st) {
     const from = orderedFrom(i).filter(Boolean);
+    // sent to another supplier: its own discount for this item right under the name (or «مالوش خصم معروف»)
+    const own = supplier(current), to = toId(), other = own && to !== own.id && knowsOffers(own);
+    const at = other ? atNote(i, to, own.id, labelOf(to)) : '';
     const lines = [
       `<strong dir="ltr">${esc(i.name_pf)}</strong>`,
+      at ? `<span class="${offerAt(i, to, own.id) ? 'od-at' : 'od-warn'}">${esc(at)}</span>` : '',
       avgNote(i) ? `<span class="od-avg">${esc(avgNote(i))}</span>` : '',
-      `<span class="hint">${esc(sourceNote(i))}</span>`,
+      `<span class="hint">${esc((other ? own.label + ': ' : '') + sourceNote(i))}</span>`,
       mismatchNote(i) ? `<span class="od-warn">${esc(mismatchNote(i))}</span>` : '',
       fallbackNote(i) ? `<span class="hint">${esc(fallbackNote(i))}</span>` : '',
       from.length ? `<span class="od-badge">اتطلب النهارده من ${esc([...new Set(from)].join(' و'))}</span>` : '',
@@ -284,13 +322,51 @@
   // «هتتفتح محادثة: …» and, when the supplier has several saved people, a button for each
   // «ابعت الطلبية دي لـ»: the six suppliers, this order's own supplier first chosen; another one = a note that the
   // discounts and prices shown are the first supplier's
+  // what is ticked in this order now, and its cost at the supplier it was made for
+  function compare(id) {
+    const s = effective(id);
+    if (!s) return null;
+    const p = picked(s, state(id));
+    return { p, base: totalAt(p, s.id, s.id) };
+  }
+  // each supplier in the list says how much the ticked items would cost there compared with the suggested one
+  // (owner 2026-11-12: «فرق 100 جنيه، تبقى فرق 200 جنيه»)
+  function optionText(o, s, c) {
+    if (o.id === s.id) return `${o.label} (المقترح)`;
+    if (!c || !c.p.length || !knowsOffers(s)) return o.label;
+    const u = unknownAt(c.p, o.id, s.id);
+    return `${o.label} · ${diffWords(totalAt(c.p, o.id, s.id) - c.base)}${u ? ` · ${u} من غير خصم معروف` : ''}`;
+  }
+  // the list's words and the note follow the ticks and the quantities
+  function drawSendLabels() {
+    const s = supplier(current), box = $('odSendTo');
+    if (!s || !box) return;
+    const c = compare(current), opts = sendOptions(drafts);
+    for (const opt of box.options) {
+      const o = opts.find((x) => x.id === opt.value);
+      if (o) opt.textContent = optionText(o, s, c);
+    }
+    const other = toId() !== s.id, lab = labelOf(toId());
+    let note = '';
+    if (other && knowsOffers(s)) {
+      const t = c ? totalAt(c.p, toId(), s.id) : 0, u = c ? unknownAt(c.p, toId(), s.id) : 0;
+      note = c && c.p.length
+        ? `محسوبة بخصومات ${lab}: حوالي ${money(t)} ج بدل ${money(c.base)} ج عند ${s.label}، يعني ${diffWords(t - c.base)}.` +
+          (u ? ` ${u} صنف مالهمش خصم معروف عند ${lab}، اتحسبوا بسعر الجمهور (متعلّم عليهم في «تعديل الأصناف»).` : '') +
+          ` الأصناف بتتكتب بأسامي ${lab} لو موجودة في قايمته، وإلا بأسامي فارمافلاي.`
+        : `الحساب بيبقى بخصومات ${lab}.`;
+    } else if (other) {
+      note = `الطلبية دي اتعملت لـ ${s.label}: الخصم والأسعار اللي فيها بتاعته، مش بتاعة ${lab}. الأصناف هتتكتب بأسامي فارمافلاي.`;
+    }
+    $('odSendNote').classList.toggle('hidden', !other);
+    $('odSendNote').textContent = note;
+  }
   function drawSendTo() {
     const s = supplier(current), box = $('odSendTo');
     if (!s || !box) return;
-    box.innerHTML = sendOptions(drafts).map((o) => `<option value="${esc(o.id)}"${o.id === toId() ? ' selected' : ''}>${esc(o.label)}${o.id === s.id ? ' (المقترح)' : ''}</option>`).join('');
+    box.innerHTML = sendOptions(drafts).map((o) => `<option value="${esc(o.id)}"${o.id === toId() ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
     const other = toId() !== s.id;
-    $('odSendNote').classList.toggle('hidden', !other);
-    $('odSendNote').textContent = other ? `الطلبية دي اتعملت لـ ${s.label}: الخصم والأسعار اللي فيها بتاعته، مش بتاعة ${labelOf(toId())}. الأصناف هتتكتب بأسامي فارمافلاي.` : '';
+    drawSendLabels();
     // sent to another supplier after some of it was already ordered today: the owner chooses (2026-11-10: «تخيرني ابعت
     // اللي احنا مختارينه والجديد ولا ابعت الجديد بس»)
     const old = (hiddenBy[current] || []).length, box2 = $('odCarry');
@@ -319,11 +395,12 @@
   function drawOrder() {
     const s = effective(current);
     if (!s) return;
-    const p = picked(s, state(current));
-    $('odMsg').value = buildMessageTo(s, state(current), toId());
+    const p = picked(s, state(current)), to = toId(), priced = to !== s.id && knowsOffers(s);
+    $('odMsg').value = buildMessageTo(s, state(current), to);
     $('odTotal').textContent = p.length
-      ? `${p.length} من ${s.items.length} صنف في الطلب، حوالي ${money(totalOf(p))} ج بعد الخصم`
+      ? `${p.length} من ${s.items.length} صنف في الطلب، حوالي ${money(priced ? totalAt(p, to, s.id) : totalOf(p))} ج ${priced ? 'بخصومات ' + labelOf(to) : 'بعد الخصم'}`
       : !s.items.length && (hiddenBy[current] || []).length ? 'كل أصناف الطلبية دي اتطلبت النهارده' : 'مفيش أصناف معلّم عليها في الطلب';
+    drawSendLabels();
     $('odCopy').disabled = !p.length;
     $('odMark').disabled = busy || !p.length;
     $('odEditCount').textContent = `هتطلب ${p.length} من ${s.items.length}`;

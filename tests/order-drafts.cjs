@@ -107,4 +107,23 @@ assert.equal(D.buildMessageTo(supX,stX,'REDA'),D.buildMessage(supX,stX));
 assert.match(D.buildMessageTo(supX,stX,'REDA'),/بروفين ٤٠٠ \(BRUFEN 400MG 30TAB\) × 3/);
 assert.equal(D.buildMessageTo(supX,stX,'AMG'),'السلام عليكم\nمحتاج الأصناف دي:\n• BRUFEN 400MG 30TAB × 3\nشكرًا');
 assert.equal(D.buildMessageTo(supX,{},'AMG'),'','nothing ticked: no message');
+// sent to another supplier: priced with THAT supplier's discount (owner 2026-11-12, «أ»): its own (list or last purchase,
+// from the laptop's offers), else the public price, marked
+const it1={item_id:1,name_pf:'SALINE',public_price:100,discount:30,source:'list',source_date:'2026-11-08',qty:2,
+  offers:{NEWCITY:{discount:30,source:'list',date:'2026-11-08'},AMG:{discount:25,source:'list',date:'2026-11-09',name_supplier:'ملح AMG'},REDA:{discount:35,source:'buy',date:'2025-09-19',stale:true,bonus:2}}};
+const it2={item_id:2,name_pf:'FERRODEP',public_price:50,discount:20,source:'buy',source_date:'2026-10-19',qty:1,offers:{NEWCITY:{discount:20,source:'buy',date:'2026-10-19'}}};
+const supO={id:'NEWCITY',label:'نيو سيتي',items:[it1,it2]},pO=D.picked(supO,D.defaultSel(supO));
+assert.equal(D.offerAt(it1,'NEWCITY','NEWCITY').discount,30,'its own supplier: the item\'s own discount');
+assert.equal(D.offerAt(it1,'AMG','NEWCITY').discount,25);assert.equal(D.offerAt(it2,'AMG','NEWCITY'),null,'nothing known at AMG');
+assert.equal(D.totalAt(pO,'NEWCITY','NEWCITY'),2*70+40);assert.equal(D.totalAt(pO,'NEWCITY','NEWCITY'),D.totalOf(pO),'same as before for its own supplier');
+assert.equal(D.totalAt(pO,'AMG','NEWCITY'),2*75+50,'AMG: its 25%, and the public price where it has nothing');
+assert.equal(D.unknownAt(pO,'AMG','NEWCITY'),1);assert.equal(D.unknownAt(pO,'ELFATH','NEWCITY'),2);assert.equal(D.unknownAt(pO,'NEWCITY','NEWCITY'),0);
+assert.equal(D.diffWords(200.4),'أغلى بـ 200 ج');assert.equal(D.diffWords(-1520),'أرخص بـ 1,520 ج');assert.equal(D.diffWords(0.3),'نفس السعر');
+assert.equal(D.atNote(it1,'AMG','NEWCITY','AMG'),'عند AMG: 25% (قايمة 09/11)');
+assert.equal(D.atNote(it1,'REDA','NEWCITY','رضا عطية'),'عند رضا عطية: 35% (آخر شرا 19/09، فيه بونص، قديم)');
+assert.equal(D.atNote(it2,'AMG','NEWCITY','AMG'),'عند AMG: مالوش خصم معروف، محسوب بسعر الجمهور');
+assert.ok(D.knowsOffers(supO));assert.ok(!D.knowsOffers(supX),'a file from before 2026-11-12');assert.ok(!D.knowsOffers(null));
+// the message to AMG: AMG's own name from its list where it has one
+assert.equal(D.buildMessageTo(supO,D.defaultSel(supO),'AMG'),'السلام عليكم\nمحتاج الأصناف دي:\n• ملح AMG (SALINE) × 2\n• FERRODEP × 1\nشكرًا');
+assert.equal(D.buildMessageTo(supO,D.defaultSel(supO),'PHARMA'),'السلام عليكم\nمحتاج الأصناف دي:\n• SALINE × 2\n• FERRODEP × 1\nشكرًا','distributors: PharmaFly names');
 console.log('order-drafts ok');
