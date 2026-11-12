@@ -1,0 +1,62 @@
+/* The store's polish (owner 2026-11-12: «تحسّن هيئة وأداء الموقع زي ما عملنا في البوت»), over store.css + look.css:
+   product cards in two columns with a big photo, a color for each section, gray placeholders while loading, the search bar
+   stays on top while scrolling the home page, a soft entrance for each page and a jump of the cart number. */
+
+/* ---------- search / section results: two columns of photo cards ---------- */
+#results.list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#results .item { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; min-width: 0; }
+#results .thumb { width: 100%; height: 128px; border-radius: 16px; }
+#results .thumb img { width: 100%; height: 100%; object-fit: contain; }
+/* no photo yet: a smaller colored tile instead of a big empty box */
+#results .thumb.icon { height: 76px; }
+#results .thumb.icon svg { width: 34px; height: 34px; }
+#results .item-text { gap: 3px; min-width: 0; }
+#results .item h3 { font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#results .item .ar { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+#results .badge { align-self: flex-start; font-size: 11.5px; }
+#results .item-side { max-width: none; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto; }
+#results .add { min-height: 36px; padding: 0 12px; font-size: 13px; flex: 1 1 auto; }
+#results .price.later { font-size: 12px; }
+#results .hint-sm { font-size: 11.5px; }
+/* a missing item with its alternative takes the whole row, photo beside the text */
+#results .item.has-alts { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; }
+#results .item.has-alts .thumb { width: 84px; height: 84px; }
+#results .item.has-alts .item-text { flex: 1 1 140px; }
+#results .item.has-alts .alts { flex-basis: 100%; }
+@media (min-width: 640px) { #results.list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 960px) { #results.list { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* ---------- a color for each section ---------- */
+.sections .sec:nth-child(1) .sec-mark { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+.sections .sec:nth-child(2) .sec-mark { background: rgba(22, 163, 74, 0.13); color: #15803d; }
+.sections .sec:nth-child(3) .sec-mark { background: rgba(219, 39, 119, 0.12); color: #be185d; }
+.sections .sec:nth-child(4) .sec-mark { background: rgba(234, 88, 12, 0.13); color: #c2410c; }
+.sections .sec:nth-child(5) .sec-mark { background: rgba(13, 148, 136, 0.13); color: #0f766e; }
+html.night .sections .sec:nth-child(1) .sec-mark { color: #93b4ff; }
+html.night .sections .sec:nth-child(2) .sec-mark { color: #7ddc9c; }
+html.night .sections .sec:nth-child(3) .sec-mark { color: #f59cc7; }
+html.night .sections .sec:nth-child(4) .sec-mark { color: #fdba74; }
+html.night .sections .sec:nth-child(5) .sec-mark { color: #6fd6cb; }
+
+/* ---------- the search bar stays on top of the home page ---------- */
+.top-search { position: sticky; top: 0; z-index: 20; padding-top: 8px; padding-bottom: 8px; }
+.top-search input { box-shadow: 0 10px 24px -14px rgba(var(--glow, 10, 74, 166), 0.55); }
+
+/* ---------- gray placeholders while the first answer comes ---------- */
+.item.skel { pointer-events: none; }
+.item.skel .thumb, .item.skel i { display: block; border-radius: 10px; background: linear-gradient(90deg, var(--line) 0%, var(--accent-soft, #e8eef9) 50%, var(--line) 100%); background-size: 200% 100%; animation: skel 1.2s ease-in-out infinite; }
+.item.skel i { height: 12px; }
+.item.skel i.s { width: 55%; }
+#popular .item.skel { min-height: 210px; }
+#results .item.skel { min-height: 230px; }
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* ---------- a soft entrance for each page, a jump of the cart number ---------- */
+[data-view]:not([hidden]) { animation: pageIn 0.22s ease-out; }
+@keyframes pageIn { from { transform: translateY(8px); } to { transform: none; } }
+.cart-n.bump { animation: bump 0.45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.45); } 100% { transform: scale(1); } }
+.add:active, .hero-btn:active { transform: scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  [data-view]:not([hidden]), .cart-n.bump, .item.skel .thumb, .item.skel i { animation: none; }
+}
