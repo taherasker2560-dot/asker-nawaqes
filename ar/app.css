@@ -1438,3 +1438,92 @@ html.night select,
 html.night textarea {
   background: var(--card);
 }
+/* the search on top of every section (ar/home.js, 2026-11-12): results, the pen, the Arabic name editor */
+.hs-out {
+  margin-top: 8px;
+}
+.hs-top {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.hs-names {
+  flex: 1;
+  min-width: 0;
+}
+.hs-pen {
+  flex: none;
+  width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--rose);
+  color: var(--crimson-ink);
+  border: 1px solid var(--rose-line);
+  box-shadow: none;
+}
+.hs-editbox {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--rose-line);
+}
+.hs-editbox label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--crimson-ink);
+}
+.hs-editrow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.hs-editrow button {
+  flex: 1;
+  margin: 0;
+}
+.hs-editrow button.secondary {
+  flex: 0 0 auto;
+  padding-inline: 18px;
+}
+/* 24 ready colors (6 a row on a phone) + any color + the night look (ar/settings.js) */
+.accents {
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+}
+.accent {
+  font-size: 12px;
+}
+.accent span {
+  width: 40px;
+  height: 40px;
+}
+.accent-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.accent-custom.on {
+  border: 2px solid var(--ink);
+}
+.accent-custom label {
+  font-weight: 700;
+}
+.accent-custom input[type='color'] {
+  width: 56px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.night-row {
+  margin-top: 10px;
+  font-weight: 700;
+}
