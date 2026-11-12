@@ -7,7 +7,7 @@
   "scope": "./",
   "display": "standalone",
   "background_color": "#fbf8f8",
-  "theme_color": "#7d1028",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "icons/arabic-192.png?v=logo1",

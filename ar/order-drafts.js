@@ -386,7 +386,7 @@
       if (error || !blob) {
         drafts = null;
         draw();
-        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها كل ساعتين مع المخزون، وآخر مرة قبل القفل بساعة.');
+        return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها مع كل تحديث، كل ساعة.');
       }
       base = drafts = parseDrafts(JSON.parse(await blob.text()));
       if (!drafts) {
