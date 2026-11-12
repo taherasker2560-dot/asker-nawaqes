@@ -23,12 +23,16 @@ self.addEventListener('fetch', (e) => {
     return Response.redirect(page.href, 303);
   })());
 });
+// a tap on a notification opens the bot; one from ar/notify.js (2026-11-12) carries the section to open (?tab=…)
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
+  const want = e.notification.data && e.notification.data.url ? new URL(e.notification.data.url, self.registration.scope) : null;
   e.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const w = all.find((c) => c.url.includes('asker-nawaqes-arabic.html'));
+    // the page is not controlled by this worker (its scope is ar/), so it is told which section to open by a message
+    if (w && want) { try { w.postMessage({ tab: want.searchParams.get('tab') || '' }); } catch (err) {} return w.focus(); }
     if (w) return w.focus();
-    return self.clients.openWindow(new URL('../asker-nawaqes-arabic.html', self.registration.scope).href);
+    return self.clients.openWindow((want || new URL('../asker-nawaqes-arabic.html', self.registration.scope)).href);
   })());
 });

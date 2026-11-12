@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=lang-20261112a" />
+    <link rel="stylesheet" href="ar/look.css?v=alerts-20261112a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=lang-20261112a"></script>
+    <script src="ar/i18n-en.js?v=alerts-20261112a"></script>
     <script src="ar/i18n.js?v=lang-20261112a"></script>
   </head>
   <body>
@@ -61,6 +61,13 @@
         </div>
         <label class="check night-row"><input id="nightMode" type="checkbox" /> الوضع الليلي (البوت كله غامق، مع أي لون)</label>
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
+        <!-- notifications (owner 2026-11-12: «لما يكون قسم محتاج شغل يظهر إشعار ونخصصله صوت»), ar/notify.js -->
+        <h3>الإشعارات</h3>
+        <label class="check"><input id="notifyOn" type="checkbox" checked /> إشعار وصوت لما قسم يبقى محتاج شغل</label>
+        <button id="notifyPerm" type="button" class="secondary hidden">اسمح بإشعارات الموبايل</button>
+        <p id="notifyPermNote" class="hint"></p>
+        <div id="notifySounds" class="ns-list"></div>
+        <p class="hint">الصوت ده بيشتغل والبوت مفتوح. صوت إشعار الموبايل نفسه بيتغيّر من إعدادات الموبايل ← التطبيقات ← البوت ← الإشعارات.</p>
       </div>
     </section>
     <main>
@@ -141,7 +148,8 @@
           </div>
           <div class="chips" data-pfor="stock" role="group" aria-label="مخزون" hidden>
             <button type="button" class="chip" data-tab="stock">المخزون</button
-            ><button type="button" class="chip" data-tab="count">جرد المخزون</button>
+            ><button type="button" class="chip" data-tab="count">جرد المخزون</button
+            ><button type="button" class="chip" data-tab="expiry">الصلاحيات</button>
           </div>
         </div>
         <div class="subbar chips" data-for="accounts" role="group" aria-label="الحسابات" hidden>
@@ -169,6 +177,11 @@
             <button type="button" class="kpi" data-go="short"><strong id="kShort">—</strong><span>صنف ناقص</span></button>
             <button type="button" class="kpi" data-go="drafts"><strong id="kOrdered">—</strong><span>اتطلب النهارده</span></button>
             <div class="kpi"><strong id="kAge">—</strong><small id="kAgo">آخر داتا</small></div>
+          </div>
+          <!-- what needs work now (ar/notify.js + ar/alerts.js); hidden when nothing does -->
+          <div id="todoCard" class="todo hidden">
+            <h3 class="qa-h">محتاج شغل</h3>
+            <div id="todoList"></div>
           </div>
           <h3 class="qa-h">ادخل على طول</h3>
           <div class="qa">
@@ -478,9 +491,11 @@
         </section>
 
         <!-- new parts, designed with the owner one question at a time before they get data -->
+        <!-- customers above their credit limit (owner 2026-11-12, ar/alerts.js); the statement and the rest come later -->
         <section id="customersPanel" class="card hidden">
           <h2>العملاء</h2>
-          <p class="hint">قريب: هنصمم الشاشة دي سوا (اللي عليهم فلوس وحد كل عميل).</p>
+          <p id="alCustAge" class="status"></p>
+          <div id="alCustomers"></div>
         </section>
         <section id="vendorsPanel" class="card hidden">
           <h2>الموردين</h2>
@@ -497,6 +512,17 @@
         <section id="countPanel" class="card hidden">
           <h2>جرد المخزون</h2>
           <p class="hint">قريب: هنتفق الأول على طريقة الجرد، وبعدين نبنيها.</p>
+        </section>
+        <!-- «الصلاحيات» (owner 2026-11-12): PharmaFly's tasks of today, expired stock, what expires soon (ar/alerts.js) -->
+        <section id="expiryPanel" class="card hidden">
+          <h2>الصلاحيات</h2>
+          <p id="alAge" class="status"></p>
+          <div class="tabs seg sub" id="alViews" role="group" aria-label="أقسام الصلاحيات">
+            <button type="button" data-al-view="today">النهارده <b id="alTodayN" class="badge hidden"></b></button
+            ><button type="button" data-al-view="expired" class="secondary">منتهية <b id="alExpiredN" class="badge hidden"></b></button
+            ><button type="button" data-al-view="soon" class="secondary">قربت <b id="alSoonN" class="badge hidden"></b></button>
+          </div>
+          <div id="alExpiry"></div>
         </section>
         <section id="carePanel" class="card hidden">
           <h2>خدمة العملاء</h2>
@@ -577,7 +603,7 @@
     <script src="ar/settings.js?v=look-20261112a"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=search-20261112b"></script>
+    <script src="ar/app.js?v=alerts-20261112a"></script>
     <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>
@@ -587,6 +613,9 @@
     <script src="ar/store-link.js?v=link-20261112a"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>
     <script src="ar/home.js?v=scope-20261112a"></script>
-    <script src="ar/look.js?v=look-20261112a"></script>
+    <script src="ar/look.js?v=alerts-20261112a"></script>
+    <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
+    <script src="ar/alerts.js?v=alerts-20261112a"></script>
+    <script src="ar/notify.js?v=alerts-20261112a"></script>
   </body>
 </html>
