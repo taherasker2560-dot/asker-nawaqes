@@ -554,6 +554,13 @@
             ><textarea id="ssHeroText" rows="2" maxlength="400" placeholder="فاضي = الجملة الأصلية"></textarea>
             <label for="ssWhatsapp">رقم الواتساب اللي يظهر للزبون</label
             ><input id="ssWhatsapp" type="tel" dir="ltr" maxlength="16" placeholder="01xxxxxxxxx (فاضي = مايظهرش)" />
+            <!-- شكل الموقع لكل الزباين (ar/store-settings.js)؛ الزبون يقدر يغيّره لنفسه من ⚙ في الموقع -->
+            <div id="ssThemeBox" class="ss-theme" hidden>
+              <h3>شكل الموقع للزباين</h3>
+              <label class="ss-check"><input id="ssThemeNight" type="checkbox" /> الوضع الليلي</label>
+              <div id="ssThemePick" class="accents" role="radiogroup" aria-label="لون الموقع"></div>
+              <label id="ssThemeCustomRow" class="ss-check" for="ssThemeCustom">لون من اختيارك <input id="ssThemeCustom" type="color" value="#0a4aa6" /></label>
+            </div>
             <button id="ssSave" type="button">احفظ الإعدادات</button>
             <p id="ssStatus" class="status"></p>
             <h3>صنف معين</h3>
@@ -575,8 +582,8 @@
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
-    <script src="ar/store-orders.js?v=store-20261110a"></script>
-    <script src="ar/store-settings.js?v=store-20261109b"></script>
+    <script src="ar/store-orders.js?v=any-20261112a"></script>
+    <script src="ar/store-settings.js?v=theme-20261112a"></script>
     <script src="ar/store-link.js?v=link-20261112a"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>
     <script src="ar/home.js?v=scope-20261112a"></script>

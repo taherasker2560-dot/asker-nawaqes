@@ -9,7 +9,8 @@
   const STATUS = {
     available: { label: 'متوفر', cls: 'ok' },
     on_order: { label: 'بالطلب', cls: 'order' },
-    unavailable: { label: 'غير متوفر', cls: 'out' },
+    // «صعب طلبه» على فارمافلاي: بيتطلب برضه من غير سعر زي «بالطلب» (قراره 2026-11-12)
+    unavailable: { label: 'بالطلب', cls: 'order' },
   };
   // أقسام الرئيسية: أنواع التصنيف (Store\rx\classified.txt) متجمعة
   const SECTIONS = [
@@ -30,6 +31,8 @@
     bad_rx: 'صورة الروشتة ماوصلتش. اختارها تاني وابعت',
     rx_upload: 'صورة الروشتة مارفعتش. اتأكد من النت وجرب تاني',
     rx_big: 'الصورة أكبر من 8 ميجا. صوّرها تاني',
+    bad_text: 'اسم الصنف اللي كتبته لازم يكون من 2 لـ 120 حرف',
+    too_many_text: 'تقدر تكتب 10 أصناف بالكتير في الطلب الواحد',
   };
   const MAX_LINES = 30, MAX_QTY = 20;
 
@@ -59,11 +62,33 @@
     return (Math.round(x * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
   // «بالطلب» (مفيش رصيد، الصيدلية بتجيبه): بيتطلب من غير سعر، والسعر بيتأكد مع الزبون يوم الطلب (قرار 2026-11-10)
+  // وكمان «صعب طلبه» (unavailable): أي صنف مالوش رصيد بيتطلب من غير سعر (قراره 2026-11-12)
   function onOrder(it) {
-    return !!it && it.status === 'on_order';
+    return !!it && (it.status === 'on_order' || it.status === 'unavailable');
   }
   function canAdd(it) {
-    return !!it && !it.needs_rx && ((it.status === 'available' && Number(it.price) > 0) || it.status === 'on_order');
+    return !!it && !it.needs_rx && ((it.status === 'available' && Number(it.price) > 0) || onOrder(it));
+  }
+  // صنف مش على الموقع خالص: الزبون بيكتب اسمه ويضيفه للطلب سطر لوحده من غير سعر (عشان يتزامن مع النواقص بعدين)
+  const MAX_TEXT_LINES = 10;
+  function cleanText(t) {
+    return String(t || '').replace(/[<>]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function cartAddText(cart, text) {
+    const name = cleanText(text);
+    if (name.length < 2 || name.length > 120) return { cart, error: 'bad_text' };
+    const c = cart.map((x) => ({ ...x }));
+    const id = 't:' + name.toLowerCase();
+    const f = c.find((x) => x.id === id);
+    if (f) { f.qty = Math.min(MAX_QTY, f.qty + 1); return { cart: c }; }
+    if (c.length >= MAX_LINES) return { cart, error: 'bad_items' };
+    if (c.filter((x) => x.free_text).length >= MAX_TEXT_LINES) return { cart, error: 'too_many_text' };
+    c.push({ id, name, arabic_name: null, price: null, qty: 1, on_order: true, free_text: true });
+    return { cart: c };
+  }
+  // اللي بيتبعت للسيرفر: {id, qty} للصنف اللي على الموقع، و{text, qty} للي الزبون كتبه
+  function orderItems(cart) {
+    return cart.map((x) => (x.free_text ? { text: x.name, qty: x.qty } : { id: x.id, qty: x.qty }));
   }
   // السلة: [{id, name, arabic_name, price, qty, on_order}] (price = null للصنف اللي بالطلب)
   function cartAdd(cart, it) {
@@ -104,6 +129,7 @@
     const byId = new Map((current || []).map((it) => [Number(it.id), it]));
     const add = [], missing = [];
     for (const l of lines || []) {
+      if (l.free_text) { add.push({ text: l.name, qty: Math.max(1, Math.min(MAX_QTY, Number(l.qty) || 1)) }); continue; }
       const it = byId.get(Number(l.id));
       if (canAdd(it)) add.push({ item: it, qty: Math.max(1, Math.min(MAX_QTY, Number(l.qty) || 1)) });
       else missing.push(l.name);
@@ -150,7 +176,7 @@
     const pr = it.status === 'available' && Number(it.price) > 0 ? ` بـ ${money(it.price)} جنيه` : '';
     return `${nm}${pr} من صيدلية عسكر، اطلبه من هنا: ${link}`;
   }
-  const api = { itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -229,6 +255,7 @@
       return;
     }
     closeItem();
+    if (root.AskerStoreTheme && !$('themeSheet').hidden) root.AskerStoreTheme.open(false);
     const h = location.hash.replace('#', '');
     if (h === 'cart') view('cart');
     else if (h === 'orders') view('orders');
@@ -243,7 +270,7 @@
     let action = '';
     if (canAdd(it)) {
       action = `<button type="button" class="add" data-add="${it.id}">${inCart ? 'في السلة (' + inCart.qty + ') +' : onOrder(it) ? 'اطلبه' : 'ضيف للسلة'}</button>`;
-    } else if (onOrder(it)) {
+    } else if (it.needs_rx) {
       action = `<span class="hint-sm">بالروشتة: ابعت صورة الروشتة</span>`;
     }
     const al = !canAdd(it) || it.status !== 'available' ? alts[it.id] || [] : [];
@@ -283,9 +310,11 @@
   }
   // إعدادات الموقع (صاحب الصيدلية بيغيّرها من صفحة البوت)
   async function loadSettings() {
-    const { data, error } = await client.from('ar_store_settings').select('is_open,closed_message,hero_title,hero_text,whatsapp').limit(1);
+    // '*': the color columns (theme_color, theme_night) exist only after migration 202611120600
+    const { data, error } = await client.from('ar_store_settings').select('*').limit(1);
     if (error || !data || !data[0]) return;
     settings = data[0];
+    if (root.AskerStoreTheme && 'theme_color' in settings) root.AskerStoreTheme.setDefault(settings.theme_color, settings.theme_night);
     if (settings.hero_title) $('heroTitle').textContent = settings.hero_title;
     if (settings.hero_text) $('heroText').textContent = settings.hero_text;
     const closed = settings.is_open === false;
@@ -402,6 +431,7 @@
     if (!terms.length) { shown = []; drawList(false); $('resNote').textContent = 'اكتب حرفين على الأقل من اسم الدوا أو المنتج'; return; }
     lastQuery = { terms, text: String(text).trim() };
     offset = 0;
+    $('freeText').value = lastQuery.text.slice(0, 120); $('freeMsg').textContent = '';
     runQuery(lastQuery, false);
   }
   function openSection(key) {
@@ -469,11 +499,11 @@
     }
     box.innerHTML = cart.map((x) => `<article class="item cart-line">
       <div class="item-text"><h3 dir="ltr">${esc(x.name)}</h3>${x.arabic_name ? `<p class="ar">${esc(x.arabic_name)}</p>` : ''}
-        <span class="hint-sm">${x.on_order ? 'بالطلب · السعر يتأكد معاك على واتساب' : money(x.price) + ' ج للواحدة'}</span></div>
+        <span class="hint-sm">${x.free_text ? 'كتبته بنفسك · هنجيبه ونكلمك بسعره' : x.on_order ? 'بالطلب · السعر يتأكد معاك على واتساب' : money(x.price) + ' ج للواحدة'}</span></div>
       <div class="qty">
-        <button type="button" data-qty="${x.id}" data-d="1" aria-label="زوّد واحدة">+</button>
+        <button type="button" data-qty="${esc(x.id)}" data-d="1" aria-label="زوّد واحدة">+</button>
         <span>${x.qty}</span>
-        <button type="button" data-qty="${x.id}" data-d="-1" aria-label="${x.qty > 1 ? 'قلّل واحدة' : 'شيله من السلة'}">−</button>
+        <button type="button" data-qty="${esc(x.id)}" data-d="-1" aria-label="${x.qty > 1 ? 'قلّل واحدة' : 'شيله من السلة'}">−</button>
       </div></article>`).join('');
     const later = cartLater(cart);
     const sum = later && later === cart.length ? '—' : money(cartTotal(cart)) + ' ج';
@@ -503,7 +533,7 @@
         try { rx = await uploadRx(); } catch (err) { return say(errorText(err.message), true); }
         say('بيبعت الطلب…');
       }
-      const args = { p_name: name, p_phone: phone, p_address: address, p_notes: notes || null, p_items: cart.map((x) => ({ id: x.id, qty: x.qty })) };
+      const args = { p_name: name, p_phone: phone, p_address: address, p_notes: notes || null, p_items: orderItems(cart) };
       if (rx.length) args.p_rx = rx;
       const { data, error } = await client.rpc('ar_store_place_order', args);
       if (error) throw error;
@@ -511,7 +541,7 @@
       const changed = Math.abs(Number(data.total) - cartTotal(cart)) > 0.009;
       myOrders = rememberOrder(myOrders, {
         id: data.order_id, phone, at: new Date().toISOString(), total: Number(data.total), status: 'new',
-        items: (data.items || []).map((x) => ({ id: x.id, name: x.name, qty: x.qty })),
+        items: (data.items || []).map((x) => (x.free_text ? { name: x.name, qty: x.qty, free_text: true } : { id: x.id, name: x.name, qty: x.qty })),
       });
       store.set('asker_store_orders', myOrders);
       const onlyRx = !cart.length, later = (data.items || []).filter((x) => x.on_order).length;
@@ -568,11 +598,15 @@
     const o = myOrders.find((x) => String(x.id) === String(id));
     if (!o) return;
     btn.disabled = true;
-    const { data, error } = await client.from('ar_store_items').select(COLS).in('id', (o.items || []).map((x) => x.id));
+    const ids = (o.items || []).filter((x) => !x.free_text).map((x) => x.id);
+    const { data, error } = ids.length ? await client.from('ar_store_items').select(COLS).in('id', ids) : { data: [], error: null };
     btn.disabled = false;
     if (error) { $('ordersNote').textContent = 'مقدرتش أجيب الأصناف. اتأكد من النت وجرب تاني.'; return; }
     const plan = reorderPlan(o.items, data);
-    for (const a of plan.add) { cart = cartAdd(cart, a.item); cart = cartSet(cart, a.item.id, a.qty); }
+    for (const a of plan.add) {
+      if (a.text) { const r = cartAddText(cart, a.text); cart = r.cart; const l = cart.find((x) => x.free_text && x.name === cleanText(a.text)); if (l) cart = cartSet(cart, l.id, a.qty); continue; }
+      cart = cartAdd(cart, a.item); cart = cartSet(cart, a.item.id, a.qty);
+    }
     saveCart();
     $('ordersNote').textContent = plan.add.length
       ? `اتضاف ${plan.add.length} صنف للسلة` + (plan.missing.length ? `، و${plan.missing.length} مش متوفر دلوقتي: ${plan.missing.join('، ')}` : '')
@@ -609,7 +643,7 @@
     }
     const q = e.target.closest('[data-qty]');
     if (q) {
-      const id = Number(q.dataset.qty), line = cart.find((x) => x.id === id);
+      const line = cart.find((x) => String(x.id) === q.dataset.qty), id = line && line.id;
       if (line) { cart = cartSet(cart, id, line.qty + Number(q.dataset.d)); saveCart(); drawCart(); }
       return;
     }
@@ -624,6 +658,15 @@
   $('orderForm').addEventListener('submit', send);
   $('rxFile').addEventListener('change', () => { addRx([...($('rxFile').files || [])]); $('rxFile').value = ''; });
   window.addEventListener('hashchange', route);
+  $('freeForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const r = cartAddText(cart, $('freeText').value);
+    if (r.error) { $('freeMsg').textContent = errorText(r.error); $('freeMsg').className = 'hint-sm bad'; return; }
+    cart = r.cart; saveCart();
+    $('freeMsg').className = 'hint-sm';
+    $('freeMsg').innerHTML = `«${esc(cleanText($('freeText').value))}» اتضاف للسلة · <a href="#cart">افتح السلة</a>`;
+    $('freeText').value = '';
+  });
   $('shAdd').addEventListener('click', sheetAdd);
   $('shPlus').addEventListener('click', () => { sheetQty = Math.min(MAX_QTY, sheetQty + 1); drawSheet(); });
   $('shMinus').addEventListener('click', () => { sheetQty = Math.max(1, sheetQty - 1); drawSheet(); });
