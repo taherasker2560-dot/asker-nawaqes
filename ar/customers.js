@@ -121,6 +121,14 @@
     const k = num(l.k) > 0 ? num(l.k) : 1;
     return num(l.s) * (num(l.p) + num(l.u) / k) - num(l.d);
   }
+  // the customer's discount on a sale or a return: the items' value minus what was charged (the laptop sends the charged
+  // amount: PharmaFly's Total minus the ticket's Discount, e.g. 374 − 9.9% = 336.97). 0 when there is none.
+  function discountOf(m) {
+    if ((m.kind !== 'sale' && m.kind !== 'return') || !Array.isArray(m.items) || !m.items.length) return 0;
+    const gross = m.items.reduce((s, l) => s + lineValue(l), 0);
+    const d = Math.abs(gross) - Math.abs(num(m.total));
+    return d > 0.5 ? Math.round(d * 100) / 100 : 0;
+  }
   // this month: what was bought (sales minus returns) and paid (payments and what was paid on a sale, minus refunds)
   function monthSums(moves, now) {
     const y = now.getFullYear(), mo = now.getMonth();
@@ -140,7 +148,7 @@
     return moves;
   }
   const sortMoves = (list) => list.sort((a, b) => String(b.at).localeCompare(String(a.at)) || num(b.id) - num(a.id));
-  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD };
+  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -257,6 +265,8 @@
     const open = st.open.has(m.id);
     const bits = [at ? clock(at) : ''];
     if (items.length) bits.push(`<button type="button" class="linklike" data-cu-items="${esc(m.id)}">${esc(itemsWord(items.length))} ${open ? '▾' : '▸'}</button>`);
+    const disc = discountOf(m);
+    if (disc) bits.push(`<span>خصم ${esc(money(disc))} ج</span>`);
     if (m.kind === 'sale' && num(m.paid) > 0) bits.push(`<span>دفع منها ${esc(money(m.paid))} ج</span>`);
     const lines = open && items.length
       ? '<div class="cu-items">' + items.map((l) => `<div><span class="notr" dir="ltr">${esc(l.n)}</span><span>${esc(qtyText(l))} · ${esc(money(lineValue(l)))} ج</span></div>`).join('') + '</div>'

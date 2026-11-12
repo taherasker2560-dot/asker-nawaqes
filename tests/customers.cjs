@@ -41,6 +41,12 @@ assert.equal(Math.round(L.lineValue({s:288,p:0,u:1,k:3,d:0})*100)/100,96);
 assert.equal(L.lineValue({s:170,p:1,u:0,k:1,d:0}),170);
 assert.equal(L.lineValue({s:50,p:2,u:1,k:2,d:5}),120);
 assert.equal(L.lineValue({s:24,p:1,u:0,k:0}),24,'no strips count = 1');
+// the customer's discount: the items' value minus what was charged (PharmaFly's Total minus the ticket's Discount)
+assert.equal(L.discountOf({kind:'sale',total:336.97,items:[{s:374,p:1,u:0,k:2,d:0}]}),37.03);
+assert.equal(L.discountOf({kind:'return',total:-48.65,items:[{s:54,p:1,u:0,k:1,d:0}]}),5.35);
+assert.equal(L.discountOf({kind:'sale',total:374,items:[{s:374,p:1,u:0,k:2,d:0}]}),0,'no discount');
+assert.equal(L.discountOf({kind:'sale',total:100.3,items:[{s:100,p:1,u:0,k:1,d:0}]}),0,'never a negative discount');
+assert.equal(L.discountOf({kind:'payment',total:0,items:[{s:0,p:1}]}),0);
 // this month: sales minus returns, and everything paid (on a sale too) minus refunds
 const now=new Date(2026,10,12,12,0,0);
 const M=[

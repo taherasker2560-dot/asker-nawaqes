@@ -16,7 +16,7 @@ const MOVES=[
  {id:-7,customer_id:101,at:at(old,13,7),kind:'payment',total:0,paid:500,balance:6800,items:[{n:'أصناف متنوعة',p:1,u:0,k:1,s:0,d:0}]},
  {id:11,customer_id:101,at:at(today,9,0),kind:'sale',total:166.7,paid:0,balance:6966.7,items:[{n:'PANADOL EXTRA 24 TAB',p:1,u:0,k:1,s:66.7,d:0},{n:'VITACID C 1000',p:0,u:2,k:2,s:100,d:0}]},
  {id:12,customer_id:101,at:at(today,10,0),kind:'return',total:-54,paid:0,balance:6912.7,items:[{n:'OMEZ 40 20 CAP',p:0,u:1,k:2,s:108,d:0}]},
- {id:13,customer_id:101,at:at(today,11,0),kind:'sale',total:261.8,paid:0,balance:7174.5,items:[{n:'لزق جروح طويل',p:5,u:0,k:1,s:0.5,d:0},{n:'B',p:1,u:0,k:1,s:259.3,d:0}]},
+ {id:13,customer_id:101,at:at(today,11,0),kind:'sale',total:261.8,paid:0,balance:7174.5,items:[{n:'لزق جروح طويل',p:5,u:0,k:1,s:0.5,d:0},{n:'B',p:1,u:0,k:1,s:290.3,d:0}]},
  {id:20,customer_id:102,at:at(old,9,10),kind:'payment',total:0,paid:1000,balance:9500,items:null},
 ];
 const setData=(page,c=CUSTOMERS,m=MOVES)=>page.evaluate(([c,m])=>{window.__tables.ar_customers=c;window.__tables.ar_customer_moves=m},[c,m]);
@@ -77,6 +77,9 @@ run('Customers: the statement (sales with items, returns, payments, the balance 
  await page.click('#cuMoves [data-cu-items="11"]');
  assert.deepEqual(await page.$$eval('#cuMoves .cu-items div',d=>d.map(x=>x.textContent.replace(/\s+/g,' ').trim())),['PANADOL EXTRA 24 TAB1 علبة · 66.70 ج','VITACID C 10002 وحدة · 100 ج']);
  assert.match(await text(page,'#cuMoves [data-cu-items="11"]'),/صنفين ▾/);
+ // the customer's discount shows next to the invoice (items 292.80, charged 261.80); none when there is none
+ const d=await page.$$eval('#cuMoves .cu-mv-d',x=>x.map(e=>e.textContent.replace(/\s+/g,' ').trim()));
+ assert.match(d[0],/خصم 31 ج/);assert.doesNotMatch(d[2],/خصم/);
  // «المدفوعات» / «المبيعات»
  await page.click('[data-cu-filter="payments"]');
  assert.deepEqual(await page.$$eval('#cuMoves .cu-k',k=>k.map(x=>x.textContent)),['دفعة 500 ج']);

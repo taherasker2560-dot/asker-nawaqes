@@ -810,6 +810,7 @@ window.AskerEN = {
   "بعدها: ليه {0} ج": "After: in credit {0} EGP",
   "بعدها: خالص": "After: settled",
   "دفع منها {0} ج": "paid {0} EGP of it",
+  "خصم {0} ج": "discount {0} EGP",
   "مفيش حركات من النوع ده في اللي ظاهر.": "No movements of this type in what is shown.",
   "مفيش حركات للعميل ده.": "No movements for this customer.",
   "مقدرتش أجيب الحركات: {0}": "Could not load the movements: {0}",
