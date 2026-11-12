@@ -39,4 +39,9 @@ assert.equal(T.money(274.7),'274.70 ج');assert.equal(T.money(1500),'1,500 ج');
 // the list: what is still on the phone first and once, newest first
 const m=T.merged([{id:'a',sold_at:'2026-11-12T10:00:00Z',status:'entered'},{id:'b',sold_at:'2026-11-12T12:00:00Z',status:'pending'}],[{id:'b',sold_at:'2026-11-12T12:00:00Z'},{id:'c',sold_at:'2026-11-12T13:00:00Z'}]);
 assert.deepEqual(m.map(x=>[x.id,!!x.queued]),[['c',true],['b',true],['a',false]]);
+// the main back camera: «camera2 0, facing back», not the wide / zoom lens or the front one
+const cams=[{deviceId:'f',label:'camera2 1, facing front'},{deviceId:'w',label:'camera2 2, facing back'},{deviceId:'m',label:'camera2 0, facing back'},{deviceId:'z',label:'camera2 3, facing back'}];
+assert.equal(T.mainBack(cams).deviceId,'m');
+assert.equal(T.mainBack([{deviceId:'a',label:'Back Camera'},{deviceId:'b',label:'Front Camera'}]).deviceId,'a','another naming: the first back one');
+assert.equal(T.mainBack([{deviceId:'x',label:''}]),null,'no names yet: the phone decides');
 console.log('PASS: temp sale: sticker = 100000 + code, box/unit prices, the bill, the limit, the row, the list');

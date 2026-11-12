@@ -85,7 +85,12 @@
     for (const s of server || []) if (!out.some((q) => q.id === s.id)) out.push(s);
     return out.sort((a, b) => String(b.sold_at).localeCompare(String(a.sold_at)));
   }
-  const api = { stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
+  // the phone's main back camera among its cameras (Android: «camera2 0, facing back»; the others are wide / zoom lenses)
+  function mainBack(list) {
+    const back = (list || []).filter((d) => /back|rear|environment|خلف/i.test(d.label || ''));
+    return back.find((d) => /camera2?\s*0\b/i.test(d.label || '')) || back[0] || null;
+  }
+  const api = { mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -202,8 +207,14 @@
   // again (the sticker's kind is not known yet: leaving out ITF/codabar stopped every reading); safety comes from the same
   // value twice in a row and a whole sticker number only. The back camera is asked at a high resolution with continuous
   // focus; «🔄 كاميرا تانية» goes through the phone's cameras (the choice is kept on this phone).
-  const CAMKEY = 'asker-ts-cam';
-  let cams = [];
+  // The right camera stays by itself (owner 2026-11-13 «عاوز يثبت عالكاميرا الصح، معايا بهايم»): with no choice yet the
+  // phone's main back camera is taken (Android names it «camera2 0, facing back»; the others are the wide / zoom lenses);
+  // the camera that reads a sticker is kept on this phone (CAMKEY) and the switch hides; it shows again only after
+  // QUIET_MS with nothing read.
+  const CAMKEY = 'asker-ts-cam', QUIET_MS = 10000;
+  let cams = [], lastGood = 0, quietTimer = null;
+  const camNow = () => (stream && stream.getVideoTracks()[0] ? stream.getVideoTracks()[0].getSettings().deviceId || '' : '');
+  function showSwitch(on) { const b = $('tsCam'); if (b) b.classList.toggle('hidden', !on || cams.length < 2); }
   async function openCamera(deviceId) {
     const video = { width: { ideal: 1920 }, height: { ideal: 1080 } };
     if (deviceId) video.deviceId = { exact: deviceId }; else video.facingMode = { ideal: 'environment' };
@@ -219,7 +230,6 @@
       const back = all.filter((d) => /back|rear|environment|خلف/i.test(d.label));
       cams = back.length ? [...back, ...all.filter((d) => !back.includes(d))] : all;
     } catch (e) { cams = []; }
-    $('tsCam').classList.toggle('hidden', cams.length < 2);
   }
   async function startScan(deviceId) {
     $('tsScanBox').classList.remove('hidden');
@@ -234,13 +244,23 @@
       if (stream) stream.getTracks().forEach((t) => t.stop());
       const saved = deviceId || load(CAMKEY, '');
       try { stream = await openCamera(saved); } catch (e) { if (!saved) throw e; stream = await openCamera(''); }
+      await listCams();
+      // no camera kept yet: the main back camera instead of whatever the phone gave
+      const main = !saved && mainBack(cams);
+      if (main && main.deviceId !== camNow()) {
+        try { const s2 = await openCamera(main.deviceId); stream.getTracks().forEach((t) => t.stop()); stream = s2; } catch (e) {}
+      }
       const v = $('tsVideo');
       v.srcObject = stream;
       await v.play();
-      await listCams();
       say('tsFind', 'وجّه الكاميرا على باركود الملصق، وثبّت الموبايل ثانية');
       clearInterval(timer);
       timer = setInterval(tick, 250);
+      // the switch only when this camera reads nothing for a while
+      showSwitch(false);
+      lastGood = Date.now();
+      clearInterval(quietTimer);
+      quietTimer = setInterval(() => { if (stream && Date.now() - lastGood > QUIET_MS) showSwitch(true); }, 1000);
     } catch (e) {
       stopScan();
       say('tsFind', 'الكاميرا ما اتفتحتش: ' + (e && e.message ? e.message : e), 'bad');
@@ -278,11 +298,16 @@
     const code = stickerCode(raw, true), it = code ? await itemByCode(code) : null;
     if (!it) return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad');
     add(it);
+    // this camera reads the stickers: kept on this phone, the switch hides
+    if (stream && camNow()) keep(CAMKEY, camNow());
+    lastGood = Date.now();
+    showSwitch(false);
     if (navigator.vibrate) navigator.vibrate(60);
     say('tsFind', `اتضاف: ${nameOf(it)} (الباركود ${raw})`, 'ok');
   }
   function stopScan() {
     clearInterval(timer); timer = null;
+    clearInterval(quietTimer); quietTimer = null;
     if (stream) stream.getTracks().forEach((t) => t.stop());
     stream = null;
     const box = $('tsScanBox');
