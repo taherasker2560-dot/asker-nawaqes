@@ -700,3 +700,149 @@ html[lang='en'] .st-item > strong {
 html[dir='ltr'] button {
   margin: 6px 6px 0 0;
 }
+
+/* ---------- red numbers on sections that need work (ar/notify.js, owner 2026-11-12) ---------- */
+.bottomnav button[data-badge],
+.subbar .chip[data-badge] {
+  position: relative;
+}
+.bottomnav button[data-badge]::after,
+.subbar .chip[data-badge]::after {
+  content: attr(data-badge);
+  position: absolute;
+  top: 2px;
+  inset-inline-end: 16%;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e5243b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--crimson-deep);
+}
+.subbar .chip[data-badge]::after {
+  top: -6px;
+  inset-inline-end: -4px;
+  box-shadow: 0 0 0 2px var(--tint);
+}
+/* «محتاج شغل» on the home screen */
+.todo #todoList {
+  display: grid;
+  gap: 6px;
+}
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid #e5243b;
+  box-shadow: var(--sh-1);
+  text-align: start;
+  font-weight: 600;
+}
+.todo-row b {
+  min-width: 34px;
+  color: #c41a30;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+html.night .todo-row b {
+  color: #ff8fa3;
+}
+/* «الصلاحيات» and the customers' limits (ar/alerts.js) */
+.al-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 6px;
+  font-size: 15.5px;
+}
+.al-n {
+  min-width: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--rose);
+  color: var(--crimson-ink);
+  font-size: 12.5px;
+  line-height: 22px;
+  text-align: center;
+}
+.al-item {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.al-item.warn {
+  border-inline-start: 4px solid #e8a33d;
+}
+.al-item strong {
+  display: block;
+  font-size: 14.5px;
+}
+.al-line {
+  margin-top: 2px;
+  color: var(--crimson-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.al-batches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.al-batch {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.al-week > summary {
+  margin-top: 14px;
+  color: var(--muted);
+  font-weight: 600;
+}
+/* a sound per section in ⚙️ */
+.ns-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+.ns-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+.ns-row span {
+  flex: 1;
+}
+.ns-row select {
+  width: auto;
+  min-width: 130px;
+  padding: 8px 10px;
+}
+.ns-row button {
+  width: 40px;
+  min-height: 38px;
+  margin: 0;
+  padding: 0;
+}

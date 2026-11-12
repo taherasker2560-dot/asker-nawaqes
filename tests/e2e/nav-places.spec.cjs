@@ -19,7 +19,7 @@ run('bottom bar: five sections, «الرئيسية» first, «المشتريات
  assert.deepEqual(await names(page,'[data-pgroup]'),['نواقص','طلبيات','مخزون']);
  assert.deepEqual(await names(page,'[data-pfor="short"] [data-tab]'),['النواقص','الوارد','الترجمة']);
  assert.deepEqual(await names(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن']);
- assert.deepEqual(await names(page,'[data-pfor="stock"] [data-tab]'),['المخزون','جرد المخزون']);
+ assert.deepEqual(await names(page,'[data-pfor="stock"] [data-tab]'),['المخزون','جرد المخزون','الصلاحيات'],'«الصلاحيات» (2026-11-12) sits with the stock');
  assert.ok(await page.isVisible('[data-pfor="short"]'));assert.ok(!(await page.isVisible('[data-pfor="orders"]')));
  await page.click('[data-tab="translate"]');assert.ok(await vis(page,'translatePanel'));assert.ok(!(await vis(page,'shortPanel')));
  // «طلبيات» opens on «الطلبيات»; «مخزون» on «المخزون»; «جرد المخزون» is coming

@@ -8,7 +8,7 @@
   const GROUP = { home: 'الرئيسية', purchases: 'المشتريات', accounts: 'الحسابات', sales: 'المبيعات', care: 'خدمة العملاء' };
   const PANEL = {
     homePanel: '', shortPanel: 'النواقص', readPanel: 'الوارد', translatePanel: 'الترجمة', draftsPanel: 'الطلبيات',
-    docsPanel: 'الفواتير', suppliersPanel: 'قوايم المخازن', stockPanel: 'المخزون', countPanel: 'جرد المخزون',
+    docsPanel: 'الفواتير', suppliersPanel: 'قوايم المخازن', stockPanel: 'المخزون', countPanel: 'جرد المخزون', expiryPanel: 'الصلاحيات',
     customersPanel: 'العملاء', vendorsPanel: 'الموردين', storeOrdersPanel: 'طلبات الموقع', salesPanel: 'حركة البيع',
     tempSalePanel: 'البيع المؤقت', carePanel: '',
   };
