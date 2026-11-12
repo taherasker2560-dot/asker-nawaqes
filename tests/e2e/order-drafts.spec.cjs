@@ -89,6 +89,35 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen; too wide: '+wide.join(' | '));
  assert.equal(await page.$$eval('.bottomnav button',b=>b.length),5);assert.deepEqual(wide,[],'nothing sticks out of the screen');
 },{permissions:['clipboard-read','clipboard-write']});
+// owner 2026-11-12 («أ»): sent to another supplier, the order is priced with THAT supplier's discounts; each supplier in the list
+// says how much more or less it costs; an item that supplier has no known discount for = public price, marked under it
+run('orders tab: another supplier is priced with its own discounts',async({page})=>{
+ const off=(d,extra={})=>({discount:d,source:'list',date:'2026-11-08',stale:false,bonus:0,...extra});
+ const o=drafts();
+ o.suppliers[0].items[0].offers={NEWCITY:off(30),AMG:off(25,{name_supplier:'ملح ٠.٩ AMG'}),REDA:off(35,{source:'buy',date:'2025-09-19',stale:true})};
+ o.suppliers[0].items[1].offers={NEWCITY:off(21.2,{source:'buy',date:'2026-10-19',bonus:3})};
+ await put(page,o);
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForSelector('#odChips [data-sup]');
+ // at New City: 23×70 + 3×78.8 = 1,846. AMG: 23×75 + 3×100 (no known discount) = 2,025. Rida: 23×65 + 300 = 1,795. El-Fath: 2,600.
+ const opts=()=>page.$$eval('#odSendTo option',x=>x.map(o=>o.textContent.trim()));
+ assert.deepEqual(await opts(),['نيو سيتي (المقترح)','AMG · أغلى بـ 179 ج · 1 من غير خصم معروف','رضا عطية · أرخص بـ 51 ج · 1 من غير خصم معروف','الفتح · أغلى بـ 754 ج · 2 من غير خصم معروف','فارما · أغلى بـ 754 ج · 2 من غير خصم معروف','ابن سينا · أغلى بـ 754 ج · 2 من غير خصم معروف']);
+ await page.selectOption('#odSendTo','AMG');
+ assert.match(await text(page,'#odSendNote'),/محسوبة بخصومات AMG: حوالي 2,025 ج بدل 1,846 ج عند نيو سيتي، يعني أغلى بـ 179 ج\. 1 صنف مالهمش خصم معروف عند AMG/);
+ assert.match(await text(page,'#odTotal'),/2 من 2 صنف في الطلب، حوالي 2,025 ج بخصومات AMG/);
+ assert.equal(await msgOf(page),'السلام عليكم\nمحتاج الأصناف دي:\n• ملح ٠.٩ AMG (SALINE 0.9% 500CC RCقديم) × 23\n• FERRODEP 150 ML SYRUP × 3\nشكرًا','AMG\'s own name from its list');
+ await page.click('#odEdit');
+ assert.match(await text(page,'#odItems .od-item:nth-child(1) .od-at'),/عند AMG: 25% \(قايمة 08\/11\)/);
+ assert.match(await text(page,'#odItems .od-item:nth-child(1)'),/نيو سيتي: آخر خصم 30%/,'the suggested supplier\'s own discount is still shown');
+ assert.match(await text(page,'#odItems .od-item:nth-child(2) .od-warn'),/عند AMG: مالوش خصم معروف، محسوب بسعر الجمهور/);
+ // the numbers follow the quantities: 10×75 + 300 = 1,050 vs 10×70 + 236.4 = 936
+ await page.fill('#odItems .od-item:nth-child(1) [data-qty]','10');
+ assert.match(await text(page,'#odSendNote'),/حوالي 1,050 ج بدل 936 ج عند نيو سيتي، يعني أغلى بـ 114 ج/);
+ assert.equal((await opts())[1],'AMG · أغلى بـ 114 ج · 1 من غير خصم معروف');
+ // back to its own supplier: as before
+ await page.selectOption('#odSendTo','NEWCITY');assert.ok(!(await page.isVisible('#odSendNote')));
+ assert.match(await text(page,'#odTotal'),/حوالي 936 ج بعد الخصم/);assert.equal(await page.$$eval('#odItems .od-at',x=>x.length),0);
+});
 run('orders tab: a supplier with no saved number, no file yet, an old file, a broken file',async({page})=>{
  await page.evaluate(()=>{window.__opened=[]});
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
