@@ -45,6 +45,10 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.evaluate(()=>window.AskerTempSale.scanned('101060'));
  assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b'),'2');
  assert.match(await text(page,'#tsFind'),/اتضاف: صنف تجربة \(الباركود 101060\)/,'the number read is shown');
+ // the sticker's barcode itself (ITF, 10 digits): 1 + code + the batch's month and year; the line shows that batch's expiry
+ await page.evaluate(()=>window.AskerTempSale.scanned('1048750729',true,'itf'));
+ assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/صلاحية 07\/2029/);
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');
  // a short or long reading is never taken as a code; the number read is shown
  await page.evaluate(()=>window.AskerTempSale.scanned('9493',true,'itf'));
  assert.match(await text(page,'#tsFind'),/الكاميرا قرت 9493 \(itf\): ده مش رقم ملصق فارمافلاي/,'the number and its barcode kind are shown');

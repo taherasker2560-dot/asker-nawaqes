@@ -16,10 +16,21 @@
   // misread or another barcode, never taken as a code (the owner: «الباركود ينطق اصناف غلط», 2026-11-13).
   function stickerCode(raw, scanned) {
     const s = String(raw || '').replace(/[٠-٩]/g, (c) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).trim();
-    if (scanned) return /^1\d{5}$/.test(s) ? Number(s) - 100000 || null : null;
+    if (scanned) { const r = stickerRead(s); return r ? r.code : null; }
     const d = s.replace(/\D/g, '');
-    if (/^1\d{5}$/.test(d)) return Number(d) - 100000 || null;
+    const r = stickerRead(d);
+    if (r) return r.code;
     if (/^\d{1,5}$/.test(d)) return Number(d) || null;
+    return null;
+  }
+  // The sticker's barcode (an ITF of 10 digits, found 2026-11-13 from the owner's scan 1634760729 = FEMOGESAL TAB, code
+  // 63476, its batch 07/2029): 1 + the item code (5 digits) + the batch's expiry month (2) + year (2). The number printed
+  // above it is the first 6 digits. -> {code, exp: 'YYYY-MM'} (exp null for the 6 digits alone), null when it is neither.
+  function stickerRead(raw) {
+    const s = String(raw || '').trim();
+    const m = s.match(/^1(\d{5})(0[1-9]|1[0-2])(\d{2})$/);
+    if (m) return Number(m[1]) ? { code: Number(m[1]), exp: `20${m[3]}-${m[2]}` } : null;
+    if (/^1\d{5}$/.test(s)) return Number(s) - 100000 ? { code: Number(s) - 100000, exp: null } : null;
     return null;
   }
   // one box, or one unit (strip / ampoule) when the box is split in PharmaFly (parts > 1)
@@ -109,7 +120,7 @@
     const sh = Math.round(vw / a);
     return { sx: 0, sy: Math.round((vh - sh) / 2), sw: vw, sh };
   }
-  const api = { overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
+  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -346,10 +357,12 @@
     // every reading is kept on this phone (the last 20), to learn the stickers' barcode; never sent anywhere
     const shown = raw + (format ? ` (${format})` : '');
     keep('asker-ts-raw', [shown, ...load('asker-ts-raw', []).filter((x) => x !== shown)].slice(0, 20));
-    const code = stickerCode(raw, true), it = code ? await itemByCode(code) : null;
+    const sr = stickerRead(raw), it = sr ? await itemByCode(sr.code) : null;
     if (!it) { beep(false); return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad'); }
     beep(true);
-    add(it);
+    const line = add(it);
+    // the sticker carries its own batch's expiry: the line shows that one (as PharmaFly does when it sells that batch)
+    if (sr.exp && line) { line.exp = sr.exp; drawCart(); }
     // this camera reads the stickers: kept on this phone, the switch hides
     if (stream && camNow()) keep(CAMKEY, camNow());
     lastGood = Date.now();
