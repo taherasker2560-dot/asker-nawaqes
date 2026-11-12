@@ -15,7 +15,7 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=link-20261112a" />
+    <link rel="stylesheet" href="ar/look.css?v=scope-20261112a" />
   </head>
   <body>
     <header class="appbar">
@@ -81,6 +81,13 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             <input id="hsQ" type="search" autocomplete="off" aria-label="دوّر على صنف" placeholder="دوّر على صنف: كل أصناف السيستم والمخازن…" />
             <button id="hsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+          </div>
+          <!-- where to search (owner 2026-11-12): everything, the pharmacy's stock, the warehouses' lists, the shortages -->
+          <div id="hsScope" class="chips hs-scope" role="radiogroup" aria-label="دوّر في">
+            <button type="button" class="chip on" data-scope="all" role="radio" aria-checked="true">الكل</button
+            ><button type="button" class="chip" data-scope="stock" role="radio" aria-checked="false">المخزون</button
+            ><button type="button" class="chip" data-scope="lists" role="radio" aria-checked="false">القوايم</button
+            ><button type="button" class="chip" data-scope="short" role="radio" aria-checked="false">النواقص</button>
           </div>
           <div id="hsOut" class="hs-out hidden">
             <p id="hsStatus" class="status"></p>
@@ -567,7 +574,7 @@
     <script src="ar/store-settings.js?v=store-20261109b"></script>
     <script src="ar/store-link.js?v=link-20261112a"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>
-    <script src="ar/home.js?v=buys-20261112c"></script>
+    <script src="ar/home.js?v=scope-20261112a"></script>
     <script src="ar/look.js?v=look-20261112a"></script>
   </body>
 </html>

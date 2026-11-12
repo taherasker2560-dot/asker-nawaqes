@@ -54,6 +54,30 @@ run('search on top: every item of the system, one card each, with its marks',asy
  // nothing was written
  assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc||/ar_stock|ar_supplier_items|ar_orders|ar_names|ar_store/.test(JSON.stringify(w)))),[]);
 },{home:true});
+// owner 2026-11-12: four buttons under the box: الكل / المخزون / القوايم / النواقص
+run('search on top: الكل / المخزون / القوايم / النواقص',async({page})=>{
+ await seed(page);await page.reload();await ready(page);
+ const names=()=>page.$$eval('#hsItems .hs-item strong',x=>x.map(e=>e.textContent.trim()));
+ const find=async(q,re)=>{await page.fill('#hsQ',q);await page.waitForFunction(src=>new RegExp(src).test(document.getElementById('hsStatus').textContent+document.getElementById('hsItems').textContent),re.source);};
+ assert.deepEqual(await page.$$eval('#hsScope [data-scope]',b=>b.map(x=>x.textContent.trim())),['الكل','المخزون','القوايم','النواقص']);
+ assert.equal(await page.$eval('#hsScope .on',b=>b.dataset.scope),'all','starts on «الكل»');
+ // المخزون: only what has stock now (Brufen 3 packs), Flagyl (no stock) is not there
+ await page.click('[data-scope="stock"]');
+ await find('بروفين',/بروفين ٤٠٠/);assert.match(await page.textContent('#hsStatus'),/في المخزون/);
+ await find('FLAGYL',/مفيش صنف بالاسم ده في المخزون/);assert.deepEqual(await names(),[]);
+ // القوايم: only items in a warehouse's list, plus the lines that are not ours yet
+ await page.click('[data-scope="lists"]');
+ await find('FLAGYL',/فلاجيل ١٢٥ شراب/);assert.match(await page.textContent('#hsItems'),/في القوايم: AMG 22%/);
+ await find('CONCOR',/مفيش صنف بالاسم ده في القوايم/);
+ await page.fill('#hsQ','فلاجيل');await page.waitForFunction(()=>!document.getElementById('hsLinesBox').classList.contains('hidden'));
+ // النواقص: only the shortage list (Brufen and Flagyl), not Concor
+ await page.click('[data-scope="short"]');
+ await find('CONCOR',/مفيش صنف بالاسم ده في النواقص/);
+ await find('بروفين',/بروفين ٤٠٠/);assert.ok(await page.$eval('#hsLinesBox',b=>b.classList.contains('hidden')),'no list lines here');
+ // الكل again: Concor is found
+ await page.click('[data-scope="all"]');await find('CONCOR',/كونكور/);
+ assert.equal(await page.$eval('#hsScope [aria-checked="true"]',b=>b.dataset.scope),'all');
+},{home:true});
 run('search on top: ✏️ fixes the Arabic name everywhere',async({page})=>{
  await seed(page);await page.reload();await ready(page);
  await page.fill('#hsQ','CONCOR');

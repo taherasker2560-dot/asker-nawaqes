@@ -102,12 +102,21 @@
     if (it.ordered) out.push({ text: 'اتطلب النهارده', kind: 'warn' });
     return out;
   }
-  // «في القوايم: AMG 22% · رضا عطية 20%» (the best three)
+  // «في القوايم: AMG 22% · رضا عطية 20% · …» every warehouse (there are four lists; 2026-11-12: the fourth was cut before)
   function offersText(it) {
-    const o = (it.offers || []).slice(0, 3).map((x) => supName(x.supplier) + (num(x.disc) != null ? ' ' + num(x.disc) + '%' : ''));
+    const o = (it.offers || []).slice(0, 6).map((x) => supName(x.supplier) + (num(x.disc) != null ? ' ' + num(x.disc) + '%' : ''));
     return o.length ? 'في القوايم: ' + o.join(' · ') : '';
   }
-  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate };
+  // the four buttons under the box (owner 2026-11-12): الكل / المخزون (has stock now) / القوايم (in a warehouse's list) /
+  // النواقص (on the shortage list)
+  function inScope(it, scope) {
+    if (scope === 'stock') { const s = it.stock; return !!s && (num(s.packs) || 0) + (num(s.units) || 0) > 0; }
+    if (scope === 'lists') return (it.offers || []).length > 0;
+    if (scope === 'short') return !!it.short;
+    return true;
+  }
+  const SCOPE_WORDS = { stock: 'في المخزون', lists: 'في القوايم', short: 'في النواقص' };
+  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS };
   root.AskerHomeLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -123,6 +132,7 @@
   let lines = null, linesLoading = null, linesFail = '';
   let catalog = null, catLoading = null, catFail = '';
   let buys = null, buysLoading = null; // «آخر شرا» (ar_item_buys): quiet when the table is not there yet
+  let scope = 'all'; // the button under the box; every page open starts on «الكل», so nothing is hidden by a forgotten choice
 
   function say(text, kind) {
     const el = $('hsStatus');
@@ -233,8 +243,10 @@
     if (editing && document.activeElement && document.activeElement.id === 'hsAr') return; // never wipe what is being typed
     loadCatalog(); loadLines(); loadBuys(); askStock();
     const ix = currentIndex();
-    const hits = fz().rank(q, ix.items, (it) => it._h, 25);
-    const extra = lines ? fz().rank(q, ix.extra, (l) => l._h, 10) : [];
+    const pool = scope === 'all' ? ix.items : ix.items.filter((it) => inScope(it, scope));
+    const hits = fz().rank(q, pool, (it) => it._h, 25);
+    // the warehouses' lines that are not surely one of our items belong to «الكل» and «القوايم»
+    const extra = lines && (scope === 'all' || scope === 'lists') ? fz().rank(q, ix.extra, (l) => l._h, 10) : [];
     shown = new Map(hits.map((it) => [it.key, it]));
     $('hsItems').innerHTML = hits.map(card).join('');
     if (editing && shown.has(editing)) openEditor(editing);
@@ -242,8 +254,9 @@
     $('hsLinesBox').classList.toggle('hidden', !extra.length);
     const age = root.AskerStock ? root.AskerStock.age() : '';
     const wait = [catLoading ? 'بحمّل كل أصناف السيستم…' : catFail, linesLoading ? 'بحمّل قوايم المخازن…' : linesFail].filter(Boolean).join(' · ');
-    if (!hits.length && !extra.length) return say(wait || 'مفيش صنف بالاسم ده.', catFail || linesFail ? 'bad' : '');
-    say([hits.length === 25 ? 'أقرب 25 صنف' : `${hits.length} صنف`, age, wait].filter(Boolean).join(' · '), catFail || linesFail ? 'bad' : '');
+    const where = SCOPE_WORDS[scope] || '';
+    if (!hits.length && !extra.length) return say(wait || (where ? `مفيش صنف بالاسم ده ${where}. دوس «الكل» تدوّر في كله.` : 'مفيش صنف بالاسم ده.'), catFail || linesFail ? 'bad' : '');
+    say([(hits.length === 25 ? 'أقرب 25 صنف' : `${hits.length} صنف`) + (where ? ' ' + where : ''), age, wait].filter(Boolean).join(' · '), catFail || linesFail ? 'bad' : '');
   }
   function openEditor(key) {
     const it = shown.get(key), cardEl = $('hsItems').querySelector(`[data-k="${CSS.escape(key)}"]`);
@@ -286,6 +299,15 @@
     if (!box) return;
     box.addEventListener('input', () => { editing = null; clearTimeout(timer); timer = setTimeout(draw, 220); });
     $('hsClear')?.addEventListener('click', () => { box.value = ''; editing = null; draw(); box.focus(); });
+    $('hsScope')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-scope]');
+      if (!b) return;
+      scope = b.dataset.scope;
+      $('hsScope').querySelectorAll('[data-scope]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
+      editing = null;
+      draw();
+      if (!box.value) box.focus();
+    });
     $('hsItems')?.addEventListener('click', async (e) => {
       const cardEl = e.target.closest('[data-k]');
       if (!cardEl) return;

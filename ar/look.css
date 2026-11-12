@@ -254,6 +254,21 @@ html.night .topsearch .search svg {
 .topsearch .search .search-clear {
   inset-inline-end: 9px;
 }
+/* where to search: four equal buttons under the box (ar/home.js, owner 2026-11-12) */
+.hs-scope {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  overflow: visible;
+}
+.hs-scope .chip {
+  min-height: 36px;
+  padding: 4px 6px;
+  font-size: 13.5px;
+  text-align: center;
+}
 
 /* ---------- chips, the three groups of «المشتريات», segmented tabs ---------- */
 .chips .chip {
