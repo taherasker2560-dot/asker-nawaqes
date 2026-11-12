@@ -240,7 +240,12 @@
   function saveCart() {
     store.set('asker_store_cart', cart);
     const n = cartCount(cart);
-    document.querySelectorAll('.cart-n').forEach((el) => { el.textContent = n; el.hidden = !n; });
+    document.querySelectorAll('.cart-n').forEach((el) => {
+      const up = n > (Number(el.textContent) || 0) && !el.hidden;
+      el.textContent = n; el.hidden = !n;
+      // a small jump of the cart number when something is added
+      if (up) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    });
   }
   function view(name) {
     document.querySelectorAll('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== name));
@@ -304,18 +309,31 @@
     $('popularBox').hidden = !popular.length;
     $('popular').innerHTML = popular.map(row).join('');
   }
+  const skel = (n) => Array.from({ length: n }, () => '<article class="item skel" aria-hidden="true"><div class="thumb"></div><i></i><i></i><i class="s"></i></article>').join('');
   async function loadPopular() {
+    const cached = store.get('asker_store_pop', null);
+    if (Array.isArray(cached) && cached.length) { popular = cached; drawPopular(); }
+    else { $('popularBox').hidden = false; $('popular').innerHTML = skel(3); }
     const { data, error } = await client.from('ar_store_items').select(COLS).not('popular_rank', 'is', null).eq('status', 'available').order('popular_rank').limit(12);
-    if (error || !data) return;
+    if (error || !data) { if (!popular.length) drawPopular(); return; }
     popular = data;
+    store.set('asker_store_pop', data);
     drawPopular();
   }
   // إعدادات الموقع (صاحب الصيدلية بيغيّرها من صفحة البوت)
+  // speed (owner 2026-11-12, «حسّن هيئة وأداء الموقع»): the last settings and best sellers are kept on the phone and drawn at
+  // once on the next visit, then refreshed from the server; until the first answer, gray placeholder cards (skeleton)
   async function loadSettings() {
+    const cached = store.get('asker_store_settings', null);
+    if (cached && typeof cached === 'object') applySettings(cached);
     // '*': the color columns (theme_color, theme_night) exist only after migration 202611120600
     const { data, error } = await client.from('ar_store_settings').select('*').limit(1);
     if (error || !data || !data[0]) return;
-    settings = data[0];
+    store.set('asker_store_settings', data[0]);
+    applySettings(data[0]);
+  }
+  function applySettings(s) {
+    settings = s;
     if (root.AskerStoreTheme && 'theme_color' in settings) root.AskerStoreTheme.setDefault(settings.theme_color, settings.theme_night);
     // the owner's own texts: in English they are used only when the dictionary knows them, else the page's English stays
     const own = (t) => {
@@ -344,6 +362,7 @@
     if (q.cats) req = req.in('cat', q.cats).eq('status', 'available');
     req = req.order('status').order('name').range(offset, offset + PAGE - 1);
     $('resNote').textContent = 'بيدوّر…';
+    if (!append) { $('results').innerHTML = skel(4); $('more').hidden = true; }
     const { data, error } = await req;
     if (my !== seq) return;
     if (error) { $('resNote').textContent = 'مقدرتش أجيب الأصناف. اتأكد من النت وجرب تاني.'; return; }
