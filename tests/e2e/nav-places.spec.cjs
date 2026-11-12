@@ -15,7 +15,7 @@ run('bottom bar: five sections, «الرئيسية» first, «المشتريات
  assert.equal(await page.$('#gsQ'),null,'the old search boxes on top are gone');assert.equal(await page.$('#gwQ'),null);
  // «المشتريات»: the three groups, «نواقص» open on «النواقص»
  await page.click('[data-group="purchases"]');
- assert.ok(await vis(page,'shortPanel'));assert.ok(!(await vis(page,'homePanel')));
+ assert.ok(await vis(page,'shortPanel'));assert.ok(!(await vis(page,'homePanel')));assert.ok(await vis(page,'hsQ'),'the search stays on top of every section');
  assert.deepEqual(await names(page,'[data-pgroup]'),['نواقص','طلبيات','مخزون']);
  assert.deepEqual(await names(page,'[data-pfor="short"] [data-tab]'),['النواقص','الوارد','الترجمة']);
  assert.deepEqual(await names(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن']);

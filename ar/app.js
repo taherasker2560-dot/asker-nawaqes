@@ -234,8 +234,8 @@
     document.querySelectorAll('.subbar [data-tab]').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
     document.querySelectorAll('[data-pgroup]').forEach((x) => x.classList.toggle('on', x.dataset.pgroup === pgroup));
     document.querySelectorAll('[data-pfor]').forEach((x) => (x.hidden = x.dataset.pfor !== pgroup));
+    window.AskerHome?.close?.(); // choosing a section leaves the search on top
     $('homePanel')?.classList.toggle('hidden', tab !== 'home');
-    if (tab === 'home') window.AskerHome?.open();
     $('countPanel')?.classList.toggle('hidden', tab !== 'count');
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
     $('carePanel')?.classList.toggle('hidden', tab !== 'care');
@@ -1933,6 +1933,15 @@
   // «الرئيسية» (ar/home.js) reads what this page already loaded: the shortage list, every Arabic name and today's «اتطلب»
   // (new arrays / maps after each reload, so home.js rebuilds its index when one of them is not the same object any more)
   window.AskerApp.lookup = () => ({ shortages, knownNames, orders, nk });
+  // an Arabic name fixed from the search on top (ar/home.js): the shortage list and «الترجمة» show it at once
+  window.AskerApp.setName = (row) => {
+    if (!row || !row.name_key) return;
+    knownNames.set(row.name_key, { ...(knownNames.get(row.name_key) || {}), ...row });
+    shortages.forEach((x) => { if (nk(x.product_name) === row.name_key) names.set(x.id, knownNames.get(row.name_key)); });
+    saveCache();
+    drawShort();
+    drawTranslate();
+  };
   window.AskerApp.openWhatsApp = (text, phone) => {
     const t = text || '',
       ph = waPhone(phone || ''),

@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/arabic-192.png?v=logo1" />
     <link rel="apple-touch-icon" href="icons/arabic-192.png?v=logo1" />
     <title>بوت نواقص صيدلية عسكر</title>
-    <link rel="stylesheet" href="ar/app.css?v=home-20261112a" />
+    <link rel="stylesheet" href="ar/app.css?v=search-20261112b" />
   </head>
   <body>
     <header class="appbar">
@@ -46,6 +46,11 @@
         </div>
         <h3>لون البوت</h3>
         <div id="accentPick" class="accents" role="radiogroup" aria-label="لون البوت"></div>
+        <div id="accentCustomRow" class="accent-custom">
+          <label for="accentCustom">لون من اختيارك (أي لون)</label>
+          <input id="accentCustom" type="color" value="#7d1028" />
+        </div>
+        <label class="check night-row"><input id="nightMode" type="checkbox" /> الوضع الليلي (البوت كله غامق، مع أي لون)</label>
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
       </div>
     </section>
@@ -60,7 +65,25 @@
       <div id="app" class="hidden">
         <p id="versionWarn" class="status bad hidden"></p>
         <div id="pendingOrder" class="status hidden"><span id="pendingText"></span> <button id="pendingYes" class="small">أيوه اتبعت</button> <button id="pendingNo" class="secondary small">لأ، متبعتتش</button></div>
-        <!-- the bottom bar: five sections (owner 2026-11-12): الرئيسية (the search), المشتريات، الحسابات، المبيعات، خدمة العملاء -->
+        <!-- ONE search on top of every section (owner 2026-11-12: «عايز البحث ثابت زي ما كان فوق كل الأقسام»): every item of the
+             system (ar_store_items, ~32,000), the stock, the shortages and the warehouses' lists; typing shows the cards here and
+             hides the section below until the box is cleared (ar/home.js) -->
+        <div class="topsearch">
+          <div class="search home-q">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="hsQ" type="search" autocomplete="off" aria-label="دوّر على صنف" placeholder="دوّر على صنف: كل أصناف السيستم والمخازن…" />
+            <button id="hsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+          </div>
+          <div id="hsOut" class="hs-out hidden">
+            <p id="hsStatus" class="status"></p>
+            <div id="hsItems"></div>
+            <div id="hsLinesBox" class="hidden">
+              <h3 class="hs-h">في قوايم المخازن بس (مش متسجّل عندنا)</h3>
+              <div id="hsLines"></div>
+            </div>
+          </div>
+        </div>
+        <!-- the bottom bar: five sections (owner 2026-11-12): الرئيسية، المشتريات، الحسابات، المبيعات، خدمة العملاء -->
         <nav class="bottomnav" aria-label="الأقسام">
           <button data-group="home">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4.2-4.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -111,20 +134,14 @@
           ><button type="button" class="chip" data-tab="tempsale">البيع المؤقت</button>
         </div>
 
-        <!-- «الرئيسية» (owner 2026-11-12): ONE search for an item: the pharmacy's stock, the shortages and the warehouses'
-             lists together, one card per item with its marks (رصيد / ملوش رصيد / ناقص / اتطلب النهارده) and who sells it (ar/home.js) -->
-        <section id="homePanel" class="home">
-          <div class="search home-q">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            <input id="hsQ" type="search" autocomplete="off" aria-label="دوّر على صنف" placeholder="دوّر على صنف: المخزون والنواقص والمخازن…" />
-            <button id="hsClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
-          </div>
-          <p id="hsStatus" class="status">اكتب حرفين من اسم الصنف، عربي أو إنجليزي.</p>
-          <div id="hsItems"></div>
-          <div id="hsLinesBox" class="hidden">
-            <h3 class="hs-h">في قوايم المخازن بس (مش متسجّل عندنا)</h3>
-            <div id="hsLines"></div>
-          </div>
+        <!-- «الرئيسية»: the first screen under the search -->
+        <section id="homePanel" class="card home">
+          <h2>دوّر على أي صنف من فوق</h2>
+          <p class="hint">
+            البحث بيدوّر في كل أصناف السيستم (حوالي 32 ألف صنف) وقوايم المخازن مرة واحدة. كل صنف بيطلع في كارت واحد: الرصيد أو
+            «ملوش رصيد»، و«ناقص» لو في النواقص، و«اتطلب النهارده»، ومين عنده بأحسن خصم. القلم ✏️ بيصلّح الاسم العربي، والتصليح بيظهر
+            في النواقص والمخزون والموقع.
+          </p>
         </section>
 
         <section id="shortPanel" class="card hidden">
@@ -490,10 +507,10 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="ar/settings.js?v=home-20261112a"></script>
+    <script src="ar/settings.js?v=colors-20261112b"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=home-20261112a"></script>
+    <script src="ar/app.js?v=search-20261112b"></script>
     <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=layout-20261110a"></script>
@@ -501,6 +518,6 @@
     <script src="ar/store-orders.js?v=store-20261110a"></script>
     <script src="ar/store-settings.js?v=store-20261109b"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>
-    <script src="ar/home.js?v=home-20261112a"></script>
+    <script src="ar/home.js?v=search-20261112b"></script>
   </body>
 </html>
