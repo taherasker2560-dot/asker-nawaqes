@@ -188,6 +188,8 @@
   const COLS = 'id,name,arabic_name,status,price,cat,needs_rx';
   const PAGE = 40;
   const $ = (id) => document.getElementById(id);
+  // the name read out for an item (screen readers, photo text): the English name in English, else the Arabic one if any
+  const label = (it) => (root.AskerI18n && root.AskerI18n.lang() === 'en' ? it.name : (it.arabic_name || it.name));
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -280,7 +282,7 @@
       <span class="hint-sm">اتأكد مع الصيدلي قبل ما تغيّر الدوا</span></div>` : '';
     return `<article class="item${altBox ? ' has-alts' : ''}">
       ${thumb(it)}
-      <div class="item-text" data-open="${it.id}" role="button" tabindex="0" aria-label="تفاصيل ${esc(it.arabic_name || it.name)}">
+      <div class="item-text" data-open="${it.id}" role="button" tabindex="0" aria-label="تفاصيل ${esc(label(it))}">
         <h3 dir="ltr">${esc(it.name)}</h3>
         ${it.arabic_name ? `<p class="ar">${esc(it.arabic_name)}</p>` : ''}
         <span class="badge ${st.cls}">${st.label}</span>
@@ -315,12 +317,18 @@
     if (error || !data || !data[0]) return;
     settings = data[0];
     if (root.AskerStoreTheme && 'theme_color' in settings) root.AskerStoreTheme.setDefault(settings.theme_color, settings.theme_night);
-    if (settings.hero_title) $('heroTitle').textContent = settings.hero_title;
-    if (settings.hero_text) $('heroText').textContent = settings.hero_text;
+    // the owner's own texts: in English they are used only when the dictionary knows them, else the page's English stays
+    const own = (t) => {
+      const I = root.AskerI18n;
+      if (!t || !I || I.lang() !== 'en') return t || null;
+      return /[؀-ۿ]/.test(I.translate(t)) ? null : t;
+    };
+    if (own(settings.hero_title)) $('heroTitle').textContent = settings.hero_title;
+    if (own(settings.hero_text)) $('heroText').textContent = settings.hero_text;
     const closed = settings.is_open === false;
     document.querySelectorAll('.closed-note').forEach((el) => {
       el.hidden = !closed;
-      el.textContent = settings.closed_message || ERRORS.closed;
+      el.textContent = own(settings.closed_message) || ERRORS.closed;
     });
     $('sendBtn').disabled = closed;
     if (settings.whatsapp) {
@@ -379,7 +387,7 @@
     if (!it) return;
     const f = pics[it.id], st = STATUS[it.status] || STATUS.on_order;
     $('shPic').className = 'sh-pic' + (f ? '' : ' icon');
-    $('shPic').innerHTML = f ? `<img src="store/img/${esc(f)}" alt="صورة ${esc(it.arabic_name || it.name)}">` : `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[shapeOf(it.name, it.cat)]}</svg>`;
+    $('shPic').innerHTML = f ? `<img src="store/img/${esc(f)}" alt="صورة ${esc(label(it))}">` : `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[shapeOf(it.name, it.cat)]}</svg>`;
     $('shName').textContent = it.name;
     $('shAr').textContent = it.arabic_name || '';
     $('shAr').hidden = !it.arabic_name;
@@ -694,6 +702,10 @@
   saveCart();
   route();
   loadSettings();
+  // English: the translator never touches message boxes, so their hint (placeholder) is translated here
+  if (root.AskerI18n && root.AskerI18n.lang() === 'en') {
+    document.querySelectorAll('textarea[placeholder]').forEach((t) => { t.placeholder = root.AskerI18n.translate(t.placeholder); });
+  }
   loadPopular();
   loadPics();
 })(typeof window === 'undefined' ? globalThis : window);
