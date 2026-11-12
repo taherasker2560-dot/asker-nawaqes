@@ -9,8 +9,8 @@
   const STATUS = {
     available: { label: 'متوفر', cls: 'ok' },
     on_order: { label: 'بالطلب', cls: 'order' },
-    // «صعب طلبه» على فارمافلاي: بيتطلب برضه من غير سعر زي «بالطلب» (قراره 2026-11-12)
-    unavailable: { label: 'بالطلب', cls: 'order' },
+    // «صعب طلبه» على فارمافلاي = أصناف النواقص (مينالاكس مثلًا): «غير متوفر» ومش بيتطلب، وبيظهر البديل (قراره 2026-11-12)
+    unavailable: { label: 'غير متوفر', cls: 'out' },
   };
   // أقسام الرئيسية: أنواع التصنيف (Store\rx\classified.txt) متجمعة
   const SECTIONS = [
@@ -62,9 +62,9 @@
     return (Math.round(x * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
   // «بالطلب» (مفيش رصيد، الصيدلية بتجيبه): بيتطلب من غير سعر، والسعر بيتأكد مع الزبون يوم الطلب (قرار 2026-11-10)
-  // وكمان «صعب طلبه» (unavailable): أي صنف مالوش رصيد بيتطلب من غير سعر (قراره 2026-11-12)
+  // «غير متوفر» (unavailable = النواقص) مش بيتطلب؛ بيظهر تحته البديل المتوفر
   function onOrder(it) {
-    return !!it && (it.status === 'on_order' || it.status === 'unavailable');
+    return !!it && it.status === 'on_order';
   }
   function canAdd(it) {
     return !!it && !it.needs_rx && ((it.status === 'available' && Number(it.price) > 0) || onOrder(it));
