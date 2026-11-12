@@ -14,6 +14,8 @@ window.AskerEN = {
   "كود الصنف أو الرقم اللي فوق الباركود": "Item code or the number above the barcode",
   "الزبون": "Customer",
   "بيع ولا مرتجع": "Sale or return",
+  "🔄 كاميرا تانية": "🔄 Other camera",
+  "وجّه الكاميرا على باركود الملصق، وثبّت الموبايل ثانية": "Point the camera at the sticker's barcode and hold the phone still for a second",
   "بيع": "Sale",
   "رجّعتله كام فلوس؟": "Money given back?",
   "احفظ المرتجع": "Save the return",

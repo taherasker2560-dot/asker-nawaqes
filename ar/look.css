@@ -1246,4 +1246,5 @@ html.night .ts-st.d { background: rgba(60, 200, 110, 0.15); color: #7fe0a2; }.ts
 .ts-return .ts-types .chip.on { background: linear-gradient(135deg, #c62828 0%, #8e1b1b 100%); }
 .ts-return .ts-save { background: #c62828; }
 .ts-st.r { background: #fdecee; color: #c62828; }
-html.night .ts-st.r { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
+html.night .ts-st.r { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }.ts-scan { position: relative; }
+.ts-cam { position: absolute; inset-inline-end: 8px; bottom: 8px; min-height: 36px; margin: 0; padding: 4px 12px; border-radius: 12px; background: rgba(0, 0, 0, 0.55); color: #fff; border: 0; font-size: 13px; font-weight: 700; }

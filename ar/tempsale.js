@@ -198,40 +198,73 @@
   // ---------- the camera (the PharmaFly sticker's barcode) ----------
   // a reading counts only when the same value comes twice in a row (one frame can misread a bar)
   let stream = null, timer = null, detector = null, busy = false, lastRaw = '', lastAt = 0, seenRaw = '', seenAt = 0;
-  async function startScan() {
+  // The camera (owner 2026-11-13 «مبتقراش خالص … الكاميرا اللي انت مختارها»): every straight-line barcode kind is read
+  // again (the sticker's kind is not known yet: leaving out ITF/codabar stopped every reading); safety comes from the same
+  // value twice in a row and a whole sticker number only. The back camera is asked at a high resolution with continuous
+  // focus; «🔄 كاميرا تانية» goes through the phone's cameras (the choice is kept on this phone).
+  const CAMKEY = 'asker-ts-cam';
+  let cams = [];
+  async function openCamera(deviceId) {
+    const video = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    if (deviceId) video.deviceId = { exact: deviceId }; else video.facingMode = { ideal: 'environment' };
+    const s = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+    const track = s.getVideoTracks()[0];
+    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+    return s;
+  }
+  // the phone's cameras, back ones first (names are known only after the first permission)
+  async function listCams() {
+    try {
+      const all = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+      const back = all.filter((d) => /back|rear|environment|خلف/i.test(d.label));
+      cams = back.length ? [...back, ...all.filter((d) => !back.includes(d))] : all;
+    } catch (e) { cams = []; }
+    $('tsCam').classList.toggle('hidden', cams.length < 2);
+  }
+  async function startScan(deviceId) {
     $('tsScanBox').classList.remove('hidden');
     if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       $('tsScanBox').classList.add('hidden');
       return say('tsFind', 'الموبايل ده مش بيقرا الباركود من البوت. اكتب الرقم اللي فوق الباركود في «الكود».', 'bad');
     }
     try {
-      // the stickers' kinds only: itf / codabar / code_93 read pieces of other bars as numbers
       const all = await root.BarcodeDetector.getSupportedFormats();
-      const formats = all.filter((f) => /^(code_128|code_39|ean_13|ean_8|upc_a|upc_e)$/.test(f));
+      const formats = all.filter((f) => /^(code_128|code_39|code_93|codabar|ean_13|ean_8|itf|upc_a|upc_e)$/.test(f));
       detector = new root.BarcodeDetector(formats.length ? { formats } : undefined);
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      const saved = deviceId || load(CAMKEY, '');
+      try { stream = await openCamera(saved); } catch (e) { if (!saved) throw e; stream = await openCamera(''); }
       const v = $('tsVideo');
       v.srcObject = stream;
       await v.play();
-      say('tsFind', 'وجّه الكاميرا على باركود الملصق');
+      await listCams();
+      say('tsFind', 'وجّه الكاميرا على باركود الملصق، وثبّت الموبايل ثانية');
       clearInterval(timer);
-      timer = setInterval(tick, 300);
+      timer = setInterval(tick, 250);
     } catch (e) {
       stopScan();
       say('tsFind', 'الكاميرا ما اتفتحتش: ' + (e && e.message ? e.message : e), 'bad');
     }
+  }
+  // the next camera on the phone
+  async function nextCam() {
+    if (cams.length < 2) return;
+    const now = stream && stream.getVideoTracks()[0] ? stream.getVideoTracks()[0].getSettings().deviceId : '';
+    const i = cams.findIndex((c) => c.deviceId === now), next = cams[(i + 1) % cams.length];
+    keep(CAMKEY, next.deviceId);
+    await startScan(next.deviceId);
   }
   async function tick() {
     if (busy || !detector || !stream) return;
     busy = true;
     try {
       const found = await detector.detect($('tsVideo'));
-      if (found && found.length) await scanned(String(found[0].rawValue || ''));
+      if (found && found.length) await scanned(String(found[0].rawValue || ''), false, found[0].format);
     } catch (e) {}
     busy = false;
   }
   // sure = the camera read the same value twice in a row (tests and a typed reading pass true)
-  async function scanned(raw, sure) {
+  async function scanned(raw, sure, format) {
     raw = String(raw || '').trim();
     const now = Date.now();
     if (!raw) return;
@@ -240,9 +273,10 @@
     if (raw === lastRaw && now - lastAt < 2500) return;
     lastRaw = raw; lastAt = now;
     // every reading is kept on this phone (the last 20), to learn the stickers' barcode; never sent anywhere
-    keep('asker-ts-raw', [raw, ...load('asker-ts-raw', []).filter((x) => x !== raw)].slice(0, 20));
+    const shown = raw + (format ? ` (${format})` : '');
+    keep('asker-ts-raw', [shown, ...load('asker-ts-raw', []).filter((x) => x !== shown)].slice(0, 20));
     const code = stickerCode(raw, true), it = code ? await itemByCode(code) : null;
-    if (!it) return say('tsFind', `الكاميرا قرت ${raw}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad');
+    if (!it) return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad');
     add(it);
     if (navigator.vibrate) navigator.vibrate(60);
     say('tsFind', `اتضاف: ${nameOf(it)} (الباركود ${raw})`, 'ok');
@@ -425,6 +459,7 @@
       if (t.dataset.tsView) return showView(t.dataset.tsView);
       if (t.dataset.tsWay) return setWay(t.dataset.tsWay);
       if (t.dataset.tsType) return setKind(t.dataset.tsType);
+      if (t.id === 'tsCam') return nextCam();
       if (t.dataset.tsAdd) {
         const it = await itemByCode(Number(t.dataset.tsAdd));
         if (it) { add(it); say('tsFind', 'اتضاف: ' + nameOf(it), 'ok'); }
