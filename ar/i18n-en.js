@@ -168,6 +168,9 @@ window.AskerEN = {
   "عنوان الرئيسية": "Home title",
   "الجملة اللي تحت العنوان": "The line under the title",
   "رقم الواتساب اللي يظهر للزبون": "WhatsApp number shown to the customer",
+  "شكل الموقع للزباين": "Store look for customers",
+  "الوضع الليلي": "Night mode",
+  "لون من اختيارك": "Pick your own color",
   "احفظ الإعدادات": "Save settings",
   "صنف معين": "A specific item",
   "دوّر على الصنف عشان تخفيه من الموقع أو تعدّل اسمه العربي.": "Search for the item to hide it from the store site or edit its Arabic name.",
@@ -197,6 +200,7 @@ window.AskerEN = {
   "فاضي = اطلب من صيدليتك وهي توصلك": "Empty = Order from your pharmacy and it comes to you",
   "فاضي = الجملة الأصلية": "Empty = original line",
   "01xxxxxxxxx (فاضي = مايظهرش)": "01xxxxxxxxx (empty = not shown)",
+  "لون الموقع": "Store color",
   "اسم الصنف (عربي أو إنجليزي)": "Item name (Arabic or English)",
   "دوّر على صنف في الموقع": "Search for an item on the store site",
   "تنبيه: السيرفر شغال بنسخة {0} والصفحة مستنية {1}. النتايج ممكن تكون ناقصة؛ قول للمطوّر يرفع الدالة.": "Warning: the server runs version {0} and the page expects {1}. Results may be incomplete; tell the developer to deploy the function.",
@@ -705,7 +709,8 @@ window.AskerEN = {
   "تمسح كل الوارد": "clear all incoming",
   "ماتقراش": "not read",
   "هطلب {1}": "I'll order {1}",
-  "فاضي = تلقائي": "empty = automatic"
+  "فاضي = تلقائي": "empty = automatic",
+  "اللون مش مظبوط": "The color is not valid"
  },
  "phrases": {
   "آخر خصم": "last discount",
