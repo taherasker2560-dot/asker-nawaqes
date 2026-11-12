@@ -28,7 +28,9 @@ assert.equal(S.canAdd({status:'available',price:75,needs_rx:false}),true);
 assert.equal(S.canAdd({status:'available',price:null,needs_rx:false}),false,'no price');
 assert.equal(S.canAdd({status:'on_order',price:null,needs_rx:false}),true,'on order: asked for, priced on the order day');
 assert.equal(S.canAdd({status:'on_order',price:null,needs_rx:true}),false,'on order but prescription');
-assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:false}),false,'general shortage');
+assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:false}),true,'«صعب طلبه»: ordered without a price too (owner 2026-11-12)');
+assert.equal(S.canAdd({status:'unavailable',price:null,needs_rx:true}),false,'but not a prescription item');
+assert.equal(S.onOrder({status:'unavailable'}),true);
 {let o=S.cartAdd([],{id:7,name:'L',status:'on_order',price:null});o=S.cartAdd(o,{id:8,name:'M',status:'available',price:4});
  assert.equal(o[0].price,null);assert.equal(o[0].on_order,true);assert.equal(o[1].on_order,undefined);assert.equal(S.cartTotal(o),4,'on-order lines add nothing to the total');assert.equal(S.cartLater(o),1);}
 assert.equal(S.canAdd({status:'available',price:75,needs_rx:true}),false,'prescription');
@@ -58,7 +60,8 @@ assert.deepEqual(S.rememberOrder(null,{id:1}),[{id:1}]);
 const plan=S.reorderPlan([{id:1,name:'A',qty:2},{id:2,name:'B',qty:1},{id:3,name:'C',qty:50}],
  [{id:1,status:'available',price:10,needs_rx:false},{id:2,status:'on_order',price:null,needs_rx:false},{id:3,status:'available',price:5,needs_rx:false}]);
 assert.deepEqual(plan.add.map(a=>[a.item.id,a.qty]),[[1,2],[2,1],[3,20]],'on order is asked for again');assert.deepEqual(plan.missing,[]);
-assert.deepEqual(S.reorderPlan([{id:4,name:'D',qty:1}],[{id:4,status:'unavailable',price:null,needs_rx:false}]).missing,['D'],'general shortage');
+assert.deepEqual(S.reorderPlan([{id:4,name:'D',qty:1}],[{id:4,status:'unavailable',price:null,needs_rx:true}]).missing,['D'],'prescription item');
+assert.deepEqual(S.reorderPlan([{name:'typed one',qty:3,free_text:true}],[]).add,[{text:'typed one',qty:3}],'a typed line comes back as typed');
 assert.deepEqual(S.reorderPlan([{id:9,name:'Z',qty:1}],[]).missing,['Z'],'item gone from the site');
 assert.deepEqual(Object.keys(S.ORDER_STATUS),['new','confirmed','done','cancelled'],'same statuses as ar_store_orders');
 assert.ok(S.errorText('closed')!==S.errorText('x'),'closed has words');
@@ -89,4 +92,17 @@ assert.equal(S.itemLink('https://x.io/store.html#search','4468'),'https://x.io/s
 assert.equal(S.itemLink('https://x.io/store.html#item=1',7),'https://x.io/store.html#item=7');
 assert.equal(S.shareText({name:'PANADOL EXTRA',arabic_name:'بانادول اكسترا',status:'available',price:65},'L'),'بانادول اكسترا بـ 65 جنيه من صيدلية عسكر، اطلبه من هنا: L');
 assert.equal(S.shareText({name:'CONGESTAL',status:'on_order',price:null},'L'),'CONGESTAL من صيدلية عسكر، اطلبه من هنا: L','no price for an on-order item');
+// a line the customer types (not on the site): no price, same name = one line, sent as {text, qty}
+let tc=S.cartAddText([], '  ابيمول   شراب ').cart;
+assert.deepEqual(tc,[{id:'t:ابيمول شراب',name:'ابيمول شراب',arabic_name:null,price:null,qty:1,on_order:true,free_text:true}]);
+tc=S.cartAddText(tc,'ابيمول شراب').cart;assert.equal(tc[0].qty,2,'same text adds one');
+assert.equal(S.cartAddText([],'x').error,'bad_text');
+assert.equal(S.cartAddText([],'a'.repeat(121)).error,'bad_text');
+assert.equal(S.cleanText('<b>x</b> y'),'b x /b y','no tags');
+let ten=[];for(let i=0;i<10;i++)ten=S.cartAddText(ten,'صنف '+i).cart;
+assert.equal(S.cartAddText(ten,'صنف 11').error,'too_many_text');
+const mixed=S.cartAdd(tc,{id:5,name:'P',status:'available',price:10,needs_rx:false});
+assert.deepEqual(S.orderItems(mixed),[{text:'ابيمول شراب',qty:2},{id:5,qty:1}]);
+assert.equal(S.cartTotal(mixed),10,'typed lines have no price');
+assert.equal(S.cartLater(mixed),1);
 console.log('store ok');

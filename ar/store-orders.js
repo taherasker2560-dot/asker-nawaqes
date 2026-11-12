@@ -61,7 +61,8 @@
   }
   let rxUrls = {};
   function card(o) {
-    const items = (o.items || []).map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)} <b>${x.on_order ? 'بالطلب' : esc(money(x.line_total))}</b></li>`).join('');
+    // free_text = a line the customer typed (not on the site), 2026-11-12
+    const items = (o.items || []).map((x) => `<li><span dir="ltr">${esc(x.name)}</span> × ${esc(x.qty)} <b>${x.on_order ? 'بالطلب' : esc(money(x.line_total))}</b>${x.free_text ? ' <small>(كتبه الزبون)</small>' : ''}</li>`).join('');
     const later = (o.items || []).filter((x) => x.on_order).length;
     const open = o.status === 'new' || o.status === 'confirmed';
     const rx = (o.rx_paths || []).map((p, i) => /\.pdf$/.test(p)
