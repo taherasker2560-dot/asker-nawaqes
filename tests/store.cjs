@@ -79,4 +79,14 @@ assert.equal(sh('VOLTAREN AMP 6 AMP'),'injection');assert.equal(sh('APIDRA 100 U
 assert.equal(sh('OTRIVIN AD. 1% 15ML NSE DROPS'),'drops');assert.equal(sh('MEBO 15GM OINT'),'tube');assert.equal(sh('REGAINE 5% SPRAY'),'spray');
 assert.equal(sh('NAN COMFORT 400 G'),'can');assert.equal(sh('HERO BABY 2 MILK'),'can');assert.equal(sh('بيبى جوى رقم 4','baby'),'can');
 assert.equal(sh('SOMETHING ODD'),'box');assert.equal(sh('GLOSS NATURE','cosmetic'),'tube');
+// one item's link (#item=id): opens the item sheet; anything else is not an item link
+assert.equal(S.itemIdFromHash('#item=4468'),4468);
+assert.equal(S.itemIdFromHash('item=12'),12);
+assert.equal(S.itemIdFromHash('#cart'),null);
+assert.equal(S.itemIdFromHash('#item=12x'),null);
+assert.equal(S.itemIdFromHash('#item=1);alert(1)'),null);
+assert.equal(S.itemLink('https://x.io/store.html#search','4468'),'https://x.io/store.html#item=4468');
+assert.equal(S.itemLink('https://x.io/store.html#item=1',7),'https://x.io/store.html#item=7');
+assert.equal(S.shareText({name:'PANADOL EXTRA',arabic_name:'بانادول اكسترا',status:'available',price:65},'L'),'بانادول اكسترا بـ 65 جنيه من صيدلية عسكر، اطلبه من هنا: L');
+assert.equal(S.shareText({name:'CONGESTAL',status:'on_order',price:null},'L'),'CONGESTAL من صيدلية عسكر، اطلبه من هنا: L','no price for an on-order item');
 console.log('store ok');

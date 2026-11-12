@@ -631,3 +631,19 @@ html.night .qa button svg {
     animation: none;
   }
 }
+
+/* ---------- «رابط الموقع» (ar/store-link.js), 2026-11-12 ---------- */
+.sl-box {
+  margin: 0 0 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(var(--glow), 0.1), rgba(var(--glow), 0.03));
+  border: 1px solid rgba(var(--glow), 0.18);
+}
+.sl-box h3 { margin: 0 0 4px; }
+.sl-url { margin: 0 0 10px; font-size: 14px; color: var(--muted); text-align: left; overflow-wrap: anywhere; user-select: all; }
+.sl-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sl-btns button { min-height: 44px; padding: 8px 10px; font-size: 14.5px; }
+.sl-qr { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.sl-qr img { width: 240px; height: auto; border-radius: 16px; background: #fff; box-shadow: var(--sh-2); }
+.sl-qr a { font-weight: 700; }

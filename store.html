@@ -7,9 +7,13 @@
     <meta name="theme-color" content="#0a4aa6" />
     <title>صيدلية عسكر</title>
     <link rel="icon" href="icons/arabic-192.png?v=logo2" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-180.png?v=logo2" />
+    <link rel="manifest" href="manifest-store.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
+    <link rel="stylesheet" href="store/look.css?v=modern-20261112a" />
   </head>
   <body>
     <p class="trial">نسخة تجريبية</p>
@@ -39,6 +43,11 @@
           <a href="#cart" class="hero-btn ghost" id="heroRx">صوّر الروشتة وابعتها</a>
         </div>
       </section>
+      <div id="installBox" class="install" hidden>
+        <img src="icons/arabic-192.png?v=logo2" alt="" width="44" height="44" />
+        <div><strong>نزّل الصيدلية على موبايلك</strong><span>تفتحها من الشاشة الرئيسية زي أي تطبيق</span></div>
+        <button id="installBtn" type="button">نزّل</button>
+      </div>
       <section class="block">
         <h2>الأقسام</h2>
         <div id="sections" class="sections"></div>
@@ -138,6 +147,34 @@
       </section>
     </div>
 
+    <!-- صفحة الصنف: بتطلع من تحت لما تدوس على صورة الصنف أو اسمه، أو من رابط متبعت (#item=رقم) -->
+    <div id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="shName" hidden>
+      <div class="sheet-bg" data-close></div>
+      <div class="sheet-card">
+        <button type="button" class="sheet-x" data-close aria-label="اقفل">×</button>
+        <div id="shPic" class="sh-pic"></div>
+        <h2 id="shName" dir="ltr"></h2>
+        <p id="shAr" class="sh-ar"></p>
+        <div class="sh-row"><span id="shPrice" class="price"></span><span id="shBadge" class="badge"></span></div>
+        <div id="shAlts"></div>
+        <p id="shRx" class="sh-rx" hidden>الدوا ده بالروشتة: صوّر الروشتة وابعتها من السلة، وإحنا نكلمك.</p>
+        <div id="shAct" class="sh-act">
+          <div class="qty">
+            <button type="button" id="shPlus" aria-label="زوّد واحدة">+</button>
+            <span id="shQty">1</span>
+            <button type="button" id="shMinus" aria-label="قلّل واحدة">−</button>
+          </div>
+          <button type="button" id="shAdd" class="add"></button>
+        </div>
+        <a id="shRxBtn" href="#cart" class="hero-btn" hidden>ابعت الروشتة</a>
+        <button type="button" id="shShare" class="share">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+          ابعت الصنف لحد
+        </button>
+        <p id="shNote" class="hint-sm center" role="status"></p>
+      </div>
+    </div>
+
     <nav class="tabbar" aria-label="القائمة">
       <a href="#" data-go="home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z" /></svg>الرئيسية</a>
       <a href="#search" data-go="search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>بحث</a>
@@ -146,6 +183,6 @@
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="store/store.js?v=store-20261111a"></script>
+    <script src="store/store.js?v=modern-20261112a"></script>
   </body>
 </html>

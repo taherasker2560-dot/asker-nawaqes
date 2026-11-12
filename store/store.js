@@ -137,7 +137,20 @@
     if (cat === 'cosmetic') return 'tube';
     return 'box';
   }
-  const api = { STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  // رابط صنف واحد (#item=رقم): بيفتح صفحة الصنف على طول (زرار «ابعت الصنف لحد»)
+  function itemIdFromHash(h) {
+    const m = /^#?item=(\d{1,9})$/.exec(String(h || ''));
+    return m ? Number(m[1]) : null;
+  }
+  function itemLink(base, id) {
+    return String(base || '').replace(/#.*$/, '') + '#item=' + Number(id);
+  }
+  function shareText(it, link) {
+    const nm = it.arabic_name || it.name;
+    const pr = it.status === 'available' && Number(it.price) > 0 ? ` بـ ${money(it.price)} جنيه` : '';
+    return `${nm}${pr} من صيدلية عسكر، اطلبه من هنا: ${link}`;
+  }
+  const api = { itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -175,10 +188,18 @@
     can: '<ellipse cx="12" cy="5" rx="7" ry="2"/><path d="M5 5v14c0 1.1 3.1 2 7 2s7-.9 7-2V5"/>',
     box: '<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/>',
   };
+  // أيقونات الأقسام في الرئيسية (بدل الحرف)
+  const SEC_ICONS = {
+    meds: '<rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-35 12 12)"/><path d="M9.5 8.3l5 7.4" />',
+    vit: '<path d="M5 19c0-8 6-14 14-14 0 8-6 14-14 14z"/><path d="M5 19l7-7"/>',
+    care: '<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>',
+    baby: '<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M10.5 8h.01M13.5 8h.01"/>',
+    supplies: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M12 11v5M9.5 13.5h5"/>',
+  };
   function thumb(it) {
     const f = pics[it.id];
-    if (f) return `<div class="thumb"><img src="store/img/${esc(f)}" alt="" loading="lazy"></div>`;
-    return `<div class="thumb icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[shapeOf(it.name, it.cat)]}</svg></div>`;
+    if (f) return `<div class="thumb" data-open="${it.id}"><img src="store/img/${esc(f)}" alt="" loading="lazy"></div>`;
+    return `<div class="thumb icon" data-open="${it.id}" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[shapeOf(it.name, it.cat)]}</svg></div>`;
   }
   async function loadPics() {
     try {
@@ -201,6 +222,13 @@
     window.scrollTo(0, 0);
   }
   function route() {
+    const linked = itemIdFromHash(location.hash);
+    if (linked) {
+      if (document.querySelectorAll('[data-view]:not([hidden])').length !== 1) view('home');
+      openFromLink(linked);
+      return;
+    }
+    closeItem();
     const h = location.hash.replace('#', '');
     if (h === 'cart') view('cart');
     else if (h === 'orders') view('orders');
@@ -225,7 +253,7 @@
       <span class="hint-sm">اتأكد مع الصيدلي قبل ما تغيّر الدوا</span></div>` : '';
     return `<article class="item${altBox ? ' has-alts' : ''}">
       ${thumb(it)}
-      <div class="item-text">
+      <div class="item-text" data-open="${it.id}" role="button" tabindex="0" aria-label="تفاصيل ${esc(it.arabic_name || it.name)}">
         <h3 dir="ltr">${esc(it.name)}</h3>
         ${it.arabic_name ? `<p class="ar">${esc(it.arabic_name)}</p>` : ''}
         <span class="badge ${st.cls}">${st.label}</span>
@@ -295,7 +323,79 @@
     const { data, error } = await client.rpc('ar_store_alternatives', { p_ids: need });
     if (error || !Array.isArray(data)) return;
     for (const r of data) alts[r.id] = r.alts || [];
-    if (data.length) drawList(!$('more').hidden);
+    if (data.length) { drawList(!$('more').hidden); if (sheetItem) drawSheet(); }
+  }
+
+  // ---------- صفحة الصنف (sheet) ----------
+  let sheetItem = null, sheetQty = 1, sheetFromLink = false;
+  const known = () => shown.concat(popular, sheetItem ? [sheetItem] : [], ...Object.values(alts));
+  function openItem(it, fromLink) {
+    sheetItem = it; sheetQty = 1; sheetFromLink = !!fromLink;
+    $('shNote').textContent = '';
+    if (!canAdd(it) || it.status !== 'available') loadAlts([it.id]);
+    drawSheet();
+    $('sheet').hidden = false;
+    document.body.classList.add('sheet-open');
+    $('shAdd').focus({ preventScroll: true });
+  }
+  function closeItem() {
+    if ($('sheet').hidden) return;
+    $('sheet').hidden = true;
+    document.body.classList.remove('sheet-open');
+    sheetItem = null;
+    if (sheetFromLink && itemIdFromHash(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+  }
+  function drawSheet() {
+    const it = sheetItem;
+    if (!it) return;
+    const f = pics[it.id], st = STATUS[it.status] || STATUS.on_order;
+    $('shPic').className = 'sh-pic' + (f ? '' : ' icon');
+    $('shPic').innerHTML = f ? `<img src="store/img/${esc(f)}" alt="صورة ${esc(it.arabic_name || it.name)}">` : `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[shapeOf(it.name, it.cat)]}</svg>`;
+    $('shName').textContent = it.name;
+    $('shAr').textContent = it.arabic_name || '';
+    $('shAr').hidden = !it.arabic_name;
+    $('shPrice').className = 'price' + (onOrder(it) ? ' later' : '');
+    $('shPrice').textContent = onOrder(it) ? 'السعر يتأكد معاك يوم الطلب' : canAdd(it) ? money(it.price) + ' جنيه' : '';
+    $('shBadge').className = 'badge ' + st.cls;
+    $('shBadge').textContent = st.label;
+    const rx = !!it.needs_rx;
+    $('shRx').hidden = !rx; $('shRxBtn').hidden = !rx;
+    $('shAct').hidden = !canAdd(it);
+    const inCart = cart.find((x) => x.id === it.id);
+    $('shQty').textContent = sheetQty;
+    $('shMinus').disabled = sheetQty <= 1;
+    $('shAdd').textContent = (onOrder(it) ? 'اطلبه' : 'ضيف للسلة') + (inCart ? ` (في السلة ${inCart.qty})` : '');
+    const al = !canAdd(it) || it.status !== 'available' ? alts[it.id] || [] : [];
+    $('shAlts').innerHTML = al.length ? `<div class="alts"><span class="alts-h">بديل متوفر بنفس المادة الفعالة والتركيز:</span>
+      ${al.map((a) => `<div class="alt"><span dir="ltr">${esc(a.name)}</span><span class="alt-p">${money(a.price)} ج</span>
+        <button type="button" class="add sm" data-add="${a.id}">${cart.find((x) => x.id === a.id) ? 'في السلة +' : 'ضيف'}</button></div>`).join('')}
+      <span class="hint-sm">اتأكد مع الصيدلي قبل ما تغيّر الدوا</span></div>` : '';
+  }
+  function sheetAdd() {
+    const it = sheetItem;
+    if (!it || !canAdd(it)) return;
+    const had = cart.find((x) => x.id === it.id);
+    if (!had && cart.length >= MAX_LINES) { $('shNote').textContent = 'السلة فيها 30 صنف، ودي أقصى حاجة في الطلب الواحد'; return; }
+    cart = cartAdd(cart, it);
+    cart = cartSet(cart, it.id, (had ? had.qty : 0) + sheetQty);
+    saveCart(); drawList(!$('more').hidden);
+    sheetQty = 1; drawSheet();
+    $('shNote').innerHTML = 'اتضاف للسلة · <a href="#cart">افتح السلة</a>';
+  }
+  async function shareItem() {
+    const it = sheetItem;
+    if (!it) return;
+    const link = itemLink(location.href, it.id), text = shareText(it, link);
+    try {
+      if (navigator.share) { await navigator.share({ title: 'صيدلية عسكر', text }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  }
+  async function openFromLink(id) {
+    const it = known().find((x) => Number(x.id) === id);
+    if (it) { openItem(it, true); return; }
+    const { data, error } = await client.from('ar_store_items').select(COLS).eq('id', id).limit(1);
+    if (!error && data && data[0]) openItem(data[0], true);
   }
   function search(text) {
     const terms = searchTerms(text);
@@ -496,7 +596,15 @@
       if (it && canAdd(it)) {
         if (cart.length >= MAX_LINES && !cart.find((x) => x.id === it.id)) { $('resNote').textContent = 'السلة فيها 30 صنف، ودي أقصى حاجة في الطلب الواحد'; return; }
         cart = cartAdd(cart, it); saveCart(); drawList(!$('more').hidden);
+        if (sheetItem) drawSheet();
       }
+      return;
+    }
+    if (e.target.closest('[data-close]')) { closeItem(); return; }
+    const open = e.target.closest('[data-open]');
+    if (open) {
+      const it = known().find((x) => String(x.id) === open.dataset.open);
+      if (it) openItem(it);
       return;
     }
     const q = e.target.closest('[data-qty]');
@@ -516,8 +624,28 @@
   $('orderForm').addEventListener('submit', send);
   $('rxFile').addEventListener('change', () => { addRx([...($('rxFile').files || [])]); $('rxFile').value = ''; });
   window.addEventListener('hashchange', route);
+  $('shAdd').addEventListener('click', sheetAdd);
+  $('shPlus').addEventListener('click', () => { sheetQty = Math.min(MAX_QTY, sheetQty + 1); drawSheet(); });
+  $('shMinus').addEventListener('click', () => { sheetQty = Math.max(1, sheetQty - 1); drawSheet(); });
+  $('shShare').addEventListener('click', shareItem);
+  $('shRxBtn').addEventListener('click', closeItem);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeItem();
+    else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.item-text[data-open]')) { e.preventDefault(); e.target.click(); }
+  });
+  // «نزّل الصيدلية على موبايلك»: الزرار بيظهر بس لما المتصفح يقول إن التنزيل متاح (كروم على أندرويد)
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; $('installBox').hidden = false; });
+  window.addEventListener('appinstalled', () => { installEvt = null; $('installBox').hidden = true; });
+  $('installBtn').addEventListener('click', async () => {
+    if (!installEvt) return;
+    installEvt.prompt();
+    try { await installEvt.userChoice; } catch (e) { /* closed */ }
+    installEvt = null; $('installBox').hidden = true;
+  });
 
-  $('sections').innerHTML = SECTIONS.map((s) => `<a href="#search" data-section="${s.key}" class="sec"><span class="sec-mark">${s.mark}</span><span>${s.name}</span></a>`).join('');
+  $('sections').innerHTML = SECTIONS.map((s) => `<a href="#search" data-section="${s.key}" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true">${SEC_ICONS[s.key] || ''}</svg></span><span>${s.name}</span></a>`).join('')
+    + '<a href="#search" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span><span>كل الأصناف</span></a>';
   const me = store.get('asker_store_me', null);
   if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; $('cAddr').value = me.address || ''; }
   saveCart();
