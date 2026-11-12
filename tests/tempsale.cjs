@@ -49,4 +49,13 @@ assert.deepEqual(T.stripBox(1080,1920,3.5),{sx:0,sy:806,sw:1080,sh:309});
 assert.deepEqual(T.stripBox(1920,1080,3.5),{sx:0,sy:266,sw:1920,sh:549});
 assert.deepEqual(T.stripBox(4000,500,3.5),{sx:1125,sy:0,sw:1750,sh:500});
 assert.equal(T.stripBox(0,0,3.5),null);
+// the line's stock and expiry, as in PharmaFly's sale
+const L=[];T.addItem(L,{item_id:7,name:'X',price:100,parts:3,packs:2,units:1,exp_near:'2028-03-28'});
+assert.deepEqual([L[0].sp,L[0].su,L[0].exp],[2,1,'2028-03-28']);
+assert.equal(T.overStock(L[0]),false);L[0].q=3;assert.equal(T.overStock(L[0]),true,'3 boxes > 2 boxes + 1 unit');
+T.setUnit(L[0],'unit');L[0].q=7;assert.equal(T.overStock(L[0]),false,'7 units = 2×3 + 1');L[0].q=8;assert.equal(T.overStock(L[0]),true);
+const now=new Date(2026,10,13);
+assert.deepEqual(T.expInfo('2028-03-28',now),{text:'صلاحية 03/2028',soon:false,gone:false});
+assert.equal(T.expInfo('2027-01-28',now).soon,true,'within 3 months');assert.equal(T.expInfo('2026-11-28',now).gone,true);
+assert.equal(T.expInfo(null,now),null,'no expiry in PharmaFly: nothing shown');
 console.log('PASS: temp sale: sticker = 100000 + code, box/unit prices, the bill, the limit, the row, the list');

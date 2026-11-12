@@ -25,6 +25,12 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.click('#tsHits [data-ts-add="4875"]');
  await page.click('#tsHits [data-ts-add="4875"]');
  assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'2');
+ // the line shows the stock and the nearest expiry, as in PharmaFly; more than the stock = red
+ assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/رصيد 3 علب · صلاحية 07\/2028/);
+ assert.equal(await page.$('#tsCart .ts-line[data-i="0"] .ts-warn'),null);
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus]');
+ assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-warn'),/الكمية أكتر من الرصيد/);
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');
  // by code: the sticker's number works too (101060 = code 1060)
  await page.click('[data-ts-way="code"]');
  assert.equal(await page.getAttribute('#tsQ','inputmode'),'numeric');

@@ -35,9 +35,20 @@
     const same = lines.find((l) => l.c === c);
     if (same) { same.q += 1; return same; }
     const base = Number(it.price) || 0, k = Number(it.parts) > 1 ? Number(it.parts) : 1;
-    const line = { c, n: String(it.name || ''), ar: String(it.arabic_name || ''), q: 1, u: 'pack', k, base, p: priceOf(base, k, 'pack') };
+    const line = { c, n: String(it.name || ''), ar: String(it.arabic_name || ''), q: 1, u: 'pack', k, base, p: priceOf(base, k, 'pack'),
+      // the stock and the nearest expiry, shown on the line as in PharmaFly's sale (never sent to the server)
+      sp: Number(it.packs) || 0, su: Number(it.units) || 0, exp: it.exp_near || null, nostock: !!it.nostock };
     lines.push(line);
     return line;
+  }
+  // the line's quantity in units against the stock in units (a box = parts units)
+  const overStock = (l) => !l.nostock && (l.u === 'unit' ? l.q : l.q * l.k) > (l.sp * l.k + l.su) + 1e-9;
+  // «صلاحية 03/2028» (nothing for an item with no expiry in PharmaFly); soon = within 3 months from now
+  function expInfo(exp, now) {
+    const m = String(exp || '').match(/^(\d{4})-(\d{2})/);
+    if (!m) return null;
+    const n = now || new Date(), months = (+m[1] - n.getFullYear()) * 12 + (+m[2] - 1 - n.getMonth());
+    return { text: `صلاحية ${m[2]}/${m[1]}`, soon: months <= 3, gone: months <= 0 };
   }
   function setUnit(line, unit) {
     line.u = unit === 'unit' && line.k > 1 ? 'unit' : 'pack';
@@ -98,7 +109,7 @@
     const sh = Math.round(vw / a);
     return { sx: 0, sy: Math.round((vh - sh) / 2), sw: vw, sh };
   }
-  const api = { stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
+  const api = { overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -132,12 +143,12 @@
       const rows = root.AskerStock ? await root.AskerStock.ensure() : [];
       if (rows && rows.length) {
         useItems(rows);
-        keep(IKEY, rows.map((r) => [r.item_id, r.name, r.arabic_name || '', r.price, r.parts, r.packs, r.units]));
+        keep(IKEY, rows.map((r) => [r.item_id, r.name, r.arabic_name || '', r.price, r.parts, r.packs, r.units, r.exp_near || null]));
         return;
       }
     } catch (e) {}
     const saved = load(IKEY, []);
-    useItems(saved.map((a) => ({ item_id: a[0], name: a[1], arabic_name: a[2], price: a[3], parts: a[4], packs: a[5], units: a[6] })));
+    useItems(saved.map((a) => ({ item_id: a[0], name: a[1], arabic_name: a[2], price: a[3], parts: a[4], packs: a[5], units: a[6], exp_near: a[7] || null })));
   }
   async function loadCustomers() {
     try {
@@ -239,7 +250,28 @@
       cams = back.length ? [...back, ...all.filter((d) => !back.includes(d))] : all;
     } catch (e) { cams = []; }
   }
+  // the usual scanner beep on a sticker read (a low buzz when the reading is not a sticker); started on the tap itself so
+  // the phone allows the sound (owner 2026-11-13: «تطلع صوت زي اصوات الباركود المعتاده»)
+  let actx = null;
+  function unlockBeep() {
+    try { actx = actx || new (root.AudioContext || root.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) { actx = null; }
+  }
+  function beep(ok) {
+    try {
+      if (!actx) return;
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime, len = ok ? 0.12 : 0.28;
+      o.type = 'square';
+      o.frequency.value = ok ? 2700 : 380;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.01);
+      g.gain.setValueAtTime(0.12, t + len - 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + len + 0.01);
+    } catch (e) {}
+  }
   async function startScan(deviceId) {
+    unlockBeep();
     $('tsScanBox').classList.remove('hidden');
     if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       $('tsScanBox').classList.add('hidden');
@@ -315,7 +347,8 @@
     const shown = raw + (format ? ` (${format})` : '');
     keep('asker-ts-raw', [shown, ...load('asker-ts-raw', []).filter((x) => x !== shown)].slice(0, 20));
     const code = stickerCode(raw, true), it = code ? await itemByCode(code) : null;
-    if (!it) return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad');
+    if (!it) { beep(false); return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad'); }
+    beep(true);
     add(it);
     // this camera reads the stickers: kept on this phone, the switch hides
     if (stream && camNow()) keep(CAMKEY, camNow());
@@ -334,6 +367,15 @@
   }
 
   // ---------- the bill ----------
+  // under the item's name, as in PharmaFly's sale: its stock and nearest expiry; red when the bill asks more than the stock
+  function lineInfo(l) {
+    const stock = l.nostock ? 'مفيش' : root.AskerStockLib ? root.AskerStockLib.qtyText(l.sp, l.su, l.k) : '';
+    const e = expInfo(l.exp);
+    const bits = [`<span>رصيد ${esc(stock)}</span>`];
+    if (e) bits.push(`<span class="${e.soon ? 'ts-soon' : ''}">${esc(e.text)}</span>`);
+    const short = kind !== 'return' && (overStock(l) || l.nostock);
+    return `<div class="ts-info">${bits.join(' · ')}${short ? '<div class="ts-warn">⚠️ الكمية أكتر من الرصيد</div>' : ''}</div>`;
+  }
   function drawCart() {
     const box = $('tsCart');
     if (!box) return;
@@ -342,6 +384,7 @@
     } else {
       box.innerHTML = cart.map((l, i) => `<div class="ts-line" data-i="${i}">
         <div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>
+        ${lineInfo(l)}
         <div class="ts-l2">
           <span class="ts-code">كود ${esc(l.c)}</span>
           <span class="ts-qty"><button type="button" data-ts-minus aria-label="أقل">−</button><b>${esc(l.q)}</b><button type="button" data-ts-plus aria-label="أكتر">+</button></span>
@@ -403,7 +446,7 @@
     document.querySelectorAll('[data-ts-type]').forEach((b) => b.classList.toggle('on', b.dataset.tsType === kind));
     $('tsNew').classList.toggle('ts-return', kind === 'return');
     $('tsSave').textContent = kind === 'return' ? 'احفظ المرتجع' : 'احفظ البيعة';
-    drawCust();
+    drawCart();
   }
   // sends what is kept on the phone; returns how many are still waiting
   async function flush() {
