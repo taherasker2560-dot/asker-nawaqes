@@ -38,7 +38,16 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-pgroup="orders"]');for(const t of ['drafts','docs','suppliers']){await go(`[data-tab="${t}"]`);await page.waitForTimeout(400);await scan(t)}
  await go('[data-pgroup="stock"]');await go('[data-tab="stock"]');await page.fill('#stQ','BR');await page.waitForTimeout(300);await go('[data-tab="count"]');await scan('stock');
  await go('[data-tab="expiry"]');await page.waitForTimeout(400);for(const v of ['today','expired','soon']){await go(`[data-al-view="${v}"]`);await scan('expiry/'+v)}
- await go('[data-group="accounts"]');await go('[data-tab="vendors"]');await scan('accounts');
+ // the customers' accounts and a statement (2026-11-12), made-up customers; names and item names stay as they are
+ await page.evaluate(()=>{const d=new Date(),p=n=>String(n).padStart(2,'0'),at=(x,h)=>`${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}T${p(h)}:05:00`,old=new Date(Date.now()-40*864e5);
+  window.__tables.ar_customers=[{id:5,name:'عميل تجربة',credit_limit:1000,balance:5400.25,last_at:at(d,11),last_kind:'sale'},{id:6,name:'NEAR',credit_limit:10000,balance:9500,last_at:at(old,10),last_kind:'payment'},{id:7,name:'CREDIT',credit_limit:0,balance:-300,last_at:null,last_kind:null},{id:8,name:'ZERO',credit_limit:10000,balance:0.2,last_at:at(old,9),last_kind:'refund'}];
+  window.__tables.ar_customer_moves=[{id:11,customer_id:5,at:at(d,9),kind:'sale',total:120.5,paid:50,balance:5450.25,items:[{n:'PANADOL',p:1,u:2,k:3,s:60,d:0},{n:'لزق جروح',p:5,u:0,k:1,s:0.5,d:0},{n:'C',p:1,u:0,k:1,s:1,d:0}]},{id:12,customer_id:5,at:at(d,10),kind:'return',total:-50,paid:0,balance:5400.25,items:[{n:'X',p:1,u:0,k:1,s:50,d:0}]},{id:13,customer_id:5,at:at(old,10),kind:'payment',total:0,paid:500,balance:5379.75,items:null},{id:-14,customer_id:5,at:at(old,9),kind:'refund',total:0,paid:-20,balance:5879.75,items:null}]});
+ await go('[data-group="accounts"]');await page.waitForTimeout(400);for(const v of ['over','owing','prepaid','all'])await go(`#cuChips [data-cu-view="${v}"]`);await scan('customers');
+ await page.fill('#cuQ','zzz');await page.waitForTimeout(200);await scan('customers/search');await go('#cuClear');
+ await go('#cuRows [data-cu="5"]');await page.waitForTimeout(400);await go('[data-cu-items="11"]');await scan('statement');
+ for(const f of ['payments','sales'])await go(`[data-cu-filter="${f}"]`);await scan('statement/filters');await go('[data-cu-back]');await page.waitForTimeout(300);
+ await go('#cuRows [data-cu="7"]');await page.waitForTimeout(400);await scan('statement/empty');await go('[data-cu-back]');await page.waitForTimeout(300);
+ await go('[data-tab="vendors"]');await scan('accounts');
  await go('[data-group="sales"]');await page.waitForTimeout(400);await go('[data-tab="sales"]');await go('[data-tab="tempsale"]');await scan('sales');
  await go('[data-group="care"]');await scan('care');
  await go('#settingsBtn');await scan('settings');await go('#settingsClose');

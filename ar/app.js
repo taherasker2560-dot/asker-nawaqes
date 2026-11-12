@@ -240,6 +240,8 @@
     // «الصلاحيات» and the customers' limits come from the laptop's alerts file (ar/alerts.js, owner 2026-11-12)
     $('expiryPanel')?.classList.toggle('hidden', tab !== 'expiry');
     if (tab === 'expiry' || tab === 'customers') window.AskerAlerts?.open();
+    // the customers' accounts and statements (ar/customers.js, owner 2026-11-12)
+    if (tab === 'customers') window.AskerCustomers?.open();
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
     $('carePanel')?.classList.toggle('hidden', tab !== 'care');
     $('shortPanel').classList.toggle('hidden', tab !== 'short');

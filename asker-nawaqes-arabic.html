@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=alerts-20261112a" />
+    <link rel="stylesheet" href="ar/look.css?v=customers-20261112a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=alerts-20261112a"></script>
+    <script src="ar/i18n-en.js?v=customers-20261112a"></script>
     <script src="ar/i18n.js?v=lang-20261112a"></script>
   </head>
   <body>
@@ -178,11 +178,6 @@
             <button type="button" class="kpi" data-go="drafts"><strong id="kOrdered">—</strong><span>اتطلب النهارده</span></button>
             <div class="kpi"><strong id="kAge">—</strong><small id="kAgo">آخر داتا</small></div>
           </div>
-          <!-- what needs work now (ar/notify.js + ar/alerts.js); hidden when nothing does -->
-          <div id="todoCard" class="todo hidden">
-            <h3 class="qa-h">محتاج شغل</h3>
-            <div id="todoList"></div>
-          </div>
           <h3 class="qa-h">ادخل على طول</h3>
           <div class="qa">
             <button type="button" data-go="short"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>النواقص</button>
@@ -191,6 +186,11 @@
             <button type="button" data-go="docs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>الفواتير</button>
             <button type="button" data-go="suppliers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12M7 21v-7h10v7M7 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>قوايم المخازن</button>
             <button type="button" data-go="stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>المخزون</button>
+          </div>
+          <!-- what needs work now (ar/notify.js + ar/alerts.js); hidden when nothing does. Under «ادخل على طول» (owner 2026-11-12) -->
+          <div id="todoCard" class="todo hidden">
+            <h3 class="qa-h">محتاج شغل</h3>
+            <div id="todoList"></div>
           </div>
           <details class="home-help">
             <summary>البحث اللي فوق بيدوّر في إيه؟</summary>
@@ -491,11 +491,27 @@
         </section>
 
         <!-- new parts, designed with the owner one question at a time before they get data -->
-        <!-- customers above their credit limit (owner 2026-11-12, ar/alerts.js); the statement and the rest come later -->
+        <!-- customers' accounts (owner 2026-11-12, ar/customers.js): the numbers are buttons, a search, every customer, and a tap
+             on a name opens the statement. Until the tables have data: the customers above their limit from ar/alerts.js -->
         <section id="customersPanel" class="card hidden">
-          <h2>العملاء</h2>
-          <p id="alCustAge" class="status"></p>
-          <div id="alCustomers"></div>
+          <div id="cuListView">
+            <h2>العملاء</h2>
+            <p id="alCustAge" class="status"></p>
+            <div id="cuBox" class="hidden">
+              <div id="cuStats" class="grid cu-stats"></div>
+              <div class="search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <input id="cuQ" type="search" autocomplete="off" aria-label="دوّر في العملاء" placeholder="دوّر باسم العميل أو الكود…" />
+                <button id="cuClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+              </div>
+              <div id="cuChips" class="chips" role="group" aria-label="العملاء"></div>
+              <p id="cuCount" class="sr-count"></p>
+              <div id="cuRows"></div>
+              <p class="hint">الرصيد = آخر حركة للعميل في فارمافلاي (بيع أو دفع)، والحد من كارت العميل. أقل من نص جنيه محسوب خالص. بيتحدّث كل ساعة.</p>
+            </div>
+            <div id="alCustomers"></div>
+          </div>
+          <div id="cuSt" class="hidden"></div>
         </section>
         <section id="vendorsPanel" class="card hidden">
           <h2>الموردين</h2>
@@ -603,7 +619,7 @@
     <script src="ar/settings.js?v=look-20261112a"></script>
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
-    <script src="ar/app.js?v=alerts-20261112a"></script>
+    <script src="ar/app.js?v=customers-20261112a"></script>
     <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>
@@ -616,6 +632,7 @@
     <script src="ar/look.js?v=alerts-20261112a"></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=alerts-20261112a"></script>
+    <script src="ar/customers.js?v=customers-20261112a"></script>
     <script src="ar/notify.js?v=alerts-20261112a"></script>
   </body>
 </html>
