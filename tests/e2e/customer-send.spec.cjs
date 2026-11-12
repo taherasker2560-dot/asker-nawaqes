@@ -33,7 +33,7 @@ run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is
  await page.click('[data-cu-phone-edit]');
  await page.click('[data-cu-pick]');
  await page.waitForSelector('[data-cu-tel]');
- assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0101 111 2222','+20222334455','ضيفهم كلهم']);
+ assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0101 111 2222 جار الصيدلية','+20222334455 جار الصيدلية','ضيفهم كلهم']);
  await page.click('[data-cu-tel="0"]');
  // several numbers a customer (owner: «رقم و2 و3»): the new one is added next to the first
  await page.waitForFunction(()=>document.querySelectorAll('#cuSt .cu-phone [data-cu-phone-del]').length===2);
@@ -45,6 +45,16 @@ run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is
  await page.click('[data-cu-tel="all"]');
  await page.waitForFunction(()=>/اتحفظ 2 رقم/.test(document.getElementById('cuSt').textContent));
  assert.deepEqual((await table('ar_customer_phones')).map(r=>r.phone),['201012345678','201011112222','20222334455']);
+ // two names ticked in the list: the numbers of both, each with its own name
+ await page.evaluate(()=>{Object.defineProperty(navigator,'contacts',{value:{select:async(props,opts)=>{window.__pickOpts=opts;return [{name:['الأب'],tel:['01022223333']},{name:['الابن'],tel:['01044445555','0102 222 3333']}]}},configurable:true})});
+ await page.click('[data-cu-phone-edit]');await page.click('[data-cu-pick]');await page.waitForSelector('[data-cu-tel="all"]');
+ assert.deepEqual(await page.evaluate(()=>window.__pickOpts),{multiple:true},'the tick-box list');
+ assert.deepEqual(await page.$$eval('[data-cu-tel]',b=>b.map(x=>x.textContent)),['0102 222 3333 الأب','0104 444 5555 الابن','ضيفهم كلهم']);
+ await page.click('[data-cu-tel="1"]');
+ await page.waitForFunction(()=>window.__tables.ar_customer_phones.some(r=>r.phone==='201044445555'));
+ assert.equal((await table('ar_customer_phones')).find(r=>r.phone==='201044445555').contact_name,'الابن');
+ page.once('dialog',d=>d.accept());await page.click('[data-cu-phone-del="201044445555"]');
+ await page.waitForFunction(()=>!window.__tables.ar_customer_phones.some(r=>r.phone==='201044445555'));
  // remove one (asks first)
  page.once('dialog',d=>{assert.match(d.message(),/تشيل الرقم ده من العميل؟ \+20222334455/);d.accept()});
  await page.click('[data-cu-phone-del="20222334455"]');

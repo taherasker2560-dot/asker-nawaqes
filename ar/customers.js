@@ -342,9 +342,10 @@
         (list.length < MAX_NUMBERS ? '<button type="button" class="linklike cu-add" data-cu-phone-edit>+ ضيف رقم تاني</button>' : '') +
         (st.send ? '' : '<button type="button" class="cu-send" data-cu-send>ابعت كشف الحساب على الواتس</button>') + note;
     }
+    // the numbers that came from the contacts list ({ p, name }), when more than one
     const tels = st.tels && st.tels.length > 1
-      ? '<p class="hint">الاسم ده عليه أكتر من رقم، اختار اللي هتضيفه:</p><div class="cu-tels">' +
-        st.tels.map((t, i) => `<button type="button" class="secondary small" data-cu-tel="${i}" dir="ltr">${esc(showPhone(t))}</button>`).join('') +
+      ? '<p class="hint">جه أكتر من رقم، اختار اللي هتضيفه:</p><div class="cu-tels">' +
+        st.tels.map((t, i) => `<button type="button" class="secondary small" data-cu-tel="${i}"><b dir="ltr">${esc(showPhone(t.p))}</b>${t.name ? ` <small class="notr">${esc(t.name)}</small>` : ''}</button>`).join('') +
         '<button type="button" class="small" data-cu-tel="all">ضيفهم كلهم</button></div>'
       : '';
     return rows + `<div class="cu-phone"><span>${list.length ? '📱 رقم واتس جديد' : '📱 مالوش رقم واتس'}</span>` +
@@ -371,11 +372,11 @@
     }
     return true;
   }
-  async function saveAll(tels, name) {
+  async function saveAll(tels) {
     const me = st;
     let n = 0;
     me.phoneBad = false;
-    for (const t of tels) { if (await savePhone(t, name, true)) n++; if (st !== me) return; if (me.phoneBad) break; }
+    for (const t of tels) { if (await savePhone(t.p, t.name, true)) n++; if (st !== me) return; if (me.phoneBad) break; }
     if (!me.phoneBad) Object.assign(me, { phoneEdit: false, tels: null, phoneDraft: '', phoneMsg: `اتحفظ ${n} رقم.`, phoneBad: false });
     if (st === me) drawStatement();
   }
@@ -403,11 +404,12 @@
   async function pickContact() {
     const me = st;
     rememberPick(me.c.id);
-    Object.assign(me, { phoneMsg: 'اختار الاسم من القايمة ودوس «تم»…', phoneBad: false, tels: null });
+    Object.assign(me, { phoneMsg: 'علّم على الاسم (أو أكتر) ودوس «تم»…', phoneBad: false, tels: null });
     drawStatement();
     let got;
     try {
-      got = await navigator.contacts.select(['name', 'tel'], { multiple: false });
+      // the tick-box list (2026-11-12: on the owner's Chrome 156 the one-name list came back empty after «تم»)
+      got = await navigator.contacts.select(['name', 'tel'], { multiple: true });
     } catch (e) {
       forgetPick();
       Object.assign(me, { phoneMsg: 'مقدرتش أفتح أسامي الموبايل: ' + errText(e) + '. انسخ الرقم ودوس «الصق الرقم».', phoneBad: true });
@@ -415,15 +417,24 @@
       return;
     }
     forgetPick();
-    const c = got && got[0];
-    if (!c) {
-      Object.assign(me, { phoneMsg: 'ماوصلش أي اسم من القايمة. علّم على الاسم ودوس «تم»، أو انسخ الرقم ودوس «الصق الرقم».', phoneBad: true });
+    const people = Array.isArray(got) ? got : [];
+    if (!people.length) {
+      Object.assign(me, { phoneMsg: 'ماوصلش أي اسم من القايمة. علّم على المربع اللي جنب الاسم ودوس «تم»، أو انسخ الرقم ودوس «الصق الرقم».', phoneBad: true });
       if (st === me) drawStatement();
       return;
     }
-    const name = (c.name && c.name[0]) || '';
-    const raw = (c.tel || []).filter((t) => String(t || '').trim());
-    const tels = [...new Set(raw.map(intlPhone).filter(Boolean))];
+    // every number of every ticked name, once
+    const seen = new Set(), tels = [];
+    const raw = [];
+    for (const c of people) {
+      const name = (c && c.name && c.name[0]) || '';
+      for (const t of (c && c.tel) || []) {
+        if (!String(t || '').trim()) continue;
+        raw.push(t);
+        const p = intlPhone(t);
+        if (p && !seen.has(p)) { seen.add(p); tels.push({ p, name }); }
+      }
+    }
     if (!tels.length) {
       me.phoneMsg = raw.length
         ? `الرقم اللي وصل (${raw[0]}) مش رقم ينفع للواتس. انسخ الرقم الصح ودوس «الصق الرقم».`
@@ -432,8 +443,7 @@
       if (st === me) drawStatement();
       return;
     }
-    me.pickName = name;
-    if (tels.length === 1) { await savePhone(tels[0], name); return; }
+    if (tels.length === 1) { await savePhone(tels[0].p, tels[0].name); return; }
     me.tels = tels; me.phoneMsg = ''; if (st === me) drawStatement();
   }
   // the number copied on the phone (from the contacts app or a WhatsApp chat): one tap
@@ -625,7 +635,7 @@
       if (e.target.closest('[data-cu-pick]')) { keepDraft(); pickContact(); return; }
       if (e.target.closest('[data-cu-paste]')) { keepDraft(); pastePhone(); return; }
       const tel = e.target.closest('[data-cu-tel]');
-      if (tel && st.tels) { if (tel.dataset.cuTel === 'all') saveAll(st.tels, st.pickName); else savePhone(st.tels[+tel.dataset.cuTel], st.pickName); return; }
+      if (tel && st.tels) { if (tel.dataset.cuTel === 'all') saveAll(st.tels); else { const t = st.tels[+tel.dataset.cuTel]; if (t) savePhone(t.p, t.name); } return; }
       if (e.target.closest('[data-cu-phone-save]')) { keepDraft(); savePhone(st.phoneDraft, ''); return; }
       const del = e.target.closest('[data-cu-phone-del]');
       if (del) { deletePhone(del.dataset.cuPhoneDel); return; }
