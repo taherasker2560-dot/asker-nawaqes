@@ -14,6 +14,7 @@ assert.equal(S.activityText({tbl:'ar_temp_sales',op:'insert',info:{kind:'return'
 assert.equal(S.activityText({tbl:'ar_orders',op:'insert',info:{name:'ITEM'}}),'علّم «اتطلب» على «ITEM»');
 assert.equal(S.activityText({tbl:'ar_shortages',op:'delete',info:{name:'ITEM'}}),'شال من النواقص «ITEM»');
 assert.equal(S.activityText({tbl:'ar_documents',op:'update',info:{status:'entered'}}),'عدّل في الفواتير (entered)');
+assert.equal(S.activityText({tbl:'ar_count_entries',op:'insert',info:{name:'ITEM',result:'diff'}}),'جرد «ITEM» (فيه فرق)');
 // the message: his name, the link, «ثبّت», keep it to yourself
 const m=S.waMessage('موظف تجربة','https://x/#staff=abc');
 assert.match(m,/أهلاً موظف تجربة/);assert.match(m,/https:\/\/x\/#staff=abc/);assert.match(m,/ثبّت/);assert.match(m,/ليك انت بس/);

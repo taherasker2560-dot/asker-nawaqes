@@ -244,6 +244,8 @@
     window.AskerHome?.close?.(); // choosing a section leaves the search on top
     $('homePanel')?.classList.toggle('hidden', tab !== 'home');
     $('countPanel')?.classList.toggle('hidden', tab !== 'count');
+    // «جرد المخزون» (ar/count.js, owner 2026-11-13); leaving it turns its camera off
+    if (tab === 'count') window.AskerCount?.open(); else window.AskerCount?.close();
     // «الصلاحيات» and the customers' limits come from the laptop's alerts file (ar/alerts.js, owner 2026-11-12)
     $('expiryPanel')?.classList.toggle('hidden', tab !== 'expiry');
     if (tab === 'expiry' || tab === 'customers') window.AskerAlerts?.open();

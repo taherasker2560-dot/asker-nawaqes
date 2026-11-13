@@ -42,6 +42,7 @@
       const detail = [i.no ? '#' + i.no : '', i.n ? `${i.n} صنف` : '', i.total != null ? `${i.total} ج` : ''].filter(Boolean).join(' · ');
       return (a.op === 'insert' ? `سجّل ${what}` : a.op === 'update' ? `بعت ${what} تاني` : `مسح ${what}`) + (detail ? ` (${detail})` : '');
     }
+    if (a.tbl === 'ar_count_entries') return (a.op === 'insert' ? 'جرد' : 'عدّل جرد') + (name || ' صنف') + (i.result === 'ok' ? ' (مظبوط)' : i.result === 'diff' ? ' (فيه فرق)' : '');
     if (a.tbl === 'ar_orders') return (a.op === 'delete' ? 'شال علامة «اتطلب» من' : 'علّم «اتطلب» على') + (name || ' صنف');
     if (a.tbl === 'ar_shortages') return (a.op === 'insert' ? 'ضاف للنواقص' : a.op === 'delete' ? 'شال من النواقص' : 'عدّل في النواقص') + name;
     return `${OP[a.op] || a.op} ${TBL[a.tbl] || a.tbl}${name}${i.status ? ` (${i.status})` : ''}`;
@@ -340,5 +341,5 @@
   }
   bind();
   linkLogin();
-  root.AskerStaff = { check, isStaff, can, fixTab: (t) => (isStaff() ? fixTab(t, me.active ? me.perms : []) : t), nameOf: (id) => (staffList.find((s) => s.user_id === id) || {}).name || '', reload: loadAdmin };
+  root.AskerStaff = { check, isStaff, can, myId: () => (me && !me.preview ? me.user_id : null), fixTab: (t) => (isStaff() ? fixTab(t, me.active ? me.perms : []) : t), nameOf: (id) => (staffList.find((s) => s.user_id === id) || {}).name || '', reload: loadAdmin };
 })(typeof window === 'undefined' ? globalThis : window);
