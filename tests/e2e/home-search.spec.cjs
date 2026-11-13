@@ -78,6 +78,25 @@ run('search on top: الكل / المخزون / القوايم / النواقص'
  await page.click('[data-scope="all"]');await find('CONCOR',/كونكور/);
  assert.equal(await page.$eval('#hsScope [aria-checked="true"]',b=>b.dataset.scope),'all');
 },{home:true});
+// owner 2026-11-13 «قوايم المخازن بتغيب على ما تحمّل»: the lists start loading by themselves when the bot opens, are kept
+// on the phone (IndexedDB), and the next opening answers from the kept copy at once, even with the server slow or down
+run('search on top: the lists kept on the phone, ready before the first search',async({page})=>{
+ await seed(page);await page.reload();await ready(page);
+ await page.waitForFunction(()=>window.__reads.some(r=>r.table==='ar_supplier_items'),null,{timeout:15000});
+ await page.waitForFunction(()=>window.AskerCache.get('sp-lines-v1').then(c=>!!(c&&c.rows&&c.rows.length===4)),null,{timeout:15000});
+ await page.waitForFunction(()=>window.AskerCache.get('hs-catalog-v1').then(c=>!!(c&&c.rows&&c.rows.length===3)),null,{timeout:15000});
+ assert.equal(await page.$eval('#hsQ',e=>e.value),'','no search was typed');
+ // the next opening, the lists' server down: the kept copy answers
+ await page.evaluate(()=>localStorage.setItem('__fakeFail','ar_supplier_items'));
+ await page.reload();await ready(page);
+ await page.fill('#hsQ','FLAGYL');
+ await page.waitForFunction(()=>/في القوايم: AMG 22%/.test(document.getElementById('hsItems').textContent));
+ assert.doesNotMatch(await page.textContent('#hsStatus'),/ماتحمّلتش/);
+ // «خروج» takes the kept copy away
+ await page.evaluate(()=>localStorage.removeItem('__fakeFail'));
+ await page.evaluate(()=>window.AskerCache.clear());
+ assert.equal(await page.evaluate(()=>window.AskerCache.get('sp-lines-v1')),null);
+},{home:true});
 run('search on top: ✏️ fixes the Arabic name everywhere',async({page})=>{
  await seed(page);await page.reload();await ready(page);
  await page.fill('#hsQ','CONCOR');

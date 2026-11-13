@@ -159,16 +159,30 @@
     }
     return out;
   }
+  // every item of the system and the last purchases: the copy kept on this phone (ar/cache.js) at once, read again in
+  // the background when it is older than 30 minutes (owner 2026-11-13 «بتغيب على ما تحمّل»)
+  const FRESH_MS = 30 * 60 * 1000;
+  const cache = () => root.AskerCache;
+  async function keptOrRead(key, read, onFresh) {
+    const copy = cache() ? await cache().get(key) : null;
+    const reread = () => read().then((rows) => { cache() && cache().set(key, { at: Date.now(), rows }); return rows; });
+    if (copy && Array.isArray(copy.rows) && copy.rows.length) {
+      if (!(Date.now() - (copy.at || 0) < FRESH_MS)) reread().then(onFresh, () => {});
+      return copy.rows;
+    }
+    return reread();
+  }
+  function keepCatalog() { if (catalog && cache()) cache().set('hs-catalog-v1', { at: Date.now(), rows: catalog }); }
   function loadCatalog() {
     if (catalog || catLoading || !db()) return;
-    catLoading = readCatalog()
+    catLoading = keptOrRead('hs-catalog-v1', readCatalog, (all) => { catalog = all; draw(); })
       .then((all) => { catalog = all; catFail = ''; })
       .catch((e) => { catFail = 'أصناف السيستم ماتحمّلتش: ' + ((e && e.message) || e); })
       .finally(() => { catLoading = null; draw(); });
   }
   function loadBuys() {
     if (buys || buysLoading || !db()) return;
-    buysLoading = readAll('ar_item_buys', 'item_id,supplier,last_date,discount_pct,bonus', 'item_id,supplier')
+    buysLoading = keptOrRead('hs-buys-v1', () => readAll('ar_item_buys', 'item_id,supplier,last_date,discount_pct,bonus', 'item_id,supplier'), (all) => { buys = all; draw(); })
       .then((all) => { buys = all; })
       .catch(() => { buys = []; }) // not there yet (before its migration) or not readable: the cards just have no «آخر شرا»
       .finally(() => { buysLoading = null; draw(); });
@@ -179,6 +193,16 @@
       .then((all) => { lines = all; linesFail = ''; })
       .catch((e) => { linesFail = 'قوايم المخازن ماتحمّلتش: ' + ((e && e.message) || e); })
       .finally(() => { linesLoading = null; draw(); });
+  }
+  // the lists newer than the kept copy arrived in the background (ar/suppliers.js)
+  root.addEventListener && root.addEventListener('asker-lines', (e) => { if (Array.isArray(e.detail)) { lines = e.detail; draw(); } });
+  // ready before the first search: start reading (the kept copies, then the server) a moment after the bot opens
+  let preloaded = false;
+  function preload() {
+    if (preloaded || !db() || !$('app') || $('app').classList.contains('hidden')) return;
+    if (root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff() && !(root.AskerStaff.can && root.AskerStaff.can('search'))) return;
+    preloaded = true;
+    loadCatalog(); loadLines(); loadBuys(); askStock();
   }
   let stockAsked = false;
   function askStock() {
@@ -289,7 +313,7 @@
     it.ar = shownName;
     it._h = [fz().fold(it.ar), fz().fold(it.en)];
     const c = catalog && catalog.find((r) => String(r.id) === String(it.id));
-    if (c) c.arabic_name = shownName;
+    if (c) { c.arabic_name = shownName; keepCatalog(); } // the kept copy shows the fixed name next time too
     if (it.stock) it.stock.arabic_name = shownName;
     msg.textContent = '';
     return shownName;
@@ -297,6 +321,9 @@
   function bind() {
     const box = $('hsQ');
     if (!box) return;
+    // a moment after the bot opens (signed in), the search's lists start loading by themselves
+    let tries = 0;
+    const warm = setInterval(() => { tries++; setTimeout(preload, 0); if (preloaded || tries > 60) clearInterval(warm); }, 2000);
     box.addEventListener('input', () => { editing = null; clearTimeout(timer); timer = setTimeout(draw, 220); });
     $('hsClear')?.addEventListener('click', () => { box.value = ''; editing = null; draw(); box.focus(); });
     $('hsScope')?.addEventListener('click', (e) => {

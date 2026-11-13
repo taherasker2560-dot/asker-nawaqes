@@ -328,31 +328,74 @@
   const fz = () => root.AskerFuzzy;
   const sure = (r) => !!r.item_id && (r.review === 'accepted' || (r.review === 'pending' && (r.match_status === 'strong' || r.match_status === 'good')));
   const prep = (r) => { r._h = [fz().fold(r.supplier_name), [sure(r) ? fz().fold(r.pharmafly_name) : '', 1]]; return r; };
-  function forget() { allGen++; allLines = allById = null; } // after a new list or «اقبل القوي»: read again at the next search
+  // the copy kept on this phone (ar/cache.js, owner 2026-11-13 «قوايم المخازن بتغيب على ما تحمّل»): the search uses it at
+  // once; in the background the server's signature (how many lines, the newest line, the newest review) is checked and
+  // the lines read again only when it changed
+  const CACHE_KEY = 'sp-lines-v1';
+  const kept = () => root.AskerCache;
+  function forget() { allGen++; allLines = allById = null; kept() && kept().del(CACHE_KEY); } // after a new list or «اقبل القوي»: read again at the next search
   function patchKept(id, fields) { const r = allById && allById.get(id); if (r) prep(Object.assign(r, fields)); }
+  async function readLines() {
+    const page = (a, z, opts) => db().from('ar_supplier_items').select(LINE_COLS, opts).order('id', { ascending: true }).range(a, z);
+    const first = await page(0, 999, { count: 'exact' });
+    if (first.error) throw first.error;
+    const out = [...(first.data || [])];
+    const size = out.length, total = first.count == null ? null : first.count; // the server may give less than 1000 a page
+    if (size && (total == null ? size === 1000 : total > size)) {
+      for (let from = size; total == null || from < total; from += size * 4) {
+        const parts = await Promise.all([0, 1, 2, 3].map((k) => page(from + k * size, from + (k + 1) * size - 1)));
+        let short = false;
+        for (const p of parts) { if (p.error) throw p.error; out.push(...(p.data || [])); if ((p.data || []).length < size) short = true; }
+        if (short) break;
+      }
+    }
+    return out;
+  }
+  async function signature() {
+    const t = () => db().from('ar_supplier_items');
+    const [c, last, rev] = await Promise.all([
+      t().select('id', { count: 'exact', head: true }),
+      t().select('id').order('id', { ascending: false }).limit(1),
+      t().select('reviewed_at').order('reviewed_at', { ascending: false, nullsFirst: false }).limit(1),
+    ]);
+    if (c.error || last.error || rev.error) throw c.error || last.error || rev.error;
+    return [c.count == null ? (c.data || []).length : c.count, ((last.data || [])[0] || {}).id || 0, ((rev.data || [])[0] || {}).reviewed_at || ''].join('|');
+  }
+  const plain = (rows) => rows.map((r) => { const o = {}; for (const k of LINE_COLS.split(',')) o[k] = r[k]; return o; });
+  function use(out, gen) {
+    out.sort((a, b) => (b.discount_pct ?? -1) - (a.discount_pct ?? -1)); // a tie in closeness: best discount first
+    out.forEach(prep);
+    if (gen !== allGen) return out; // lines changed while reading: use these once, read again next time
+    allById = new Map(out.map((r) => [r.id, r]));
+    return (allLines = out);
+  }
+  // the kept copy is old: read the lines again, keep them, and tell the search (event «asker-lines»)
+  async function refresh(oldSig, gen) {
+    try {
+      const sig = await signature();
+      if (sig === oldSig) return;
+      const out = await readLines();
+      kept() && kept().set(CACHE_KEY, { sig, at: Date.now(), rows: plain(out) });
+      if (gen !== allGen) return;
+      use(out, gen);
+      root.dispatchEvent && root.dispatchEvent(new CustomEvent('asker-lines', { detail: allLines }));
+    } catch (e) { /* the kept copy stays; checked again next time */ }
+  }
   async function loadAll() {
     if (allLines) return allLines;
     if (!allLoading)
       allLoading = (async () => {
         const gen = allGen;
-        const page = (a, z, opts) => db().from('ar_supplier_items').select(LINE_COLS, opts).order('id', { ascending: true }).range(a, z);
-        const first = await page(0, 999, { count: 'exact' });
-        if (first.error) throw first.error;
-        const out = [...(first.data || [])];
-        const size = out.length, total = first.count == null ? null : first.count; // the server may give less than 1000 a page
-        if (size && (total == null ? size === 1000 : total > size)) {
-          for (let from = size; total == null || from < total; from += size * 4) {
-            const parts = await Promise.all([0, 1, 2, 3].map((k) => page(from + k * size, from + (k + 1) * size - 1)));
-            let short = false;
-            for (const p of parts) { if (p.error) throw p.error; out.push(...(p.data || [])); if ((p.data || []).length < size) short = true; }
-            if (short) break;
-          }
+        const copy = kept() ? await kept().get(CACHE_KEY) : null;
+        if (copy && Array.isArray(copy.rows) && copy.rows.length) {
+          const out = use(copy.rows, gen);
+          refresh(copy.sig, gen);
+          return out;
         }
-        out.sort((a, b) => (b.discount_pct ?? -1) - (a.discount_pct ?? -1)); // a tie in closeness: best discount first
-        out.forEach(prep);
-        if (gen !== allGen) return out; // lines changed while reading: use these once, read again next time
-        allById = new Map(out.map((r) => [r.id, r]));
-        return (allLines = out);
+        const sig = await signature().catch(() => '');
+        const out = await readLines();
+        if (sig && kept()) kept().set(CACHE_KEY, { sig, at: Date.now(), rows: plain(out) });
+        return use(out, gen);
       })().finally(() => { allLoading = null; });
     return allLoading;
   }

@@ -212,6 +212,8 @@
     refresh();
   };
   $('logoutBtn').onclick = async () => {
+    // the search's lists kept on this phone (ar/cache.js) leave with the account
+    try { await window.AskerCache?.clear(); } catch (e) {}
     await client.auth.signOut();
     refresh();
   };
