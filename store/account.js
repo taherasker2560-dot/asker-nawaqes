@@ -127,8 +127,11 @@
     title: 'حسابي',
     every10: 'بيتحدث كل 10 دقايق',
     install: '📲 نزّل حسابك على موبايلك',
-    installIos: 'على الآيفون: دوس زرار المشاركة ⬆️ في سفاري، وبعدين «إضافة إلى الشاشة الرئيسية».',
+    installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
+    installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
+    installSamsung: 'في متصفح سامسونج: دوس ≡ تحت، وبعدين «إضافة صفحة إلى» ← «الشاشة الرئيسية».',
+    installOther: 'افتح قايمة المتصفح (⋮ أو ≡)، واختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
     installed: 'اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.',
   };
   // installing on his phone (owner 2026-11-13 «والعميل يثبته عنده ازاى»): the app's icon opens on HIS account. The manifest
@@ -149,7 +152,18 @@
     };
   }
   const isIos = (ua, platform, touch) => /iPad|iPhone|iPod/.test(String(ua || '')) || (platform === 'MacIntel' && Number(touch) > 1);
-  const api = { tokenFromHash, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, TEXTS, KEY };
+  // the steps for HIS browser when it does not offer a one-tap install (owner 2026-11-13: «لو المتصفح فايرفوكس او اي متصفح
+  // تاني»); every browser on an iPhone adds it the same way (Share)
+  function installSteps(ua, platform, touch) {
+    const u = String(ua || '');
+    if (isIos(u, platform, touch)) return TEXTS.installIos;
+    if (/SamsungBrowser/.test(u)) return TEXTS.installSamsung;
+    if (/Firefox|FxiOS/.test(u)) return TEXTS.installFirefox;
+    if (/OPR\/|Opera|EdgA\/|YaBrowser|UCBrowser|MiuiBrowser|HuaweiBrowser|HeyTap/.test(u)) return TEXTS.installOther;
+    if (/Chrome\//.test(u)) return TEXTS.installAndroid;
+    return TEXTS.installOther;
+  }
+  const api = { tokenFromHash, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') { root.AskerStoreAccountLib = api; return; }
   root.AskerStoreAccountLib = api;
@@ -335,14 +349,14 @@
     if (installEvt) {
       const e = installEvt;
       installEvt = null;
-      try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = TEXTS.installAndroid; }
+      try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = installSteps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints); }
       draw();
       return;
     }
     if (isIos(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)) {
       try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ }
-      installNote = TEXTS.installIos;
-    } else installNote = TEXTS.installAndroid;
+    }
+    installNote = installSteps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
     draw();
   }
 
