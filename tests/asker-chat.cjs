@@ -44,10 +44,11 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   // the owner answered: every phone of that chat gets a push with no payload; a dead address is dropped
   let f = fake({ subs: ['https://push.example/a1', 'https://gone.example/b2'] });
   let r = await F.handle(req({ action: 'push', chat_id: CHAT }), env, f), b = await r.json();
-  assert.equal(r.status, 200); assert.deepEqual(b, { ok: true, sent: 1, gone: 1, failed: 0 });
+  assert.equal(r.status, 200); assert.deepEqual(b, { ok: true, sent: 1, gone: 1, failed: 0, codes: [201, 410] });
   assert.deepEqual(f.deleted, ['eq.https://gone.example/b2']);
   const h = f.pushes[0].headers;
-  assert.equal(h.TTL, '86400'); assert.equal(h['Content-Length'], '0'); assert.equal(f.calls.find((c) => c.url === 'https://push.example/a1').o.body, undefined, 'nothing in the push');
+  assert.equal(h.TTL, '86400'); assert.equal(h['Content-Length'], undefined, 'the fetch sets the length itself');
+  assert.equal(f.calls.find((c) => c.url === 'https://push.example/a1').o.body.length, 0, 'nothing in the push');
   // the VAPID header: a JWT for that push service, signed with the server's key, and the public key
   const m = /^vapid t=([^.]+)\.([^.]+)\.([^,]+), k=(.+)$/.exec(h.Authorization);
   assert.ok(m, h.Authorization); assert.equal(m[4], pubRaw);

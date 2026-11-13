@@ -111,19 +111,31 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured', message: 'مفاتيح الإشعارات مش موجودة.' }, headers);
     const subs = await rows('/rest/v1/ar_chat_push?select=endpoint&chat_id=eq.' + chatId) as { endpoint: string }[];
     let sent = 0, gone = 0, failed = 0;
+    const codes: (number | string)[] = [];
     for (const s of subs) {
+      const host = (() => { try { return new URL(s.endpoint).host; } catch { return '?'; } })();
       try {
+        // an empty body (no payload); the fetch sets its own length (a hand-set Content-Length is not sent)
         const r = await fetchImpl(s.endpoint, {
-          method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS),
-          headers: { Authorization: await vapidAuth(s.endpoint, env), TTL: '86400', Urgency: 'high', 'Content-Length': '0' },
+          method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS), body: new Uint8Array(0),
+          headers: { Authorization: await vapidAuth(s.endpoint, env), TTL: '86400', Urgency: 'high' },
         });
+        codes.push(r.status);
         if (r.status === 404 || r.status === 410) {
           gone++;
           await call('/rest/v1/ar_chat_push?endpoint=eq.' + encodeURIComponent(s.endpoint), { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
-        } else if (r.ok) sent++; else failed++;
-      } catch { failed++; }
+        } else if (r.ok) sent++;
+        else {
+          failed++;
+          // what the push service said (for the logs: «asker-chat push …»)
+          console.log('asker-chat push', host, r.status, (await r.text().catch(() => '')).slice(0, 300));
+        }
+      } catch (e) {
+        failed++; codes.push('error');
+        console.log('asker-chat push', host, 'error', String((e as Error)?.message || e).slice(0, 300));
+      }
     }
-    return reply(200, { ok: true, sent, gone, failed }, headers);
+    return reply(200, { ok: true, sent, gone, failed, codes }, headers);
   }
   return reply(400, { error: 'action', message: 'طلب مش معروف.' }, headers);
 }

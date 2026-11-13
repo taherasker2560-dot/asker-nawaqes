@@ -1048,6 +1048,7 @@ window.AskerEN = {
   "اتبعت، ووصله إشعار على موبايله.": "Sent, and a notification reached his phone.",
   "اتبعت. هيشوفه أول ما يفتح الصفحة (مفيش إشعار مفعّل عنده).": "Sent. He will see it when he opens the page (he has no notifications on).",
   "ما اتبعتش: {0}": "Not sent: {0}",
+  "اتبعت، بس الإشعار ما وصلش لموبايله. هيشوف الرد أول ما يفتح الصفحة.": "Sent, but the notification did not reach his phone. He will see the answer when he opens the page.",
   "رسالة جديدة من عميل": "New message from a customer",
   "{0} عميل مستني رد في الرسايل": "{0} customers waiting for an answer in messages",
   "رسايل العملاء": "Customers' messages",

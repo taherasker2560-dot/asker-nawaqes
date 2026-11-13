@@ -166,12 +166,16 @@
       if (!data || !data.ok) throw new Error((data && data.error) || 'ما اتبعتش');
       me.draft = ''; if ($('chatReply')) $('chatReply').value = '';
       // the customer's phone(s): a notification (nothing in it but «ردينا عليك»)
-      let told = false;
+      let told = false, failedPush = 0;
       try {
         const r = await db().functions.invoke('asker-chat', { body: { action: 'push', chat_id: me.c.id } });
         told = !!(r && r.data && r.data.sent > 0);
-      } catch (e) { /* the answer is there anyway */ }
-      Object.assign(me, { note: told ? 'اتبعت، ووصله إشعار على موبايله.' : 'اتبعت. هيشوفه أول ما يفتح الصفحة (مفيش إشعار مفعّل عنده).', noteBad: false });
+        failedPush = (r && r.data && r.data.failed) || 0;
+      } catch (e) { failedPush = 1; }
+      const note = told ? 'اتبعت، ووصله إشعار على موبايله.'
+        : failedPush ? 'اتبعت، بس الإشعار ما وصلش لموبايله. هيشوف الرد أول ما يفتح الصفحة.'
+        : 'اتبعت. هيشوفه أول ما يفتح الصفحة (مفيش إشعار مفعّل عنده).';
+      Object.assign(me, { note, noteBad: false });
       Object.assign(me.c, { waiting: 0, last_from: 'pharmacy', last_text: body.slice(0, 200), last_at: new Date().toISOString() });
     } catch (e) {
       Object.assign(me, { note: 'ما اتبعتش: ' + ((e && e.message) || e), noteBad: true });
