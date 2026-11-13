@@ -18,7 +18,8 @@ run('Count: sections, correct or the difference per batch, a wrong section, rand
  // inside a section: the batches as PharmaFly holds them
  await page.click('#ctSecList [data-ct-open="3"]');
  assert.match(await text(page,'#ctItems [data-ct="63476"]'),/صلاحية 07\/2029 · الجهاز: 2[\s\S]*صلاحية 08\/2029 · الجهاز: 9/);
- assert.equal(await page.$('#ctItems .ct-where'),null,'the section line is for the random count only');
+ // the section box is on every card of the section list too (owner 2026-11-13), set to the item's own section
+ assert.equal(await page.$eval('#ctItems [data-ct="63476"] [data-ct-move]',e=>e.options[e.selectedIndex].textContent),'أقراص وكبسول');
  // the dates are mixed up: one box less of 07/2029, one more of 08/2029
  await page.click('#ctItems [data-ct="63476"] [data-ct-edit]');
  await page.click('#ctItems [data-ct="63476"] [data-ct-key="2029-07"] [data-ct-dec]');

@@ -30,6 +30,12 @@ const c={id:101,name:'عميل تجربة',credit_limit:5000,balance:4900};
 assert.deepEqual(T.overLimit(c,230,0),{bal:4900,lim:5000,after:5130});
 assert.equal(T.overLimit(c,230,200),null,'paid enough: no warning');
 assert.equal(T.overLimit({...c,credit_limit:0},99999,0),null,'no limit on the card');assert.equal(T.overLimit(null,500,0),null);
+// his account with this bill (owner 2026-11-13): before + the bill − paid = after; a return takes the bill off and adds
+// what was given back in cash
+assert.deepEqual(T.account({balance:250},'sale',274.7,100),{before:250,amount:274.7,paid:100,ret:false,after:424.7});
+assert.deepEqual(T.account({balance:250},'return',54,0),{before:250,amount:54,paid:0,ret:true,after:196});
+assert.equal(T.account({balance:250},'return',54,20).after,216);assert.equal(T.account(null,'sale',5,0),null);
+assert.equal(T.balText(196),'196 ج');assert.equal(T.balText(-50.5),'له 50.50 ج');
 // the row sent to the server
 const rec=T.record({id:'00000000-0000-4000-8000-000000000001',soldAt:'2026-11-12T19:42:00.000Z',lines,customer:c,paid:'50',note:'  بعد الضهر '});
 assert.deepEqual(rec,{id:'00000000-0000-4000-8000-000000000001',sold_at:'2026-11-12T19:42:00.000Z',kind:'sale',customer_id:101,customer_name:'عميل تجربة',

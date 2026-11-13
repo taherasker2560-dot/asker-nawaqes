@@ -90,8 +90,11 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.fill('#tsCQ','عميل تجربة');
  await page.click('#tsCHits [data-ts-cust="101"]');
  assert.match(await text(page,'#tsCust .ts-warn'),/هيبقى عليه 500 ج والحد 300 ج/);
+ // his account with this bill, like a PharmaFly invoice (owner 2026-11-13)
+ assert.match(await text(page,'#tsCust .ts-acct'),/حسابه السابق ?250 ج قيمة الفاتورة ?\+ 250 ج حسابه بعد الفاتورة ?500 ج/);
  await page.fill('#tsPaid','200');
  assert.equal(await page.$('#tsCust .ts-warn'),null);
+ assert.match(await text(page,'#tsCust .ts-acct'),/قيمة الفاتورة ?\+ 250 ج دفع ?− 200 ج حسابه بعد الفاتورة ?300 ج/);
  await page.fill('#tsNote','بعد الضهر');
  // no internet: kept on the phone, shown as «لسه ما اتبعتتش»
  await page.evaluate(()=>{window.__realClient=window.AskerApp.client;window.AskerApp.client={from:()=>({upsert:async()=>({error:{message:'offline'}}),select(){return this},gte(){return this},order(){return this},range:async()=>({data:null,error:{message:'offline'}})})}});

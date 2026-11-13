@@ -73,6 +73,13 @@
     const lim = Number(cust.credit_limit) || 0, bal = Number(cust.balance) || 0, after = r2(bal + (Number(amount) || 0) - (Number(paid) || 0));
     return lim > 0 && after > lim ? { bal: r2(bal), lim: r2(lim), after } : null;
   }
+  // the customer's account with this bill (owner 2026-11-13): his balance before, the bill (a sale adds it, a return takes
+  // it off), what he paid now (a return: what was given back to him in cash), and his balance after
+  function account(cust, kind, amount, paid) {
+    if (!cust) return null;
+    const before = r2(Number(cust.balance) || 0), amt = r2(Number(amount) || 0), cash = r2(Number(paid) || 0), ret = kind === 'return';
+    return { before, amount: amt, paid: cash, ret, after: r2(ret ? before - amt + cash : before + amt - cash) };
+  }
   // the row kept on the phone and sent to ar_temp_sales
   // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; paid = what was given back)
   function record({ id, soldAt, lines, customer, paid, note, kind }) {
@@ -122,7 +129,9 @@
     const sh = Math.round(vw / a);
     return { sx: 0, sy: Math.round((vh - sh) / 2), sw: vw, sh };
   }
-  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, record, qtyText, countText, money, merged };
+  // a balance in words: «250 ج», or «له 50 ج» when the pharmacy owes him
+  const balText = (x) => (r2(x) < 0 ? 'له ' + money(-x) : money(x));
+  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, account, balText, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -436,10 +445,16 @@
     const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, total(cart), paid);
     let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button>${can('credit') ? `<button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button>` : ''}</div>`;
     if (cust) {
-      html += `<div class="ts-cust${over ? ' warn' : ''}"><strong class="notr">${esc(cust.name)}</strong> <small>كود ${esc(cust.id)}</small>
-        <div class="hint">عليه ${esc(money(Math.max(0, Number(cust.balance) || 0)))}${Number(cust.credit_limit) ? ' · الحد ' + esc(money(cust.credit_limit)) : ''}</div>
+      // his account with this bill, like a PharmaFly invoice (owner 2026-11-13): before, the bill, paid, after
+      const a = account(cust, kind, total(cart), paid);
+      html += `<div class="ts-cust${over ? ' warn' : ''}"><strong class="notr">${esc(cust.name)}</strong> <small>كود ${esc(cust.id)}${Number(cust.credit_limit) ? ' · الحد ' + esc(money(cust.credit_limit)) : ''}</small>
+        <div class="ts-acct">
+          <div><span>حسابه السابق</span><b>${esc(balText(a.before))}</b></div>
+          <div><span>${a.ret ? 'قيمة المرتجع' : 'قيمة الفاتورة'}</span><b class="${a.ret ? 'neg' : 'pos'}">${a.ret ? '−' : '+'} ${esc(money(a.amount))}</b></div>
+          ${a.paid ? `<div><span>${a.ret ? 'رجّعتله فلوس' : 'دفع'}</span><b class="${a.ret ? 'pos' : 'neg'}">${a.ret ? '+' : '−'} ${esc(money(a.paid))}</b></div>` : ''}
+          <div class="ts-acct-after"><span>${a.ret ? 'حسابه بعد المرتجع' : 'حسابه بعد الفاتورة'}</span><b>${esc(balText(a.after))}</b></div>
+        </div>
         ${over ? `<div class="ts-warn">⚠️ هيبقى عليه ${esc(money(over.after))} والحد ${esc(money(over.lim))}: هيعدّي الحد بالبيعة دي</div>` : ''}
-        ${ret && cart.length ? `<div class="hint">المرتجع هيقلّل حسابه ${esc(money(Math.max(0, total(cart) - paid)))}</div>` : ''}
         <button type="button" class="linklike" data-ts-change>غيّر العميل</button></div>`;
     } else if (custOpen) {
       html += `<div class="search"><input id="tsCQ" type="search" autocomplete="off" aria-label="العميل" placeholder="اسم العميل أو الكود…" /></div><div id="tsCHits"></div>`;

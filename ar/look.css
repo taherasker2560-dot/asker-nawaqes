@@ -1312,6 +1312,12 @@ body.ts-page #dataAge { display: none !important; }
 #tsNew > .ts-scan, #tsNew > .search { margin-top: 8px; }
 #tsNew > .ts-h:first-of-type { margin-top: 10px; }
 .ts-back { width: 100%; margin: 0 0 8px; }
+/* the credit customer's account with this bill (owner 2026-11-13): before, the bill, paid, after */
+.ts-acct { margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); font-size: 14px; }
+.ts-acct > div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+.ts-acct b.pos { color: #b45309; }
+.ts-acct b.neg { color: #15803d; }
+.ts-acct .ts-acct-after { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--line); font-size: 15.5px; font-weight: 800; }
 /* «جرد المخزون» (ar/count.js, owner 2026-11-13) */
 .ct-scan { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; margin: 8px 0; padding: 12px 14px; border: 0; border-radius: 16px; background: var(--grad); color: #fff; font-size: 17px; font-weight: 800; text-align: start; box-shadow: var(--sh-acc); }
 .ct-scan i { font-style: normal; font-size: 24px; }

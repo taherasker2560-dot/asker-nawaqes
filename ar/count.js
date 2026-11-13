@@ -180,8 +180,8 @@
   }
   const secLabel = (id) => secName(id, (sections.find((s) => Number(s.i) === Number(id)) || {}).n);
   const movedLine = (from, to) => `<div class="sec">القسم اتغير من ${esc(secLabel(from))} لـ ${esc(secLabel(to))}</div>`;
-  // withSec (random count, owner 2026-11-13): the section PharmaFly has it in, as a list of all the sections: picking
-  // another one opens the editor with «اتغير من كذا لكذا»
+  // withSec (random count, then the section list too, owner 2026-11-13): the section PharmaFly has it in, as a list of
+  // all the sections: picking another one opens the editor with «اتغير من كذا لكذا»
   function itemCard(it, withSec) {
     const e = lastOf().get(it.i), editing = editId === it.i, lines = sysLines(it);
     const who = e ? (e.created_by && root.AskerStaff && root.AskerStaff.nameOf(e.created_by)) || '' : '';
@@ -236,7 +236,7 @@
     const n = { todo: all.filter((it) => !last.has(it.i)).length, done: all.filter((it) => last.has(it.i)).length, diff: all.filter((it) => last.has(it.i) && last.get(it.i).result === 'diff').length };
     $('ctFilters').innerHTML = [['todo', 'لسه'], ['done', 'اتجرد'], ['diff', 'فيه فرق']].map(([k, l]) => `<button type="button" class="chip${filter === k ? ' on' : ''}" data-ct-filter="${k}">${l} ${n[k]}</button>`).join('');
     const list = sectionItems();
-    $('ctItems').innerHTML = list.slice(0, shown).map((it) => itemCard(it, false)).join('') +
+    $('ctItems').innerHTML = list.slice(0, shown).map((it) => itemCard(it, true)).join('') +
       (list.length > shown ? `<button type="button" class="secondary ct-more" data-ct-more>اعرض ${Math.min(PAGE, list.length - shown)} كمان</button>` : '') +
       (!list.length ? `<p class="hint">${filter === 'todo' ? 'القسم ده اتجرد كله ✓' : 'مفيش أصناف هنا'}</p>` : '');
   }
