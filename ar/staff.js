@@ -131,6 +131,9 @@
     html.classList.toggle('staff', on);
     html.classList.toggle('staff-off', on && !me.active);
     html.classList.toggle('can-search', !on || can('search'));
+    // the search's lists kept on this phone (ar/cache.js) stay only for someone who may search (2026-11-13): a staff
+    // member without «البحث», or a stopped one, loses them (not in the owner's preview on his own phone)
+    if (on && !me.preview && !can('search')) root.AskerCache?.clear();
     $('staffAdmin')?.classList.toggle('hidden', on);
     // the way out of a staff account (not in the owner's preview: «رجوع لحسابي» is there)
     $('staffOut')?.classList.toggle('hidden', !on || !!(me && me.preview));

@@ -62,8 +62,11 @@ run('Staff: the owner adds a person, opens sections, sends the link, stops him',
 });
 run('Staff: a staff member sees only the sections open for him',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify({ar_staff:[{user_id:'u1',name:'موظف تجربة',perms:['tempsale','expiry'],active:true}]})));
+ // a copy of the search's lists left on this phone (2026-11-13): gone for someone without «البحث»
+ await page.evaluate(()=>window.AskerCache.set('sp-lines-v1',{sig:'x',rows:[{id:1}]}));
  await page.reload();
  await page.waitForFunction(()=>document.documentElement.classList.contains('staff'));
+ await page.waitForFunction(()=>window.AskerCache.get('sp-lines-v1').then(c=>c===null));
  // his home: one button per open section, his name; no owner home, no search on top (not opened), no logout, no staff list
  await page.waitForSelector('#staffHomePanel:not(.hidden) [data-stf-go]');
  assert.match(await text(page,'#staffHomePanel h2'),/أهلاً موظف تجربة/);
