@@ -111,6 +111,7 @@
     pdfBusy: 'بيعمل الكشف…',
     pdfBad: 'الكشف ما اتعملش. جرب تاني.',
     call: '📞 كلّمنا',
+    chat: '💬 كلّمنا',
     older: 'اعرض أقدم',
     loading: 'بيجيب حسابك…',
     none: 'مفيش حركات في حسابك.',
@@ -354,7 +355,8 @@
     html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
     const wa = waHref();
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
-      (wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>';
+      // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
+      (root.AskerStoreChat ? `<a class="share" href="#chat">${esc(TEXTS.chat)}</a>` : wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>';
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
     const chip = (f, label) => `<button type="button" class="chip${st.filter === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
     html += `<div class="ac-chips" role="group">${chip('all', TEXTS.all)}${chip('sales', TEXTS.sales)}${chip('payments', TEXTS.payments)}</div>`;

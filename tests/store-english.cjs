@@ -30,6 +30,10 @@ for(const b of [7174,-200,0])check(A.afterText(b));
 for(const n of [1,2,5,14])check(A.itemsWord(n));
 for(const l of [{p:1,u:0},{p:0,u:2},{p:1,u:3}])check(A.qtyText(l)+' · 66.70');
 for(const s of ['حسابك يا Ahmed · كود 2489','خصم 5 ج','دفعت منها 100 ج','آخر تحديث النهارده 8:10 م · بيتحدث كل 10 دقايق','آخر تحديث 05/11/2026','⛔ حسابك موقوف دلوقتي','10:33 م · ','الطلب هيتحط على حسابك في الصيدلية'])check(s);
+// «الرسايل» (store/chat.js, 2026-11-13)
+const CH=require('../store/chat.js');
+for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);
+for(const s of ['بنرد عليك هنا · Ahmed','🎤 فويس 0:12','اتكتب: «Panadol»','10:33 م'])check(s);
 // some built texts (numbers and names put in)
 for(const s of ['نتايج «PANADOL»','طلب رقم 12','طلبك رقم 12 وصلنا. الإجمالي 150 جنيه','اتضاف 3 صنف للسلة','470 ج للواحدة','تفاصيل PANADOL 500','في السلة (2)','3 صنف في السلة · 470 ج','2 صنف في السلة + أصناف بالطلب','طلب رقم 12 · 4 صنف'])check(s);
 assert.deepEqual(bad,[],'Arabic texts without English in store/i18n-en-store.js:\n'+bad.join('\n'));

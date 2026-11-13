@@ -261,6 +261,8 @@
     // and the sale's bill gets the most room: no data-age line there either (owner 2026-11-13 «في 2 سنتي»)
     document.body.classList.toggle('ts-page', tab === 'tempsale');
     $('carePanel')?.classList.toggle('hidden', tab !== 'care');
+    // «خدمة العملاء ← الرسايل» (ar/chat.js, owner 2026-11-13): our own messages page's chats
+    if (tab === 'care') window.AskerChat?.open(); else window.AskerChat?.close();
     $('shortPanel').classList.toggle('hidden', tab !== 'short');
     // names may have changed in the other tabs; never «0 صنف» before the list (saved or from the server) is there
     if (tab === 'short' && (cacheReady || shortages.length)) drawShort();

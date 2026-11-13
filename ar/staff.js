@@ -14,10 +14,10 @@
     ['tempsale', 'البيع المؤقت', 'المبيعات'], ['return', 'المرتجع (في البيع المؤقت)', 'المبيعات'], ['credit', 'البيع للعملاء الآجل', 'المبيعات'], ['storeorders', 'الموقع', 'المبيعات'],
     ['stock', 'المخزون', 'المخزون'], ['count', 'جرد المخزون', 'المخزون'], ['expiry', 'الصلاحيات', 'المخزون'],
     ['short', 'النواقص', 'المشتريات'], ['read', 'الوارد', 'المشتريات'], ['translate', 'الترجمة', 'المشتريات'], ['drafts', 'الطلبيات', 'المشتريات'], ['docs', 'الفواتير', 'المشتريات'], ['suppliers', 'قوايم المخازن', 'المشتريات'],
-    ['customers', 'العملاء', 'الحسابات'], ['search', 'البحث اللي فوق الأقسام', 'عام'],
+    ['customers', 'العملاء', 'الحسابات'], ['care', 'رسايل العملاء', 'خدمة العملاء'], ['search', 'البحث اللي فوق الأقسام', 'عام'],
   ];
   // the bot's tabs a staff member can be given, and their place in the bottom bar
-  const GROUP = { short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', customers: 'accounts', storeorders: 'sales', tempsale: 'sales' };
+  const GROUP = { short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', customers: 'accounts', storeorders: 'sales', tempsale: 'sales', care: 'care' };
   const PGROUP = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const TABS = Object.keys(GROUP);
   const allowedTabs = (perms) => TABS.filter((t) => (perms || []).includes(t));
@@ -147,7 +147,7 @@
     drawHome(tabs);
   }
   // his home: big buttons for the sections open for him
-  const ICON = { tempsale: '🧾', storeorders: '🛒', stock: '📦', count: '📋', expiry: '⏳', short: '📉', read: '📥', translate: '🔤', drafts: '📝', docs: '🧾', suppliers: '🏬', customers: '👥' };
+  const ICON = { care: '💬', tempsale: '🧾', storeorders: '🛒', stock: '📦', count: '📋', expiry: '⏳', short: '📉', read: '📥', translate: '🔤', drafts: '📝', docs: '🧾', suppliers: '🏬', customers: '👥' };
   function drawHome(tabs) {
     const box = $('staffHomePanel');
     if (!box) return;
@@ -155,7 +155,7 @@
       box.innerHTML = '<h2>حسابك متوقف</h2><p class="hint">كلّم صاحب الصيدلية لو محتاج تدخل تاني.</p>';
       return;
     }
-    const label = (t) => { const b = document.querySelector(`.subbar [data-tab="${t}"]`); return b ? b.textContent.trim() : t; };
+    const label = (t) => { const b = document.querySelector(`.subbar [data-tab="${t}"]`); return b ? b.textContent.trim() : t === 'care' ? 'رسايل العملاء' : t; };
     box.innerHTML = `<h2>أهلاً <span class="notr">${esc(me.name)}</span></h2>` +
       (tabs.length ? tabs.map((t) => `<button type="button" class="stf-big" data-stf-go="${t}"><i aria-hidden="true">${ICON[t] || '•'}</i><span>${esc(label(t))}</span></button>`).join('')
         : '<p class="hint">لسه مفيش أقسام مفتوحة لك. كلّم صاحب الصيدلية.</p>');

@@ -26,6 +26,8 @@
     { key: 'expiry', group: 'purchases', tab: 'expiry', sound: 'double', title: 'صلاحيات محتاجة شغل', body: (n) => `${n} صنف النهارده: صلاحيات اتلخبطت من البيع أو بيع بالسالب` },
     { key: 'customers', group: 'accounts', tab: 'customers', sound: 'alert', title: 'عميل عدّى الحد', body: (n) => `${n} عميل عدّوا حدهم` },
     { key: 'store', group: 'sales', tab: 'storeorders', sound: 'bell', title: 'طلب جديد من الموقع', body: (n) => `${n} طلب جديد من الموقع` },
+    // «الرسايل» (ar/chat.js, owner 2026-11-13): customers waiting for an answer on our messages page
+    { key: 'care', group: 'care', tab: 'care', sound: 'pop', title: 'رسالة جديدة من عميل', body: (n) => `${n} عميل مستني رد في الرسايل` },
   ];
   // which numbers went up since the last time they were seen (the first time only remembers, it does not ring)
   function rises(prev, now) {
@@ -55,7 +57,7 @@
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const SEEN = 'asker-notify-seen', PICK = 'asker-notify-sounds', ON = 'asker-notify-on';
-  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع' };
+  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء' };
   let counts = {}, timer = null, ctx = null, busy = false;
 
   const picks = () => { try { return JSON.parse(read(PICK, '{}')) || {}; } catch (e) { return {}; } };
@@ -96,9 +98,10 @@
     const c = db();
     if (!c) return null;
     if (ticks++ > 0 && $('inboxRefresh')) { $('inboxRefresh').click(); await new Promise((r) => setTimeout(r, 1200)); }
-    const [docs, store] = await Promise.all([
+    const [docs, store, care] = await Promise.all([
       count(c.from('ar_documents').select('id').eq('status', 'new')),
       count(c.from('ar_store_orders').select('id').eq('status', 'new')),
+      count(c.from('ar_chats').select('id').gte('waiting', 1)),
     ]);
     const a = root.AskerAlerts && root.AskerAlerts.data();
     const today = (l) => (l || []).filter((x) => Number(x.today) > 0).length;
@@ -107,6 +110,7 @@
     if (inc !== undefined) out.incoming = inc;
     if (docs != null) out.docs = docs;
     if (store != null) out.store = store;
+    if (care != null) out.care = care;
     if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
     return out;
   }

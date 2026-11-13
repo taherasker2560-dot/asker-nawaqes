@@ -15,11 +15,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
     <link rel="stylesheet" href="store/look.css?v=en-20261112d" />
-    <link rel="stylesheet" href="store/polish.css?v=owner-20261113a" />
+    <link rel="stylesheet" href="store/polish.css?v=chat-20261113a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=look-20261112a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=owner-20261113a"></script>
+    <script src="store/i18n-en-store.js?v=chat-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=acct-20261113b"></script>
   </head>
@@ -241,6 +241,22 @@
       <div id="acctBox"></div>
     </div>
 
+    <!-- الرسايل: صفحة الرسايل بتاعتنا (store/chat.js) -->
+    <div data-view="chat" hidden>
+      <header class="top acct-top chat-top">
+        <div class="brand">
+          <img src="icons/arabic-96.png?v=logo2" alt="لوجو صيدلية عسكر" width="48" height="48" />
+          <div><strong>صيدلية عسكر</strong><span id="chatWho">بنرد عليك هنا</span></div>
+        </div>
+        <div class="top-btns">
+          <button type="button" class="cart-btn" data-theme-open aria-label="الألوان والوضع الليلي" aria-controls="themeSheet">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></svg>
+          </button>
+        </div>
+      </header>
+      <div id="chatBox"></div>
+    </div>
+
     <!-- الطلب وصل -->
     <div data-view="done" hidden>
       <section class="done">
@@ -303,14 +319,16 @@
       <a href="#account" data-go="account" data-acct hidden><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>حسابي</a>
       <a href="#" data-go="home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z" /></svg>الرئيسية</a>
       <a href="#search" data-go="search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>بحث</a>
+      <a href="#chat" data-go="chat"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8M8 12h5" /></svg>الرسايل</a>
       <a href="#orders" data-go="orders"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h4" /></svg>طلباتي</a>
       <a href="#cart" data-go="cart"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>السلة <span class="cart-n" hidden>0</span></a>
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
-    <script src="store/account.js?v=owner-20261113a"></script>
-    <script src="store/store.js?v=acct-20261113a"></script>
+    <script src="store/account.js?v=chat-20261113a"></script>
+    <script src="store/chat.js?v=chat-20261113a"></script>
+    <script src="store/store.js?v=chat-20261113a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>
 </html>

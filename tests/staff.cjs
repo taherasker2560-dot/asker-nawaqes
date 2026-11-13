@@ -6,7 +6,7 @@ assert.equal(S.fixTab('short',['expiry','tempsale']),'expiry','another open tab 
 assert.equal(S.fixTab('customers',['expiry']),'home','nothing open in «الحسابات»: his home');
 assert.equal(S.fixTab('tempsale',['tempsale']),'tempsale');assert.equal(S.fixTab('home',[]),'home');
 // every section key the server knows has a switch, and the other way round
-const server=['short','read','translate','drafts','docs','suppliers','stock','count','expiry','customers','storeorders','tempsale','search','return','credit'];
+const server=['short','read','translate','drafts','docs','suppliers','stock','count','expiry','customers','storeorders','tempsale','care','search','return','credit'];
 assert.deepEqual(S.SECTIONS.map(x=>x[0]).sort(),[...server].sort());
 // what he did
 assert.equal(S.activityText({tbl:'ar_temp_sales',op:'insert',info:{no:14,n:3,total:274.7}}),'سجّل بيعة مؤقتة (#14 · 3 صنف · 274.7 ج)');

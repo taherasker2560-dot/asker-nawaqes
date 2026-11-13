@@ -230,6 +230,8 @@
   const client = root.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
   // a credit customer's personal link (store/account.js, owner 2026-11-13): «حسابي» and ordering on his account
   const acct = root.AskerStoreAccount || null;
+  // «الرسايل» (store/chat.js, owner 2026-11-13): our own messages page
+  const chat = root.AskerStoreChat || null;
   const COLS = 'id,name,arabic_name,status,price,cat,needs_rx';
   const PAGE = 40;
   const $ = (id) => document.getElementById(id);
@@ -309,6 +311,7 @@
     if (name === 'cart') drawCart();
     if (name === 'orders') drawOrders();
     if (name === 'account' && acct) acct.draw();
+    if (chat) { if (name === 'chat') chat.open(); else chat.close(); }
     window.scrollTo(0, 0);
   }
   function route() {
@@ -326,6 +329,7 @@
     else if (h === 'search') { view('search'); if (!lastQuery) $('q').focus(); }
     else if (h === 'done') view('done');
     else if (h === 'account' && acct && acct.linked()) view('account');
+    else if (h === 'chat' && chat) view('chat');
     else view('home');
   }
 
@@ -840,6 +844,7 @@
   const me = store.get('asker_store_me', null);
   if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; $('cAddr').value = me.address || ''; }
   if (acct) acct.attach(client);
+  if (chat) chat.attach(client);
   saveCart();
   route();
   loadSettings();

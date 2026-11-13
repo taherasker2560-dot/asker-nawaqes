@@ -22,7 +22,7 @@ assert.match(A.when('2026-11-05T09:05:00','2026-11-11T06:00:00'),/^05\/11 9:05 Ø
 assert.deepEqual(N.rises({incoming:2,docs:1},{incoming:3,docs:1,store:4}),['incoming']);
 assert.deepEqual(N.rises({},{incoming:3}),[],'first time: nothing rings');
 assert.deepEqual(N.rises({incoming:5},{incoming:1}),[]);
-assert.deepEqual(N.groupCounts({incoming:2,docs:1,expiry:3,customers:4,store:1}),{purchases:6,accounts:4,sales:1});
+assert.deepEqual(N.groupCounts({incoming:2,docs:1,expiry:3,customers:4,store:1,care:2}),{purchases:6,accounts:4,sales:1,care:2});
 // every section has a sound, every sound is well formed
 for(const k of N.KINDS){assert.ok(N.SOUNDS[k.sound],k.key);assert.match(k.body(3),/3/)}
 for(const [id,s] of Object.entries(N.SOUNDS)){assert.ok(s.name);for(const n of s.notes){assert.equal(n.length,5,id);assert.ok(n[0]>100&&n[2]>0&&n[3]<=1)}}
