@@ -191,7 +191,7 @@ window.AskerEN = {
   "اسمح بإشعارات الموبايل": "Allow phone notifications",
   "الصوت ده بيشتغل والبوت مفتوح. صوت إشعار الموبايل نفسه بيتغيّر من إعدادات الموبايل ← التطبيقات ← البوت ← الإشعارات.": "This sound plays while the bot is open. The phone notification's own sound is changed in the phone's Settings ← Apps ← the bot ← Notifications.",
   "تسجيل الدخول": "Sign in",
-  "صحتك أولوية · من 1981": "Your health comes first · since 1981",
+  "صحتك أولوية · من 1981": "Your Health is Priority · since 1981",
   "الإيميل": "Email",
   "كلمة السر": "Password",
   "دخول": "Sign in",
