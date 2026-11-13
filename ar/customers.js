@@ -195,7 +195,20 @@
     if (/^20\d{10}$/.test(d)) { const l = '0' + d.slice(2); return `${l.slice(0, 4)} ${l.slice(4, 7)} ${l.slice(7)}`; }
     return d ? '+' + d : '';
   }
-  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn };
+  // the customer's personal link (owner 2026-11-13, IDEAS row 1): his own account on the store site, store.html#me=<secret>
+  function linkUrl(base, token) {
+    return new URL('store.html#me=' + token, String(base || '').replace(/#.*$/, '')).href;
+  }
+  function linkMessage(name, url) {
+    return [
+      'أهلًا بحضرتك 🌿',
+      `ده رابط حسابك في صيدلية عسكر يا ${String(name || '').trim()}:`,
+      'تشوف منه رصيدك وكشف حسابك بالأصناف، وتطلب مننا على طول.',
+      url,
+      'الرابط ده ليك انت بس، ما تبعتهوش لحد.',
+    ].join('\n');
+  }
+  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -212,6 +225,8 @@
   let view = null, query = '', shown = SHOW;
   // the customers' WhatsApp numbers (ar_customer_phones, owner 2026-11-12); null = not there (the send part stays hidden)
   let phones = null;
+  // who is stopped (ar_customer_stops, owner 2026-11-13 «وقّف الآجل»): Map id -> row; null = the table is not there yet
+  let stops = null;
   // the open statement
   let st = null;   // { c, moves, done, filter, open: Set, busy, error, phoneEdit, tels, send }
   const canPick = () => !!(navigator.contacts && navigator.contacts.select && root.ContactsManager);
@@ -230,6 +245,16 @@
       phones = null;
     }
   }
+  async function loadStops() {
+    try {
+      const { data, error } = await db().from('ar_customer_stops').select('customer_id,stopped_at').range(0, 4999);
+      if (error) throw new Error(error.message || String(error));
+      stops = new Map((data || []).map((r) => [String(r.customer_id), r]));
+    } catch (e) {
+      stops = null;
+    }
+  }
+  const isStopped = (id) => !!(stops && stops.has(String(id)));
 
   async function loadList(force) {
     if (!db()) return list;
@@ -245,7 +270,7 @@
           if (!data || data.length < PAGE) break;
         }
         list = rows; failed = ''; loadedAt = Date.now();
-        await loadPhones();
+        await Promise.all([loadPhones(), loadStops()]);
         // a contact shared from the phone's contacts app for a customer (takeContactShare)
         if (shared) { applyShared(); return list; }
         // the bot was closed and reopened while the phone's contacts list was open: back to that customer, and say so
@@ -274,7 +299,7 @@
     const pct = lim ? Math.max(0, Math.min(100, Math.round(100 * num(c.balance) / lim))) : 0;
     const last = c.last_at ? `<small>آخر حركة ${esc(whenText(c.last_at, new Date()))} (${esc(KIND_WORD[c.last_kind] || 'بيع')})</small>` : '<small>مفيش حركات</small>';
     return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}" data-cu="${esc(c.id)}">` +
-      `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}</strong>${last}` +
+      `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}${isStopped(c.id) ? ' ⛔' : ''}</strong>${last}` +
       (lim && owes(c) ? `<i class="cu-bar"><b class="${isOver(c) ? 'r' : ''}" style="width:${pct}%"></b></i>` : '') + '</span>' +
       `<span class="cu-amt ${b.cls}">${esc(b.text)}${lim ? `<small>الحد ${esc(money(lim))}</small>` : ''}</span></button>`;
   }
@@ -626,6 +651,90 @@
       .then(({ error }) => { if (!error) Object.assign(p, { last_sent_at: at, last_sent_from: s.stmt.from }); });
     drawStatement();
   }
+  // ---------- the customer's personal link and «وقّف الآجل» (owner 2026-11-13, IDEAS row 1; owner only) ----------
+  const ownerHere = () => !(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
+  async function loadLink(me) {
+    try {
+      const { data, error } = await db().from('ar_customer_links').select('token,created_at,last_seen_at,seen_count').eq('customer_id', me.c.id).maybeSingle();
+      if (error) throw new Error(error.message || String(error));
+      me.link = data || null; me.linkOff = false;
+    } catch (e) {
+      me.link = null; me.linkOff = true; // the table is not on the server (yet)
+    }
+    if (st === me) drawStatement();
+  }
+  // the number to send to: the last one a statement went to, else the first
+  function linkNumber(id) {
+    const nums = numbersOf(id);
+    const last = [...nums].filter((x) => x.last_sent_at).sort((a, b) => String(b.last_sent_at).localeCompare(String(a.last_sent_at)))[0];
+    return (last || nums[0] || {}).phone || null;
+  }
+  function openLinkChat(me, token, phone) {
+    const t = linkMessage(me.c.name, linkUrl(location.href, token));
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, phone);
+    else root.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(t), '_blank');
+  }
+  async function sendLink(fresh) {
+    const me = st;
+    if (!me || me.linkBusy) return;
+    const phone = linkNumber(me.c.id);
+    if (!phone) { Object.assign(me, { linkMsg: 'ضيف رقم الواتس بتاعه الأول، وبعدين ابعتله الرابط.', linkBad: true }); drawStatement(); return; }
+    if (fresh && me.link && !root.confirm(tr('الرابط القديم هيبطل على طول، وهيتبعتله رابط جديد. أكمّل؟'))) return;
+    // the same link again: WhatsApp opens at once
+    if (!fresh && me.link && me.link.token) {
+      openLinkChat(me, me.link.token, phone);
+      Object.assign(me, { linkMsg: 'اتفتحت محادثته في الواتس ومعاها رابطه: دوس إرسال هناك.', linkBad: false });
+      drawStatement();
+      return;
+    }
+    me.linkBusy = true; me.linkMsg = ''; drawStatement();
+    try {
+      const { data, error } = await db().rpc('ar_customer_link', { p_customer: me.c.id, p_new: !!fresh });
+      if (error) throw new Error(error.message || String(error));
+      if (!data || !data.ok || !data.token) throw new Error((data && data.error) || 'مفيش رابط');
+      me.link = fresh || !me.link ? { token: data.token, created_at: new Date().toISOString(), last_seen_at: null, seen_count: 0 } : Object.assign(me.link, { token: data.token });
+      openLinkChat(me, data.token, phone);
+      Object.assign(me, { linkMsg: 'اتفتحت محادثته في الواتس ومعاها رابطه: دوس إرسال هناك.', linkBad: false });
+    } catch (e) {
+      Object.assign(me, { linkMsg: 'الرابط ما اتعملش: ' + errText(e), linkBad: true });
+    } finally {
+      me.linkBusy = false;
+      if (st === me) drawStatement();
+    }
+  }
+  async function setStop(on) {
+    const me = st;
+    if (!me || me.stopBusy || !stops) return;
+    me.stopBusy = true; drawStatement();
+    try {
+      const t = db().from('ar_customer_stops');
+      const { error } = on ? await t.upsert({ customer_id: me.c.id }, { onConflict: 'customer_id' }) : await t.delete().eq('customer_id', me.c.id);
+      if (error) throw new Error(error.message || String(error));
+      if (on) stops.set(String(me.c.id), { customer_id: me.c.id, stopped_at: new Date().toISOString() });
+      else stops.delete(String(me.c.id));
+      Object.assign(me, { linkBad: false, linkMsg: on ? 'اتوقف الآجل: رابطه بيقوله «حسابك موقوف»، وطلباته من الموقع كاش بس.' : 'رجع الآجل: يقدر يطلب على حسابه تاني.' });
+    } catch (e) {
+      Object.assign(me, { linkMsg: 'ما اتغيرش: ' + errText(e), linkBad: true });
+    } finally {
+      me.stopBusy = false;
+      if (st === me) drawStatement();
+    }
+  }
+  function linkHtml() {
+    if (!ownerHere() || !stops || st.linkOff || st.link === undefined) return '';
+    const stop = stops.get(String(st.c.id));
+    const l = st.link;
+    const seen = !l ? 'لسه ما اتبعتلوش رابط' : l.last_seen_at ? `فتح رابطه: ${whenText(localIso(l.last_seen_at), new Date())}` : 'لسه ما فتحش رابطه';
+    return '<div class="cu-link">' +
+      (stop ? `<p class="cu-stopped">⛔ موقوف من ${esc(whenText(localIso(stop.stopped_at), new Date()))}: رابطه بيقوله «حسابك موقوف»، وطلباته كاش بس</p>` : '') +
+      `<button type="button" class="cu-send" data-cu-link-send${st.linkBusy ? ' disabled' : ''}>🔗 ابعتله رابط حسابه على الواتس</button>` +
+      (stop
+        ? `<button type="button" class="secondary cu-unstop" data-cu-unstop${st.stopBusy ? ' disabled' : ''}>✅ رجّع الآجل</button>`
+        : `<button type="button" class="cu-stop" data-cu-stop${st.stopBusy ? ' disabled' : ''}>⛔ وقّف الآجل</button>`) +
+      `<div class="cu-link-seen"><span>${esc(seen)}</span>${l ? '<button type="button" class="linklike" data-cu-link-new>🔄 رابط جديد</button>' : ''}</div>` +
+      (st.linkMsg ? `<p class="status cu-note ${st.linkBad ? 'bad' : 'good'}">${esc(st.linkMsg)}</p>` : '') +
+      '</div>';
+  }
   function drawStatement() {
     const box = $('cuSt');
     if (!box) return;
@@ -651,7 +760,7 @@
       `<div class="cu-head"><div class="cu-name"><strong class="notr">${esc(c.name)}</strong> <span class="hint">كود ${esc(c.id)}</span></div>` +
       `<div class="cu-bal ${b.cls}">${esc(b.text)}</div><div class="hint">${esc(limLine)}</div>` +
       (st.monthDone ? `<div class="cu-sum"><div>اشترى الشهر ده<b>${esc(money(sums.bought))} ج</b></div><div>دفع الشهر ده<b class="paid">${esc(money(sums.paid))} ج</b></div></div>` : '') +
-      phoneHtml() +
+      phoneHtml() + linkHtml() +
       '</div>' +
       sendHtml() +
       `<div class="chips cu-filter" role="group" aria-label="نوع الحركة">${chip('all', 'الكل')}${chip('sales', 'المبيعات')}${chip('payments', 'المدفوعات')}</div>` +
@@ -664,11 +773,12 @@
   function openStatement(id, fromHistory) {
     const c = (list || []).find((x) => String(x.id) === String(id));
     if (!c) return;
-    st = { c, moves: [], done: false, monthDone: false, filter: 'all', open: new Set(), busy: false, error: '' };
+    st = { c, moves: [], done: false, monthDone: false, filter: 'all', open: new Set(), busy: false, error: '', link: undefined };
     if (!fromHistory) { try { history.pushState({ cuSt: c.id }, ''); } catch (e) {} }
     drawStatement();
     window.scrollTo?.(0, 0);
     loadMoves();
+    if (ownerHere() && stops) loadLink(st);
   }
   function closeStatement() {
     st = null;
@@ -733,6 +843,11 @@
       if (e.target.closest('[data-cu-make]')) { makeStatement(); return; }
       if (e.target.closest('[data-cu-pdf]') && st.send && st.send.pdfUrl) { root.open(st.send.pdfUrl, '_blank'); return; }
       if (e.target.closest('[data-cu-wa]')) { openWa(); return; }
+      // his personal link and «وقّف الآجل»
+      if (e.target.closest('[data-cu-link-send]')) { sendLink(false); return; }
+      if (e.target.closest('[data-cu-link-new]')) { sendLink(true); return; }
+      if (e.target.closest('[data-cu-stop]')) { setStop(true); return; }
+      if (e.target.closest('[data-cu-unstop]')) { setStop(false); return; }
     });
     // the message can be changed before sending; a redraw keeps the change
     panel.addEventListener('input', (e) => { if (e.target.id === 'cuMsg' && st && st.send) st.send.msg = e.target.value; });

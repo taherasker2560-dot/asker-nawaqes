@@ -1394,3 +1394,63 @@ body.ts-page #dataAge { display: none !important; }
 .ct-more { width: 100%; margin-top: 6px; }
 html.night .ct-tag.ok { background: rgba(60, 200, 110, 0.15); color: #7fe0a2; }
 html.night .ct-tag.diff { background: rgba(255, 180, 60, 0.15); color: #ffc46b; }
+/* the customer's personal link and «وقّف الآجل» (owner 2026-11-13, ar/customers.js linkHtml) */
+.cu-link {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line, #e3e6ee);
+}
+.cu-link button.cu-send { margin-top: 0; }
+button.cu-stop,
+button.cu-unstop {
+  width: 100%;
+  margin: 8px 0 0;
+  font-weight: 700;
+}
+button.cu-stop {
+  background: transparent;
+  border: 2px solid #d32f2f;
+  color: #c62828;
+}
+.cu-stopped {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(211, 47, 47, 0.08);
+  color: #b71c1c;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.5;
+}
+html.night .cu-stopped { color: #ffb4b4; }
+.cu-link-seen {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted, #6b7280);
+}
+.cu-link-seen .linklike {
+  min-height: 0;
+  padding: 2px 4px;
+  background: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+/* an order from a customer's personal link (owner 2026-11-13): who he is and how he pays */
+.so-acct {
+  display: inline-block;
+  align-self: flex-start;
+  margin: 2px 0;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: rgba(31, 168, 85, 0.1);
+  color: #166534;
+  font-size: 13px;
+  font-weight: 700;
+}
+.so-acct.on { background: rgba(10, 74, 166, 0.1); color: #0a4aa6; }
+html.night .so-acct { color: #9fe0b8; }
+html.night .so-acct.on { color: #a9c6f2; }

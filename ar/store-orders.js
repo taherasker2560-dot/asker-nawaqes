@@ -71,6 +71,7 @@
     return `<div class="so-item so-${esc(o.status)}" data-order="${esc(o.id)}">
       <div class="so-head"><strong>#${esc(o.id)} · ${esc(o.customer_name)}</strong><span class="so-st">${esc(STATUS[o.status] || o.status)}</span></div>
       <span class="hint">${esc(when(o.created_at))} · <span dir="ltr">${esc(o.phone)}</span></span>
+      ${o.customer_id ? `<span class="so-acct${o.pay === 'account' ? ' on' : ''}">🔗 من رابط حسابه · كود ${esc(o.customer_id)} · ${o.pay === 'account' ? '💳 على حسابه' : '💵 كاش عند الاستلام'}</span>` : ''}
       <span class="hint">${esc(o.address)}</span>
       ${o.notes ? `<span class="hint">ملاحظة: ${esc(o.notes)}</span>` : ''}
       ${rx ? `<div class="so-rxs"><span class="hint">${items ? 'ومعاه روشتة:' : 'طلب بالروشتة: اقراها واكتب الأسعار في رسالة الواتساب'}</span>${rx}</div>` : ''}

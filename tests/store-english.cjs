@@ -21,6 +21,15 @@ for(const v of S.SECTIONS)check(v.name);
 for(const v of S.NEEDS)check(v.name);
 for(const v of Object.values(S.ORDER_STATUS))check(typeof v==='string'?v:v.label);
 for(const v of Object.values(S.ERRORS))check(v);
+// «حسابي» (store/account.js, 2026-11-13): its fixed texts and the ones it builds
+const A=require('../store/account.js');
+for(const v of Object.values(A.TEXTS))check(v);
+for(const b of [7174,-200,0.2])check(A.balanceWords(b).text);
+for(const k of ['sale','return','payment','refund'])check(A.moveTitle({kind:k,total:k==='return'?-54:166.7,paid:k==='payment'?8000:k==='refund'?-200:0}).text);
+for(const b of [7174,-200,0])check(A.afterText(b));
+for(const n of [1,2,5,14])check(A.itemsWord(n));
+for(const l of [{p:1,u:0},{p:0,u:2},{p:1,u:3}])check(A.qtyText(l)+' · 66.70');
+for(const s of ['حسابك يا Ahmed · كود 2489','خصم 5 ج','دفعت منها 100 ج','آخر تحديث النهارده 8:10 م · بيتحدث كل 10 دقايق','آخر تحديث 05/11/2026','⛔ حسابك موقوف دلوقتي','10:33 م · ','الطلب هيتحط على حسابك في الصيدلية'])check(s);
 // some built texts (numbers and names put in)
 for(const s of ['نتايج «PANADOL»','طلب رقم 12','طلبك رقم 12 وصلنا. الإجمالي 150 جنيه','اتضاف 3 صنف للسلة','470 ج للواحدة','تفاصيل PANADOL 500','في السلة (2)','3 صنف في السلة · 470 ج','2 صنف في السلة + أصناف بالطلب','طلب رقم 12 · 4 صنف'])check(s);
 assert.deepEqual(bad,[],'Arabic texts without English in store/i18n-en-store.js:\n'+bad.join('\n'));

@@ -158,6 +158,7 @@
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name', kind = 'sale';
+  let stopped = new Set(); // customers whose credit the owner stopped
   // «الفكة»: the amount off (−) or added (+) on this bill; any change in the lines clears it
   let adj = 0, adjOpen = false, adjSign = -1;
   const clearAdj = () => { adj = 0; adjOpen = false; };
@@ -202,6 +203,11 @@
     } catch (e) {
       customers = load(CKEY, []).map((a) => ({ id: a[0], name: a[1], credit_limit: a[2], balance: a[3] }));
     }
+    // who the owner stopped (ar_customer_stops, «وقّف الآجل» 2026-11-13): said on the bill; the table may not be there yet
+    try {
+      const { data, error } = await db().from('ar_customer_stops').select('customer_id').range(0, 4999);
+      if (!error) stopped = new Set((data || []).map((r) => String(r.customer_id)));
+    } catch (e) { /* keeps the last list */ }
   }
   // an item with no stock (not in the stock list) is looked up by its code on the server
   async function itemByCode(code) {
@@ -478,6 +484,7 @@
           ${a.paid ? `<div><span>${a.ret ? 'رجّعتله فلوس' : 'دفع'}</span><b class="${a.ret ? 'pos' : 'neg'}">${a.ret ? '+' : '−'} ${esc(money(a.paid))}</b></div>` : ''}
           <div class="ts-acct-after"><span>${a.ret ? 'حسابه بعد المرتجع' : 'حسابه بعد الفاتورة'}</span><b>${esc(balText(a.after))}</b></div>
         </div>
+        ${!ret && stopped.has(String(cust.id)) ? '<div class="ts-warn ts-stop">⛔ العميل ده موقوف: البيع ليه كاش بس</div>' : ''}
         ${over ? `<div class="ts-warn">⚠️ هيبقى عليه ${esc(money(over.after))} والحد ${esc(money(over.lim))}: هيعدّي الحد بالبيعة دي</div>` : ''}
         <button type="button" class="linklike" data-ts-change>غيّر العميل</button></div>`;
     } else if (custOpen) {
@@ -495,7 +502,7 @@
     let hits = [];
     if (/^\d+$/.test(q)) hits = customers.filter((c) => String(c.id) === q);
     else if (q.length >= 2 && F) hits = F.rank(q, customers, (c) => [F.fold(c.name)], 8);
-    $('tsCHits').innerHTML = hits.map((c) => `<button type="button" class="ts-hit" data-ts-cust="${esc(c.id)}"><strong class="notr">${esc(c.name)}</strong><small>كود ${esc(c.id)} · عليه ${esc(money(Math.max(0, Number(c.balance) || 0)))}</small></button>`).join('') ||
+    $('tsCHits').innerHTML = hits.map((c) => `<button type="button" class="ts-hit" data-ts-cust="${esc(c.id)}"><strong class="notr">${esc(c.name)}${stopped.has(String(c.id)) ? ' ⛔' : ''}</strong><small>كود ${esc(c.id)} · عليه ${esc(money(Math.max(0, Number(c.balance) || 0)))}</small></button>`).join('') ||
       (q.length >= 2 ? '<p class="status">مفيش عميل بالاسم ده</p>' : '');
   }
 

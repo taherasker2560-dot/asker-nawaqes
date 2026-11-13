@@ -50,6 +50,10 @@
     rx_big: 'الصورة أكبر من 8 ميجا. صوّرها تاني',
     bad_text: 'اسم الصنف اللي كتبته لازم يكون من 2 لـ 120 حرف',
     too_many_text: 'تقدر تكتب 10 أصناف بالكتير في الطلب الواحد',
+    // a customer ordering from his personal link (store/account.js)
+    stopped: 'حسابك اتوقف، فالطلب ده كاش عند الاستلام. دوس «إرسال الطلب» تاني',
+    link: 'الرابط ده مبقاش شغال. اطلب رابط جديد من الصيدلية، أو اكتب اسمك وابعت الطلب عادي',
+    bad_pay: 'اختار طريقة الدفع',
   };
   const MAX_LINES = 30, MAX_QTY = 20;
 
@@ -224,6 +228,8 @@
   const SUPABASE_URL = 'https://qwrzdjdgvanmhaicncuk.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_af0XfsvB0Fwwo3HORqMN2g_iJNd9o0q';
   const client = root.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  // a credit customer's personal link (store/account.js, owner 2026-11-13): «حسابي» and ordering on his account
+  const acct = root.AskerStoreAccount || null;
   const COLS = 'id,name,arabic_name,status,price,cat,needs_rx';
   const PAGE = 40;
   const $ = (id) => document.getElementById(id);
@@ -302,6 +308,7 @@
     document.querySelectorAll('.tabbar a').forEach((a) => a.classList.toggle('on', a.dataset.go === name));
     if (name === 'cart') drawCart();
     if (name === 'orders') drawOrders();
+    if (name === 'account' && acct) acct.draw();
     window.scrollTo(0, 0);
   }
   function route() {
@@ -318,6 +325,7 @@
     else if (h === 'orders') view('orders');
     else if (h === 'search') { view('search'); if (!lastQuery) $('q').focus(); }
     else if (h === 'done') view('done');
+    else if (h === 'account' && acct && acct.linked()) view('account');
     else view('home');
   }
 
@@ -647,12 +655,15 @@
   async function send(e) {
     e.preventDefault();
     if (sending) return;
-    const name = $('cName').value.trim(), phone = normPhone($('cPhone').value), address = $('cAddr').value.trim(), notes = $('cNotes').value.trim();
+    // from a customer's link: his name comes from the pharmacy's card, he picks on account or cash
+    const link = acct && acct.active();
+    const typed = $('cName').value.trim(), name = link ? link.name || typed : typed;
+    const phone = normPhone($('cPhone').value), address = $('cAddr').value.trim(), notes = $('cNotes').value.trim();
     if (!cart.length && !rxFiles.length) return say(ERRORS.bad_items, true);
-    if (name.length < 2) return say(ERRORS.bad_name, true);
+    if (!link && name.length < 2) return say(ERRORS.bad_name, true);
     if (!phone) return say(ERRORS.bad_phone, true);
     if (address.length < 5) return say(ERRORS.bad_address, true);
-    store.set('asker_store_me', { name, phone, address });
+    store.set('asker_store_me', { name: typed, phone, address });
     sending = true; $('sendBtn').disabled = true; say(rxFiles.length ? 'بيرفع صورة الروشتة…' : 'بيبعت الطلب…');
     try {
       let rx = [];
@@ -662,9 +673,15 @@
       }
       const args = { p_name: name, p_phone: phone, p_address: address, p_notes: notes || null, p_items: orderItems(cart) };
       if (rx.length) args.p_rx = rx;
-      const { data, error } = await client.rpc('ar_store_place_order', args);
+      let fn = 'ar_store_place_order';
+      if (link) { delete args.p_name; Object.assign(args, { p_token: link.token, p_pay: link.pay }); fn = 'ar_customer_place_order'; }
+      const { data, error } = await client.rpc(fn, args);
       if (error) throw error;
-      if (!data || !data.ok) return say(errorText(data && data.error), true);
+      if (!data || !data.ok) {
+        if (link && data && data.error === 'stopped') acct.stoppedNow();
+        if (link && data && data.error === 'link') acct.linkGone();
+        return say(errorText(data && data.error), true);
+      }
       const changed = Math.abs(Number(data.total) - cartTotal(cart)) > 0.009;
       myOrders = rememberOrder(myOrders, {
         id: data.order_id, phone, at: new Date().toISOString(), total: Number(data.total), status: 'new',
@@ -679,6 +696,8 @@
         ? `طلب الروشتة رقم ${data.order_id} وصلنا. هنقرا الروشتة ونكلمك بالأسعار.`
         : `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + (data.rx ? '، ومعاه الروشتة' : '') + '.'
           + (later ? ` و${later} صنف بالطلب، هنكلمك بسعرهم وميعادهم.` : '');
+      $('donePay').hidden = !data.pay;
+      $('donePay').textContent = data.pay === 'account' ? 'الطلب هيتحط على حسابك في الصيدلية' : 'الدفع كاش عند الاستلام';
       say('');
       location.hash = 'done';
     } catch (err) {
@@ -820,6 +839,7 @@
     + '<a href="#search" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span><span>كل الأصناف</span></a>';
   const me = store.get('asker_store_me', null);
   if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; $('cAddr').value = me.address || ''; }
+  if (acct) acct.attach(client);
   saveCart();
   route();
   loadSettings();

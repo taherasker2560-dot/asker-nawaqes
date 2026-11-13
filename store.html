@@ -15,11 +15,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
     <link rel="stylesheet" href="store/look.css?v=en-20261112d" />
-    <link rel="stylesheet" href="store/polish.css?v=card-20261113b" />
+    <link rel="stylesheet" href="store/polish.css?v=acct-20261113a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=look-20261112a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=home-20261112a"></script>
+    <script src="store/i18n-en-store.js?v=acct-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=theme-20261112a"></script>
   </head>
@@ -88,6 +88,12 @@
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.5"/><circle cx="17" cy="17.5" r="1.5"/></svg><span>توصيل لحد البيت</span></li>
       </ul>
 
+      <!-- a credit customer's own account (his personal link from the pharmacy, store/account.js) -->
+      <a href="#account" class="home-card acct-card" id="acctCard" data-acct hidden>
+        <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></span>
+        <span class="hc-text"><strong>حسابي</strong><span id="acctCardText"></span></span>
+        <span class="hc-go">افتح</span>
+      </a>
       <a href="#cart" class="home-card cart-card" id="cartCard" hidden>
         <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg></span>
         <span class="hc-text"><strong>كمّل طلبك</strong><span id="cartCardText"></span></span>
@@ -177,7 +183,7 @@
         <div id="checkout" hidden>
           <section class="panel">
             <h2>بيانات التوصيل</h2>
-            <label for="cName">الاسم</label>
+            <label for="cName" id="cNameLbl">الاسم</label>
             <input id="cName" type="text" autocomplete="name" maxlength="80" required />
             <label for="cPhone">رقم الموبايل (واتساب)</label>
             <input id="cPhone" type="tel" dir="ltr" autocomplete="tel" inputmode="tel" maxlength="16" placeholder="01xxxxxxxxx" required />
@@ -186,12 +192,14 @@
             <label for="cNotes">ملاحظات (اختياري)</label>
             <textarea id="cNotes" rows="2" maxlength="500" placeholder="مثلًا: صنف مش لاقيه، أو ميعاد يناسبك"></textarea>
           </section>
+          <!-- a customer from his link: on account or cash (cash only when the pharmacy stopped his account) -->
+          <section class="panel" id="payBox" hidden></section>
           <section class="panel sums" id="sumBox">
             <div><span>المنتجات</span><span id="sumItems"></span></div>
             <div><span>التوصيل</span><span>هنقولك على واتساب</span></div>
             <div class="total"><span>الإجمالي (من غير التوصيل)</span><span id="sumTotal"></span></div>
             <span class="hint-sm later-note" id="sumLater" hidden></span>
-            <span class="hint-sm">الدفع كاش عند الاستلام</span>
+            <span class="hint-sm" id="cashNote">الدفع كاش عند الاستلام</span>
           </section>
           <div class="send">
             <p class="closed-note" hidden></p>
@@ -216,12 +224,24 @@
       <div id="ordersList" class="list"></div>
     </div>
 
+    <!-- حسابي: العميل الآجل من رابطه الشخصي (store/account.js) -->
+    <div data-view="account" hidden>
+      <header class="top acct-top">
+        <div class="brand">
+          <img src="icons/arabic-96.png?v=logo2" alt="لوجو صيدلية عسكر" width="48" height="48" />
+          <div><strong>صيدلية عسكر</strong><span id="acctName"></span></div>
+        </div>
+      </header>
+      <div id="acctBox"></div>
+    </div>
+
     <!-- الطلب وصل -->
     <div data-view="done" hidden>
       <section class="done">
         <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M7 12.5l3.2 3L17 9" /></svg>
         <h1>طلبك وصل</h1>
         <p id="doneText"></p>
+        <p id="donePay" class="done-pay" hidden></p>
         <p>هنكلمك على واتساب قريب نأكد الطلب ومصاريف التوصيل. وتقدر تتابعه من «طلباتي».</p>
         <a href="#orders" class="hero-btn">تابع طلبك</a>
       </section>
@@ -274,6 +294,7 @@
     </div>
 
     <nav class="tabbar" aria-label="القائمة">
+      <a href="#account" data-go="account" data-acct hidden><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>حسابي</a>
       <a href="#" data-go="home"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z" /></svg>الرئيسية</a>
       <a href="#search" data-go="search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>بحث</a>
       <a href="#orders" data-go="orders"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h4" /></svg>طلباتي</a>
@@ -281,7 +302,9 @@
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="store/store.js?v=card-20261113a"></script>
+    <script src="ar/statement-pdf.js?v=year-20261112a"></script>
+    <script src="store/account.js?v=acct-20261113a"></script>
+    <script src="store/store.js?v=acct-20261113a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>
 </html>
