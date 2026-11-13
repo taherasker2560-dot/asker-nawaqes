@@ -272,7 +272,9 @@
     const pool = scope === 'all' ? ix.items : ix.items.filter((it) => inScope(it, scope));
     const hits = fz().rank(q, pool, (it) => it._h, 25);
     // the warehouses' lines that are not surely one of our items belong to «الكل» and «القوايم»
-    const extra = lines && (scope === 'all' || scope === 'lists') ? fz().rank(q, ix.extra, (l) => l._h, 10) : [];
+    // strict: each word inside one word of the line, no letter forgiven, and close enough (owner 2026-11-13: «ابيمول» showed
+    // «اب كير امبول»: «اصناف تانية غريبة كده ملهاش علاقة بيه»)
+    const extra = lines && (scope === 'all' || scope === 'lists') ? fz().rank(q, ix.extra, (l) => l._h, 10, { strict: true, min: 0.6 }) : [];
     shown = new Map(hits.map((it) => [it.key, it]));
     $('hsItems').innerHTML = hits.map(card).join('');
     if (editing && shown.has(editing)) openEditor(editing);

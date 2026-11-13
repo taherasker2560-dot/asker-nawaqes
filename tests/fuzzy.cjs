@@ -61,6 +61,15 @@ const two = [{ n: 'x', h: [F.fold('بروفين ٤٠٠'), F.fold('BRUFEN 400MG')
 assert.equal(F.rank('brufen', two, (x) => x.h).length, 1);
 assert.equal(F.rank('بروفين', two, (x) => x.h).length, 1);
 assert.equal(F.rank('بروفين brufen', two, (x) => x.h).length, 0, 'all words must be in the same name');
+// strict (the warehouses' lines that are not one of our items, owner 2026-11-13 «اصناف تانية غريبة ملهاش علاقة»):
+// a typed word stays inside one word of the line, no letter is forgiven, and the match must be close enough
+const wl = ['ابيمول اقراص', 'ابیمول اكسترا اقراص', 'اب كیر امبولات', 'ابكير امبولات للشعر', 'ابيرازول ٤٠ مجم ١٠ كبسولات', 'امبروبيم ١جم فيال', 'صابيميثارون امبول', 'ابيروفاستين ٤٠ مجم اقراص'].map((n) => ({ n, h: [F.fold(n)] }));
+const strict = (q) => F.rank(q, wl, (x) => x.h, 10, { strict: true, min: 0.6 }).map((x) => x.n);
+assert.deepEqual(strict('ابيمول'), ['ابيمول اقراص', 'ابیمول اكسترا اقراص'], 'no «اب كير امبول» picked from three words');
+assert.ok(F.rank('ابيمول', wl, (x) => x.h).some((x) => x.n === 'اب كیر امبولات'), 'the normal search is unchanged');
+assert.deepEqual(strict('ابكير'), ['ابكير امبولات للشعر', 'اب كیر امبولات'], 'only the space itself may be skipped');
+assert.deepEqual(strict('شامبو'), [], 'no letter forgiven («امبروبيم»)');
+assert.deepEqual(strict('ابرفستن'), ['ابيروفاستين ٤٠ مجم اقراص'], "the owner's way still works");
 // speed: 30,000 names, one search well under a second
 const many = [];
 for (let i = 0; i < 30000; i++) many.push({ h: [F.fold(NAMES[i % NAMES.length] + ' ' + i)] });
