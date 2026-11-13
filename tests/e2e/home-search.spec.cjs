@@ -97,6 +97,16 @@ run('search on top: the lists kept on the phone, ready before the first search',
  await page.evaluate(()=>window.AskerCache.clear());
  assert.equal(await page.evaluate(()=>window.AskerCache.get('sp-lines-v1')),null);
 },{home:true});
+// 2026-11-13: on his phone the kept copy never answered and the search said «بحمّل…» for a quarter of an hour: a phone
+// storage that does not answer is skipped and the lists come from the server
+run('search on top: a phone storage that never answers does not hold the search',async({page})=>{
+ await seed(page);
+ await page.addInitScript(()=>{window.indexedDB.open=()=>({});});
+ await page.reload();await ready(page);
+ await page.fill('#hsQ','FLAGYL');
+ await page.waitForFunction(()=>/في القوايم: AMG 22%/.test(document.getElementById('hsItems').textContent),null,{timeout:12000});
+ await page.waitForFunction(()=>!/بحمّل/.test(document.getElementById('hsStatus').textContent),null,{timeout:12000});
+},{home:true});
 run('search on top: ✏️ fixes the Arabic name everywhere',async({page})=>{
  await seed(page);await page.reload();await ready(page);
  await page.fill('#hsQ','CONCOR');

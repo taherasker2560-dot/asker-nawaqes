@@ -335,8 +335,10 @@
   const kept = () => root.AskerCache;
   function forget() { allGen++; allLines = allById = null; kept() && kept().del(CACHE_KEY); } // after a new list or «اقبل القوي»: read again at the next search
   function patchKept(id, fields) { const r = allById && allById.get(id); if (r) prep(Object.assign(r, fields)); }
+  // a server read with a time limit and one more try (ar/cache.js): a weak line never holds the search
+  const limited = (build) => (kept() && kept().limited ? kept().limited(build, 30000) : build());
   async function readLines() {
-    const page = (a, z, opts) => db().from('ar_supplier_items').select(LINE_COLS, opts).order('id', { ascending: true }).range(a, z);
+    const page = (a, z, opts) => limited(() => db().from('ar_supplier_items').select(LINE_COLS, opts).order('id', { ascending: true }).range(a, z));
     const first = await page(0, 999, { count: 'exact' });
     if (first.error) throw first.error;
     const out = [...(first.data || [])];
@@ -354,9 +356,9 @@
   async function signature() {
     const t = () => db().from('ar_supplier_items');
     const [c, last, rev] = await Promise.all([
-      t().select('id', { count: 'exact', head: true }),
-      t().select('id').order('id', { ascending: false }).limit(1),
-      t().select('reviewed_at').order('reviewed_at', { ascending: false, nullsFirst: false }).limit(1),
+      limited(() => t().select('id', { count: 'exact', head: true })),
+      limited(() => t().select('id').order('id', { ascending: false }).limit(1)),
+      limited(() => t().select('reviewed_at').order('reviewed_at', { ascending: false, nullsFirst: false }).limit(1)),
     ]);
     if (c.error || last.error || rev.error) throw c.error || last.error || rev.error;
     return [c.count == null ? (c.data || []).length : c.count, ((last.data || [])[0] || {}).id || 0, ((rev.data || [])[0] || {}).reviewed_at || ''].join('|');
@@ -392,8 +394,8 @@
           refresh(copy.sig, gen);
           return out;
         }
-        const sig = await signature().catch(() => '');
-        const out = await readLines();
+        // the signature alongside the reading, not before it
+        const [sig, out] = await Promise.all([signature().catch(() => ''), readLines()]);
         if (sig && kept()) kept().set(CACHE_KEY, { sig, at: Date.now(), rows: plain(out) });
         return use(out, gen);
       })().finally(() => { allLoading = null; });

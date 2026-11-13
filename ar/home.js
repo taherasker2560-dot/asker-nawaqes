@@ -144,7 +144,9 @@
   async function readCatalog() { return readAll('ar_store_items', ITEM_COLS, 'id'); }
   async function readAll(table, cols, orderBy) {
     // a stable order (every key column), so pages never skip or repeat a row
-    const page = (a, z, opts) => orderBy.split(',').reduce((q, c) => q.order(c.trim(), { ascending: true }), db().from(table).select(cols, opts)).range(a, z);
+    // each page with a time limit and one more try (ar/cache.js), so a weak line never holds the search
+    const build = (a, z, opts) => () => orderBy.split(',').reduce((q, c) => q.order(c.trim(), { ascending: true }), db().from(table).select(cols, opts)).range(a, z);
+    const page = (a, z, opts) => (root.AskerCache && root.AskerCache.limited ? root.AskerCache.limited(build(a, z, opts), 30000) : build(a, z, opts)());
     const first = await page(0, 999, { count: 'exact' });
     if (first.error) throw first.error;
     const out = [...(first.data || [])];
