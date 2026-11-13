@@ -1292,4 +1292,5 @@ html.night .preview-bar { background: rgba(255, 180, 60, 0.15); color: #ffc46b; 
 details.stf-card > summary::-webkit-details-marker { display: none; }
 details.stf-card > summary .hint { flex: 1; margin: 0 6px; }
 details.stf-card[open] > summary { margin-bottom: 6px; }
-.stf-acts .stf-del { color: #c62828; }
+.stf-acts .stf-del { color: #c62828; }/* the search choices sit above the box now (owner 2026-11-13) */
+.topsearch .hs-scope { margin: 0 0 8px; }
