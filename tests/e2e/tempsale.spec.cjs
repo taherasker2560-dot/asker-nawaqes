@@ -129,10 +129,16 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.waitForSelector('#tsHits [data-ts-add="1060"]');
  await page.click('#tsHits [data-ts-add="1060"]');
  assert.ok(await page.$eval('#tsPaidRow',e=>e.classList.contains('hidden')),'cash: no «دفع كام»');
+ // «الفكة» (owner 2026-11-13): 210 needs no rounding, so only «مبلغ تاني»: 10 off -> «المطلوب» 200
+ assert.equal(await page.$('[data-ts-adj]'),null);
+ await page.click('[data-ts-adjx]');
+ await page.fill('#tsAdj','10');
+ assert.match(await text(page,'.ts-due'),/المطلوب \(خصم 10 ج\) ?200 ج/);
  await page.click('#tsSave');
  await page.waitForFunction(()=>/اتحفظت ✓/.test(document.getElementById('tsStatus').textContent));
  const cash=(await table('ar_temp_sales')).find(r=>r.status==='pending');
- assert.equal(cash.customer_id,null);assert.equal(cash.paid,null);assert.equal(cash.total,210);assert.equal(cash.kind,'sale');
+ assert.equal(cash.customer_id,null);assert.equal(cash.paid,null);assert.equal(cash.total,200);assert.equal(cash.adjust,-10);assert.equal(cash.kind,'sale');
+ assert.equal(await page.$('.ts-due'),null,'a new bill has no change');
  // a return (مرتجع): its own bill, red; «رجّعتله كام فلوس؟» even for cash; marked in the list
  await page.click('[data-ts-type="return"]');
  assert.equal(await text(page,'#tsSave'),'احفظ المرتجع');

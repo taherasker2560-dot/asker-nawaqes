@@ -39,7 +39,12 @@ assert.equal(T.balText(196),'196 ج');assert.equal(T.balText(-50.5),'له 50.50 
 // the row sent to the server
 const rec=T.record({id:'00000000-0000-4000-8000-000000000001',soldAt:'2026-11-12T19:42:00.000Z',lines,customer:c,paid:'50',note:'  بعد الضهر '});
 assert.deepEqual(rec,{id:'00000000-0000-4000-8000-000000000001',sold_at:'2026-11-12T19:42:00.000Z',kind:'sale',customer_id:101,customer_name:'عميل تجربة',
- items:[{c:1060,n:'ITEM ONE 14TAB',q:2,u:'unit',p:105},{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}],total:230,paid:50,note:'بعد الضهر',status:'pending'});
+ items:[{c:1060,n:'ITEM ONE 14TAB',q:2,u:'unit',p:105},{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}],total:230,adjust:null,paid:50,note:'بعد الضهر',status:'pending'});
+// «الفكة» (owner 2026-11-13): round down / up to 5 pounds; the row keeps the amount and asks for the total after it
+assert.deepEqual(T.roundOptions(274.7),[{to:270,adj:-4.7},{to:275,adj:0.3}]);
+assert.deepEqual(T.roundOptions(270),[]);assert.deepEqual(T.roundOptions(3.5),[{to:5,adj:1.5}],'never down to zero');
+const off=T.record({id:'o',soldAt:'t',lines,customer:null,paid:'',note:'',adjust:-5});assert.equal(off.total,225);assert.equal(off.adjust,-5);
+assert.equal(T.due(lines,0.5),230.5);
 // a return (مرتجع): its own bill; paid = what was given back (also to a cash customer)
 const back=T.record({id:'r',soldAt:'t',lines,customer:null,paid:'20',note:'',kind:'return'});assert.equal(back.kind,'return');assert.equal(back.total,230);assert.equal(back.paid,20);
 const cash=T.record({id:'x',soldAt:'t',lines,customer:null,paid:'40',note:''});assert.equal(cash.customer_id,null);assert.equal(cash.paid,null,'cash: no paid part');assert.equal(cash.note,null);

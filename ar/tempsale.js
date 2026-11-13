@@ -80,16 +80,29 @@
     const before = r2(Number(cust.balance) || 0), amt = r2(Number(amount) || 0), cash = r2(Number(paid) || 0), ret = kind === 'return';
     return { before, amount: amt, paid: cash, ret, after: r2(ret ? before - amt + cash : before + amt - cash) };
   }
+  // «الفكة» (owner 2026-11-13 «خصم مبلغ او اضافة مبلغ»): the bill rounded down / up to 5 pounds, and the amount that
+  // gets there; adjust is taken off (minus) or added (plus) on the whole bill
+  function roundOptions(sum) {
+    const s = r2(sum);
+    if (!(s > 0)) return [];
+    const down = Math.floor(s / 5) * 5, up = Math.ceil(s / 5) * 5, out = [];
+    if (down !== s && down > 0) out.push({ to: down, adj: r2(down - s) });
+    if (up !== s) out.push({ to: up, adj: r2(up - s) });
+    return out;
+  }
+  const due = (lines, adj) => r2(total(lines) + (Number(adj) || 0));
   // the row kept on the phone and sent to ar_temp_sales
   // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; paid = what was given back)
-  function record({ id, soldAt, lines, customer, paid, note, kind }) {
-    const sum = total(lines);
+  // adjust: «الفكة» (− off the bill, + added); total is what is asked for, after it
+  function record({ id, soldAt, lines, customer, paid, note, kind, adjust }) {
+    const adj = r2(adjust);
     return {
       id, sold_at: soldAt, kind: kind === 'return' ? 'return' : 'sale',
       customer_id: customer ? Number(customer.id) : null,
       customer_name: customer ? String(customer.name || '').slice(0, 120) : null,
       items: lines.map((l) => ({ c: l.c, n: l.n, q: l.q, u: l.u, p: l.p })),
-      total: sum,
+      total: due(lines, adj),
+      adjust: adj || null,
       paid: (customer || kind === 'return') && Number(paid) > 0 ? r2(paid) : null,
       note: String(note || '').trim().slice(0, 300) || null,
       status: 'pending',
@@ -131,7 +144,7 @@
   }
   // a balance in words: «250 ج», or «له 50 ج» when the pharmacy owes him
   const balText = (x) => (r2(x) < 0 ? 'له ' + money(-x) : money(x));
-  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, account, balText, record, qtyText, countText, money, merged };
+  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -145,6 +158,9 @@
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name', kind = 'sale';
+  // «الفكة»: the amount off (−) or added (+) on this bill; any change in the lines clears it
+  let adj = 0, adjOpen = false, adjSign = -1;
+  const clearAdj = () => { adj = 0; adjOpen = false; };
   let queue = load(QKEY, []), server = [], view = 'new', listKind = 'pending', openRow = '', flushing = false, ready = false;
 
   function say(id, text, kind) {
@@ -201,6 +217,7 @@
   // ---------- adding items ----------
   function add(it) {
     const line = addItem(cart, it);
+    clearAdj();
     drawCart();
     return line;
   }
@@ -431,9 +448,16 @@
           ${l.k > 1 ? `<span class="ts-units"><button type="button" class="chip${l.u === 'pack' ? ' on' : ''}" data-ts-u="pack">علبة</button><button type="button" class="chip${l.u === 'unit' ? ' on' : ''}" data-ts-u="unit">وحدة</button></span>` : `<span class="ts-units">علبة</span>`}
           <button type="button" class="ts-del" data-ts-del aria-label="شيل الصنف">✕</button>
         </div></div>`).join('') +
-        `<div class="ts-total"><span>الإجمالي (تقريبي)</span><b>${esc(money(total(cart)))}</b></div>`;
+        `<div class="ts-total"><span>الإجمالي (تقريبي)</span><b>${esc(money(total(cart)))}</b></div>` + adjHtml();
     }
     drawCust();
+  }
+  // «الفكة»: round down / up to 5 pounds in one tap, or any amount off or added; then «المطلوب»
+  function adjHtml() {
+    const opts = roundOptions(total(cart));
+    return `<div class="chips ts-adj"><span class="ts-adj-l">فكة</span>${opts.map((o) => `<button type="button" class="chip${adj === o.adj && !adjOpen ? ' on' : ''}" data-ts-adj="${o.adj}">${o.adj < 0 ? 'خصم' : 'زوّد'} ${esc(money(Math.abs(o.adj)))}</button>`).join('')}<button type="button" class="chip${adjOpen ? ' on' : ''}" data-ts-adjx>مبلغ تاني</button>${adj || adjOpen ? '<button type="button" class="chip ts-adj-x" data-ts-adj0 aria-label="شيل الفكة">✕</button>' : ''}</div>` +
+      (adjOpen ? `<div class="ts-adjx"><span class="chips seg"><button type="button" class="chip${adjSign < 0 ? ' on' : ''}" data-ts-sign="-1">− خصم</button><button type="button" class="chip${adjSign > 0 ? ' on' : ''}" data-ts-sign="1">+ زيادة</button></span><input id="tsAdj" type="number" inputmode="decimal" min="0" step="0.5" aria-label="مبلغ الفكة" placeholder="0" value="${adj ? Math.abs(adj) : ''}" /></div>` : '') +
+      (adj || adjOpen ? `<div class="ts-total ts-due"><span>المطلوب${adj ? ` (${adj < 0 ? 'خصم' : 'زيادة'} ${esc(money(Math.abs(adj)))})` : ''}</span><b id="tsDue">${esc(money(due(cart, adj)))}</b></div>` : '');
   }
   // a staff member (ar/staff.js): «مرتجع» and credit customers only when the owner opened them; the owner always
   const can = (p) => !root.AskerStaff || root.AskerStaff.can(p);
@@ -442,11 +466,11 @@
     const box = $('tsCust');
     if (!box) return;
     if (!can('credit')) { cust = null; custOpen = false; }
-    const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, total(cart), paid);
+    const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, due(cart, adj), paid);
     let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button>${can('credit') ? `<button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button>` : ''}</div>`;
     if (cust) {
       // his account with this bill, like a PharmaFly invoice (owner 2026-11-13): before, the bill, paid, after
-      const a = account(cust, kind, total(cart), paid);
+      const a = account(cust, kind, due(cart, adj), paid);
       html += `<div class="ts-cust${over ? ' warn' : ''}"><strong class="notr">${esc(cust.name)}</strong> <small>كود ${esc(cust.id)}${Number(cust.credit_limit) ? ' · الحد ' + esc(money(cust.credit_limit)) : ''}</small>
         <div class="ts-acct">
           <div><span>حسابه السابق</span><b>${esc(balText(a.before))}</b></div>
@@ -479,10 +503,10 @@
   const uuid = () => (root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => ((Math.random() * 16) | 0).toString(16)));
   async function save() {
     if (!cart.length) return say('tsStatus', 'ضيف صنف الأول', 'bad');
-    const rec = record({ id: uuid(), soldAt: new Date().toISOString(), lines: cart, customer: cust, paid: $('tsPaid').value, note: $('tsNote').value, kind });
+    const rec = record({ id: uuid(), soldAt: new Date().toISOString(), lines: cart, customer: cust, paid: $('tsPaid').value, note: $('tsNote').value, kind, adjust: adj });
     queue.push(rec);
     keep(QKEY, queue);
-    cart = []; cust = null; custOpen = false; setKind('sale');
+    cart = []; cust = null; custOpen = false; clearAdj(); setKind('sale');
     $('tsPaid').value = ''; $('tsNote').value = ''; $('tsQ').value = ''; $('tsHits').innerHTML = '';
     drawCart();
     drawBadge();
@@ -591,7 +615,16 @@
     $('tsClear').onclick = () => { $('tsQ').value = ''; find(); $('tsQ').focus(); };
     $('tsSave').onclick = save;
     $('tsPaid').addEventListener('input', drawCust);
-    panel.addEventListener('input', (e) => { if (e.target.id === 'tsCQ') drawCustHits(); });
+    panel.addEventListener('input', (e) => {
+      if (e.target.id === 'tsCQ') drawCustHits();
+      // typing the change amount: only «المطلوب» and the customer's account follow (the box keeps its focus)
+      if (e.target.id === 'tsAdj') {
+        adj = r2(adjSign * Math.abs(Number(e.target.value) || 0));
+        const d = $('tsDue');
+        if (d) { d.textContent = money(due(cart, adj)); const lab = d.previousElementSibling; if (lab) lab.textContent = 'المطلوب' + (adj ? ` (${adj < 0 ? 'خصم' : 'زيادة'} ${money(Math.abs(adj))})` : ''); }
+        drawCust();
+      }
+    });
     panel.addEventListener('click', async (e) => {
       const t = e.target.closest('button');
       if (!t || !panel.contains(t)) return;
@@ -606,10 +639,15 @@
         return;
       }
       const line = t.closest('.ts-line'), l = line ? cart[Number(line.dataset.i)] : null;
-      if (l && t.hasAttribute('data-ts-plus')) { l.q += 1; return drawCart(); }
-      if (l && t.hasAttribute('data-ts-minus')) { if (l.q > 1) l.q -= 1; return drawCart(); }
-      if (l && t.dataset.tsU) { setUnit(l, t.dataset.tsU); return drawCart(); }
-      if (l && t.hasAttribute('data-ts-del')) { cart.splice(Number(line.dataset.i), 1); return drawCart(); }
+      if (l && t.hasAttribute('data-ts-plus')) { l.q += 1; clearAdj(); return drawCart(); }
+      if (l && t.hasAttribute('data-ts-minus')) { if (l.q > 1) l.q -= 1; clearAdj(); return drawCart(); }
+      if (l && t.dataset.tsU) { setUnit(l, t.dataset.tsU); clearAdj(); return drawCart(); }
+      if (l && t.hasAttribute('data-ts-del')) { cart.splice(Number(line.dataset.i), 1); clearAdj(); return drawCart(); }
+      // «الفكة»
+      if (t.dataset.tsAdj != null) { adj = Number(t.dataset.tsAdj) || 0; adjOpen = false; return drawCart(); }
+      if (t.hasAttribute('data-ts-adjx')) { adjOpen = !adjOpen; if (!adjOpen) adj = 0; drawCart(); if (adjOpen && $('tsAdj')) $('tsAdj').focus(); return; }
+      if (t.dataset.tsSign) { adjSign = Number(t.dataset.tsSign) < 0 ? -1 : 1; adj = r2(adjSign * Math.abs(adj)); drawCart(); if ($('tsAdj')) $('tsAdj').focus(); return; }
+      if (t.hasAttribute('data-ts-adj0')) { clearAdj(); return drawCart(); }
       if (t.hasAttribute('data-ts-cash')) { cust = null; custOpen = false; return drawCust(); }
       if (t.hasAttribute('data-ts-credit') || t.hasAttribute('data-ts-change')) { cust = null; custOpen = true; drawCust(); if ($('tsCQ')) $('tsCQ').focus(); return; }
       if (t.dataset.tsCust) { cust = customers.find((c) => String(c.id) === t.dataset.tsCust) || null; custOpen = false; return drawCust(); }
