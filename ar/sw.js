@@ -23,6 +23,17 @@ self.addEventListener('fetch', (e) => {
     return Response.redirect(page.href, 303);
   })());
 });
+// «رسالة جديدة من عميل» (owner 2026-11-14: a notification when a customer writes on our messages page, even with the bot
+// closed): the function asker-chat sends an empty push to the phones of the owner and of staff with «خدمة العملاء»
+self.addEventListener('push', (e) => {
+  e.waitUntil(self.registration.showNotification('رسالة جديدة من عميل', {
+    body: 'عميل كتبلك في «خدمة العملاء ← الرسايل»',
+    icon: '../icons/arabic-192.png?v=logo2',
+    badge: '../icons/arabic-192.png?v=logo2',
+    tag: 'asker-care', renotify: true, lang: 'ar', dir: 'rtl',
+    data: { url: '../asker-nawaqes-arabic.html?tab=care' },
+  }));
+});
 // a tap on a notification opens the bot; one from ar/notify.js (2026-11-12) carries the section to open (?tab=…)
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();

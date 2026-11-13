@@ -41,6 +41,52 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
   let chats = null, filter = 'waiting', failed = '', loading = false, timer = null;
+  // «رسالة جديدة من عميل» on this phone even with the bot closed (owner 2026-11-14): web push to the bot's own worker (ar/sw.js)
+  const VAPID = 'BEz67xiIZZubLNtifD1Ryqxc6p2j509IsWF6o-YUe5M1BvyWIlUm4NwaRKUP-potwMmyN9_qxqNC2qfn1s5ozwg';
+  let pushState = ''; // '' not checked, 'on', 'off', 'no' (this phone cannot), 'busy', 'bad' (refused)
+  const canPush = () => 'serviceWorker' in navigator && 'PushManager' in root && 'Notification' in root;
+  function keyBytes(b64url) {
+    const s = String(b64url).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(b64url).length + 3) % 4);
+    return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  }
+  async function botReg() {
+    const reg = (await navigator.serviceWorker.getRegistration('ar/')) || (await navigator.serviceWorker.register('ar/sw.js', { scope: 'ar/' }));
+    if (reg.active) return reg;
+    const w = reg.installing || reg.waiting;
+    await new Promise((ok) => { if (!w) return ok(); w.addEventListener('statechange', () => { if (w.state === 'activated') ok(); }); setTimeout(ok, 10000); });
+    return reg;
+  }
+  async function checkPush() {
+    if (!canPush()) { pushState = 'no'; return; }
+    try {
+      const reg = await botReg(), sub = await reg.pushManager.getSubscription();
+      if (sub && Notification.permission === 'granted') {
+        pushState = 'on';
+        db().rpc('ar_chat_staff_push_save', { p_endpoint: sub.endpoint }).then(() => null, () => null); // keeps it fresh
+      } else pushState = 'off';
+    } catch (e) { pushState = 'off'; }
+    if (!st) drawList();
+  }
+  async function turnPushOn() {
+    pushState = 'busy'; drawList();
+    try {
+      if (Notification.permission !== 'granted' && (await Notification.requestPermission()) !== 'granted') { pushState = 'bad'; drawList(); return; }
+      const reg = await botReg();
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID) }));
+      const { data, error } = await db().rpc('ar_chat_staff_push_save', { p_endpoint: sub.endpoint });
+      if (error || !data || !data.ok) throw new Error((error && error.message) || 'save');
+      pushState = 'on';
+      reg.showNotification('بوت عسكر', { body: 'إشعار الرسايل اشتغل ✅ هيجيلك زي ده لما عميل يكتب', icon: 'icons/arabic-192.png?v=logo2', tag: 'asker-care-test', lang: 'ar', dir: 'rtl' }).catch(() => null);
+    } catch (e) { pushState = 'bad'; }
+    drawList();
+  }
+  function pushHtml() {
+    if (pushState === 'off') return '<button type="button" class="secondary ch-push" data-chat-push>🔔 إشعار على موبايلك لما عميل يكتب (حتى والبوت مقفول)</button>';
+    if (pushState === 'busy') return '<p class="status">بيفعّل الإشعار…</p>';
+    if (pushState === 'on') return '<p class="hint ch-push-on">🔔 إشعار الرسايل شغال على الموبايل ده.</p>';
+    if (pushState === 'bad') return '<p class="status bad">الموبايل ما سمحش بالإشعار. اسمح للبوت بالإشعارات من إعدادات المتصفح وجرّب تاني.</p><button type="button" class="secondary ch-push" data-chat-push>🔔 جرّب تاني</button>';
+    return '';
+  }
   // the open chat: { c, msgs, urls: {path: signedUrl}, busy, error, note, account }
   let st = null;
 
@@ -109,6 +155,7 @@
     const chip = (f, label) => `<button type="button" class="chip${filter === f ? ' on' : ''}" data-chat-filter="${f}">${label}</button>`;
     box.innerHTML = '<h2>الرسايل</h2>' +
       `<p class="hint">العملاء بيكتبولك من صفحة الرسايل بتاعتنا (الرابط في رسالة الترحيب على الواتس، و«💬 كلّمنا» في حساب العميل). لما ترد بيجيلهم إشعار.</p>` +
+      pushHtml() +
       `<div class="chips">${chip('waiting', `مستنية رد <b>${n}</b>`)}${chip('all', `الكل <b>${chats.length}</b>`)}</div>` +
       (list.length ? list.map((c) => rowHtml(c, now)).join('') : `<p class="hint">${filter === 'waiting' ? 'مفيش حد مستني رد.' : 'لسه محدش كتب.'}</p>`) +
       (failed ? `<p class="status bad">مقدرتش أجيب الرسايل: ${esc(failed)}</p>` : '');
@@ -201,6 +248,7 @@
       if (row) { openChat(row.dataset.chat); return; }
       if (e.target.closest('[data-chat-back]')) { if (history.state && history.state.chatOpen) history.back(); else closeChat(); return; }
       if (e.target.closest('[data-chat-send]')) { send(); return; }
+      if (e.target.closest('[data-chat-push]')) { turnPushOn(); return; }
       if (e.target.closest('[data-chat-statement]') && st && st.c.customer_id) {
         const id = st.c.customer_id;
         if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('customers');
@@ -210,7 +258,7 @@
     window.addEventListener('popstate', () => { if (st) closeChat(); });
   }
   root.AskerChat = {
-    open() { loadChats(); clearInterval(timer); timer = setInterval(tick, POLL_MS); },
+    open() { loadChats(); if (!pushState) checkPush(); clearInterval(timer); timer = setInterval(tick, POLL_MS); },
     close() { clearInterval(timer); timer = null; },
     list: () => chats,
   };

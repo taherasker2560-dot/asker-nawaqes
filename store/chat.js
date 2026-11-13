@@ -71,6 +71,7 @@
     sending: 'بيبعت…',
     notifyAsk: '🔔 دوس هنا عشان يجيلك إشعار لما نرد عليك',
     notifyOn: 'هيجيلك إشعار لما نرد عليك',
+    notifyTest: 'الإشعارات اشتغلت ✅ هيجيلك إشعار زي ده لما نرد عليك',
     notifyNo: 'الموبايل ده مش بيسمح بالإشعارات. افتح الصفحة تاني عشان تشوف الرد.',
     us: 'صيدلية عسكر',
     voiceWords: 'اتكتب:',
@@ -308,7 +309,11 @@
       afterSend();
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
-  function afterSend() { poll(true); offerNotify(); }
+  function afterSend() {
+    poll(true); offerNotify();
+    // the pharmacy's phones: «رسالة جديدة من عميل» even with the bot closed (asker-chat; at most once a minute a chat)
+    if (client && client.functions) client.functions.invoke('asker-chat', { body: { action: 'notify', secret } }).catch(() => null);
+  }
   function toggleSend() {
     const t = $('chatText'), has = !!(t && t.value.trim());
     const s = document.querySelector('[data-ch-send]'), m = document.querySelector('[data-ch-mic]');
@@ -318,6 +323,17 @@
 
   // ---------- the notification when we answer ----------
   const canPush = () => 'serviceWorker' in navigator && 'PushManager' in root && 'Notification' in root;
+  async function activeRegistration() {
+    const reg = await navigator.serviceWorker.register('store/push-sw.js', { scope: 'store/' });
+    if (reg.active) return reg;
+    const w = reg.installing || reg.waiting;
+    await new Promise((ok) => {
+      if (!w) return ok();
+      w.addEventListener('statechange', () => { if (w.state === 'activated') ok(); });
+      setTimeout(ok, 10000);
+    });
+    return reg;
+  }
   function drawNotify() {
     const el = $('chatNotify');
     if (!el) return;
@@ -336,12 +352,15 @@
         const p = await Notification.requestPermission();
         if (p !== 'granted') { notify = TEXTS.notifyNo; drawNotify(); return; }
       }
-      const reg = await navigator.serviceWorker.register('store/push-sw.js', { scope: 'store/' });
-      await navigator.serviceWorker.ready.catch(() => null);
+      // the worker of store/ never controls this page (store.html is outside its scope), so «ready» would wait forever
+      // (owner's test 2026-11-14 in Chrome: nothing saved): wait for this registration's own worker instead
+      const reg = await activeRegistration();
       let sub = await reg.pushManager.getSubscription();
       if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID) });
       const d = await rpc('ar_chat_push_save', { p_secret: secret, p_endpoint: sub.endpoint });
       notify = d.ok && asked ? TEXTS.notifyOn : '';
+      // a first notification right away: the customer sees on his own phone that they show
+      if (d.ok && asked) reg.showNotification('صيدلية عسكر', { body: TEXTS.notifyTest, icon: 'icons/arabic-192.png?v=logo2', tag: 'asker-chat-test', lang: 'ar', dir: 'rtl' }).catch(() => null);
     } catch (e) {
       notify = asked ? TEXTS.notifyNo : '';
     }

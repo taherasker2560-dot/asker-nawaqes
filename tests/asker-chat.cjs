@@ -87,5 +87,42 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.equal((await F.handle(req({ action: 'voice', secret: SECRET, id: 77 }, null), env, fake({ msg: { ...msg, kind: 'text' } }))).status, 404);
   assert.equal((await F.handle(req({ action: 'voice', secret: SECRET, id: 77 }, null), env, fake({ msg: { ...msg, at: new Date(Date.now() - 2 * 3600e3).toISOString() } }))).status, 410);
   assert.equal((await F.handle(req({ action: 'voice', secret: 'short', id: 77 }, null), env, fake({ msg }))).status, 400);
-  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once');
+  // a customer just wrote: the owner's phone and staff with «خدمة العملاء» (not staff without it), once a minute per chat
+  const STAFF2 = '00000000-0000-4000-8000-0000000000c2';
+  function fake2({ notified = null, lastAt = new Date().toISOString() } = {}) {
+    const pushes = [], patched = [], deleted = [];
+    const f = async (url, o = {}) => {
+      const u = new URL(url);
+      if (/\.example$/.test(u.hostname)) { pushes.push(u.hostname + u.pathname); return new Response('', { status: u.hostname === 'gone.example' ? 410 : 201 }); }
+      if (u.pathname === '/rest/v1/ar_chats' && o.method === 'PATCH') { patched.push(JSON.parse(o.body)); return new Response(null, { status: 204 }); }
+      if (u.pathname === '/rest/v1/ar_chats') return new Response(JSON.stringify(u.searchParams.get('secret') === 'eq.' + SECRET ? [{ id: CHAT, notified_at: notified }] : []));
+      if (u.pathname === '/rest/v1/ar_chat_messages') { assert.equal(u.searchParams.get('sender'), 'eq.customer'); return new Response(JSON.stringify(lastAt ? [{ at: lastAt }] : [])); }
+      if (u.pathname === '/rest/v1/ar_chat_staff_push' && o.method === 'DELETE') { deleted.push(decodeURIComponent(u.searchParams.get('endpoint'))); return new Response(null, { status: 204 }); }
+      if (u.pathname === '/rest/v1/ar_chat_staff_push') return new Response(JSON.stringify([
+        { endpoint: 'https://push.example/owner', user_id: OWNER }, { endpoint: 'https://push.example/staff-care', user_id: STAFF },
+        { endpoint: 'https://push.example/staff-other', user_id: STAFF2 }, { endpoint: 'https://gone.example/old', user_id: OWNER }]));
+      if (u.pathname === '/rest/v1/ar_staff') {
+        assert.equal(u.searchParams.get('user_id'), `in.(${STAFF},${STAFF2})`);
+        return new Response(JSON.stringify([{ user_id: STAFF, active: true, perms: ['care'] }, { user_id: STAFF2, active: true, perms: ['tempsale'] }]));
+      }
+      throw Error('unexpected ' + url);
+    };
+    Object.assign(f, { pushes, patched, deleted });
+    return f;
+  }
+  f = fake2();
+  r = await F.handle(req({ action: 'notify', secret: SECRET }, null), env, f), b = await r.json();
+  assert.equal(r.status, 200); assert.equal(b.sent, 2); assert.equal(b.gone, 1);
+  assert.deepEqual(f.pushes.sort(), ['gone.example/old', 'push.example/owner', 'push.example/staff-care']);
+  assert.deepEqual(f.deleted, ['eq.https://gone.example/old']);
+  assert.equal(f.patched.length, 1, 'notified_at kept');
+  // within the minute: nobody pushed again; an old message (not just sent): nothing; a wrong secret: 404
+  f = fake2({ notified: new Date(Date.now() - 20e3).toISOString() });
+  b = await (await F.handle(req({ action: 'notify', secret: SECRET }, null), env, f)).json();
+  assert.equal(b.skipped, 'recent'); assert.equal(f.pushes.length, 0);
+  f = fake2({ lastAt: new Date(Date.now() - 10 * 60e3).toISOString() });
+  b = await (await F.handle(req({ action: 'notify', secret: SECRET }, null), env, f)).json();
+  assert.equal(b.skipped, 'old'); assert.equal(f.pushes.length, 0);
+  assert.equal((await F.handle(req({ action: 'notify', secret: 'b'.repeat(64) }, null), env, fake2())).status, 404);
+  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes');
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -1476,4 +1476,5 @@ html.night .so-acct.on { color: #a9c6f2; }
 .ch-b.us .ch-words { color: #e6eeff; }
 .ch-reply { display: flex; gap: 8px; align-items: flex-end; margin-top: 10px; }
 .ch-reply textarea { flex: 1; min-height: 52px; }
-.ch-reply button { min-height: 52px; min-width: 80px; background: #1fa855; color: #fff; font-weight: 800; }
+.ch-reply button { min-height: 52px; min-width: 80px; background: #1fa855; color: #fff; font-weight: 800; }button.ch-push { width: 100%; margin: 4px 0 6px; font-weight: 700; }
+.ch-push-on { margin: 4px 0 6px; }

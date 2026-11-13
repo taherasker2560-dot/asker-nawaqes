@@ -277,6 +277,7 @@ window.AskerEN = {
   "بيبعت…": "Sending…",
   "🔔 دوس هنا عشان يجيلك إشعار لما نرد عليك": "🔔 Tap here to get a notification when we answer",
   "هيجيلك إشعار لما نرد عليك": "You'll get a notification when we answer",
+  "الإشعارات اشتغلت ✅ هيجيلك إشعار زي ده لما نرد عليك": "Notifications are on ✅ You'll get one like this when we answer",
   "الموبايل ده مش بيسمح بالإشعارات. افتح الصفحة تاني عشان تشوف الرد.": "This phone does not allow notifications. Open the page again to see the answer.",
   "اتكتب: «{0}»": "Written: “{0}”",
   "اتكتب:": "Written:",

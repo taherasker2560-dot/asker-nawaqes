@@ -22,6 +22,8 @@ run('Messages: a cash customer writes his name and number once, sends text and a
  assert.ok(await page.isVisible('[data-ch-send]'));assert.ok(await page.isHidden('[data-ch-mic]'));
  await page.press('#chatText','Enter');
  await page.waitForFunction(()=>/عندكم بانادول كولد؟/.test(document.querySelector('#chatList .ch-b.me')?.textContent||''));
+ // the pharmacy's phones are told (asker-chat «notify»)
+ await page.waitForFunction(()=>window.__invokes.some(x=>x.startsWith('chat:notify')));
  // a photo: uploaded to the private bucket under c/<day>/<random>.png, then sent
  await page.setInputFiles('#chatPhoto',{name:'rx.png',mimeType:'image/png',buffer:PNG});
  await page.waitForSelector('#chatList .ch-b.me img.ch-photo');
@@ -70,6 +72,9 @@ run('Messages in the bot: «خدمة العملاء» lists who waits, opens a c
   ar_chat_push:[{endpoint:'https://push.example/1',chat_id:'c1'}]})},[iso(1),iso(2),iso(3),iso(60)]);
  await page.click('[data-group="care"]');
  await page.waitForSelector('#chatPanel .ch-row');
+ // the owner can have a notification on this phone when a customer writes (even with the bot closed)
+ await page.waitForSelector('#chatPanel [data-chat-push]');
+ assert.match(await text(page,'#chatPanel [data-chat-push]'),/إشعار على موبايلك لما عميل يكتب/);
  // waiting first: only the one who wrote last; «الكل» shows both
  assert.deepEqual(await page.$$eval('#chatPanel .ch-row strong',e=>e.map(x=>x.textContent)),['أحمد محمود']);
  assert.match(await text(page,'#chatPanel [data-chat-filter="waiting"]'),/مستنية رد 1/);

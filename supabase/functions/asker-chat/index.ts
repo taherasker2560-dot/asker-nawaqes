@@ -5,6 +5,8 @@
 //                                      address the push service no longer knows (404/410) is dropped.
 //   POST {action:'voice', secret, id}  (the customer's page, with its chat's secret): the words of his voice note, written by
 //                                      Gemini, saved once in ar_chat_messages.body.
+//   POST {action:'notify', secret}     (the customer's page, right after he sends): a push to the phones of the owner and of
+//                                      staff with «خدمة العملاء» (ar_chat_staff_push), at most once a minute per chat.
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), GEMINI_API_KEY, GEMINI_MODEL
 // (optional), VAPID_PRIVATE_JWK, VAPID_PUBLIC_KEY, VAPID_SUBJECT, ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the customer's page has no sign-in; the owner's and staff's calls are checked here).
@@ -67,6 +69,32 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
   const call = (path: string, init: RequestInit = {}, ms = TIMEOUT_MS) => fetchImpl(base + path, { ...init, signal: AbortSignal.timeout(ms) });
   const rows = async (path: string) => { const r = await call(path, { headers: sh }); const x = r.ok ? await r.json().catch(() => []) : []; return Array.isArray(x) ? x : []; };
+  // an empty push (no payload) to each address; an address the push service no longer knows (404/410) leaves its table;
+  // anything else that fails is written to the logs («asker-chat push host status body»)
+  async function pushAll(endpoints: string[], table: string) {
+    let sent = 0, gone = 0, failed = 0;
+    const codes: (number | string)[] = [];
+    for (const ep of endpoints) {
+      const host = (() => { try { return new URL(ep).host; } catch { return '?'; } })();
+      try {
+        // the fetch sets the length itself (a hand-set Content-Length is not sent)
+        const r = await fetchImpl(ep, {
+          method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS), body: new Uint8Array(0),
+          headers: { Authorization: await vapidAuth(ep, env), TTL: '86400', Urgency: 'high' },
+        });
+        codes.push(r.status);
+        if (r.status === 404 || r.status === 410) {
+          gone++;
+          await call(`/rest/v1/${table}?endpoint=eq.` + encodeURIComponent(ep), { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
+        } else if (r.ok) sent++;
+        else { failed++; console.log('asker-chat push', host, r.status, (await r.text().catch(() => '')).slice(0, 300)); }
+      } catch (e) {
+        failed++; codes.push('error');
+        console.log('asker-chat push', host, 'error', String((e as Error)?.message || e).slice(0, 300));
+      }
+    }
+    return { sent, gone, failed, codes };
+  }
 
   // ---------- the customer's voice note: its words ----------
   if (body.action === 'voice') {
@@ -95,6 +123,29 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return reply(200, { ok: true, text }, headers);
   }
 
+  // ---------- a customer just wrote: the pharmacy's phones (owner 2026-11-14, «بعت رسالة … وما جاليش إشعارات») ----------
+  if (body.action === 'notify') {
+    const secret = String(body.secret || '');
+    if (!/^[0-9a-f]{64}$/.test(secret)) return reply(400, { error: 'bad', message: 'الطلب ناقص.' }, headers);
+    if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
+    const chat = (await rows('/rest/v1/ar_chats?select=id,notified_at&secret=eq.' + secret + '&limit=1'))[0] as { id?: string; notified_at?: string | null } | undefined;
+    if (!chat?.id) return reply(404, { error: 'chat' }, headers);
+    // only for a message the customer really just sent, and at most once a minute for one chat
+    const last = (await rows(`/rest/v1/ar_chat_messages?select=at&chat_id=eq.${chat.id}&sender=eq.customer&order=id.desc&limit=1`))[0] as { at?: string } | undefined;
+    const now = Date.now();
+    if (!last?.at || now - new Date(last.at).getTime() > 120e3) return reply(200, { ok: true, skipped: 'old' }, headers);
+    if (chat.notified_at && now - new Date(chat.notified_at).getTime() < 60e3) return reply(200, { ok: true, skipped: 'recent' }, headers);
+    await call('/rest/v1/ar_chats?id=eq.' + chat.id, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ notified_at: new Date(now).toISOString() }) });
+    // the owner's phones, and those of staff who still have «خدمة العملاء»
+    const subs = await rows('/rest/v1/ar_chat_staff_push?select=endpoint,user_id') as { endpoint: string; user_id: string }[];
+    const others = [...new Set(subs.map((s) => s.user_id).filter((u) => u !== (env.OWNER_ID || OWNER_ID) && UUID.test(u)))];
+    const staff = others.length ? await rows('/rest/v1/ar_staff?select=user_id,active,perms&user_id=in.(' + others.join(',') + ')') as { user_id: string; active?: boolean; perms?: string[] }[] : [];
+    const ok = new Set(staff.filter((s) => s.active && (s.perms || []).includes('care')).map((s) => s.user_id));
+    const targets = subs.filter((s) => s.user_id === (env.OWNER_ID || OWNER_ID) || ok.has(s.user_id));
+    const r = await pushAll(targets.map((s) => s.endpoint), 'ar_chat_staff_push');
+    return reply(200, { ok: true, ...r }, headers);
+  }
+
   // ---------- the owner's and staff's actions ----------
   const auth = req.headers.get('authorization') || '';
   if (!/^Bearer\s+\S+$/.test(auth)) return reply(401, { error: 'auth', message: 'سجّل الدخول الأول.' }, headers);
@@ -110,32 +161,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (!UUID.test(chatId)) return reply(400, { error: 'id', message: 'المحادثة مش معروفة.' }, headers);
     if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured', message: 'مفاتيح الإشعارات مش موجودة.' }, headers);
     const subs = await rows('/rest/v1/ar_chat_push?select=endpoint&chat_id=eq.' + chatId) as { endpoint: string }[];
-    let sent = 0, gone = 0, failed = 0;
-    const codes: (number | string)[] = [];
-    for (const s of subs) {
-      const host = (() => { try { return new URL(s.endpoint).host; } catch { return '?'; } })();
-      try {
-        // an empty body (no payload); the fetch sets its own length (a hand-set Content-Length is not sent)
-        const r = await fetchImpl(s.endpoint, {
-          method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS), body: new Uint8Array(0),
-          headers: { Authorization: await vapidAuth(s.endpoint, env), TTL: '86400', Urgency: 'high' },
-        });
-        codes.push(r.status);
-        if (r.status === 404 || r.status === 410) {
-          gone++;
-          await call('/rest/v1/ar_chat_push?endpoint=eq.' + encodeURIComponent(s.endpoint), { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
-        } else if (r.ok) sent++;
-        else {
-          failed++;
-          // what the push service said (for the logs: «asker-chat push …»)
-          console.log('asker-chat push', host, r.status, (await r.text().catch(() => '')).slice(0, 300));
-        }
-      } catch (e) {
-        failed++; codes.push('error');
-        console.log('asker-chat push', host, 'error', String((e as Error)?.message || e).slice(0, 300));
-      }
-    }
-    return reply(200, { ok: true, sent, gone, failed, codes }, headers);
+    const r = await pushAll(subs.map((s) => s.endpoint), 'ar_chat_push');
+    return reply(200, { ok: true, ...r }, headers);
   }
   return reply(400, { error: 'action', message: 'طلب مش معروف.' }, headers);
 }
