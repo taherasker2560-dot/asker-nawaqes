@@ -185,6 +185,9 @@
     const v = $('chatBox');
     if (!v) return;
     $('chatWho').textContent = secret && name ? `${TEXTS.sub} · ${name}` : TEXTS.sub;
+    // on the pharmacy's phone the page may open inside the installed bot: always a way back (as on «حسابي»)
+    const back = $('chatBack');
+    if (back) back.hidden = !pharmacyPhone;
     if (!secret) {
       let me = {};
       try { me = JSON.parse(localStorage.getItem('asker_store_me') || 'null') || {}; } catch (e) { /* none */ }
