@@ -170,7 +170,7 @@
   // شكل الصنف من اسمه (للأيقونة لما مايكونش له صورة)
   function shapeOf(name, cat) {
     const n = ' ' + String(name || '').toUpperCase() + ' ';
-    if (/\b(SYR|SYRUP|SUSP|SUSPENSION|ELIXIR|SOLUTION|ORAL SOL)\b|\d+\s*(ML|CC)\b.*\b(SYR|SUSP)|شراب/.test(n)) return 'bottle';
+    if (/\b(SYR|SYP|SYRUP|SUSP|SUSPENSION|ELIXIR|SOLUTION|ORAL SOL)\b|\d+\s*(ML|CC)\b.*\b(SYR|SUSP)|شراب/.test(n)) return 'bottle';
     if (/\b(AMP|AMPOULE|VIAL|VL|INJ|INJECTION|I\.?M\.?|I\.?V\.?|PEN|SYRINGE|UNIT\/ML)\b|حقن|امبول/.test(n)) return 'injection';
     if (/\b(DROP|DROPS|E\.?D\.?|EYE|EAR|NASAL|NSE)\b|نقط|قطرة/.test(n)) return 'drops';
     if (/\b(CREAM|CREA|CR|OINT|OINTMENT|GEL|LOTION|LOT|PASTE)\b|كريم|مرهم|جل/.test(n)) return 'tube';
@@ -179,6 +179,28 @@
     if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
     if (cat === 'cosmetic') return 'tube';
     return 'box';
+  }
+  // كارت الصنف اللي مالوش صورة (owner 2026-11-13 «اعمله»): لون القسم، الشكل، اسم قصير، والتركيز أو الحجم.
+  // مش صورة العلبة؛ أول ما صورة حقيقية تتوافق عليها بتاخد مكانه.
+  const FORM_WORDS = /^(TAB|TABS|TABLET|TABLETS|TAP|T|CAP|CAPS|CAPSULE|CAPSULES|SYR|SYP|SYRUP|SUSP|SUSPENSION|CREAM|CREA|CR|OINT|OINTMENT|GEL|EMULGEL|LOTION|AMP|AMPOULE|AMPOULES|VIAL|VL|INJ|DROPS|DRPS|DROP|SPRAY|SACH|SACHETS|EFF|SUPP|F\.?C\.?|SR|XR|MR|CR|ER|ORAL|SOL|SOLUTION|POWDER|PDR|IM|IV|I\.?M\.?|I\.?V\.?)\.?$/;
+  function cardInfo(it) {
+    const name = String((it && it.name) || '').replace(/\s+/g, ' ').trim();
+    const cat = it && it.cat;
+    const sec = (SECTIONS.find((s) => s.cats.includes(cat)) || { key: 'other' }).key;
+    // التركيز أو الحجم: أول رقم بوحدة (25MG، 120 ML، 10000 IU، 0.1%، 400 GM)
+    const m = /(\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)*)\s*(MG|MCG|ML|CC|GM|G|IU|%)(?![A-Z])/i.exec(name);
+    const strength = m ? (m[1].replace(/\s+/g, '') + ' ' + (m[2].toUpperCase() === 'CC' ? 'ML' : m[2].toUpperCase())).replace(' %', '%') : '';
+    // اسم قصير: الكلام قبل أول رقم أو كلمة شكل (TAB, SYRUP...)، كلمتين بالكتير
+    const words = [];
+    for (const w of name.split(' ')) {
+      const u = w.toUpperCase();
+      if (/\d/.test(u) || FORM_WORDS.test(u)) break;
+      words.push(w);
+      if (words.length === 2) break;
+    }
+    let short = (words.length ? words : name.split(' ').slice(0, 2)).join(' ');
+    if (short.length > 18) short = short.slice(0, 17).trim() + '…';
+    return { sec, shape: shapeOf(name, cat), short, strength };
   }
   // رابط صنف واحد (#item=رقم): بيفتح صفحة الصنف على طول (زرار «ابعت الصنف لحد»)
   function itemIdFromHash(h) {
@@ -193,7 +215,7 @@
     const pr = it.status === 'available' && Number(it.price) > 0 ? ` بـ ${money(it.price)} جنيه` : '';
     return `${nm}${pr} من صيدلية عسكر، اطلبه من هنا: ${link}`;
   }
-  const api = { NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -247,7 +269,12 @@
   function thumb(it) {
     const f = pics[it.id];
     if (f) return `<div class="thumb" data-open="${it.id}"><img src="store/img/${esc(f)}" alt="" loading="lazy"></div>`;
-    return `<div class="thumb icon" data-open="${it.id}" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[shapeOf(it.name, it.cat)]}</svg></div>`;
+    return `<div class="thumb card c-${cardInfo(it).sec}" data-open="${it.id}" aria-hidden="true">${cardHtml(it)}</div>`;
+  }
+  function cardHtml(it) {
+    const c = cardInfo(it);
+    return `${c.strength ? `<span class="cd-st" dir="ltr">${esc(c.strength)}</span>` : ''}<svg viewBox="0 0 24 24">${ICONS[c.shape]}</svg>`
+      + `<span class="cd-nm" dir="auto" translate="no">${esc(c.short)}</span><span class="cd-lg">صيدلية عسكر</span>`;
   }
   async function loadPics() {
     try {
@@ -478,8 +505,8 @@
     const it = sheetItem;
     if (!it) return;
     const f = pics[it.id], st = STATUS[it.status] || STATUS.on_order;
-    $('shPic').className = 'sh-pic' + (f ? '' : ' icon');
-    $('shPic').innerHTML = f ? `<img src="store/img/${esc(f)}" alt="صورة ${esc(label(it))}">` : `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[shapeOf(it.name, it.cat)]}</svg>`;
+    $('shPic').className = 'sh-pic' + (f ? '' : ' card c-' + cardInfo(it).sec);
+    $('shPic').innerHTML = f ? `<img src="store/img/${esc(f)}" alt="صورة ${esc(label(it))}">` : cardHtml(it);
     $('shName').textContent = it.name;
     $('shAr').textContent = it.arabic_name || '';
     $('shAr').hidden = !it.arabic_name;

@@ -114,4 +114,14 @@ assert.equal('secret' in seenL[1],false);
 assert.deepEqual(S.rememberSeen(null,null),[]);
 // «محتاج إيه النهارده؟»: every chip opens real store categories
 for(const n of S.NEEDS){assert.ok(n.key&&n.name&&n.cats.length);for(const c of n.cats)assert.ok(S.SECTIONS.some(s=>s.cats.includes(c)),c)}
+// the card of an item with no photo: section color, short name, strength or size
+const ci=(name,cat)=>S.cardInfo({name,cat});
+assert.deepEqual(ci('ANGIOFOX TAB 25MG','blood_pressure_heart'),{sec:'meds',shape:'pills',short:'ANGIOFOX',strength:'25 MG'});
+assert.equal(ci('AQUA GRIPE 120ML  SYP','baby').sec,'baby');assert.equal(ci('AQUA GRIPE 120ML  SYP','baby').shape,'bottle');assert.equal(ci('AQUA GRIPE 120ML  SYP','baby').strength,'120 ML');
+assert.equal(ci('BETADERM 0.1% OINT','skin_drug').strength,'0.1%');
+assert.equal(ci('EMPACOZA TRIO 10/5/1000MG  TAB','diabetes').strength,'10/5/1000 MG');
+assert.equal(ci('SENOLAN FACIAL CLEANSING GEL','cosmetic').sec,'care');
+assert.equal(ci('قلم تحديد حواجب','cosmetic').short,'قلم تحديد');
+assert.equal(ci('X','no_such_cat').sec,'other');
+assert.ok(ci('A VERY VERY LONG PRODUCTNAMEHERE TAB','cosmetic').short.length<=18);
 console.log('store ok');
