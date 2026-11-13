@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=slogan-20261113a" />
+    <link rel="stylesheet" href="ar/look.css?v=sodel-20261113a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=slogan-20261113a"></script>
+    <script src="ar/i18n-en.js?v=sodel-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -693,7 +693,7 @@
           <p id="soStatus" class="status"></p>
           <h3 id="soOpenTitle">مفتوحة</h3>
           <div id="soOpen"></div>
-          <div id="soClosedBox" class="hidden"><h3>خلصت</h3><div id="soClosed"></div></div>
+          <div id="soClosedBox" class="hidden"><div class="so-closed-head"><h3>خلصت</h3><button id="soDelAll" type="button" class="secondary small so-del">🗑 امسح كل اللي خلصت</button></div><div id="soClosed"></div></div>
 
           <details id="storeSettings" class="ss-box">
             <summary>إعدادات الموقع</summary>
@@ -735,7 +735,7 @@
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
-    <script src="ar/store-orders.js?v=any-20261112a"></script>
+    <script src="ar/store-orders.js?v=sodel-20261113a"></script>
     <script src="ar/store-settings.js?v=theme-20261112a"></script>
     <script src="ar/store-link.js?v=back-20261112a"></script>
     <script src="ar/stock.js?v=home-20261112a"></script>

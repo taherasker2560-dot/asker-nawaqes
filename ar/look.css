@@ -1296,6 +1296,10 @@ details.stf-card[open] > summary { margin-bottom: 6px; }
 .topsearch .hs-scope { margin: 0 0 8px; }/* «بيع» chosen = orange, «مرتجع» chosen = red, whatever color the bot is set to (owner 2026-11-13) */
 #tsNew .ts-types .chip[data-ts-type="sale"].on { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 10px 22px -10px rgba(217, 119, 6, 0.65); }
 #tsNew.ts-return .ts-types .chip[data-ts-type="return"].on { background: linear-gradient(135deg, #c62828 0%, #8e1b1b 100%) !important; color: #fff !important; border-color: transparent !important; }
+/* «امسح» for finished store orders (owner 2026-11-13) */
+.so-closed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.so-closed-head h3 { margin: 0; }
+.so-del { color: #c62828 !important; }
 /* «جرد المخزون» (ar/count.js, owner 2026-11-13) */
 .ct-scan { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; margin: 8px 0; padding: 12px 14px; border: 0; border-radius: 16px; background: var(--grad); color: #fff; font-size: 17px; font-weight: 800; text-align: start; box-shadow: var(--sh-acc); }
 .ct-scan i { font-style: normal; font-size: 24px; }

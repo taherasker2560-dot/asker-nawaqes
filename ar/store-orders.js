@@ -81,6 +81,7 @@
         ${o.status === 'new' ? `<button type="button" class="small" data-set="confirmed">اتأكد</button>` : ''}
         ${o.status === 'confirmed' ? `<button type="button" class="small" data-set="done">اتسلّم</button>` : ''}
         ${open ? `<button type="button" class="secondary small" data-set="cancelled">لغي</button>` : ''}
+        ${open ? '' : '<button type="button" class="secondary small so-del" data-del>🗑 امسح</button>'}
       </div>
     </div>`;
   }
@@ -127,7 +128,31 @@
       say('ماتغيّرش: ' + e.message, 'bad');
     }
   }
+  // «امسح» (owner 2026-11-13): a delivered or cancelled order leaves for good, with its prescription photos; an open
+  // order can't be deleted (it is cancelled first)
+  async function remove(ids, btn) {
+    const gone = orders.filter((o) => ids.includes(String(o.id)) && (o.status === 'done' || o.status === 'cancelled'));
+    if (!gone.length) return;
+    const ask = gone.length === 1 ? `تمسح طلب #${gone[0].id} نهائي؟ مش هيرجع تاني.` : `تمسح ${gone.length} طلب خلصوا نهائي؟ مش هيرجعوا تاني.`;
+    if (!root.confirm(ask)) return;
+    btn.disabled = true;
+    try {
+      const { error } = await db().from('ar_store_orders').delete().in('id', gone.map((o) => o.id)).in('status', ['done', 'cancelled']);
+      if (error) throw error;
+      const files = gone.flatMap((o) => o.rx_paths || []);
+      if (files.length) { try { await db().storage.from('ar-store-rx').remove(files); } catch (err) { /* the photos stay; the order is gone */ } }
+      orders = orders.filter((o) => !gone.includes(o));
+      draw();
+      say(gone.length === 1 ? `طلب #${gone[0].id} اتمسح` : `${gone.length} طلب اتمسحوا`, 'good');
+    } catch (e) {
+      btn.disabled = false;
+      say('ماتمسحش: ' + e.message, 'bad');
+    }
+  }
   $('storeOrdersPanel')?.addEventListener('click', (e) => {
+    if (e.target.closest('#soDelAll')) return remove(orders.filter((o) => o.status === 'done' || o.status === 'cancelled').map((o) => String(o.id)), e.target.closest('#soDelAll'));
+    const d = e.target.closest('[data-del]');
+    if (d) { const it = d.closest('[data-order]'); if (it) remove([it.dataset.order], d); return; }
     const b = e.target.closest('[data-set]');
     if (!b) return;
     const item = b.closest('[data-order]');
