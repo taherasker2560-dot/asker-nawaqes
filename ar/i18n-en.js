@@ -10,6 +10,8 @@ window.AskerEN = {
   "🔎 الاسم": "🔎 Name",
   "# الكود": "# Code",
   "+ بيعة جديدة": "+ New sale",
+  "صافي الدين": "Net debt",
+  "عليهم {0} − ليهم {1}": "They owe {0} − we owe {1}",
   "حسابه السابق": "Previous balance",
   "قيمة الفاتورة": "This bill",
   "قيمة المرتجع": "This return",

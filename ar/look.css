@@ -1317,6 +1317,12 @@ body.ts-page #dataAge { display: none !important; }
 .ts-acct > div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
 .ts-acct b.pos { color: #b45309; }
 .ts-acct b.neg { color: #15803d; }
+/* the customers' net debt (owner 2026-11-13): what they owe minus what we owe */
+.cu-net { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin: 6px 0 8px; padding: 10px 14px; border-radius: 16px; background: var(--grad); color: #fff; box-shadow: var(--sh-acc); }
+.cu-net span { font-weight: 700; font-size: 15px; }
+.cu-net b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cu-net small { flex-basis: 100%; opacity: 0.85; font-size: 12.5px; }
+.cu-net:empty { display: none; }
 .ts-acct .ts-acct-after { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--line); font-size: 15.5px; font-weight: 800; }
 /* «جرد المخزون» (ar/count.js, owner 2026-11-13) */
 .ct-scan { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; margin: 8px 0; padding: 12px 14px; border: 0; border-radius: 16px; background: var(--grad); color: #fff; font-size: 17px; font-weight: 800; text-align: start; box-shadow: var(--sh-acc); }

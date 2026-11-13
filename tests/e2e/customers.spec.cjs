@@ -28,6 +28,8 @@ run('Customers: the numbers are buttons, search by name, every customer',async({
  await page.waitForSelector('#cuBox:not(.hidden)');
  assert.ok(await page.$eval('#alCustomers',e=>e.classList.contains('hidden')),'the alerts list gives way to the accounts');
  assert.deepEqual(await page.$$eval('#cuStats .cu-stat',b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim())),['1عدّوا الحد','3عليهم فلوس','1ليهم فلوس']);
+ // the net debt on top (owner 2026-11-13): what they owe minus what we owe
+ assert.match(await text(page,'#cuNet'),/صافي الدين ?[\d,.]+ ج ?عليهم 17,586.50 − ليهم [\d,.]+/);
  // opens on «عدّوا الحد» (over first, then the ones close to it)
  assert.deepEqual(await page.$$eval('#cuRows .cu-row strong',s=>s.map(x=>x.textContent)),['أحمد محمود','سامية عبد الله']);
  // the «عليهم فلوس» number opens everyone who owes, biggest first, with the total

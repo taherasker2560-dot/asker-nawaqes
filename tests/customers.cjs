@@ -11,7 +11,8 @@ const C=[
  {id:2489,name:'عميل بكود',credit_limit:null,balance:15,last_at:'2026-11-01T10:00:00',last_kind:'sale'},
 ];
 // the numbers on top: crumbs under half a pound are settled
-assert.deepEqual(L.counts(C),{over:1,near:1,owing:4,prepaid:1,all:6,owed:7174.5+9500+912+15});
+// and the net debt (owner 2026-11-13): what they owe minus what we owe the ones who paid ahead
+assert.deepEqual(L.counts(C),{over:1,near:1,owing:4,prepaid:1,all:6,owed:17601.5,credit:200,net:17401.5});
 // «عدّوا الحد»: over first, then near; «عليهم» by balance; «ليهم» the biggest credit first; «الكل» by name
 assert.deepEqual(L.pick(C,'over','').rows.map(c=>c.id),[101,102]);
 assert.deepEqual(L.pick(C,'owing','').rows.map(c=>c.id),[102,101,103,2489]);

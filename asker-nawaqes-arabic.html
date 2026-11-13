@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=acct-20261113a" />
+    <link rel="stylesheet" href="ar/look.css?v=net-20261113a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=acct-20261113a"></script>
+    <script src="ar/i18n-en.js?v=net-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -531,6 +531,8 @@
             <h2>العملاء</h2>
             <p id="alCustAge" class="status"></p>
             <div id="cuBox" class="hidden">
+              <!-- net debt (owner 2026-11-13): what they owe minus what we owe the ones who paid ahead -->
+              <div id="cuNet" class="cu-net"></div>
               <div id="cuStats" class="grid cu-stats"></div>
               <div class="search">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -743,7 +745,7 @@
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=staff-20261113a"></script>
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
-    <script src="ar/customers.js?v=share-20261112a"></script>
+    <script src="ar/customers.js?v=net-20261113a"></script>
     <script src="ar/tempsale.js?v=acct-20261113a"></script>
     <script src="ar/count.js?v=acct-20261113a"></script>
     <script src="ar/notify.js?v=alerts-20261112a"></script>

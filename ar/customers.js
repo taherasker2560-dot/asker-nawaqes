@@ -41,13 +41,15 @@
       .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
       .replace(/\s+/g, ' ').trim();
   }
+  // net (owner 2026-11-13 «الصافي بتاع الدين»): what the customers owe minus what the pharmacy owes the ones who paid ahead
   function counts(list) {
-    let over = 0, near = 0, owing = 0, pre = 0, owed = 0;
+    let over = 0, near = 0, owing = 0, pre = 0, owed = 0, credit = 0;
     for (const c of list) {
       if (isOver(c)) over++; else if (isNear(c)) near++;
-      if (owes(c)) { owing++; owed += num(c.balance); } else if (prepaid(c)) pre++;
+      if (owes(c)) { owing++; owed += num(c.balance); } else if (prepaid(c)) { pre++; credit -= num(c.balance); }
     }
-    return { over, near, owing, prepaid: pre, all: list.length, owed };
+    owed = Math.round(owed * 100) / 100; credit = Math.round(credit * 100) / 100;
+    return { over, near, owing, prepaid: pre, all: list.length, owed, credit, net: Math.round((owed - credit) * 100) / 100 };
   }
   // the list for a view and a search; searching from «عدّوا الحد» looks in everyone
   function pick(list, view, q) {
@@ -287,6 +289,7 @@
     if (!view) view = n.over ? 'over' : 'owing';
     const stat = (v, x, label) => `<button type="button" class="stat cu-stat${view === v ? ' on' : ''}" data-cu-view="${v}"><strong>${x}</strong>${label}</button>`;
     $('cuStats').innerHTML = stat('over', n.over, 'عدّوا الحد') + stat('owing', n.owing, 'عليهم فلوس') + stat('prepaid', n.prepaid, 'ليهم فلوس');
+    if ($('cuNet')) $('cuNet').innerHTML = `<span>صافي الدين</span><b>${money(n.net)} ج</b><small>عليهم ${money(n.owed)} − ليهم ${money(n.credit)}</small>`;
     const r = pick(list, view, query);
     const chip = (v, label, x) => `<button type="button" class="chip${r.view === v ? ' on' : ''}" data-cu-view="${v}">${label} <b>${x}</b></button>`;
     $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all);
