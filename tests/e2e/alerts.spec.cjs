@@ -40,7 +40,7 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.match(cust,/قربوا من الحد \(90% أو أكتر\) 1 عميل قريب .* 95% من الحد/);
  // ⚙️: a sound per section, kept on the phone
  await page.click('#settingsBtn');
- assert.deepEqual(await page.$$eval('#notifySounds [data-sound]',s=>s.map(x=>x.dataset.sound+':'+x.value)),['incoming:pop','docs:ding','expiry:double','customers:alert','store:bell']);
+ assert.deepEqual(await page.$$eval('#notifySounds [data-sound]',s=>s.map(x=>x.dataset.sound+':'+x.value)),['incoming:pop','docs:ding','expiry:double','customers:alert','store:bell','care:pop']);
  await page.selectOption('#notifySounds [data-sound="store"]','pop');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-notify-sounds')).store),'pop');
  // a new store order: the number goes up (the notification itself needs the phone's permission)
