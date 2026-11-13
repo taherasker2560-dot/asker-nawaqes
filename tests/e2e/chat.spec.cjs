@@ -99,4 +99,14 @@ run('Messages in the bot: «خدمة العملاء» lists who waits, opens a c
  await page.click('[data-chat-back]');await page.waitForSelector('#chatPanel .ch-row');
  await page.click('[data-chat-filter="waiting"]');
  assert.match(await text(page,'#chatPanel'),/مفيش حد مستني رد/);
+ // «🗑 امسح المحادثة» (owner 2026-11-14): asks first, removes its photo and voice note, then the chat and its messages
+ await page.click('[data-chat-filter="all"]');
+ await page.click('#chatPanel [data-chat="c1"]');await page.waitForSelector('[data-chat-del]');
+ page.once('dialog',d=>{assert.match(d.message(),/تمسح المحادثة دي كلها؟/);d.accept()});
+ await page.click('[data-chat-del]');
+ await page.waitForFunction(()=>/اتمسحت المحادثة/.test(document.getElementById('chatPanel').textContent));
+ assert.deepEqual((await page.evaluate(()=>window.__removed)).sort(),['c/2026-11-13/11111111-2222-4333-8444-555555555555.jpg','c/2026-11-13/11111111-2222-4333-8444-666666666666.wav']);
+ assert.deepEqual((await table('ar_chats')).map(c=>c.id),['c2']);
+ assert.equal((await table('ar_chat_messages')).filter(m=>m.chat_id==='c1').length,0);
+ assert.equal(await page.$('#chatPanel [data-chat="c1"]'),null);
 },{home:true});

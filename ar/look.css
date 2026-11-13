@@ -1478,3 +1478,4 @@ html.night .so-acct.on { color: #a9c6f2; }
 .ch-reply textarea { flex: 1; min-height: 52px; }
 .ch-reply button { min-height: 52px; min-width: 80px; background: #1fa855; color: #fff; font-weight: 800; }button.ch-push { width: 100%; margin: 4px 0 6px; font-weight: 700; }
 .ch-push-on { margin: 4px 0 6px; }
+button.ch-del { display: block; margin: 14px auto 0; color: #c62828; }

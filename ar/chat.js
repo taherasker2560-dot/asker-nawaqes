@@ -156,6 +156,7 @@
     box.innerHTML = '<h2>الرسايل</h2>' +
       `<p class="hint">العملاء بيكتبولك من صفحة الرسايل بتاعتنا (الرابط في رسالة الترحيب على الواتس، و«💬 كلّمنا» في حساب العميل). لما ترد بيجيلهم إشعار.</p>` +
       pushHtml() +
+      (listNote ? `<p class="status good">${esc(listNote)}</p>` : '') +
       `<div class="chips">${chip('waiting', `مستنية رد <b>${n}</b>`)}${chip('all', `الكل <b>${chats.length}</b>`)}</div>` +
       (list.length ? list.map((c) => rowHtml(c, now)).join('') : `<p class="hint">${filter === 'waiting' ? 'مفيش حد مستني رد.' : 'لسه محدش كتب.'}</p>`) +
       (failed ? `<p class="status bad">مقدرتش أجيب الرسايل: ${esc(failed)}</p>` : '');
@@ -186,7 +187,9 @@
       (st.error ? `<p class="status bad">${esc(st.error)}</p>` : '') +
       `<div class="ch-reply"><textarea id="chatReply" rows="2" maxlength="2000" placeholder="اكتب الرد…"></textarea>` +
       `<button type="button" data-chat-send${st.busy ? ' disabled' : ''}>${st.busy ? 'بيبعت…' : 'ابعت'}</button></div>` +
-      (st.note ? `<p class="status ${st.noteBad ? 'bad' : 'good'}">${esc(st.note)}</p>` : '');
+      (st.note ? `<p class="status ${st.noteBad ? 'bad' : 'good'}">${esc(st.note)}</p>` : '') +
+      // the owner only (owner 2026-11-14 «عايز اوبشن لحذف الرسائل»)
+      (ownerHere() ? `<button type="button" class="secondary small ch-del" data-chat-del${st.busy ? ' disabled' : ''}>🗑 امسح المحادثة</button>` : '');
     const t = $('chatReply');
     if (t) t.value = draft;
     const th = $('chatThread');
@@ -231,6 +234,36 @@
       if (st === me) { drawChat(); loadMsgs(); }
     }
   }
+  const ownerHere = () => !(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
+  const tr = (s) => (root.AskerI18n && root.AskerI18n.lang && root.AskerI18n.lang() === 'en' ? root.AskerI18n.translate(s) : s);
+  let listNote = '';
+  // the whole chat: its photos and voice notes from the bucket, then the chat itself (messages and push addresses go with it)
+  async function removeChat() {
+    const me = st;
+    if (!me || me.busy) return;
+    if (!root.confirm(tr('تمسح المحادثة دي كلها؟ الرسايل والصور والفويس هيتمسحوا ومش هيرجعوا.'))) return;
+    me.busy = true; me.note = ''; drawChat();
+    try {
+      const { data: all, error: e1 } = await db().from('ar_chat_messages').select('media').eq('chat_id', me.c.id).range(0, 999);
+      if (e1) throw new Error(e1.message || String(e1));
+      const files = (all || []).map((m) => m.media).filter(Boolean);
+      if (files.length) {
+        const rm = await db().storage.from('ar-chat').remove(files);
+        if (rm && rm.error) throw new Error(rm.error.message || String(rm.error));
+      }
+      const { data, error } = await db().rpc('ar_chat_delete', { p_chat: me.c.id });
+      if (error) throw new Error(error.message || String(error));
+      if (!data || !data.ok) throw new Error('ما اتمسحتش');
+      chats = (chats || []).filter((c) => c.id !== me.c.id);
+      listNote = 'اتمسحت المحادثة.';
+      st = null;
+      try { if (history.state && history.state.chatOpen) history.replaceState(null, ''); } catch (e) { /* no history */ }
+      drawList();
+    } catch (e) {
+      Object.assign(me, { busy: false, note: 'ما اتمسحتش: ' + ((e && e.message) || e), noteBad: true });
+      if (st === me) drawChat();
+    }
+  }
   function tick() {
     const panel = $('carePanel');
     if (!panel || panel.classList.contains('hidden') || document.visibilityState === 'hidden') return;
@@ -249,6 +282,7 @@
       if (e.target.closest('[data-chat-back]')) { if (history.state && history.state.chatOpen) history.back(); else closeChat(); return; }
       if (e.target.closest('[data-chat-send]')) { send(); return; }
       if (e.target.closest('[data-chat-push]')) { turnPushOn(); return; }
+      if (e.target.closest('[data-chat-del]')) { removeChat(); return; }
       if (e.target.closest('[data-chat-statement]') && st && st.c.customer_id) {
         const id = st.c.customer_id;
         if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('customers');
