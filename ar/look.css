@@ -1293,4 +1293,6 @@ details.stf-card > summary::-webkit-details-marker { display: none; }
 details.stf-card > summary .hint { flex: 1; margin: 0 6px; }
 details.stf-card[open] > summary { margin-bottom: 6px; }
 .stf-acts .stf-del { color: #c62828; }/* the search choices sit above the box now (owner 2026-11-13) */
-.topsearch .hs-scope { margin: 0 0 8px; }
+.topsearch .hs-scope { margin: 0 0 8px; }/* «بيع» chosen = orange, «مرتجع» chosen = red, whatever color the bot is set to (owner 2026-11-13) */
+#tsNew .ts-types .chip[data-ts-type="sale"].on { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 10px 22px -10px rgba(217, 119, 6, 0.65); }
+#tsNew.ts-return .ts-types .chip[data-ts-type="return"].on { background: linear-gradient(135deg, #c62828 0%, #8e1b1b 100%) !important; color: #fff !important; border-color: transparent !important; }
