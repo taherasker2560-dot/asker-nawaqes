@@ -74,6 +74,7 @@ begin
   return jsonb_build_object('ok', true, 'token', v_token);
 end $function$;
 revoke all on function public.ar_customer_link(bigint, boolean) from public;
+revoke all on function public.ar_customer_link(bigint, boolean) from anon;
 grant execute on function public.ar_customer_link(bigint, boolean) to authenticated;
 
 -- the customer's page: his account and his statement (newest first, p_limit movements a call, older ones with p_before_*)
