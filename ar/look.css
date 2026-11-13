@@ -1300,6 +1300,18 @@ details.stf-card[open] > summary { margin-bottom: 6px; }
 .so-closed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .so-closed-head h3 { margin: 0; }
 .so-del { color: #c62828 !important; }
+/* the sale's top in one thin bar (owner 2026-11-13 «تلم الليلة كلها في 2 سنتي»): the bill gets the screen */
+body.ts-page #dataAge { display: none !important; }
+#tempSalePanel { padding-top: 10px; }
+.ts-bar { display: flex; align-items: center; gap: 6px; }
+.ts-bar .ts-types { flex: 1; min-width: 0; margin: 0; }
+.ts-bar .ts-types .chip { min-height: 38px; padding: 0 6px; font-size: 15px; }
+.ts-bar .ts-ways { display: flex; flex-wrap: nowrap; gap: 4px; margin: 0; padding: 0; overflow: visible; }
+.ts-bar .ts-ways .chip { display: inline-flex; align-items: center; justify-content: center; width: 40px; min-width: 0; min-height: 40px; margin: 0; padding: 0; font-size: 18px; font-weight: 800; }
+.ts-listbtn { width: auto; min-height: 40px; margin: 0; padding: 0 10px; font-size: 14px; white-space: nowrap; }
+#tsNew > .ts-scan, #tsNew > .search { margin-top: 8px; }
+#tsNew > .ts-h:first-of-type { margin-top: 10px; }
+.ts-back { width: 100%; margin: 0 0 8px; }
 /* «جرد المخزون» (ar/count.js, owner 2026-11-13) */
 .ct-scan { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; margin: 8px 0; padding: 12px 14px; border: 0; border-radius: 16px; background: var(--grad); color: #fff; font-size: 17px; font-weight: 800; text-align: start; box-shadow: var(--sh-acc); }
 .ct-scan i { font-style: normal; font-size: 24px; }
