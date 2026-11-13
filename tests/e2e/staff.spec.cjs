@@ -47,6 +47,18 @@ run('Staff: the owner adds a person, opens sections, sends the link, stops him',
  await page.click('#stfRows [data-stf-log] summary');
  await page.waitForSelector('#stfRows .stf-act');
  assert.match(await text(page,'#stfRows .stf-log'),/سجّل بيعة مؤقتة \(#14 · 3 صنف · 274.7 ج\)[\s\S]*شال من النواقص «ITEM X»/);
+ // the form to add is on top of the list; each person is one short row that opens (owner: «مش عارف اضيف مستخدم غير طاهر»)
+ assert.ok(await page.evaluate(()=>{const k=[...document.getElementById('staffAdmin').children];return k.indexOf(document.querySelector('.stf-new'))<k.indexOf(document.getElementById('stfRows'))}),'the form is above the list');
+ await page.fill('#stfName','موظف تاني');
+ await page.click('#stfAdd');
+ await page.waitForFunction(()=>document.querySelectorAll('#stfRows [data-stf]').length===2);
+ assert.deepEqual(await page.$$eval('#stfRows details.stf-card',d=>d.map(x=>x.open)),[false,true],'the new one opens on his sections, the other stays a short row');
+ assert.match(await text(page,'#stfRows [data-stf="stf2"] summary'),/موظف تاني[\s\S]*مفيش أقسام مفتوحة/);
+ // «🗑 امسح الحساب»: gone for good
+ await page.click('#stfRows [data-stf="stf2"] [data-stf-remove]');
+ await page.waitForFunction(()=>/اتمسح/.test(document.getElementById('stfStatus').textContent));
+ assert.equal((await table('ar_staff')).length,1);
+ assert.equal((await page.$$('#stfRows [data-stf]')).length,1);
 });
 run('Staff: a staff member sees only the sections open for him',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify({ar_staff:[{user_id:'u1',name:'موظف تجربة',perms:['tempsale','expiry'],active:true}]})));

@@ -9,6 +9,8 @@ function fake({me=OWNER}={}){const staff=[],users={},calls=[];
  const f=async(url,o={})=>{calls.push({url,o});const u=new URL(url),body=o.body?JSON.parse(o.body):null;
   if(u.pathname==='/auth/v1/user')return new Response(JSON.stringify(me?{id:me}:{}),{status:me?200:401});
   if(u.pathname==='/auth/v1/admin/users'&&o.method==='POST'){const id=STAFF;users[id]={...body};return new Response(JSON.stringify({id}))}
+  if(u.pathname.startsWith('/auth/v1/admin/users/')&&o.method==='DELETE'){delete users[u.pathname.split('/').pop()];return new Response('{}')}
+  if(u.pathname==='/rest/v1/ar_staff'&&o.method==='DELETE'){const id=u.searchParams.get('user_id').replace('eq.','');staff.splice(staff.findIndex(s=>s.user_id===id),1);return new Response(null,{status:204})}
   if(u.pathname.startsWith('/auth/v1/admin/users/')&&o.method==='PUT'){const id=u.pathname.split('/').pop();users[id]={...users[id],...body};return new Response('{}')}
   if(u.pathname==='/auth/v1/token'){const x=Object.values(users).find(v=>v.email===body.email&&v.password===body.password);return x?new Response(JSON.stringify({access_token:'at',refresh_token:'rt'})):new Response('{}',{status:400})}
   if(u.pathname==='/rest/v1/ar_staff'&&o.method==='POST'){staff.push({active:true,...body});return new Response(null,{status:201})}
@@ -36,6 +38,12 @@ r=await F.handle(req({action:'stop',user_id:STAFF}),env,f);assert.equal(r.status
 r=await F.handle(req({action:'login',token:link2.split('#staff=')[1]},null),env,f);assert.equal(r.status,401);assert.match((await r.json()).message,/مبقاش شغال/);
 // switched on again with a new link
 r=await F.handle(req({action:'link',user_id:STAFF}),env,f);assert.equal(f.staff[0].active,true);assert.equal(f.users[STAFF].ban_duration,'none');
+// deleted for good: his row and his sign-in account; his link is refused
+const tok3=(await (await F.handle(req({action:'link',user_id:STAFF}),env,f)).json()).link.split('#staff=')[1];
+r=await F.handle(req({action:'remove',user_id:STAFF}),env,f);assert.equal(r.status,200);
+assert.equal(f.staff.length,0);assert.equal(f.users[STAFF],undefined);
+assert.equal((await F.handle(req({action:'login',token:tok3},null),env,f)).status,401);
+assert.equal((await F.handle(req({action:'remove',user_id:STAFF}),env,f)).status,404,'already gone');
 // only the owner manages staff; a broken link; another site
 assert.equal((await F.handle(req({action:'create',name:'x'}),env,fake({me:STAFF}))).status,403,'a staff member cannot make accounts');
 assert.equal((await F.handle(req({action:'create',name:'x'},null),env,fake())).status,401);

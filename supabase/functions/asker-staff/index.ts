@@ -7,6 +7,7 @@
 //   POST {action:'create', name, perms}          (owner)                          -> {user_id, link}
 //   POST {action:'link', user_id}                (owner: a new link; the old one stops working, the account is on again)
 //   POST {action:'stop', user_id}                (owner: the account is stopped at once; the link stops working)
+//   POST {action:'remove', user_id}              (owner: the account is deleted for good)
 // Secrets used: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the link's sign-in has no session yet; the owner's calls are checked here).
 
@@ -110,6 +111,14 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (!w.ok) return reply(502, { error: 'save', message: 'الرابط ما اتعملش (' + w.status + ').' }, headers);
     await setUser(id, { ban_duration: 'none' }).catch(() => null);
     return reply(200, { link: l.link }, headers);
+  }
+  if (body.action === 'remove') {
+    // gone for good (owner 2026-11-13 «مش عارف احزف طاهر»): his row, then his sign-in account (his phone is refused at once:
+    // without the row the database opens nothing for him). What he did stays in ar_activity under his id.
+    const d = await call('/rest/v1/ar_staff?user_id=eq.' + id, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
+    if (!d.ok) return reply(502, { error: 'save', message: 'ما اتمسحش (' + d.status + ').' }, headers);
+    await call('/auth/v1/admin/users/' + id, { method: 'DELETE', headers: sh }).catch(() => null);
+    return reply(200, { ok: true }, headers);
   }
   if (body.action === 'stop') {
     // the database refuses him at once (active = false); the ban stops his phone from renewing its session

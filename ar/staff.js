@@ -59,7 +59,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
   const FN = 'asker-staff';
-  let me = null, checkedFor = null, staffList = [];
+  let me = null, checkedFor = null, staffList = [], openCard = '';
   const isStaff = () => !!me;
   const can = (p) => !me || (me.active && (me.perms || []).includes(p));
   const say = (id, text, kind) => { const el = $(id); if (el) { el.textContent = text || ''; el.className = 'status' + (kind ? ' ' + kind : ''); } };
@@ -181,17 +181,20 @@
     const groups = [...new Set(SECTIONS.map((x) => x[2]))];
     const perms = groups.map((g) => `<h4>${esc(g)}</h4>` + SECTIONS.filter((x) => x[2] === g).map(([k, label]) =>
       `<label class="stf-sw"><input type="checkbox" data-perm="${k}"${(s.perms || []).includes(k) ? ' checked' : ''}${s.active ? '' : ' disabled'} /> <span>${esc(label)}</span></label>`).join('')).join('');
-    return `<div class="stf-card" data-stf="${esc(s.user_id)}">
-      <div class="stf-head"><strong class="notr">${esc(s.name)}</strong>${tag}</div>
+    const n = (s.perms || []).filter((p) => SECTIONS.some((x) => x[0] === p)).length;
+    const open = openCard === s.user_id;
+    return `<details class="stf-card" data-stf="${esc(s.user_id)}"${open ? ' open' : ''}>
+      <summary class="stf-head"><strong class="notr">${esc(s.name)}</strong><small class="hint">${n ? `${n} قسم مفتوح` : 'مفيش أقسام مفتوحة'}</small>${tag}</summary>
       ${s.last_seen_at ? `<small class="hint">آخر دخول: ${esc(when(s.last_seen_at))}</small>` : ''}
       <div class="stf-perms">${perms}</div>
       <div class="stf-acts">
         ${s.active ? '<button type="button" data-stf-link>ابعتله رابط الدخول على الواتس</button><button type="button" class="secondary" data-stf-stop>وقّف الحساب</button>'
           : '<button type="button" data-stf-link>شغّله تاني وابعتله رابط جديد</button>'}
         <button type="button" class="secondary" data-stf-preview>👁 شوف البوت زي ما هيشوفه</button>
+        <button type="button" class="secondary stf-del" data-stf-remove>🗑 امسح الحساب</button>
       </div>
       <details data-stf-log><summary>اللي عمله</summary><div class="stf-log"></div></details>
-    </div>`;
+    </details>`;
   }
   function drawAdmin() {
     $('stfRows').innerHTML = staffList.map(staffCard).join('') || '<p class="hint">لسه مفيش موظفين.</p>';
@@ -208,6 +211,7 @@
     try {
       const d = await call({ action: 'create', name, perms: [] });
       $('stfName').value = '';
+      openCard = d.user_id; // open on his sections right away
       await loadAdmin();
       say('stfStatus', `اتعمل حساب ${name}. افتحله الأقسام اللي عايزها، والرابط اتفتح في الواتس تبعته له.`, 'ok');
       sendOnWhatsApp(name, d.link);
@@ -243,7 +247,10 @@
     });
     box.addEventListener('toggle', (e) => {
       const d = e.target;
-      if (d.matches && d.matches('[data-stf-log]') && d.open) loadLog(d.closest('[data-stf]').dataset.stf, d.querySelector('.stf-log'));
+      if (!d.matches) return;
+      if (d.matches('[data-stf-log]') && d.open) loadLog(d.closest('[data-stf]').dataset.stf, d.querySelector('.stf-log'));
+      // the open person stays open when the list is drawn again (after a switch or a button)
+      if (d.matches('.stf-card')) { if (d.open) openCard = d.dataset.stf; else if (openCard === d.dataset.stf) openCard = ''; }
     }, true);
     box.addEventListener('click', async (e) => {
       const b = e.target.closest('button'), card = b && b.closest('[data-stf]');
@@ -257,6 +264,12 @@
           await loadAdmin();
           say('stfStatus', `رابط جديد لـ ${s.name} اتفتح في الواتس. الرابط القديم مبقاش شغال.`, 'ok');
           sendOnWhatsApp(s.name, d.link);
+        } else if (b.hasAttribute('data-stf-remove')) {
+          if (!root.confirm(`تمسح حساب ${s.name} نهائي؟ هيخرج من البوت ومش هيرجع. لو عايزه يرجع بعدين، استخدم «وقّف الحساب» بدل المسح.`)) return;
+          await call({ action: 'remove', user_id: s.user_id });
+          openCard = '';
+          await loadAdmin();
+          say('stfStatus', `حساب ${s.name} اتمسح.`, 'ok');
         } else if (b.hasAttribute('data-stf-stop')) {
           if (!root.confirm(`توقّف حساب ${s.name}؟ هيخرج من البوت على طول، والرابط بتاعه مش هيشتغل.`)) return;
           await call({ action: 'stop', user_id: s.user_id });

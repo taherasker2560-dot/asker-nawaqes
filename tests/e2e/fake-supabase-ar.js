@@ -26,6 +26,7 @@ const functions={invoke:async(name,{body})=>{if(name==='asker-staff'){window.__i
   if(body.action==='create'){const id='stf'+(st.length+1);st.push({user_id:id,name:body.name,perms:body.perms||[],active:true,last_seen_at:null,created_at:new Date().toISOString()});return {data:{user_id:id,link:'https://x/a.html#staff='+'a'.repeat(64)},error:null}}
   if(body.action==='link'){const s=st.find(x=>x.user_id===body.user_id);if(s)s.active=true;return {data:{link:'https://x/a.html#staff='+'b'.repeat(64)},error:null}}
   if(body.action==='stop'){const s=st.find(x=>x.user_id===body.user_id);if(s)s.active=false;return {data:{ok:true},error:null}}
+  if(body.action==='remove'){const i=st.findIndex(x=>x.user_id===body.user_id);if(i>=0)st.splice(i,1);return {data:{ok:true},error:null}}
   if(body.action==='login'){window.__staffLogin=body.token;return {data:{access_token:'at',refresh_token:'rt',name:'موظف'},error:null}}
   return {data:null,error:{message:'bad'}}}
  if(name==='arabic-shortages'){window.__invokes.push('ar:'+body.action);
