@@ -4,7 +4,10 @@
    customer's phone when we answer. A credit customer is known from his account link; anyone else writes a name and a number
    once. The chat's secret stays on the phone. The server (migration 202611132330) gives back only this chat; photos and voice
    notes go to the private bucket ar-chat and are never read back by the page (the customer sees what he sent this time).
-   Voice notes are recorded as WAV 16 kHz mono (every browser, and Gemini reads them): the function asker-chat writes the words. */
+   Voice notes are recorded as WAV 16 kHz mono (every browser, and Gemini reads them): the function asker-chat writes the words.
+   A warehouse (owner 2026-11-14 «رابط للمخزن … الربط بتاعهم بالرقم»): the same link; the page asks the number first, and a
+   number saved for a warehouse in the bot opens the warehouse's page (no name): big «📷 صوّر القايمة» / «📄 ابعت ملف» (PDF or
+   Excel), «✓ وصلت» under each message, and what it sends goes to «الوارد» (arabic-shortages ?chat=1 reads it). */
 (function (root) {
   'use strict';
   const KEY = 'asker_store_chat';
@@ -49,6 +52,14 @@
     return `${h % 12 || 12}:${String(t.getMinutes()).padStart(2, '0')} ${h < 12 ? 'ص' : 'م'}`;
   };
   const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  // a warehouse's file: PDF or Excel only (by its name, else by its type)
+  const FILE_TYPES = { pdf: 'application/pdf', xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  function fileExt(f) {
+    const m = /\.(pdf|xlsx|xls)$/i.exec(String((f && f.name) || ''));
+    if (m) return m[1].toLowerCase();
+    const t = String((f && f.type) || '');
+    return t === 'application/pdf' ? 'pdf' : /spreadsheetml/.test(t) ? 'xlsx' : /ms-excel/.test(t) ? 'xls' : '';
+  }
   // the push key as the browser wants it
   function keyBytes(b64url) {
     const s = String(b64url).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(b64url).length + 3) % 4);
@@ -59,8 +70,16 @@
     title: 'الرسايل',
     sub: 'بنرد عليك هنا',
     hello: 'اكتبلنا أي حاجة: صنف عايزه، روشتة، أو اسأل الصيدلي. وتقدر تبعت صورة أو فويس.',
-    formH: 'قبل أول رسالة: اسمك ورقمك',
+    formH: 'قبل أول رسالة: رقم موبايلك',
     name: 'الاسم',
+    supHint: '🏬 مندوب مخزن؟ لازم تكتب رقمك اللي الصيدلية مسجلاه عندها، عشان اللي تبعته يروح المشتريات على طول.',
+    supWho: 'المشتريات',
+    supOk: '✅ إنت متسجل كمخزن: اللي تبعته بيروح المشتريات على طول',
+    supPhoto: '📷 صوّر القايمة',
+    supFile: '📄 ابعت ملف',
+    supFileSub: 'PDF أو إكسل',
+    got: '✓ وصلت',
+    file: '📄 ملف',
     phone: 'رقم الموبايل',
     start: 'ابدأ',
     type: 'اكتب رسالتك…',
@@ -78,7 +97,10 @@
     voiceWords: 'اتكتب:',
     errors: {
       bad_name: 'اكتب اسمك',
+      need_name: 'اكتب اسمك كمان، أول مرة بس',
       bad_phone: 'رقم الموبايل لازم يكون 11 رقم ويبدأ بـ 01',
+      bad_kind: 'الملف ده مش مدعوم. ابعت صورة أو PDF أو إكسل',
+      big: 'الملف أكبر من ٨ ميجا',
       // never blaming the customer (owner 2026-11-14: «هنقول للعملاء رسائل كتير ما تبعتوش؟»)
       too_many: 'استنى دقيقة وكمّل رسايلك',
       busy: 'جرب تاني بعد شوية',
@@ -91,7 +113,7 @@
       net: 'مفيش نت أو حصلت مشكلة. جرب تاني',
     },
   };
-  const api = { normPhone, cleanName, downsample, encodeWav, clock, mmss, keyBytes, TEXTS, KEY, VAPID, MAX_SECONDS, RATE };
+  const api = { normPhone, cleanName, downsample, encodeWav, clock, mmss, keyBytes, fileExt, FILE_TYPES, TEXTS, KEY, VAPID, MAX_SECONDS, RATE };
   if (typeof module !== 'undefined') module.exports = api;
   root.AskerStoreChatLib = api;
   if (typeof document === 'undefined') return;
@@ -108,6 +130,13 @@
   };
   let client = null, secret = keep.get(), name = '', msgs = [], lastId = 0, timer = null, busy = false, error = '', opening = false;
   let rec = null, recStarting = false, notify = '';
+  // a warehouse's chat (its name in the bot), and whether the name box is asked (a number that is not a warehouse's)
+  let supplier = '', askName = false, forwarded = false;
+  const whoText = () => (supplier ? `${TEXTS.supWho} · ${supplier}` : secret && name ? `${TEXTS.sub} · ${name}` : TEXTS.sub);
+  // what a warehouse sent goes to «الوارد»: the function reads what this chat sent and is not there yet
+  function forward() {
+    if (client && client.functions && secret) client.functions.invoke('arabic-shortages?chat=1', { body: { secret } }).catch(() => null);
+  }
   const local = new Map(); // message id -> blob URL of what was sent from this page (photo / voice)
   if (secret && !/^[0-9a-f]{64}$/.test(secret)) { keep.set(null); secret = null; }
 
@@ -132,16 +161,28 @@
     opening = false;
     draw(); poll(true);
   }
+  // the number first: a warehouse's number opens its page at once; anyone else is asked his name once (a name kept on this
+  // phone from before is sent with the number)
   async function start(e) {
     e.preventDefault();
-    const n = cleanName($('chatName').value), p = normPhone($('chatPhone').value);
-    if (n.length < 2) return say(TEXTS.errors.bad_name);
+    let me = {};
+    try { me = JSON.parse(localStorage.getItem('asker_store_me') || 'null') || {}; } catch (x) { /* none */ }
+    const p = normPhone($('chatPhone').value), n = cleanName(askName && $('chatName') ? $('chatName').value : me.name || '');
     if (!p) return say(TEXTS.errors.bad_phone);
+    if (askName && n.length < 2) return say(TEXTS.errors.bad_name);
     try {
-      const d = await rpc('ar_chat_open', { p_name: n, p_phone: p });
-      if (!d.ok) return say(TEXTS.errors[d.error] || TEXTS.errors.net);
-      secret = d.secret; name = d.name || n; keep.set(secret); say('');
-      try { const me = JSON.parse(localStorage.getItem('asker_store_me') || 'null') || {}; localStorage.setItem('asker_store_me', JSON.stringify({ ...me, name: n, phone: p })); } catch (x) { /* private window */ }
+      const d = await rpc('ar_chat_open', { p_name: n || null, p_phone: p });
+      if (!d.ok) {
+        if (d.error === 'need_name' || (d.error === 'bad_name' && !askName)) {
+          askName = true; error = TEXTS.errors.need_name; draw();
+          const box = $('chatName'); if (box) box.focus();
+          return;
+        }
+        return say(TEXTS.errors[d.error] || TEXTS.errors.net);
+      }
+      secret = d.secret; name = d.name || n; supplier = d.supplier || ''; keep.set(secret); say('');
+      // a customer's name and number are kept for his orders; a warehouse's are not
+      if (!supplier) { try { localStorage.setItem('asker_store_me', JSON.stringify({ ...me, name: n, phone: p })); } catch (x) { /* private window */ } }
       draw(); poll(true);
     } catch (x) { say(TEXTS.errors.net); }
   }
@@ -153,7 +194,10 @@
         const d = await rpc('ar_chat_read', { p_secret: secret, p_after: lastId });
         if (d.ok) {
           name = d.name || name;
-          if ($('chatWho') && name) $('chatWho').textContent = `${TEXTS.sub} · ${name}`;
+          // a warehouse's chat (also one the owner marked later from the bot): its page, and its leftovers to «الوارد»
+          if ((d.supplier || '') !== supplier) { supplier = d.supplier || ''; draw(); }
+          if (supplier && !forwarded) { forwarded = true; forward(); }
+          if ($('chatWho')) $('chatWho').textContent = whoText();
           let changed = false;
           for (const m of d.messages || []) {
             const i = msgs.findIndex((x) => x.id === m.id);
@@ -164,7 +208,7 @@
           const top = msgs.length ? msgs[msgs.length - 1].id : 0;
           lastId = waitingWords ? Math.min(top, waitingWords.id - 1) : top;
           if (changed) drawMsgs();
-        } else if (d.error === 'chat') { keep.set(null); secret = null; msgs = []; lastId = 0; draw(); say(TEXTS.errors.chat); return; }
+        } else if (d.error === 'chat') { keep.set(null); secret = null; supplier = ''; forwarded = false; msgs = []; lastId = 0; draw(); say(TEXTS.errors.chat); return; }
       } catch (e) { /* next time */ }
     }
     if (shown()) timer = setTimeout(() => poll(false), POLL_MS);
@@ -174,37 +218,48 @@
     const mine = m.sender === 'customer', url = local.get(m.id);
     let inner = '';
     if (m.kind === 'photo') inner = url ? `<img class="ch-photo" src="${esc(url)}" alt="">` : `<span class="ch-file">${esc(TEXTS.photo)}</span>`;
+    else if (m.kind === 'file') inner = `<span class="ch-file ch-doc"><b>📄</b><span dir="auto">${esc(m.body || TEXTS.file)}</span></span>`;
     else if (m.kind === 'voice') {
       inner = url ? `<audio class="ch-audio" controls preload="none" src="${esc(url)}"></audio>` : `<span class="ch-file">${esc(TEXTS.voice)} ${esc(mmss(m.seconds || 0))}</span>`;
       if (m.body) inner += `<span class="ch-words">${esc(TEXTS.voiceWords)} «${esc(m.body)}»</span>`;
     } else inner = `<span class="ch-text">${esc(m.body)}</span>`;
-    return `<div class="ch-b ${mine ? 'me' : 'us'}">${mine ? '' : `<span class="ch-who">${esc(TEXTS.us)}</span>`}${inner}<small>${esc(clock(m.at))}</small></div>`;
+    // a warehouse sees «✓ وصلت» under what it sent (stored: it goes to «الوارد»)
+    const time = clock(m.at) + (mine && supplier ? ` · ${TEXTS.got}` : '');
+    return `<div class="ch-b ${mine ? 'me' : 'us'}">${mine ? '' : `<span class="ch-who">${esc(TEXTS.us)}</span>`}${inner}<small>${esc(time)}</small></div>`;
   }
   function drawMsgs() {
     const list = $('chatList');
     if (!list) return;
     const atEnd = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-    list.innerHTML = `<p class="ch-hello">${esc(TEXTS.hello)}</p>` + msgs.map(bubble).join('');
+    list.innerHTML = (supplier ? `<p class="ch-ok">${esc(TEXTS.supOk)}</p>` : `<p class="ch-hello">${esc(TEXTS.hello)}</p>`) + msgs.map(bubble).join('');
     if (atEnd || !list.dataset.seen) { list.scrollTop = list.scrollHeight; list.dataset.seen = '1'; window.scrollTo(0, document.body.scrollHeight); }
   }
   function draw() {
     const v = $('chatBox');
     if (!v) return;
-    $('chatWho').textContent = secret && name ? `${TEXTS.sub} · ${name}` : TEXTS.sub;
+    $('chatWho').textContent = whoText();
     // on the pharmacy's phone the page may open inside the installed bot: always a way back (as on «حسابي»)
     const back = $('chatBack');
     if (back) back.hidden = !pharmacyPhone;
     if (!secret) {
       let me = {};
       try { me = JSON.parse(localStorage.getItem('asker_store_me') || 'null') || {}; } catch (e) { /* none */ }
+      const typed = $('chatPhone') ? $('chatPhone').value : me.phone || '';
       v.innerHTML = `<form id="chatForm" class="panel ch-form" novalidate><h2>${esc(TEXTS.formH)}</h2>` +
-        `<label for="chatName">${esc(TEXTS.name)}</label><input id="chatName" type="text" maxlength="60" autocomplete="name" value="${esc(me.name || '')}">` +
-        `<label for="chatPhone">${esc(TEXTS.phone)}</label><input id="chatPhone" type="tel" dir="ltr" inputmode="tel" maxlength="16" placeholder="01xxxxxxxxx" value="${esc(me.phone || '')}">` +
-        `<p id="chatMsg" class="form-msg bad"${error ? '' : ' hidden'}>${esc(error)}</p><button type="submit" class="ch-start">${esc(TEXTS.start)}</button></form>`;
+        `<label for="chatPhone">${esc(TEXTS.phone)}</label><input id="chatPhone" type="tel" dir="ltr" inputmode="tel" maxlength="16" placeholder="01xxxxxxxxx" value="${esc(typed)}">` +
+        (askName ? `<label for="chatName">${esc(TEXTS.name)}</label><input id="chatName" type="text" maxlength="60" autocomplete="name" value="${esc(me.name || '')}">` : '') +
+        `<p class="ch-sup-hint">${esc(TEXTS.supHint)}</p>` +
+        `<p id="chatMsg" class="form-msg ${askName && error === TEXTS.errors.need_name ? 'ask' : 'bad'}"${error ? '' : ' hidden'}>${esc(error)}</p><button type="submit" class="ch-start">${esc(TEXTS.start)}</button></form>`;
       $('chatForm').addEventListener('submit', start);
       return;
     }
-    v.innerHTML = `<div id="chatList" class="ch-list"></div>` +
+    // a warehouse: two big buttons first (its list's photo, or its PDF / Excel file)
+    const fileAccept = '.pdf,.xls,.xlsx,' + Object.values(FILE_TYPES).join(',');
+    v.innerHTML = (supplier
+      ? `<div class="ch-big"><label class="ch-bigb p1">${esc(TEXTS.supPhoto)}<input id="chatPhoto2" type="file" accept="image/*" hidden></label>` +
+        `<label class="ch-bigb p2">${esc(TEXTS.supFile)}<small>${esc(TEXTS.supFileSub)}</small><input id="chatFile" type="file" accept="${esc(fileAccept)}" hidden></label></div>`
+      : '') +
+      `<div id="chatList" class="ch-list"></div>` +
       `<p id="chatNotify" class="ch-notify"${notify ? '' : ' hidden'}>${esc(notify)}</p>` +
       `<p id="chatMsg" class="form-msg bad ch-err"${error ? '' : ' hidden'}>${esc(error)}</p>` +
       `<div class="ch-bar">` +
@@ -214,6 +269,7 @@
         : rec
         ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec"><i class="ch-dot"></i><b id="chatRecT">0:00</b> ${esc(TEXTS.recording)}</span><button type="button" class="ch-ic ch-mic on" data-ch-recsend aria-label="${esc(TEXTS.voice)}">➤</button>`
         : `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.photo)}">📷<input id="chatPhoto" type="file" accept="image/*" hidden></label>` +
+          (supplier ? `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.supFile)}">📎<input id="chatFile2" type="file" accept="${esc(fileAccept)}" hidden></label>` : '') +
           `<textarea id="chatText" rows="1" maxlength="2000" placeholder="${esc(TEXTS.type)}"></textarea>` +
           `<button type="button" class="ch-ic ch-mic" data-ch-mic aria-label="${esc(TEXTS.voice)}">🎤</button><button type="button" class="ch-ic ch-send" data-ch-send aria-label="ابعت" hidden>➤</button>`) +
       `</div>`;
@@ -244,16 +300,17 @@
       afterSend();
     } catch (e) { say(TEXTS.errors.net); } finally { busy = false; }
   }
-  async function shrink(file) {
+  // a warehouse's list keeps more detail (small print): 2400 px instead of 1600
+  async function shrink(file, max = 1600, quality = 0.85) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
     try {
       const bmp = await createImageBitmap(file);
-      const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
       if (scale === 1 && file.size < 1.5 * 1024 * 1024 && file.type === 'image/jpeg') return file;
       const c = document.createElement('canvas');
       c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
       c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-      const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.85));
+      const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', quality));
       return blob || file;
     } catch (e) { return file; }
   }
@@ -261,12 +318,27 @@
     if (!file || busy) return;
     busy = true; say(TEXTS.sending);
     try {
-      const img = await shrink(file);
+      const img = supplier ? await shrink(file, 2400, 0.9) : await shrink(file);
       const type = img.type === 'image/png' || img.type === 'image/webp' ? img.type : 'image/jpeg';
       const path = await upload(img, type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg', type);
       const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'photo', p_media: path });
       if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
       local.set(d.id, URL.createObjectURL(img)); say('');
+      afterSend();
+    } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
+  }
+  // a warehouse's PDF or Excel list (8 MB at most, like the photos)
+  async function sendFile(file) {
+    if (!file || busy) return;
+    const ext = fileExt(file);
+    if (!ext) return say(TEXTS.errors.bad_kind);
+    if (file.size > 8 * 1024 * 1024) return say(TEXTS.errors.big);
+    busy = true; say(TEXTS.sending);
+    try {
+      const path = await upload(file, ext, FILE_TYPES[ext]);
+      const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'file', p_media: path, p_body: cleanName(file.name).slice(0, 120) || null });
+      if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
+      say('');
       afterSend();
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
@@ -325,12 +397,16 @@
       const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'voice', p_media: path, p_seconds: seconds });
       if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
       local.set(d.id, URL.createObjectURL(blob)); say('');
-      // the words of the voice note (the function asker-chat asks Gemini); the next reads show them
-      client.functions.invoke('asker-chat', { body: { action: 'voice', secret, id: d.id } }).catch(() => null);
+      // the words of the voice note (the function asker-chat asks Gemini); the next reads show them. A warehouse's voice
+      // note goes to «الوارد» once its words are there.
+      const words = client.functions.invoke('asker-chat', { body: { action: 'voice', secret, id: d.id } }).catch(() => null);
       afterSend();
+      if (supplier) words.then(forward);
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
   function afterSend() {
+    // a warehouse: to «الوارد» (no «رسالة جديدة من عميل», no answer to wait for)
+    if (supplier) { poll(true); forward(); return; }
     poll(true); offerNotify();
     // the pharmacy's phones: «رسالة جديدة من عميل» even with the bot closed (asker-chat; at most once a minute a chat)
     if (client && client.functions) client.functions.invoke('asker-chat', { body: { action: 'notify', secret } }).catch(() => null);
@@ -398,7 +474,9 @@
   });
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'chatText') toggleSend(); });
   document.addEventListener('change', (e) => {
-    if (e.target && e.target.id === 'chatPhoto') { const f = e.target.files && e.target.files[0]; e.target.value = ''; sendPhoto(f); }
+    const id = e.target && e.target.id;
+    if (id === 'chatPhoto' || id === 'chatPhoto2') { const f = e.target.files && e.target.files[0]; e.target.value = ''; sendPhoto(f); }
+    if (id === 'chatFile' || id === 'chatFile2') { const f = e.target.files && e.target.files[0]; e.target.value = ''; sendFile(f); }
   });
   document.addEventListener('keydown', (e) => {
     if (e.target && e.target.id === 'chatText' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }

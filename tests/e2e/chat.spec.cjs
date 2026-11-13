@@ -9,10 +9,17 @@ run('Messages: a cash customer writes his name and number once, sends text and a
  await page.evaluate((t)=>localStorage.setItem('__fakeTables',JSON.stringify(t)),tables());
  await page.goto(base+'store.html#chat');await page.reload();
  await page.waitForSelector('[data-view="chat"]:not([hidden]) #chatForm');
- // the name and the number first (a wrong number is refused)
- await page.fill('#chatName','سامية');await page.fill('#chatPhone','0101');await page.click('.ch-start');
+ // the number first (a wrong number is refused); a word for the warehouses' reps (owner 2026-11-14)
+ assert.match(await text(page,'.ch-sup-hint'),/مندوب مخزن؟ لازم تكتب رقمك اللي الصيدلية مسجلاه/);
+ assert.equal(await page.$('#chatName'),null,'no name box before the number');
+ await page.fill('#chatPhone','0101');await page.click('.ch-start');
  assert.match(await text(page,'#chatMsg'),/11 رقم ويبدأ بـ 01/);
  await page.fill('#chatPhone','01012345678');await page.click('.ch-start');
+ // not a warehouse's number: his name too, once (the number stays)
+ await page.waitForSelector('#chatName');
+ assert.match(await text(page,'#chatMsg'),/اكتب اسمك كمان، أول مرة بس/);
+ assert.equal(await page.inputValue('#chatPhone'),'01012345678');
+ await page.fill('#chatName','سامية');await page.click('.ch-start');
  await page.waitForSelector('#chatText');
  assert.equal(await text(page,'#chatWho'),'بنرد عليك هنا · سامية');
  const secret=await page.evaluate(()=>localStorage.getItem('asker_store_chat'));

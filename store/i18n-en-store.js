@@ -308,7 +308,19 @@ window.AskerEN = {
   "في متصفح سامسونج: دوس ≡ تحت، وبعدين «إضافة صفحة إلى» ← «الشاشة الرئيسية».": "In Samsung Internet: tap ≡ at the bottom, then «Add page to» → «Home screen».",
   "افتح قايمة المتصفح (⋮ أو ≡)، واختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».": "Open the browser's menu (⋮ or ≡) and choose «Install» or «Add to Home screen».",
   "دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».": "Tap ⋮ at the top in Chrome, then «Install app» or «Add to Home screen».",
-  "اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.": "Installed: you'll find «Asker Pharmacy» on your home screen, and it opens on your account."
+  "اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.": "Installed: you'll find «Asker Pharmacy» on your home screen, and it opens on your account.",
+  "قبل أول رسالة: رقم موبايلك": "Before your first message: your mobile number",
+  "🏬 مندوب مخزن؟ لازم تكتب رقمك اللي الصيدلية مسجلاه عندها، عشان اللي تبعته يروح المشتريات على طول.": "🏬 A warehouse rep? Write the number the pharmacy has saved for you, so what you send goes straight to purchasing.",
+  "المشتريات": "Purchasing",
+  "✅ إنت متسجل كمخزن: اللي تبعته بيروح المشتريات على طول": "✅ You are saved as a warehouse: what you send goes straight to purchasing",
+  "📷 صوّر القايمة": "📷 Photo of the list",
+  "📄 ابعت ملف": "📄 Send a file",
+  "PDF أو إكسل": "PDF or Excel",
+  "✓ وصلت": "✓ Received",
+  "📄 ملف": "📄 File",
+  "اكتب اسمك كمان، أول مرة بس": "Write your name too, the first time only",
+  "الملف ده مش مدعوم. ابعت صورة أو PDF أو إكسل": "This file is not supported. Send a photo, a PDF or an Excel file",
+  "الملف أكبر من ٨ ميجا": "The file is bigger than 8 MB"
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",

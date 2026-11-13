@@ -22,7 +22,13 @@ function builder(table){let filters=[],op='select',payload=null,opts={},range=nu
   then(res,rej){if(op==='select')window.__reads.push({table,at:performance.now()});if(op==='select'&&localStorage.getItem('__fakeFail')===table)return Promise.resolve({data:null,error:{message:'down'}}).then(res,rej);const d=+localStorage.getItem('__fakeDelay')||0;if(!d||op!=='select')return Promise.resolve(run()).then(res,rej);return new Promise(ok=>setTimeout(()=>ok(run()),d)).then(res,rej)}};return b}
 const catalog=[{id:'1',name:'BRUFEN 400'},{id:'2',name:'سليسبت 500'},{id:'3',name:'JANUVIA 50MG 28TAB'},{id:'4',name:'JANUVIA 100MG 28TAB'}];
 window.__invokes=[];
-const functions={invoke:async(name,{body})=>{if(name==='asker-chat'){window.__invokes.push('chat:'+body.action+':'+(body.chat_id||body.id));return {data:{ok:true,sent:(tables.ar_chat_push||[]).filter(p=>p.chat_id===body.chat_id).length,gone:0,failed:0},error:null}}
+const functions={invoke:async(name,{body})=>{
+ // a warehouse's messages page → «الوارد» (arabic-shortages ?chat=1, migration 202611141400): each message once, via 'link'
+ if(name==='arabic-shortages?chat=1'){window.__invokes.push('chatinbox');const c=(tables.ar_chats||[]).find(x=>x.secret===body.secret);if(!c||!c.supplier)return {data:{ok:false,error:'not-supplier'},error:null};
+  const ms=(tables.ar_chat_messages||[]).filter(m=>m.chat_id===c.id&&m.sender==='customer'&&!m.inbox_at&&(m.kind!=='voice'||m.body));
+  ms.forEach(m=>{m.inbox_at=new Date().toISOString();(tables.ar_inbox||(tables.ar_inbox=[])).push({id:'li'+m.id,received_at:m.at,sender:'رابط المخزن',supplier:c.supplier,kind:m.kind==='photo'?'image':m.kind==='file'?'pdf':'text',body_text:m.kind==='file'?null:m.body,file_path:null,status:'new',error:null,rows:[],sure:0,review:0,maybe:null,via:'link',chat_msg:m.id})});
+  return {data:{ok:true,done:ms.length},error:null}}
+ if(name==='asker-chat'){window.__invokes.push('chat:'+body.action+':'+(body.chat_id||body.id));return {data:{ok:true,sent:(tables.ar_chat_push||[]).filter(p=>p.chat_id===body.chat_id).length,gone:0,failed:0},error:null}}
  if(name==='asker-staff'){window.__invokes.push('staff:'+body.action);const st=tables.ar_staff||(tables.ar_staff=[]);
   if(body.action==='create'){const id='stf'+(st.length+1);st.push({user_id:id,name:body.name,perms:body.perms||[],active:true,last_seen_at:null,created_at:new Date().toISOString()});return {data:{user_id:id,link:'https://x/a.html#staff='+'a'.repeat(64)},error:null}}
   if(body.action==='link'){const s=st.find(x=>x.user_id===body.user_id);if(s)s.active=true;return {data:{link:'https://x/a.html#staff='+'b'.repeat(64)},error:null}}
@@ -57,15 +63,24 @@ function customerRpc(name,a){const T=k=>tables[k]||(tables[k]=[]);
  // «الرسايل» (migration 202611132330): the customer's page and the pharmacy's answer
  const hex=()=>Array.from({length:64},()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
  const chatOf=()=>T('ar_chats').find(c=>c.secret===a.p_secret);
- if(name==='ar_chat_open'){let c=a.p_secret&&chatOf();if(c)return {ok:true,secret:c.secret,name:c.name,linked:!!c.customer_id};
+ // a warehouse's number (ar_suppliers / ar_supplier_phones, «201…»): two names with one number, the one naming a person
+ const supOf=(ph)=>{const wa='2'+ph,s=T('ar_suppliers').filter(x=>x.phone===wa).sort((x,y)=>(/\(.+\)/.test(y.name)?1:0)-(/\(.+\)/.test(x.name)?1:0)||x.name.localeCompare(y.name))[0];return s?s.name:((T('ar_supplier_phones').find(p=>p.phone===wa)||{}).supplier||null)};
+ if(name==='ar_chat_make_supplier'){const c=T('ar_chats').find(x=>x.id===a.p_chat);if(!c)return {ok:false,error:'chat'};if(c.customer_id||!c.phone)return {ok:false,error:'not_cash'};const wa='2'+c.phone;let nm;
+  if(a.p_new){nm=String(a.p_new).trim();if(T('ar_suppliers').some(s=>s.name===nm))return {ok:false,error:'exists'};T('ar_suppliers').push({name:nm,phone:wa})}
+  else{const s=T('ar_suppliers').find(x=>x.name===a.p_supplier);if(!s)return {ok:false,error:'supplier'};nm=s.name;if(!s.phone)s.phone=wa;else if(s.phone!==wa)T('ar_supplier_phones').push({phone:wa,supplier:nm,added_at:new Date().toISOString()})}
+  T('ar_chats').filter(x=>x.phone===c.phone&&!x.customer_id).forEach(x=>Object.assign(x,{supplier:nm,waiting:0}));return {ok:true,supplier:nm,secret:c.secret}}
+ if(name==='ar_chat_open'){let c=a.p_secret&&chatOf();if(c)return {ok:true,secret:c.secret,name:c.name,linked:!!c.customer_id,supplier:c.supplier||null};
   if(a.p_token){const cu=who();if(!cu)return {ok:false,error:'link'};c=T('ar_chats').find(x=>x.customer_id===cu.id);if(!c){c={id:'chat'+cu.id,secret:hex(),customer_id:cu.id,name:cu.name,phone:null,last_at:new Date().toISOString(),last_from:'customer',waiting:0,last_text:null};T('ar_chats').push(c)}return {ok:true,secret:c.secret,name:c.name,linked:true}}
-  const nm=String(a.p_name||'').trim(),ph=String(a.p_phone||'');if(nm.length<2)return {ok:false,error:'bad_name'};if(!/^01\d{9}$/.test(ph))return {ok:false,error:'bad_phone'};
-  c={id:'chat'+(T('ar_chats').length+1),secret:hex(),customer_id:null,name:nm,phone:ph,last_at:new Date().toISOString(),last_from:'customer',waiting:0,last_text:null};T('ar_chats').push(c);return {ok:true,secret:c.secret,name:nm,linked:false}}
- if(name==='ar_chat_read'){const c=chatOf();if(!c)return {ok:false,error:'chat'};return {ok:true,name:c.name,messages:T('ar_chat_messages').filter(m=>m.chat_id===c.id&&m.id>(a.p_after||0)).map(m=>({id:m.id,at:m.at,sender:m.sender,kind:m.kind,body:m.body,seconds:m.seconds}))}}
+  // the number first: a warehouse's number needs no name; anyone else is asked his name
+  const nm=String(a.p_name||'').trim(),ph=String(a.p_phone||'');if(!/^01\d{9}$/.test(ph))return {ok:false,error:'bad_phone'};
+  const sup=supOf(ph);if(!sup){if(!nm)return {ok:false,error:'need_name'};if(nm.length<2)return {ok:false,error:'bad_name'}}
+  c={id:'chat'+(T('ar_chats').length+1),secret:hex(),customer_id:null,name:sup||nm,phone:ph,supplier:sup,last_at:new Date().toISOString(),last_from:'customer',waiting:0,last_text:null};T('ar_chats').push(c);return {ok:true,secret:c.secret,name:c.name,linked:false,supplier:sup}}
+ if(name==='ar_chat_read'){const c=chatOf();if(!c)return {ok:false,error:'chat'};return {ok:true,name:c.name,supplier:c.supplier||null,messages:T('ar_chat_messages').filter(m=>m.chat_id===c.id&&m.id>(a.p_after||0)).map(m=>({id:m.id,at:m.at,sender:m.sender,kind:m.kind,body:m.body,seconds:m.seconds}))}}
  if(name==='ar_chat_send'){const c=chatOf();if(!c)return {ok:false,error:'chat'};if(a.p_kind==='text'&&!String(a.p_body||'').trim())return {ok:false,error:'bad_text'};
+  if(a.p_kind==='file'&&!c.supplier)return {ok:false,error:'bad_kind'};
   if(a.p_kind!=='text'&&!window.__storage[a.p_media])return {ok:false,error:'bad_media'};
-  const m={id:1000+T('ar_chat_messages').length,chat_id:c.id,at:new Date().toISOString(),sender:'customer',kind:a.p_kind,body:a.p_kind==='text'?a.p_body:null,media:a.p_kind==='text'?null:a.p_media,seconds:a.p_seconds||null,sent_by:null};T('ar_chat_messages').push(m);
-  Object.assign(c,{last_at:m.at,last_from:'customer',waiting:(c.waiting||0)+1,last_text:m.body||'📷 صورة'});return {ok:true,id:m.id}}
+  const m={id:1000+T('ar_chat_messages').length,chat_id:c.id,at:new Date().toISOString(),sender:'customer',kind:a.p_kind,body:a.p_kind==='text'||a.p_kind==='file'?a.p_body:null,media:a.p_kind==='text'?null:a.p_media,seconds:a.p_seconds||null,sent_by:null};T('ar_chat_messages').push(m);
+  Object.assign(c,{last_at:m.at,last_from:'customer',waiting:c.supplier?0:(c.waiting||0)+1,last_text:a.p_kind==='file'?'📄 '+(m.body||'ملف'):m.body||'📷 صورة'});return {ok:true,id:m.id}}
  if(name==='ar_chat_push_save'){const c=chatOf();if(!c)return {ok:false,error:'chat'};T('ar_chat_push').push({endpoint:a.p_endpoint,chat_id:c.id});return {ok:true}}
  if(name==='ar_chat_delete'){const L=T('ar_chats');const i=L.findIndex(c=>c.id===a.p_chat);if(i<0)return {ok:false,deleted:0};L.splice(i,1);tables.ar_chat_messages=T('ar_chat_messages').filter(m=>m.chat_id!==a.p_chat);tables.ar_chat_push=T('ar_chat_push').filter(p=>p.chat_id!==a.p_chat);return {ok:true,deleted:1}}
  if(name==='ar_chat_reply'){const c=T('ar_chats').find(x=>x.id===a.p_chat);if(!c)return {ok:false,error:'chat'};const m={id:1000+T('ar_chat_messages').length,chat_id:c.id,at:new Date().toISOString(),sender:'pharmacy',kind:'text',body:a.p_body,media:null,seconds:null,sent_by:'u1'};T('ar_chat_messages').push(m);Object.assign(c,{last_at:m.at,last_from:'pharmacy',waiting:0,last_text:a.p_body});return {ok:true,id:m.id}}

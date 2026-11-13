@@ -248,3 +248,17 @@ body.ch-open .ch-notify, body.ch-open .ch-err { bottom: calc(76px + env(safe-are
 .ch-rec.wait { color: var(--ink); font-weight: 700; font-size: 14px; }
 .ch-dot { width: 12px; height: 12px; flex: none; border-radius: 50%; background: #c62828; animation: ch-beat 1s ease-in-out infinite; }
 @keyframes ch-beat { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.75); } }
+/* a warehouse's page (owner 2026-11-14): the number first with a word for the reps, then two big buttons and «✓ وصلت» */
+.ch-sup-hint { margin: 12px 0 4px; padding: 10px 12px; border-radius: 14px; background: #fff7e0; border: 1px solid #f0d58a; color: #6b4a00; font-size: 14px; line-height: 1.7; }
+html.night .ch-sup-hint { background: #3a3220; border-color: #6b5a2a; color: #f3dfa8; }
+#chatBox .form-msg.ask { color: var(--accent-text, var(--accent)); font-weight: 800; }
+.ch-ok { margin: 4px 4px 10px; padding: 10px 12px; border-radius: 14px; background: #e7f7ec; border: 1px solid #9ad8ad; color: #14532d; font-size: 14px; font-weight: 700; line-height: 1.7; }
+html.night .ch-ok { background: #183524; border-color: #2f6b45; color: #bdf0cd; }
+.ch-big { display: flex; gap: 10px; margin: 12px 12px 0; }
+.ch-bigb { flex: 1; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 16px; font-size: 17px; font-weight: 800; cursor: pointer; text-align: center; }
+.ch-bigb.p1 { background: var(--accent); color: #fff; }
+.ch-bigb.p2 { background: var(--card); color: var(--accent-text, var(--accent)); border: 2px solid var(--accent); }
+.ch-bigb small { font-size: 12px; font-weight: 600; opacity: 0.85; }
+.ch-doc { display: flex; align-items: center; gap: 8px; }
+.ch-doc b { font-size: 24px; }
+.ch-doc span { direction: ltr; text-align: right; }

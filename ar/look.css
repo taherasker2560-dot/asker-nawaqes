@@ -1479,3 +1479,13 @@ html.night .so-acct.on { color: #a9c6f2; }
 .ch-reply button { min-height: 52px; min-width: 80px; background: #1fa855; color: #fff; font-weight: 800; }button.ch-push { width: 100%; margin: 4px 0 6px; font-weight: 700; }
 .ch-push-on { margin: 4px 0 6px; }
 button.ch-del { display: block; margin: 14px auto 0; color: #c62828; }
+/* the warehouses' link (owner 2026-11-14): «🏬 ده مندوب مخزن؟» in a chat, «🔗 من الرابط» in the inbox, the link per warehouse */
+button.ch-sup { display: block; margin: 12px auto 0; }
+.ch-mv { margin: 12px 0 0; padding: 12px; border-radius: 14px; background: #fffbea; border: 2px solid #e0b84a; }
+.ch-mv h4 { margin: 0 0 4px; color: #8a5a00; }
+.ch-mv .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+html.night .ch-mv { background: #3a3220; border-color: #6b5a2a; }
+html.night .ch-mv h4 { color: #f3dfa8; }
+.pill.link { background: var(--accent-soft, #e8eefb); color: var(--accent, #0a4aa6); }
+.sup-row .sup-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.sup-row [data-send-link] { background: #1fa855; color: #fff; }

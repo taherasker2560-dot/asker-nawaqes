@@ -987,6 +987,95 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
   return out(200, { ok: true, id: saved?.id, supplier, sure: sureIds.size, review, say: spoken }, say);
 }
 
+// ---------- a warehouse's link on our messages page (owner 2026-11-14 «رابط للمخزن زيه زي العملاء») ----------
+// POST <function>?chat=1 body {secret}: sent by the messages page (store.html#chat) of a warehouse after each message, and by
+// the bot after «🏬 ده مندوب مخزن». A warehouse's chat is the one opened with a number saved in «الوارد ← الشركات»
+// (migration 202611141400). What it sent in the last CHAT_DAYS days and is not in the inbox yet is read and matched like
+// the phone's WhatsApp inbox and kept in ar_inbox under the warehouse's name (via 'link'); the phone's voice says it
+// (ar_sync_news block 3c), and the laptop's reader fills a photo Google could not read, as for WhatsApp's.
+// No login: the chat's secret is the key, and only a warehouse's chat is read. Each message is taken once (inbox_at).
+const CHAT_DAYS = 3, CHAT_BATCH = 4, CHAT_BUDGET_MS = 90 * 1000;
+type ChatMsg = { id: number; kind: string; body: string | null; media: string | null };
+export async function handleChatInbox(req: Request, env: Env, fetchImpl: typeof fetch, headers: Record<string, string>): Promise<Response> {
+  const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!service || !env.SUPABASE_URL || !env.GEMINI_API_KEY) return reply(503, { error: 'not-configured' }, headers);
+  let body: { secret?: unknown };
+  try { body = await req.json(); } catch { return reply(400, { error: 'body' }, headers); }
+  const secret = String(body?.secret || '');
+  if (!/^[0-9a-f]{64}$/.test(secret)) return reply(400, { error: 'chat' }, headers);
+  const base = env.SUPABASE_URL.replace(/\/$/, ''), sh = serviceHeaders(service), t0 = Date.now();
+  const [chat] = await restAll<{ id: string; supplier: string | null }>(env, sh, fetchImpl, 'ar_chats?select=id,supplier&secret=eq.' + secret);
+  if (!chat) return reply(404, { error: 'chat' }, headers);
+  if (!chat.supplier) return reply(200, { ok: false, error: 'not-supplier' }, headers);
+  const since = new Date(Date.now() - CHAT_DAYS * 864e5).toISOString();
+  // a voice note waits for its words (asker-chat writes them a moment after it is sent)
+  const todo = (await restAll<ChatMsg>(env, sh, fetchImpl, `ar_chat_messages?select=id,kind,body,media&chat_id=eq.${chat.id}&sender=eq.customer&inbox_at=is.null&at=gte.${encodeURIComponent(since)}&order=id`))
+    .filter((m) => m.kind !== 'voice' || !!m.body);
+  const done: Record<string, string> = {};
+  const patch = (id: number, v: string | null, only: string) => fetchImpl(`${base}/rest/v1/ar_chat_messages?id=eq.${id}${only}`, {
+    method: 'PATCH', body: JSON.stringify({ inbox_at: v }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=representation' }, signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).catch(() => null);
+  for (const m of todo) {
+    if (Object.keys(done).length >= CHAT_BATCH || Date.now() - t0 > CHAT_BUDGET_MS) break;
+    // taken by this call only (the page and the bot may call at the same moment)
+    const claim = await patch(m.id, new Date().toISOString(), '&inbox_at=is.null');
+    const got = claim?.ok ? await claim.json().catch(() => []) : [];
+    if (!Array.isArray(got) || !got.length) continue;
+    let r = 'error';
+    try { r = await linkItem(env, fetchImpl, base, sh, chat.supplier, m); } catch (e) { log('chat-inbox-error', t0, { m: String((e as Error).message || e).slice(0, 80) }); }
+    // not kept (the file could not be fetched, the save failed): given back, so the next call tries it again
+    if (r === 'file' || r === 'save' || r === 'error') await patch(m.id, null, '');
+    done[m.id] = r;
+  }
+  log('chat-inbox', t0, { waiting: todo.length, done });
+  return reply(200, { ok: true, done, left: todo.length - Object.keys(done).length }, headers);
+}
+// one message of a warehouse's chat -> one ar_inbox row (the same reading and matching as the phone's WhatsApp inbox)
+async function linkItem(env: Env, fetchImpl: typeof fetch, base: string, sh: Record<string, string>, supplier: string, m: ChatMsg): Promise<string> {
+  let kind: 'text' | 'image' | 'pdf' | 'sheet' | '' = 'text', bytes = new Uint8Array(0), name = '', ct = '', text: string | null = null;
+  if (m.kind === 'text' || m.kind === 'voice') {
+    text = String(m.body || '').slice(0, 20000);
+    if (!text.trim()) return 'empty';
+  } else {
+    if (!m.media) return 'empty';
+    const f = await fetchImpl(`${base}/storage/v1/object/ar-chat/${m.media}`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!f.ok) return 'file';
+    bytes = new Uint8Array(await f.arrayBuffer()); ct = f.headers.get('content-type') || '';
+    name = m.kind === 'file' && m.body ? m.body : m.media;
+    kind = sniffKind(bytes) || inboxKind(ct, m.media);
+    if (!kind || kind === 'text') return 'type';
+    if (bytes.length > MAX_IMAGE_BYTES) return 'size';
+  }
+  let filePath: string | null = null;
+  if (kind !== 'text') {
+    const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+    // the same photo/file already in the inbox (sent twice, or from WhatsApp too): kept once
+    const dup = await restAll<{ id: string }>(env, sh, fetchImpl, 'ar_inbox?select=id&file_path=like.*' + hash + '*');
+    if (dup.length) return 'duplicate';
+    const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? ((m.media || '').match(SHEET)?.[1] || (bytes[0] === 0xd0 ? 'xls' : 'xlsx')).toLowerCase() : 'jpg';
+    filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
+    const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
+    const up = await fetchImpl(`${base}/storage/v1/object/ar-inbox/${filePath}`, { method: 'POST', body: bytes, headers: { ...sh, 'Content-Type': type }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!up.ok && !/duplicate|exists/i.test(await up.text().catch(() => ''))) filePath = null;
+  }
+  let rows: Row[] = [], error: string | null = null;
+  try {
+    if (kind === 'text') rows = text!.split(/\r?\n/).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
+    else if (kind === 'sheet') {
+      const XLSX = await import('npm:xlsx@0.18.5');
+      const wb = XLSX.read(bytes, { type: 'array' });
+      const all: unknown[][] = [];
+      for (const n of wb.SheetNames) all.push(...XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false, blankrows: false }) as unknown[][]);
+      rows = sheetNames(all).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
+    } else rows = await readFileRows(env, fetchImpl, bytes, kind, name, ct);
+  } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
+  const s = await scoreInboxRows(env, sh, fetchImpl, error ? [] : rows);
+  const row = { sender: 'رابط المخزن', supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: s.list, sure: s.sureIds.size, review: s.review, via: 'link', chat_msg: m.id };
+  const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (ins.status === 409) return 'duplicate';
+  return ins.ok ? (error ? 'unread' : 'ok') : 'save';
+}
+
 // which section a page action belongs to, for a staff member (ar_staff.perms)
 const STAFF_PERM: Record<string, string> = { read: 'read', lines: 'read', match: 'read', reread: 'read', translate: 'translate' };
 async function staffMay(env: Env, fetchImpl: typeof fetch, id: string | undefined, perm: string | undefined): Promise<boolean> {
@@ -1005,6 +1094,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
   if (req.method !== 'POST') return reply(405, { error: 'method' }, headers);
   if (!headers['Access-Control-Allow-Origin']) return reply(403, { error: 'origin', message: 'الطلب جاي من صفحة مش مسموح لها.' }, headers);
+  // a warehouse's messages page (no login: the chat's secret is the key)
+  if (new URL(req.url).searchParams.get('chat') === '1') return handleChatInbox(req, env, fetchImpl, headers);
   const allowedEmails = list(env.ALLOWED_EMAILS);
   if (!env.GEMINI_API_KEY || !allowedEmails.length || !env.SUPABASE_URL) return reply(503, { error: 'not-configured', message: 'الإعدادات ناقصة على Supabase.' }, headers);
   const auth = req.headers.get('authorization') || '';

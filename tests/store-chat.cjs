@@ -44,4 +44,14 @@ const now = new Date(2026, 10, 13, 23, 0);
 assert.equal(B.whenText(new Date(2026, 10, 13, 22, 33).toISOString(), now), '10:33 م');
 assert.equal(B.whenText(new Date(2026, 10, 12, 9, 5).toISOString(), now), 'امبارح 9:05 ص');
 assert.equal(B.whenText(new Date(2026, 10, 8, 9, 5).toISOString(), now), '08/11');
-console.log('PASS: chat helpers (number, WAV 16 kHz, push key, the bot\'s list)');
+// a warehouse's file (owner 2026-11-14): PDF or Excel, by its name, else by its type; anything else is refused
+const L = require('../store/chat.js');
+assert.equal(L.fileExt({ name: 'عروض.PDF', type: '' }), 'pdf');
+assert.equal(L.fileExt({ name: 'list.xlsx', type: 'application/octet-stream' }), 'xlsx');
+assert.equal(L.fileExt({ name: 'old.xls', type: '' }), 'xls');
+assert.equal(L.fileExt({ name: 'document', type: 'application/pdf' }), 'pdf');
+assert.equal(L.fileExt({ name: 'sheet', type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'xlsx');
+assert.equal(L.fileExt({ name: 'a.docx', type: 'application/msword' }), '');
+assert.equal(L.fileExt({ name: 'a.exe', type: '' }), '');
+assert.deepEqual(Object.keys(L.FILE_TYPES).sort(), ['pdf', 'xls', 'xlsx']);
+console.log('PASS: chat helpers (number, WAV 16 kHz, push key, the bot\'s list, a warehouse\'s files)');

@@ -294,6 +294,8 @@
     $('subManual').classList.toggle('hidden', name !== 'manual');
     $('subCompanies').classList.toggle('hidden', name !== 'companies');
     $('readOut').classList.toggle('hidden', name === 'companies');
+    // which warehouses send from their link (ar/app.js drawSupplierRows)
+    if (name === 'companies') loadLinkInfo();
   }
   document.querySelectorAll('[data-sub]').forEach((b) => (b.onclick = () => showSub(b.dataset.sub)));
 
@@ -1358,7 +1360,9 @@
 
   // ---------- WhatsApp: companies, ready message, share target ----------
   let suppliers = [],
-    msgEdited = false;
+    msgEdited = false,
+    // which warehouses send from their link, and their other numbers (loadLinkInfo, on «الشركات»)
+    linkInfo = { used: new Map(), extra: new Map() };
   const digitsOnly = (s) =>
     String(s || '')
       .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
@@ -1373,7 +1377,7 @@
   // the saved companies, or null when they could not be read
   async function fetchSuppliers() {
     try {
-      const { data, error } = await client.from('ar_suppliers').select('name,phone').order('name');
+      const { data, error } = await client.from('ar_suppliers').select('name,phone,link_sent_at').order('name');
       return error ? null : data || [];
     } catch (e) {
       return null;
@@ -1411,14 +1415,90 @@
       );
   }
   // ---------- automatic incoming: companies, phone key, inbox ----------
+  // The warehouses' link (owner 2026-11-14 «رابط للمخزن … الربط بتاعهم بالرقم»): the reps send their lists from our messages
+  // page (store.html#chat); the page knows a warehouse by its number saved here. «📲 ابعتله الرابط» opens WhatsApp to the rep
+  // with a ready message (his number in it); each row says whether the warehouse sends from the link yet.
+  const localPhone = (p) => {
+    const d = digitsOnly(p).replace(/^20(?=1\d{9}$)/, '0');
+    return /^01\d{9}$/.test(d) ? `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}` : d;
+  };
+  async function loadLinkInfo() {
+    try {
+      const [c, p] = await Promise.all([
+        client.from('ar_chats').select('supplier,last_text').not('supplier', 'is', null).range(0, 999),
+        client.from('ar_supplier_phones').select('phone,supplier').order('added_at').range(0, 999),
+      ]);
+      const used = new Map(),
+        extra = new Map();
+      for (const x of (c && c.data) || []) used.set(x.supplier, used.get(x.supplier) || !!x.last_text);
+      for (const x of (p && p.data) || []) extra.set(x.supplier, [...(extra.get(x.supplier) || []), x.phone]);
+      linkInfo = { used, extra };
+    } catch (e) {
+      /* the rows show without it */
+    }
+    drawSupplierRows();
+  }
+  function linkMessage(x) {
+    const rep = (x.name.match(/\(([^)]+)\)/) || [])[1],
+      store = x.name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+    return [
+      `أهلًا ${rep ? `يا أستاذ ${rep.trim()}` : 'بيك'} 👋`,
+      'من النهارده ابعت قوايمك وصورها لصيدلية عسكر من الرابط ده، بتوصل المشتريات على طول:',
+      new URL('store.html#chat', location.href).href,
+      `أول مرة بس هيطلب رقمك: اكتب ${localPhone(x.phone)}`,
+      `ده الرقم المتسجل عندنا لـ${store}، ومن غيره القايمة مش هتوصل المشتريات.`,
+    ].join('\n');
+  }
   function drawSupplierRows() {
     $('supplierRows').innerHTML =
       suppliers
-        .map(
-          (x) =>
-            `<div class="item"><strong dir="auto">${esc(x.name)}</strong> <span class="hint" dir="ltr">${esc(x.phone || '')}</span> <button class="secondary small" data-del-supplier="${esc(x.name)}">شيل</button></div>`,
-        )
+        .map((x) => {
+          const used = linkInfo.used.get(x.name),
+            extra = linkInfo.extra.get(x.name) || [];
+          const state =
+            used === true
+              ? '<span class="pill good">✓ بيبعت من الرابط</span>'
+              : used === false
+                ? '<span class="pill">فتح الرابط · لسه ما بعتش منه</span>'
+                : x.link_sent_at
+                  ? '<span class="pill warn">اتبعتله الرابط · لسه ما فتحوش</span>'
+                  : '';
+          const send =
+            x.phone && used !== true
+              ? `<button class="small" data-send-link="${esc(x.name)}">${x.link_sent_at ? '📲 ابعتهوله تاني' : '📲 ابعتله الرابط'}</button>`
+              : '';
+          const more = extra.length
+            ? `<div class="hint">أرقام تانية: ${extra.map((p) => `<span dir="ltr">${esc(localPhone(p))}</span> <button class="secondary small" data-del-phone="${esc(p)}">✕</button>`).join(' ')}</div>`
+            : '';
+          return `<div class="item sup-row"><strong dir="auto">${esc(x.name)}</strong> <span class="hint" dir="ltr">${esc(x.phone || '')}</span>${more}<div class="sup-acts">${state} ${send} <button class="secondary small" data-del-supplier="${esc(x.name)}">شيل</button></div></div>`;
+        })
         .join('') || '<p class="hint">مفيش شركات لسه.</p>';
+    $('supplierRows')
+      .querySelectorAll('[data-send-link]')
+      .forEach(
+        (b) =>
+          (b.onclick = () => {
+            const x = suppliers.find((s) => s.name === b.dataset.sendLink);
+            if (!x || !x.phone) return;
+            window.open(`https://wa.me/${x.phone}?text=${encodeURIComponent(linkMessage(x))}`, '_blank', 'noopener');
+            x.link_sent_at = new Date().toISOString();
+            client.from('ar_suppliers').update({ link_sent_at: x.link_sent_at }).eq('name', x.name).then(
+              () => null,
+              () => null,
+            );
+            drawSupplierRows();
+          }),
+      );
+    $('supplierRows')
+      .querySelectorAll('[data-del-phone]')
+      .forEach(
+        (b) =>
+          (b.onclick = async () => {
+            const { error } = await client.from('ar_supplier_phones').delete().eq('phone', b.dataset.delPhone);
+            if (error) return status('supplierStatus', 'ماتشالش: ' + error.message, 'bad');
+            await loadLinkInfo();
+          }),
+      );
     $('supplierRows')
       .querySelectorAll('[data-del-supplier]')
       .forEach(
@@ -1591,7 +1671,7 @@
       const since = new Date(Date.now() - 3 * 864e5).toISOString();
       const { data, error } = await client
         .from('ar_inbox')
-        .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review,maybe')
+        .select('id,received_at,sender,supplier,kind,file_path,status,error,rows,sure,review,maybe,via')
         // photos still waiting for their company and messages not read stay listed until handled, however old
         .or(`received_at.gte."${since}",maybe.not.is.null,status.eq.error`)
         .is('hidden_at', null)
@@ -1629,7 +1709,9 @@
                   `<div class="unsure-photo"><a data-photo="${esc(x.file_path || '')}" target="_blank" rel="noopener"><img data-photo="${esc(x.file_path || '')}" alt="الصورة" /></a><div class="hint">وصل ${x.sure || 0}${x.review ? ` · محتاج تأكيدك ${x.review}` : ''}${x.status === 'error' ? ` · ماتقراش <button class="secondary small" data-reread="${esc(x.id)}">اقرا تاني</button>` : ''}</div><div>${g.maybe.map((n) => `<button class="secondary small" data-assign="${esc(x.id)}" data-to="${esc(n)}">${esc(n)}</button>`).join(' ')}</div></div>`,
               )
               .join('')}<button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
-          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div>${errors ? `<button class="secondary small" data-reread="${esc(g.items.filter((x) => x.status === 'error').map((x) => x.id).join(','))}">اقرا تاني</button> ` : ''}<button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
+          // sent from the warehouse's link on our messages page (not WhatsApp)
+          const link = g.items.some((x) => x.via === 'link') ? ' <span class="pill link">🔗 من الرابط</span>' : '';
+          return `<div class="item inbox-item${fresh ? ' fresh' : ''}"><div><strong dir="auto">${esc(g.supplier)}</strong> <span class="hint">${esc(daysAgo(g.day))} · ${esc(time(g.items[g.items.length - 1].received_at))}</span>${fresh ? ' <span class="pill bad">جديد</span>' : ''}${link}</div><div class="hint">${g.items.map((x) => KIND[x.kind] || x.kind).join('، ')} · وصل ${sure}${review ? ` · محتاج تأكيدك ${review}` : ''}${errors ? ` · ${errors} ماتقراش` : ''}</div>${errors ? `<button class="secondary small" data-reread="${esc(g.items.filter((x) => x.status === 'error').map((x) => x.id).join(','))}">اقرا تاني</button> ` : ''}<button data-inbox-open="${gi}">افتح</button> <button class="secondary small" data-inbox-del="${gi}">امسح</button></div>`;
         })
         .join('') || '<p class="hint">مفيش وارد وصل لوحده لسه.</p>';
     $('inboxList')

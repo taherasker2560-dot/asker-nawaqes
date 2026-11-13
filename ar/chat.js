@@ -94,7 +94,8 @@
     if (!db() || loading) return;
     loading = true;
     try {
-      const { data, error } = await db().from('ar_chats').select('id,customer_id,name,phone,last_at,last_from,waiting,last_text').order('last_at', { ascending: false }).range(0, 299);
+      // a warehouse's chat is not here: what it sends goes to «الوارد» (migration 202611141400)
+      const { data, error } = await db().from('ar_chats').select('id,customer_id,name,phone,last_at,last_from,waiting,last_text').is('supplier', null).order('last_at', { ascending: false }).range(0, 299);
       if (error) throw new Error(error.message || String(error));
       chats = data || []; failed = '';
       if (st) { const c = chats.find((x) => x.id === st.c.id); if (c) st.c = c; }
@@ -165,6 +166,7 @@
     const mine = m.sender === 'pharmacy', url = m.media && st.urls[m.media];
     let inner = '';
     if (m.kind === 'photo') inner = url ? `<a href="${esc(url)}" target="_blank" rel="noopener"><img class="ch-photo" src="${esc(url)}" alt="صورة من العميل" loading="lazy"></a>` : '<span>📷 صورة</span>';
+    else if (m.kind === 'file') inner = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">📄 <span class="notr">${esc(m.body || '')}</span></a>` : `<span>📄 <span class="notr">${esc(m.body || '')}</span></span>`;
     else if (m.kind === 'voice') {
       inner = url ? `<audio class="ch-audio" controls preload="none" src="${esc(url)}"></audio>` : `<span>🎤 فويس ${esc(mmss(m.seconds))}</span>`;
       inner += m.body ? `<span class="ch-words">اتكتب: «<span class="notr">${esc(m.body)}</span>»</span>` : '<span class="ch-words">بيتكتب…</span>';
@@ -188,6 +190,7 @@
       `<div class="ch-reply"><textarea id="chatReply" rows="2" maxlength="2000" placeholder="اكتب الرد…"></textarea>` +
       `<button type="button" data-chat-send${st.busy ? ' disabled' : ''}>${st.busy ? 'بيبعت…' : 'ابعت'}</button></div>` +
       (st.note ? `<p class="status ${st.noteBad ? 'bad' : 'good'}">${esc(st.note)}</p>` : '') +
+      supHtml() +
       // the owner only (owner 2026-11-14 «عايز اوبشن لحذف الرسائل»)
       (ownerHere() ? `<button type="button" class="secondary small ch-del" data-chat-del${st.busy ? ' disabled' : ''}>🗑 امسح المحادثة</button>` : '');
     const t = $('chatReply');
@@ -264,6 +267,52 @@
       if (st === me) drawChat();
     }
   }
+  // «🏬 ده مندوب مخزن؟» (owner 2026-11-14): a rep whose number is not saved wrote here as a customer. The owner picks his
+  // warehouse (or a new one) once: the number is saved for it, every chat of that number becomes the warehouse's, and
+  // its messages go to «الوارد» (arabic-shortages reads them); the chat leaves this list.
+  function supHtml() {
+    if (!ownerHere() || !st || st.c.customer_id || !st.c.phone) return '';
+    if (!st.sup) return `<button type="button" class="secondary small ch-sup" data-chat-sup${st.busy ? ' disabled' : ''}>🏬 ده مندوب مخزن؟</button>`;
+    const names = st.supNames;
+    return `<div class="ch-mv"><h4>🏬 ده مندوب مخزن؟</h4><p class="hint">اختار مخزنه مرة واحدة: رقمه يتسجل، والقايمة دي واللي بعدها يروحوا «الوارد» ويتقروا.</p>` +
+      (names == null ? '<p class="status">بيجيب المخازن…</p>'
+        : `<div class="chips">${names.map((n) => `<button type="button" class="chip notr" data-chat-supname="${esc(n)}"${st.busy ? ' disabled' : ''}>${esc(n)}</button>`).join('')}` +
+          `<button type="button" class="chip" data-chat-supnew${st.busy ? ' disabled' : ''}>＋ مخزن جديد</button></div>`) +
+      `<button type="button" class="secondary small" data-chat-supno>لغي</button></div>`;
+  }
+  async function openSup() {
+    const me = st;
+    if (!me) return;
+    me.sup = true; me.supNames = null; drawChat();
+    try {
+      const { data, error } = await db().from('ar_suppliers').select('name').order('name');
+      if (error) throw new Error(error.message || String(error));
+      me.supNames = (data || []).map((x) => x.name);
+    } catch (e) {
+      Object.assign(me, { sup: false, note: 'مقدرتش أجيب المخازن: ' + ((e && e.message) || e), noteBad: true });
+    }
+    if (st === me) drawChat();
+  }
+  async function makeSupplier(pick, fresh) {
+    const me = st;
+    if (!me || me.busy) return;
+    me.busy = true; me.note = ''; drawChat();
+    try {
+      const { data, error } = await db().rpc('ar_chat_make_supplier', { p_chat: me.c.id, p_supplier: pick || null, p_new: fresh || null });
+      if (error) throw new Error(error.message || String(error));
+      if (!data || !data.ok) throw new Error(data && data.error === 'exists' ? tr('الاسم ده موجود، اختاره من القايمة') : (data && data.error) || 'ماتسجلش');
+      // what he sent goes to «الوارد» now (read in the background)
+      db().functions.invoke('arabic-shortages?chat=1', { body: { secret: data.secret } }).catch(() => null);
+      chats = (chats || []).filter((c) => c.customer_id || c.phone !== me.c.phone);
+      listNote = 'اتسجل كمندوب مخزن، ورسايله رايحة الوارد.';
+      st = null;
+      try { if (history.state && history.state.chatOpen) history.replaceState(null, ''); } catch (e) { /* no history */ }
+      drawList();
+    } catch (e) {
+      Object.assign(me, { busy: false, note: 'ماتسجلش: ' + ((e && e.message) || e), noteBad: true });
+      if (st === me) drawChat();
+    }
+  }
   function tick() {
     const panel = $('carePanel');
     if (!panel || panel.classList.contains('hidden') || document.visibilityState === 'hidden') return;
@@ -283,6 +332,15 @@
       if (e.target.closest('[data-chat-send]')) { send(); return; }
       if (e.target.closest('[data-chat-push]')) { turnPushOn(); return; }
       if (e.target.closest('[data-chat-del]')) { removeChat(); return; }
+      if (e.target.closest('[data-chat-sup]')) { openSup(); return; }
+      if (e.target.closest('[data-chat-supno]')) { if (st) { st.sup = false; drawChat(); } return; }
+      const sn = e.target.closest('[data-chat-supname]');
+      if (sn) { makeSupplier(sn.dataset.chatSupname, null); return; }
+      if (e.target.closest('[data-chat-supnew]')) {
+        const n = (root.prompt(tr('اسم المخزن الجديد (واسم المندوب بين قوسين لو حابب):')) || '').trim();
+        if (n) makeSupplier(null, n);
+        return;
+      }
       if (e.target.closest('[data-chat-statement]') && st && st.c.customer_id) {
         const id = st.c.customer_id;
         if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('customers');
