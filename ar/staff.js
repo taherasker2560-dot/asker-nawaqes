@@ -131,6 +131,7 @@
     html.classList.toggle('staff-off', on && !me.active);
     html.classList.toggle('can-search', !on || can('search'));
     $('staffAdmin')?.classList.toggle('hidden', on);
+    $('staffOut')?.classList.toggle('hidden', !on);
     $('logoutBtn')?.classList.toggle('staff-hide', on);
     if (!on) { document.querySelectorAll('.staff-hidden').forEach((x) => x.classList.remove('staff-hidden')); return; }
     const tabs = me.active ? allowedTabs(me.perms) : [];
@@ -289,6 +290,17 @@
       showInstall();
     });
     $('installNo')?.addEventListener('click', () => { try { localStorage.setItem('asker-install-no', String(Date.now())); } catch (e) {} showInstall(); });
+    // out of a staff account (in ⚙️ only, so it is not pressed by mistake): back to the sign-in page
+    $('staffLogout')?.addEventListener('click', async () => {
+      if (!root.confirm('تخرج من الحساب ده؟')) return;
+      try { localStorage.removeItem(RKEY); } catch (e) {}
+      me = null; checkedFor = null;
+      document.documentElement.classList.remove('staff', 'staff-off', 'can-search');
+      $('settingsPanel')?.classList.add('hidden');
+      // the bot's own sign-out (it also forgets the saved lists and shows the sign-in page)
+      const lb = $('logoutBtn');
+      if (lb) lb.click(); else await db().auth.signOut();
+    });
   }
   bind();
   linkLogin();

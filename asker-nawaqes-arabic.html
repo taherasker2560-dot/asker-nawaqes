@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="ar/look.css?v=staff-20261113a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=staff-20261113a"></script>
+    <script src="ar/i18n-en.js?v=out-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -78,6 +78,12 @@
             <button id="stfAdd" type="button">+ موظف جديد</button>
           </div>
           <p id="stfStatus" class="status"></p>
+        </div>
+        <!-- a staff member's way out of this account (owner 2026-11-13: «دخلت بحساب الموظف ومش عارف اخرج منه») -->
+        <div id="staffOut" class="hidden">
+          <h3>الحساب</h3>
+          <button id="staffLogout" type="button" class="secondary">خروج من الحساب ده</button>
+          <p class="hint">بعد الخروج تقدر تدخل بحساب تاني. الموظف هيحتاج رابط جديد من صاحب الصيدلية عشان يرجع.</p>
         </div>
       </div>
     </section>
@@ -680,7 +686,7 @@
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
     <script src="ar/app.js?v=staff-20261113a"></script>
-    <script src="ar/staff.js?v=staff-20261113a"></script>
+    <script src="ar/staff.js?v=out-20261113a"></script>
     <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>

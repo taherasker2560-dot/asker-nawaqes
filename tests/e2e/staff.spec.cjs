@@ -61,10 +61,16 @@ run('Staff: a staff member sees only the sections open for him',async({page})=>{
  assert.equal(await shown('[data-ts-type="return"]'),false);
  assert.equal(await page.$('#tsCust [data-ts-credit]'),null);
  assert.ok(await page.$('#tsCust [data-ts-cash]'));
- // the settings: no staff list for him
+ // the settings: no staff list for him, but a way out of this account (the owner tried his own link: «مش عارف اخرج منه»)
  await page.click('#settingsBtn');
  assert.equal(await shown('#staffAdmin'),false);
- await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+ assert.equal(await shown('#staffOut'),true);
+ page.once('dialog',d=>d.accept());
+ await page.click('#staffLogout');
+ await page.waitForFunction(()=>!document.getElementById('loginCard').classList.contains('hidden'));
+ assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('staff')),false);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker-role')),null);
+ await page.evaluate(()=>{localStorage.removeItem('__fakeTables');window.__fakeSignedOut=false});
 },{home:true});
 run('Staff: a stopped account sees nothing but the message',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify({ar_staff:[{user_id:'u1',name:'موظف تجربة',perms:['tempsale'],active:false}]})));
