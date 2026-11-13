@@ -128,8 +128,15 @@
     every10: 'بيتحدث كل 10 دقايق',
     install: '📲 ثبّت التطبيق الآن',
     installWhy: 'عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية',
-    openChrome: '🌐 ثبّته بدوسة من جوجل كروم',
-    orHere: 'أو ثبّته من المتصفح ده:',
+    // after the hand-off to Chrome: the browser only installs on a tap, so one more (big) tap
+    installAgain: '📲 دوسة كمان ويتثبت',
+    installWait: 'استنى ثانية…',
+    // iPhone: no browser there installs by itself; a big guide pointing at the Share button
+    guideTitle: 'التثبيت على الآيفون في 3 دوسات:',
+    guide1: 'دوس زرار المشاركة ⬆️ اللي تحت',
+    guide2: 'انزل واختار «إضافة إلى الشاشة الرئيسية»',
+    guide3: 'دوس «إضافة» فوق',
+    guideOk: 'تمام',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
@@ -173,8 +180,9 @@
   // ?me=, which the page takes out of the address at once); with no Chrome on the phone it opens here again
   function chromeIntent(pageUrl, token) {
     const page = new URL('store.html', String(pageUrl || '').replace(/[?#].*$/, ''));
-    const back = page.href + '?me=' + token;
-    return `intent://${page.host}${page.pathname}?me=${token}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(back)};end`;
+    // install=1: Chrome opens ready to install; with no Chrome the fallback page shows this browser's steps
+    const back = page.href + '?me=' + token + '&install=1';
+    return `intent://${page.host}${page.pathname}?me=${token}&install=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(back)};end`;
   }
   function tokenFromSearch(s) {
     const m = /[?&]me=([0-9a-f]{64})(?:&|$)/.exec(String(s || ''));
@@ -182,7 +190,7 @@
   }
   // the address without ?me=… (other parts kept)
   function dropMe(s) {
-    const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^me=/.test(p));
+    const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^(me|install)=/.test(p));
     return rest.length ? '?' + rest.join('&') : '';
   }
   const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
@@ -198,6 +206,9 @@
   // the link just opened: keep the secret, take it out of the address (it is never shown or shared again), open «حسابي»
   // (#me= from WhatsApp; ?me= when another browser sent him to Chrome)
   const fromLink = tokenFromHash(location.hash) || tokenFromSearch(location.search);
+  // sent here by the install button from another browser (?install=1): in Chrome one more tap installs; anywhere else
+  // (no Chrome on the phone) this browser's steps show at once
+  const handedOff = !!fromLink && /[?&]install=1(?:&|$)/.test(location.search);
   if (fromLink) {
     keep.set(fromLink);
     try { history.replaceState(null, '', location.pathname + dropMe(location.search) + '#account'); } catch (e) { location.hash = 'account'; }
@@ -224,9 +235,13 @@
   }
   useManifest(true);
   // Chrome's «install» (store/store.js keeps it for the home's box too); null when the phone does not offer it
-  let installEvt = null, installNote = '';
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; draw(); });
+  let installEvt = null, installNote = '', installBusy = false, guide = false;
+  const waiters = [];
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; waiters.splice(0).forEach((w) => w()); draw(); });
   window.addEventListener('appinstalled', () => { installEvt = null; installNote = TEXTS.installed; draw(); });
+  // Chrome may offer the install a moment after the page opens: wait for it a little (still inside the tap)
+  const waitOffer = (ms) => new Promise((ok) => { if (installEvt) return ok(); waiters.push(ok); setTimeout(ok, ms); });
+  if (handedOff && offerChrome(navigator.userAgent)) installNote = installSteps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   let client = null;
@@ -305,12 +320,20 @@
     // first thing on the page, big (owner 2026-11-13: «زرار كبير مكتوب عليه ثبت التطبيق الان»); not in the installed app
     let html = '';
     if (!standalone()) {
-      html += `<button type="button" class="ac-btn ac-install" data-acct-install>${esc(TEXTS.install)}</button>` +
-        (installNote && installNote !== TEXTS.installed && offerChrome(navigator.userAgent)
-          ? `<a class="ac-btn ac-chrome" href="${esc(chromeIntent(location.href, token))}">${esc(TEXTS.openChrome)}</a><p class="hint-sm center ac-or">${esc(TEXTS.orHere)}</p>`
-          : '') +
+      // one button, one tap (owner: «يا اما تثبت التطبيق يا اما تاخده للسكة اللي هيثبت بها التطبيق مباشر … فلاحين»)
+      const again = handedOff && !installNote;
+      html += `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
     }
+    // the iPhone's guide: big, over the page, the arrow points at Safari's Share button below
+    let g = $('acctGuide');
+    if (guide && !g) {
+      g = document.createElement('div');
+      g.id = 'acctGuide'; g.className = 'ac-guide'; g.setAttribute('role', 'dialog');
+      g.innerHTML = `<div class="ac-guide-card"><h2>${esc(TEXTS.guideTitle)}</h2><ol><li>${esc(TEXTS.guide1)}</li><li>${esc(TEXTS.guide2)}</li><li>${esc(TEXTS.guide3)}</li></ol>` +
+        `<button type="button" class="ac-btn ac-install" data-acct-guide-close>${esc(TEXTS.guideOk)}</button></div><div class="ac-guide-arrow" aria-hidden="true">⬇️</div>`;
+      document.body.appendChild(g);
+    } else if (!guide && g) g.remove();
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
     html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` +
       (upd ? `<div class="hint-sm">${esc(upd)} · ${esc(TEXTS.every10)}</div>` : '') +
@@ -374,23 +397,36 @@
 
   // «نزّل حسابك على موبايلك»: Chrome installs in one tap; elsewhere the steps (iPhone: Safari keeps the page's address,
   // so the address carries his link while he adds it)
+  // one tap does it (owner 2026-11-13): Chrome (or any browser that offers it) installs at once; another Android browser
+  // opens his account in Chrome straight away (one more tap there installs); an iPhone gets the big guide; a browser with
+  // neither (no Chrome on the phone) shows its own steps
   async function install() {
+    if (installBusy) return;
+    const ua = navigator.userAgent, ios = isIos(ua, navigator.platform, navigator.maxTouchPoints);
+    if (!installEvt && !ios && !offerChrome(ua)) {
+      installBusy = true; draw();
+      await waitOffer(2500);
+      installBusy = false;
+    }
     if (installEvt) {
       const e = installEvt;
       installEvt = null;
-      try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = installSteps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints); }
+      try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = installSteps(ua, navigator.platform, navigator.maxTouchPoints); }
       draw();
       return;
     }
-    if (isIos(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)) {
+    if (offerChrome(ua) && !handedOff) { location.href = chromeIntent(location.href, token); return; }
+    if (ios) {
       try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ }
+      guide = true;
     }
-    installNote = installSteps(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
+    installNote = installSteps(ua, navigator.platform, navigator.maxTouchPoints);
     draw();
   }
 
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-acct-install]')) { install(); return; }
+    if (e.target.closest('[data-acct-guide-close]') || (e.target.id === 'acctGuide')) { guide = false; draw(); return; }
     const f = e.target.closest('[data-acct-filter]');
     if (f) { st.filter = f.dataset.acctFilter; draw(); return; }
     const it = e.target.closest('[data-acct-items]');

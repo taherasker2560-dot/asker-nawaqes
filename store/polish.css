@@ -193,5 +193,14 @@ html.night .ac-big.paid { color: var(--ok, #7fd3a6); }
 #acctBox .ac-install-why { margin: 6px 16px 0; }
 #acctBox .ac-install-note { margin: 10px 16px 0; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft, #ebf1f9); color: var(--ink); font-size: 15px; font-weight: 700; line-height: 1.8; text-align: center; }
 html.night #acctBox .ac-install-note { background: rgba(255, 255, 255, 0.08); }
-#acctBox .ac-chrome { background: #1a73e8; }
-#acctBox .ac-or { margin: 10px 16px 0; font-weight: 700; }
+/* one tap (owner 2026-11-13): after the hand-off to Chrome the button calls for the last tap; the iPhone's big guide */
+#acctBox .ac-install.pulse { animation: ac-pulse 1.4s ease-in-out infinite; }
+@keyframes ac-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(10, 74, 166, 0.45); } 50% { transform: scale(1.03); box-shadow: 0 0 0 12px rgba(10, 74, 166, 0); } }
+#acctBox .ac-install[disabled] { opacity: 0.8; }
+.ac-guide { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 16px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+.ac-guide-card { width: 100%; max-width: 480px; background: var(--card); color: var(--ink); border-radius: 22px; padding: 18px 18px 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); }
+.ac-guide-card h2 { margin: 0 0 10px; font-size: 19px; }
+.ac-guide-card ol { margin: 0; padding-inline-start: 24px; font-size: 18px; font-weight: 700; line-height: 2; }
+.ac-guide-card .ac-btn { display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 12px; min-height: 52px; border: 0; border-radius: 16px; background: var(--grad); color: #fff; font: inherit; font-size: 18px; font-weight: 800; }
+.ac-guide-arrow { margin-top: 10px; font-size: 44px; line-height: 1; animation: ac-bounce 1s ease-in-out infinite; }
+@keyframes ac-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }

@@ -101,6 +101,8 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  const mf=await page.evaluate(async()=>{const h=document.querySelector('link[rel="manifest"]').href;return {blob:h.startsWith('blob:'),m:await (await fetch(h)).json()}});
  assert.ok(mf.blob,'his own manifest');assert.equal(mf.m.start_url,base+'store.html#me='+tok);assert.equal(mf.m.display,'standalone');
  await page.click('[data-acct-install]');
+ // Chrome with no offer yet: it waits a moment (still inside the tap), then the steps
+ await page.waitForSelector('.ac-install-note',{timeout:8000});
  assert.match(await text(page,'.ac-install-note'),/دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق»/);
  // Chrome offers to install: one tap
  await page.evaluate(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
@@ -136,11 +138,17 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  const w2=await page.evaluate(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_customer_place_order').map(x=>x.args.p_pay));
  assert.deepEqual(w2,['cash']);
  assert.equal(await text(page,'#donePay'),'الدفع كاش عند الاستلام');
- // sent over from another browser to Chrome (?me=…): the same account, and the secret leaves the address
+ // sent over from another browser to Chrome by the install button (?me=…&install=1): the same account, the secret leaves
+ // the address, and the big button asks for the last tap; the offer comes a moment later and that tap installs
  await page.evaluate(()=>localStorage.removeItem('asker_store_customer'));
- await page.goto(base+'store.html?me='+tok);
+ await page.goto(base+'store.html?me='+tok+'&install=1');
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
  assert.deepEqual(await page.evaluate(()=>[location.search,location.hash,localStorage.getItem('asker_store_customer')]),['','#account',tok]);
+ assert.equal(await text(page,'[data-acct-install]'),'📲 دوسة كمان ويتثبت');
+ assert.ok(await page.$('[data-acct-install].pulse'));
+ await page.evaluate(()=>{window.__prompted=false;setTimeout(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)},600)});
+ await page.$eval('[data-acct-install]',b=>b.click()); // it pulses (never «stable» for a normal click)
+ await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
  // a link that no longer works: said, and the phone forgets it
  await page.evaluate(()=>localStorage.setItem('asker_store_customer','d'.repeat(64)));
  await page.goto(base+'store.html#account');await page.reload();
@@ -149,4 +157,27 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.ok(await page.isHidden('.tabbar a[data-go="account"]'));
  assert.match(await page.evaluate(()=>document.querySelector('link[rel="manifest"]').getAttribute('href')),/^manifest-store\.json$/,'back to the store\'s own manifest');
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+},{home:true});
+
+run('Customer link install: iPhone gets the big guide; Firefox with no Chrome (back from the hand-off) shows its steps at once',async({page,base})=>{
+ const tok='c'.repeat(64);
+ await page.evaluate(([c,m,t])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[]})),[CUSTOMERS,MOVES,tok]);
+ // iPhone: one tap = the guide over the page, pointing at the Share button; «تمام» closes it
+ await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua})});
+ await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'));
+ await page.goto(base+'store.html#me='+tok);await page.reload();
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ await page.click('[data-acct-install]');
+ await page.waitForSelector('#acctGuide');
+ assert.deepEqual(await page.$$eval('#acctGuide li',l=>l.map(x=>x.textContent)),['دوس زرار المشاركة ⬆️ اللي تحت','انزل واختار «إضافة إلى الشاشة الرئيسية»','دوس «إضافة» فوق']);
+ assert.equal(await page.evaluate(()=>location.hash),'#me='+tok,'Safari keeps his link in the address while he adds it');
+ await page.click('[data-acct-guide-close]');
+ await page.waitForSelector('#acctGuide',{state:'detached'});
+ // Firefox, back from the hand-off (no Chrome on the phone): its own steps at once, no second hand-off
+ await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0'));
+ await page.goto(base+'store.html?me='+tok+'&install=1');
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-install-note');
+ assert.match(await text(page,'.ac-install-note'),/^في فايرفوكس: دوس ⋮/);
+ assert.equal(await text(page,'[data-acct-install]'),'📲 ثبّت التطبيق الآن');
+ await page.evaluate(()=>{sessionStorage.removeItem('__ua');localStorage.removeItem('__fakeTables')});
 },{home:true});

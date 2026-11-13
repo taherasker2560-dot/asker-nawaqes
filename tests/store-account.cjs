@@ -107,8 +107,8 @@ assert.equal(A.offerChrome(UA.opera), true);
 assert.equal(A.offerChrome(UA.chrome), false, 'already Chrome');
 assert.equal(A.offerChrome(UA.iosFirefox), false, 'no Chrome hand-off on iPhone');
 const intent = A.chromeIntent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html#account', tok);
-assert.equal(intent, 'intent://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok +
-  '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok) + ';end');
+assert.equal(intent, 'intent://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok + '&install=1' +
+  '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok + '&install=1') + ';end');
 // ?me= is read and then taken out of the address (other parts kept)
 assert.equal(A.tokenFromSearch('?me=' + tok), tok);
 assert.equal(A.tokenFromSearch('?a=1&me=' + tok), tok);
@@ -116,5 +116,6 @@ assert.equal(A.tokenFromSearch('?me=' + tok.slice(2)), null);
 assert.equal(A.tokenFromSearch(''), null);
 assert.equal(A.dropMe('?me=' + tok), '');
 assert.equal(A.dropMe('?a=1&me=' + tok + '&b=2'), '?a=1&b=2');
+assert.equal(A.dropMe('?me=' + tok + '&install=1'), '', 'the hand-off mark leaves too');
 assert.equal(A.dropMe(''), '');
 console.log('PASS: store account (customer link) helpers');
