@@ -289,6 +289,7 @@ window.AskerEN = {
   "الرابط ده مبقاش شغال. اكتب اسمك ورقمك": "This link no longer works. Type your name and number",
   "الموبايل ما سمحش بالمايك. اسمح للصفحة بالمايك من إعدادات المتصفح": "The phone did not allow the microphone. Allow it for this page in the browser's settings",
   "مفيش نت أو حصلت مشكلة. جرب تاني": "No internet or a problem happened. Try again",
+  "الفويس ما اتسجلش. دوس 🎤 واتكلم، وبعدين دوس ➤": "The voice note was not recorded. Tap 🎤 and talk, then tap ➤",
   "📲 ثبّت التطبيق الآن": "📲 Install the app now",
   "📲 دوسة كمان ويتثبت": "📲 One more tap and it installs",
   "استنى ثانية…": "One second…",

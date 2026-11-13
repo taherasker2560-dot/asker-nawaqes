@@ -84,6 +84,7 @@
       chat: 'المحادثة دي مش موجودة. اكتب اسمك ورقمك تاني',
       link: 'الرابط ده مبقاش شغال. اكتب اسمك ورقمك',
       mic: 'الموبايل ما سمحش بالمايك. اسمح للصفحة بالمايك من إعدادات المتصفح',
+      noVoice: 'الفويس ما اتسجلش. دوس 🎤 واتكلم، وبعدين دوس ➤',
       net: 'مفيش نت أو حصلت مشكلة. جرب تاني',
     },
   };
@@ -265,10 +266,15 @@
   // the voice note: tap 🎤 to start, ➤ to send, ✕ to drop; it stops by itself at 2 minutes
   async function startRec() {
     if (rec || busy) return;
-    let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); } catch (e) { say(TEXTS.errors.mic); return; }
+    // the sound engine is made inside the tap itself: made after the microphone question it can stay asleep and record
+    // nothing (owner's test 2026-11-14: a voice note that never came)
     const A = root.AudioContext || root.webkitAudioContext;
-    const ctx = new A(), src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), chunks = [];
+    let ctx = null;
+    try { ctx = new A(); ctx.resume && ctx.resume(); } catch (e) { say(TEXTS.errors.mic); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); } catch (e) { try { ctx.close(); } catch (x) { /* gone */ } say(TEXTS.errors.mic); return; }
+    if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (e) { /* tried */ } }
+    const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), chunks = [];
     proc.onaudioprocess = (e) => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
     src.connect(proc); proc.connect(ctx.destination);
     rec = { stream, ctx, src, proc, chunks, t0: Date.now(), tick: null };
@@ -296,7 +302,8 @@
     let o = 0;
     for (const c of r.chunks) { all.set(c, o); o += c.length; }
     const down = downsample(all, rate, RATE), seconds = Math.max(1, Math.min(180, Math.round(down.length / RATE)));
-    if (down.length < RATE / 2) return; // under half a second: a slip of the finger
+    // nothing heard (under half a second): said, never dropped silently
+    if (down.length < RATE / 2) { say(TEXTS.errors.noVoice); return; }
     const blob = new Blob([encodeWav(down, RATE)], { type: 'audio/wav' });
     busy = true; say(TEXTS.sending);
     try {
