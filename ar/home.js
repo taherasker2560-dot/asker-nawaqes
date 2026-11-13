@@ -107,6 +107,28 @@
     const o = (it.offers || []).slice(0, 6).map((x) => supName(x.supplier) + (num(x.disc) != null ? ' ' + num(x.disc) + '%' : ''));
     return o.length ? 'في القوايم: ' + o.join(' · ') : '';
   }
+  // «القوايم» (owner 2026-11-13: «تظهر لي المخازن اللي بره بس بكروتها بفرق الخصومات»): one row per warehouse, the best
+  // discount first and green, the others with how much lower. [{ name, disc, best, less }]
+  const r2 = (x) => Math.round(x * 100) / 100;
+  function offerRows(it) {
+    const o = (it.offers || []).slice(0, 6);
+    const top = o.length ? num(o[0].disc) : null;
+    return o.map((x) => {
+      const d = num(x.disc);
+      const best = d != null && top != null && d === top;
+      return { name: supName(x.supplier), disc: d, best, less: !best && d != null && top != null && top > d ? r2(top - d) : null };
+    });
+  }
+  // «آخر شرا: AMG 27% (24/9) ← النهارده أحسن بـ 3%»: the newest purchase against the best discount in the lists now
+  function buysVsLists(it, now) {
+    const t = buysText(it, now);
+    if (!t) return '';
+    const last = (it.buys || []).slice().sort((x, y) => String(y.date).localeCompare(String(x.date)))[0];
+    const top = (it.offers || []).length ? num(it.offers[0].disc) : null, was = last ? num(last.disc) : null;
+    if (top == null || was == null) return t;
+    const d = r2(top - was);
+    return t + ' ← ' + (d > 0 ? `النهارده أحسن بـ ${d}%` : d < 0 ? `آخر شرا كان أحسن بـ ${-d}%` : 'زي آخر شرا');
+  }
   // the four buttons under the box (owner 2026-11-12): الكل / المخزون (has stock now) / القوايم (in a warehouse's list) /
   // النواقص (on the shortage list)
   function inScope(it, scope) {
@@ -116,7 +138,7 @@
     return true;
   }
   const SCOPE_WORDS = { stock: 'في المخزون', lists: 'في القوايم', short: 'في النواقص' };
-  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS };
+  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists };
   root.AskerHomeLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -223,22 +245,27 @@
     return index;
   }
   const PEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // the card follows the button under the box (owner 2026-11-13): «المخزون» = the pharmacy only (no warehouse, no «آخر شرا»);
+  // «القوايم» = the warehouses only (one row each with the discount difference, «آخر شرا» against today; no stock)
   function card(it) {
     const lib = stockLib();
-    const tags = marks(it, lib.qtyText).map((m) => `<span class="tag ${m.kind}">${esc(m.text)}</span>`).join('');
-    const s = it.stock;
-    const price = s && Number(s.price) > 0 ? Number(s.price) : it.price;
+    const lists = scope === 'lists', pharmacy = scope === 'stock';
+    const tags = marks(it, lib.qtyText).filter((m) => !lists || m.kind === 'bad' || m.kind === 'warn').map((m) => `<span class="tag ${m.kind}">${esc(m.text)}</span>`).join('');
+    const s = lists ? null : it.stock;
+    const price = lists ? null : s && Number(s.price) > 0 ? Number(s.price) : it.price;
     const more = [s && lib.expText ? lib.expText(s.exp_near) : '', price > 0 ? Math.round(price * 100) / 100 + ' ج' : ''].filter(Boolean).join(' · ');
     const others = s && lib.otherText ? lib.otherText(s.other, s.parts).map((t) => `<div class="st-other">${esc(t)}</div>`).join('') : '';
-    const offers = offersText(it), bought = buysText(it);
+    const offers = pharmacy || lists ? '' : offersText(it), bought = pharmacy ? '' : lists ? buysVsLists(it) : buysText(it);
+    const table = lists ? offerRows(it).map((r) => `<tr class="${r.best ? 'best' : ''}"><td>${esc(r.name)}${r.best ? ' ✓ الأعلى' : ''}${r.less != null ? ` <span class="less">(أقل ${r.less}%)</span>` : ''}</td><td class="d">${r.disc != null ? r.disc + '%' : '—'}</td></tr>`).join('') : '';
     return `<div class="hs-item" data-k="${esc(it.key)}">
       <div class="hs-top">
         <div class="hs-names"><strong>${esc(it.ar || it.en)}</strong>${it.ar && it.en ? `<div class="hs-en" dir="ltr">${esc(it.en)}</div>` : ''}</div>
         <button type="button" class="hs-pen" data-edit aria-label="عدّل الاسم العربي" title="عدّل الاسم العربي">${PEN}</button>
       </div>
-      <div class="hs-tags">${tags}</div>
+      ${tags ? `<div class="hs-tags">${tags}</div>` : ''}
       ${others}
       ${more ? `<div class="hint">${esc(more)}</div>` : ''}
+      ${table ? `<table class="hs-offers-t">${table}</table>` : ''}
       ${bought ? `<div class="hs-buys">${esc(bought)}</div>` : ''}
       ${offers ? `<div class="hs-offers">${esc(offers)}</div>` : ''}
     </div>`;
@@ -270,7 +297,8 @@
     loadCatalog(); loadLines(); loadBuys(); askStock();
     const ix = currentIndex();
     const pool = scope === 'all' ? ix.items : ix.items.filter((it) => inScope(it, scope));
-    const hits = fz().rank(q, pool, (it) => it._h, 25);
+    // only the names close to the best one (owner 2026-11-13: «Abimol» filled 25 cards with ALFABRIMO, CARBIMAZOLE…)
+    const hits = fz().rank(q, pool, (it) => it._h, 25, { rel: 0.75 });
     // the warehouses' lines that are not surely one of our items belong to «الكل» and «القوايم»
     // strict: each word inside one word of the line, no letter forgiven, and close enough (owner 2026-11-13: «ابيمول» showed
     // «اب كير امبول»: «اصناف تانية غريبة كده ملهاش علاقة بيه»)
@@ -280,7 +308,7 @@
     if (editing && shown.has(editing)) openEditor(editing);
     $('hsLines').innerHTML = extra.map(line).join('');
     $('hsLinesBox').classList.toggle('hidden', !extra.length);
-    const age = root.AskerStock ? root.AskerStock.age() : '';
+    const age = root.AskerStock && scope !== 'lists' ? root.AskerStock.age() : ''; // «القوايم» = the warehouses only
     const wait = [catLoading ? 'بحمّل كل أصناف السيستم…' : catFail, linesLoading ? 'بحمّل قوايم المخازن…' : linesFail].filter(Boolean).join(' · ');
     const where = SCOPE_WORDS[scope] || '';
     if (!hits.length && !extra.length) return say(wait || (where ? `مفيش صنف بالاسم ده ${where}. دوس «الكل» تدوّر في كله.` : 'مفيش صنف بالاسم ده.'), catFail || linesFail ? 'bad' : '');

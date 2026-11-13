@@ -1540,3 +1540,30 @@ html.night textarea {
   font-weight: 700;
   color: var(--crimson-ink);
 }
+/* «القوايم» in the search (owner 2026-11-13): one row per warehouse, the best discount green */
+.hs-offers-t {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 4px 0 2px;
+}
+.hs-offers-t td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--line, #eceef3);
+}
+.hs-offers-t td.d {
+  font-weight: 800;
+  text-align: left;
+  direction: ltr;
+  white-space: nowrap;
+}
+.hs-offers-t tr.best td {
+  background: var(--good-bg, #e7f6ec);
+  color: var(--good);
+  font-weight: 700;
+}
+.hs-offers-t .less {
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+  font-weight: 400;
+}

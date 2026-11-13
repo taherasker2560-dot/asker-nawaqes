@@ -100,17 +100,20 @@
   const full = (ws) => ws.reduce((a, t) => a + 3 + 2.5 * (t.length - 1), 0);
   // the items that match, best first (ties keep the given order); foldedNames(item) = the item's folded names.
   // opts.strict: every typed word inside one word of the name; opts.min: keep only names scoring at least this share of
-  // the full score (0.6 = the owner's way «ابرفستن» still passes at 0.8, letters picked far apart do not)
+  // the full score (0.6 = the owner's way «ابرفستن» still passes at 0.8, letters picked far apart do not);
+  // opts.rel: keep only names scoring at least this share of the best one found (0.75: «abimol» → the ABIMOLs, not
+  // ALFABRIMO at 0.66 or CARBIMAZOLE at 0.54)
   function rank(q, items, foldedNames, limit, opts) {
     const ws = words(q);
     if (!ws.length) return items.slice(0, limit || items.length);
     const strict = !!(opts && opts.strict), floor = opts && opts.min ? opts.min * full(ws) : -Infinity;
-    const hits = [];
+    let hits = [];
     items.forEach((it, i) => {
       const s = scoreOf(ws, foldedNames(it), strict);
       if (s > -Infinity && s >= floor) hits.push([s, i, it]);
     });
     hits.sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+    if (opts && opts.rel && hits.length && hits[0][0] > 0) { const cut = opts.rel * hits[0][0]; hits = hits.filter((x) => x[0] >= cut); }
     return hits.slice(0, limit || hits.length).map((x) => x[2]);
   }
   const api = { fold, words, score, rank };

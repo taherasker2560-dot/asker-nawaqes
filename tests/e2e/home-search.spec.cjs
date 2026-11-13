@@ -64,10 +64,17 @@ run('search on top: الكل / المخزون / القوايم / النواقص'
  // المخزون: only what has stock now (Brufen 3 packs), Flagyl (no stock) is not there
  await page.click('[data-scope="stock"]');
  await find('بروفين',/بروفين ٤٠٠/);assert.match(await page.textContent('#hsStatus'),/في المخزون/);
+ // owner 2026-11-13: «المخزون» = the pharmacy only: no warehouse line, no «آخر شرا»
+ assert.equal(await page.$$eval('#hsItems .hs-offers, #hsItems .hs-buys, #hsItems .hs-offers-t',x=>x.length),0,'no warehouse on «المخزون»');
  await find('FLAGYL',/مفيش صنف بالاسم ده في المخزون/);assert.deepEqual(await names(),[]);
- // القوايم: only items in a warehouse's list, plus the lines that are not ours yet
+ // القوايم: only items in a warehouse's list, plus the lines that are not ours yet; owner 2026-11-13: the warehouses only,
+ // one row each with the discount difference, no stock
  await page.click('[data-scope="lists"]');
- await find('FLAGYL',/فلاجيل ١٢٥ شراب/);assert.match(await page.textContent('#hsItems'),/في القوايم: AMG 22%/);
+ await find('FLAGYL',/فلاجيل ١٢٥ شراب/);
+ const rows=await page.$$eval('#hsItems .hs-offers-t tr',t=>t.map(r=>({best:r.classList.contains('best'),text:r.textContent.replace(/\s+/g,' ').trim()})));
+ assert.deepEqual(rows,[{best:true,text:'AMG ✓ الأعلى22%'},{best:false,text:'رضا عطية (أقل 4%)18%'}]);
+ assert.equal(await page.$$eval('#hsItems .tag.good, #hsItems .tag.none, #hsItems .hs-offers',x=>x.length),0,'no stock on «القوايم»');
+ assert.doesNotMatch(await page.textContent('#hsStatus'),/آخر مخزون/);
  await find('CONCOR',/مفيش صنف بالاسم ده في القوايم/);
  await page.fill('#hsQ','فلاجيل');await page.waitForFunction(()=>!document.getElementById('hsLinesBox').classList.contains('hidden'));
  // النواقص: only the shortage list (Brufen and Flagyl), not Concor

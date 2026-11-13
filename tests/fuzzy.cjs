@@ -70,6 +70,11 @@ assert.ok(F.rank('ابيمول', wl, (x) => x.h).some((x) => x.n === 'اب كی�
 assert.deepEqual(strict('ابكير'), ['ابكير امبولات للشعر', 'اب كیر امبولات'], 'only the space itself may be skipped');
 assert.deepEqual(strict('شامبو'), [], 'no letter forgiven («امبروبيم»)');
 assert.deepEqual(strict('ابرفستن'), ['ابيروفاستين ٤٠ مجم اقراص'], "the owner's way still works");
+// rel: only the names close to the best one (owner 2026-11-13: «Abimol» filled 25 cards with ALFABRIMO, CARBIMAZOLE…)
+const it2 = ['ABIMOL EXTRA 20TAB', 'ABIMOL 500MG 20TAB', 'ALFABRIMO PLUS DROPS', 'CARBIMAZOLE 5MG 50T.', 'BRIMOSALM DROPS', 'AMOXICILLIN 500MG 20CAP'].map((n) => ({ n, h: [F.fold(n)] }));
+assert.deepEqual(F.rank('abimol', it2, (x) => x.h, 25, { rel: 0.75 }).map((x) => x.n), ['ABIMOL EXTRA 20TAB', 'ABIMOL 500MG 20TAB']);
+assert.ok(F.rank('abimol', it2, (x) => x.h, 25).length > 2, 'without rel the far names still come');
+assert.deepEqual(F.rank('امبيزلين', items, (x) => x.h, 25, { rel: 0.75 }).map((x) => x.n), ['امبيسلين ٥٠٠ شراب'], 'one wrong letter still forgiven');
 // speed: 30,000 names, one search well under a second
 const many = [];
 for (let i = 0; i < 30000; i++) many.push({ h: [F.fold(NAMES[i % NAMES.length] + ' ' + i)] });
