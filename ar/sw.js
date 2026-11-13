@@ -24,15 +24,28 @@ self.addEventListener('fetch', (e) => {
   })());
 });
 // «رسالة جديدة من عميل» (owner 2026-11-14: a notification when a customer writes on our messages page, even with the bot
-// closed): the function asker-chat sends an empty push to the phones of the owner and of staff with «خدمة العملاء»
+// closed) and «وارد جديد من مخزن» (a warehouse sent its list from the link): the function asker-chat sends an empty push to
+// the phones of the owner and staff; this worker asks it what the push was about (with its own push address) and says so.
+const CHAT_FN = 'https://qwrzdjdgvanmhaicncuk.supabase.co/functions/v1/asker-chat';
 self.addEventListener('push', (e) => {
-  e.waitUntil(self.registration.showNotification('رسالة جديدة من عميل', {
-    body: 'عميل كتبلك في «خدمة العملاء ← الرسايل»',
-    icon: '../icons/arabic-192.png?v=logo2',
-    badge: '../icons/arabic-192.png?v=logo2',
-    tag: 'asker-care', renotify: true, lang: 'ar', dir: 'rtl',
-    data: { url: '../asker-nawaqes-arabic.html?tab=care' },
-  }));
+  e.waitUntil((async () => {
+    let n = { title: 'رسالة جديدة من عميل', body: 'عميل كتبلك في «خدمة العملاء ← الرسايل»', tab: 'care' };
+    try {
+      const sub = await self.registration.pushManager.getSubscription();
+      if (sub) {
+        const r = await fetch(CHAT_FN, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'what', endpoint: sub.endpoint }), signal: AbortSignal.timeout(8000) });
+        const d = r.ok ? await r.json() : null;
+        if (d && d.title) n = d;
+      }
+    } catch (err) { /* the words above */ }
+    return self.registration.showNotification(n.title, {
+      body: n.body,
+      icon: '../icons/arabic-192.png?v=logo2',
+      badge: '../icons/arabic-192.png?v=logo2',
+      tag: 'asker-' + (n.tab || 'news'), renotify: true, lang: 'ar', dir: 'rtl', vibrate: [200, 100, 200],
+      data: { url: '../asker-nawaqes-arabic.html' + (n.tab ? '?tab=' + n.tab : '') },
+    });
+  })());
 });
 // a tap on a notification opens the bot; one from ar/notify.js (2026-11-12) carries the section to open (?tab=…)
 self.addEventListener('notificationclick', (e) => {

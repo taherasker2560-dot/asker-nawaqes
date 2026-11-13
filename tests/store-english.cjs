@@ -33,7 +33,7 @@ for(const s of ['حسابك يا Ahmed · كود 2489','خصم 5 ج','دفعت �
 // «الرسايل» (store/chat.js, 2026-11-13)
 const CH=require('../store/chat.js');
 for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);
-for(const s of ['بنرد عليك هنا · Ahmed','🎤 فويس 0:12','اتكتب: «Panadol»','10:33 م','المشتريات · Reda','10:33 م · ✓ وصلت'])check(s);
+for(const s of ['بنرد عليك هنا · Ahmed','🎤 فويس 0:12','اتكتب: «Panadol»','10:33 م','المشتريات · Reda','10:33 م · ✓ وصلت','بيبعت… 3/10'])check(s);
 // some built texts (numbers and names put in)
 for(const s of ['نتايج «PANADOL»','طلب رقم 12','طلبك رقم 12 وصلنا. الإجمالي 150 جنيه','اتضاف 3 صنف للسلة','470 ج للواحدة','تفاصيل PANADOL 500','في السلة (2)','3 صنف في السلة · 470 ج','2 صنف في السلة + أصناف بالطلب','طلب رقم 12 · 4 صنف'])check(s);
 assert.deepEqual(bad,[],'Arabic texts without English in store/i18n-en-store.js:\n'+bad.join('\n'));

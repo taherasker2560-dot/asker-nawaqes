@@ -6,7 +6,9 @@
 //   POST {action:'voice', secret, id}  (the customer's page, with its chat's secret): the words of his voice note, written by
 //                                      Gemini, saved once in ar_chat_messages.body.
 //   POST {action:'notify', secret}     (the customer's page, right after he sends): a push to the phones of the owner and of
-//                                      staff with «خدمة العملاء» (ar_chat_staff_push), at most once a minute per chat.
+//                                      staff with «خدمة العملاء» (ar_chat_staff_push), at most once a minute per chat; a
+//                                      warehouse's chat (its list from the link): owner and staff with «الوارد».
+//   POST {action:'what', endpoint}     (the bot's worker ar/sw.js, with its own saved push address): what the push was about.
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), GEMINI_API_KEY, GEMINI_MODEL
 // (optional), VAPID_PRIVATE_JWK, VAPID_PUBLIC_KEY, VAPID_SUBJECT, ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the customer's page has no sign-in; the owner's and staff's calls are checked here).
@@ -123,12 +125,29 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return reply(200, { ok: true, text }, headers);
   }
 
+  // ---------- what a push was about (owner 2026-11-14 «وصلت البوت … بس مفيش صوت اشعار»): pushes carry nothing, so the
+  // bot's worker (ar/sw.js) asks with its own push address, which must be one the pharmacy saved (ar_chat_staff_push).
+  // The newest of the last 15 minutes: a warehouse that sent from its link, or a customer waiting for an answer.
+  if (body.action === 'what') {
+    const ep = String((body as { endpoint?: unknown }).endpoint || '');
+    if (!/^https:\/\//.test(ep) || ep.length > 1000) return reply(400, { error: 'bad' }, headers);
+    const known = (await rows('/rest/v1/ar_chat_staff_push?select=user_id&endpoint=eq.' + encodeURIComponent(ep) + '&limit=1'))[0];
+    if (!known) return reply(404, { error: 'endpoint' }, headers);
+    const since = encodeURIComponent(new Date(Date.now() - 15 * 60e3).toISOString());
+    const w = (await rows(`/rest/v1/ar_chats?select=supplier,last_at&supplier=not.is.null&last_from=eq.customer&last_at=gte.${since}&order=last_at.desc&limit=1`))[0] as { supplier?: string; last_at?: string } | undefined;
+    const c = (await rows(`/rest/v1/ar_chats?select=name,last_at&supplier=is.null&waiting=gt.0&last_at=gte.${since}&order=last_at.desc&limit=1`))[0] as { name?: string; last_at?: string } | undefined;
+    if (w && (!c || String(w.last_at) >= String(c.last_at))) return reply(200, { title: 'وارد جديد من مخزن', body: `${w.supplier} بعت من الرابط، شوف «الوارد»`, tab: 'read' }, headers);
+    if (c) return reply(200, { title: 'رسالة جديدة من عميل', body: `${c.name} كتبلك في «خدمة العملاء ← الرسايل»`, tab: 'care' }, headers);
+    return reply(200, { title: 'صيدلية عسكر', body: 'فيه جديد في البوت', tab: '' }, headers);
+  }
+
   // ---------- a customer just wrote: the pharmacy's phones (owner 2026-11-14, «بعت رسالة … وما جاليش إشعارات») ----------
+  // A warehouse's chat (its list from the link) tells the owner and staff with «الوارد» (perm 'read') instead.
   if (body.action === 'notify') {
     const secret = String(body.secret || '');
     if (!/^[0-9a-f]{64}$/.test(secret)) return reply(400, { error: 'bad', message: 'الطلب ناقص.' }, headers);
     if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
-    const chat = (await rows('/rest/v1/ar_chats?select=id,notified_at&secret=eq.' + secret + '&limit=1'))[0] as { id?: string; notified_at?: string | null } | undefined;
+    const chat = (await rows('/rest/v1/ar_chats?select=id,notified_at,supplier&secret=eq.' + secret + '&limit=1'))[0] as { id?: string; notified_at?: string | null; supplier?: string | null } | undefined;
     if (!chat?.id) return reply(404, { error: 'chat' }, headers);
     // only for a message the customer really just sent, and at most once a minute for one chat
     const last = (await rows(`/rest/v1/ar_chat_messages?select=at&chat_id=eq.${chat.id}&sender=eq.customer&order=id.desc&limit=1`))[0] as { at?: string } | undefined;
@@ -140,7 +159,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const subs = await rows('/rest/v1/ar_chat_staff_push?select=endpoint,user_id') as { endpoint: string; user_id: string }[];
     const others = [...new Set(subs.map((s) => s.user_id).filter((u) => u !== (env.OWNER_ID || OWNER_ID) && UUID.test(u)))];
     const staff = others.length ? await rows('/rest/v1/ar_staff?select=user_id,active,perms&user_id=in.(' + others.join(',') + ')') as { user_id: string; active?: boolean; perms?: string[] }[] : [];
-    const ok = new Set(staff.filter((s) => s.active && (s.perms || []).includes('care')).map((s) => s.user_id));
+    const perm = chat.supplier ? 'read' : 'care';
+    const ok = new Set(staff.filter((s) => s.active && (s.perms || []).includes(perm)).map((s) => s.user_id));
     const targets = subs.filter((s) => s.user_id === (env.OWNER_ID || OWNER_ID) || ok.has(s.user_id));
     const r = await pushAll(targets.map((s) => s.endpoint), 'ar_chat_staff_push');
     return reply(200, { ok: true, ...r }, headers);

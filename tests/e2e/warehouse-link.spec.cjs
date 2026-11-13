@@ -28,11 +28,15 @@ run('Warehouse link: the rep writes his saved number once (no name), sends a pho
  // a Word file is refused on the page
  await page.setInputFiles('#chatFile',{name:'a.docx',mimeType:'application/msword',buffer:Buffer.from('x')});
  assert.match(await text(page,'#chatMsg'),/الملف ده مش مدعوم/);
- // to «الوارد» under the warehouse's name; no «رسالة جديدة من عميل», nobody waits for an answer, no «🔔» offer
- await page.waitForFunction(()=>(window.__tables.ar_inbox||[]).length===2);
- assert.deepEqual(await page.evaluate(()=>window.__tables.ar_inbox.map(r=>[r.supplier,r.kind,r.via])),[['مخزن تجربة (حسن)','image','link'],['مخزن تجربة (حسن)','pdf','link']]);
+ // several photos at once (owner 2026-11-14 «ممكن واحد يبعت لي 10 صور عادي»): all go, one after the other
+ assert.equal(await page.getAttribute('#chatPhoto2','multiple'),'');
+ await page.setInputFiles('#chatPhoto2',[1,2,3].map(i=>({name:`p${i}.png`,mimeType:'image/png',buffer:PNG})));
+ await page.waitForFunction(()=>document.querySelectorAll('#chatList .ch-b.me img.ch-photo').length===4);
+ // to «الوارد» under the warehouse's name; nobody waits for an answer, no «🔔» offer; the pharmacy's phones are told
+ await page.waitForFunction(()=>(window.__tables.ar_inbox||[]).length===5);
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_inbox.map(r=>[r.supplier,r.kind,r.via])),[['مخزن تجربة (حسن)','image','link'],['مخزن تجربة (حسن)','pdf','link'],...[1,2,3].map(()=>['مخزن تجربة (حسن)','image','link'])]);
  const inv=await page.evaluate(()=>window.__invokes);
- assert.ok(inv.includes('chatinbox'));assert.ok(!inv.some(x=>x.startsWith('chat:notify')),'not told as a customer');
+ assert.ok(inv.includes('chatinbox'));assert.ok(inv.some(x=>x.startsWith('chat:notify')),'«وارد جديد من مخزن» on the pharmacy\'s phones');
  assert.equal(await page.evaluate(()=>window.__tables.ar_chats[0].waiting),0);
  assert.ok(await page.isHidden('#chatNotify'));
  // next time on this phone: straight into his page

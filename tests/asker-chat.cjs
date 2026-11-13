@@ -89,13 +89,13 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.equal((await F.handle(req({ action: 'voice', secret: 'short', id: 77 }, null), env, fake({ msg }))).status, 400);
   // a customer just wrote: the owner's phone and staff with «خدمة العملاء» (not staff without it), once a minute per chat
   const STAFF2 = '00000000-0000-4000-8000-0000000000c2';
-  function fake2({ notified = null, lastAt = new Date().toISOString() } = {}) {
+  function fake2({ notified = null, lastAt = new Date().toISOString(), supplier = null } = {}) {
     const pushes = [], patched = [], deleted = [];
     const f = async (url, o = {}) => {
       const u = new URL(url);
       if (/\.example$/.test(u.hostname)) { pushes.push(u.hostname + u.pathname); return new Response('', { status: u.hostname === 'gone.example' ? 410 : 201 }); }
       if (u.pathname === '/rest/v1/ar_chats' && o.method === 'PATCH') { patched.push(JSON.parse(o.body)); return new Response(null, { status: 204 }); }
-      if (u.pathname === '/rest/v1/ar_chats') return new Response(JSON.stringify(u.searchParams.get('secret') === 'eq.' + SECRET ? [{ id: CHAT, notified_at: notified }] : []));
+      if (u.pathname === '/rest/v1/ar_chats') return new Response(JSON.stringify(u.searchParams.get('secret') === 'eq.' + SECRET ? [{ id: CHAT, notified_at: notified, supplier }] : []));
       if (u.pathname === '/rest/v1/ar_chat_messages') { assert.equal(u.searchParams.get('sender'), 'eq.customer'); return new Response(JSON.stringify(lastAt ? [{ at: lastAt }] : [])); }
       if (u.pathname === '/rest/v1/ar_chat_staff_push' && o.method === 'DELETE') { deleted.push(decodeURIComponent(u.searchParams.get('endpoint'))); return new Response(null, { status: 204 }); }
       if (u.pathname === '/rest/v1/ar_chat_staff_push') return new Response(JSON.stringify([
@@ -103,7 +103,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
         { endpoint: 'https://push.example/staff-other', user_id: STAFF2 }, { endpoint: 'https://gone.example/old', user_id: OWNER }]));
       if (u.pathname === '/rest/v1/ar_staff') {
         assert.equal(u.searchParams.get('user_id'), `in.(${STAFF},${STAFF2})`);
-        return new Response(JSON.stringify([{ user_id: STAFF, active: true, perms: ['care'] }, { user_id: STAFF2, active: true, perms: ['tempsale'] }]));
+        return new Response(JSON.stringify([{ user_id: STAFF, active: true, perms: ['care'] }, { user_id: STAFF2, active: true, perms: ['tempsale', 'read'] }]));
       }
       throw Error('unexpected ' + url);
     };
@@ -124,5 +124,36 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   b = await (await F.handle(req({ action: 'notify', secret: SECRET }, null), env, f)).json();
   assert.equal(b.skipped, 'old'); assert.equal(f.pushes.length, 0);
   assert.equal((await F.handle(req({ action: 'notify', secret: 'b'.repeat(64) }, null), env, fake2())).status, 404);
-  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes');
+  // a warehouse's chat (its list from the link, owner 2026-11-14): the owner and staff with «الوارد», not staff with care only
+  f = fake2({ supplier: 'مخزن تجربة (حسن)' });
+  b = await (await F.handle(req({ action: 'notify', secret: SECRET }, null), env, f)).json();
+  assert.deepEqual(f.pushes.sort(), ['gone.example/old', 'push.example/owner', 'push.example/staff-other']);
+
+  // «what»: the bot's worker asks what a push was about, with its own saved push address (owner 2026-11-14 «مفيش صوت اشعار»)
+  function fake3({ known = true, warehouse = null, customer = null } = {}) {
+    const f = async (url) => {
+      const u = new URL(url);
+      if (u.pathname === '/rest/v1/ar_chat_staff_push') { assert.equal(u.searchParams.get('endpoint'), 'eq.https://fcm.example/me'); return new Response(JSON.stringify(known ? [{ user_id: OWNER }] : [])); }
+      if (u.pathname === '/rest/v1/ar_chats') {
+        assert.ok(new Date(u.searchParams.get('last_at').slice(4)) > new Date(Date.now() - 16 * 60e3), 'the last 15 minutes');
+        if (u.searchParams.get('supplier') === 'not.is.null') { assert.equal(u.searchParams.get('last_from'), 'eq.customer'); return new Response(JSON.stringify(warehouse ? [warehouse] : [])); }
+        assert.equal(u.searchParams.get('supplier'), 'is.null'); assert.equal(u.searchParams.get('waiting'), 'gt.0');
+        return new Response(JSON.stringify(customer ? [customer] : []));
+      }
+      throw Error('unexpected ' + url);
+    };
+    return f;
+  }
+  const what = (f) => F.handle(req({ action: 'what', endpoint: 'https://fcm.example/me' }, null), env, f);
+  const t1 = new Date(Date.now() - 60e3).toISOString(), t2 = new Date().toISOString();
+  b = await (await what(fake3({ warehouse: { supplier: 'طاهر تجربه', last_at: t2 }, customer: { name: 'سامية', last_at: t1 } }))).json();
+  assert.deepEqual(b, { title: 'وارد جديد من مخزن', body: 'طاهر تجربه بعت من الرابط، شوف «الوارد»', tab: 'read' });
+  b = await (await what(fake3({ warehouse: { supplier: 'طاهر تجربه', last_at: t1 }, customer: { name: 'سامية', last_at: t2 } }))).json();
+  assert.deepEqual(b, { title: 'رسالة جديدة من عميل', body: 'سامية كتبلك في «خدمة العملاء ← الرسايل»', tab: 'care' });
+  b = await (await what(fake3())).json();
+  assert.deepEqual(b, { title: 'صيدلية عسكر', body: 'فيه جديد في البوت', tab: '' });
+  // a push address the pharmacy never saved: nothing said
+  assert.equal((await what(fake3({ known: false }))).status, 404);
+  assert.equal((await F.handle(req({ action: 'what', endpoint: 'http://x' }, null), env, fake3())).status, 400);
+  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes or a warehouse sends, «what» for the bot\'s worker');
 })().catch((e) => { console.error(e); process.exit(1); });

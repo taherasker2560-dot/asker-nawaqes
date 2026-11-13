@@ -256,8 +256,8 @@
     // a warehouse: two big buttons first (its list's photo, or its PDF / Excel file)
     const fileAccept = '.pdf,.xls,.xlsx,' + Object.values(FILE_TYPES).join(',');
     v.innerHTML = (supplier
-      ? `<div class="ch-big"><label class="ch-bigb p1">${esc(TEXTS.supPhoto)}<input id="chatPhoto2" type="file" accept="image/*" hidden></label>` +
-        `<label class="ch-bigb p2">${esc(TEXTS.supFile)}<small>${esc(TEXTS.supFileSub)}</small><input id="chatFile" type="file" accept="${esc(fileAccept)}" hidden></label></div>`
+      ? `<div class="ch-big"><label class="ch-bigb p1">${esc(TEXTS.supPhoto)}<input id="chatPhoto2" type="file" multiple accept="image/*" hidden></label>` +
+        `<label class="ch-bigb p2">${esc(TEXTS.supFile)}<small>${esc(TEXTS.supFileSub)}</small><input id="chatFile" type="file" multiple accept="${esc(fileAccept)}" hidden></label></div>`
       : '') +
       `<div id="chatList" class="ch-list"></div>` +
       `<p id="chatNotify" class="ch-notify"${notify ? '' : ' hidden'}>${esc(notify)}</p>` +
@@ -268,8 +268,8 @@
         ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec wait"><i class="ch-dot"></i>${esc(TEXTS.micAsk)}</span><button type="button" class="ch-ic ch-mic on" disabled aria-label="${esc(TEXTS.voice)}">🎤</button>`
         : rec
         ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec"><i class="ch-dot"></i><b id="chatRecT">0:00</b> ${esc(TEXTS.recording)}</span><button type="button" class="ch-ic ch-mic on" data-ch-recsend aria-label="${esc(TEXTS.voice)}">➤</button>`
-        : `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.photo)}">📷<input id="chatPhoto" type="file" accept="image/*" hidden></label>` +
-          (supplier ? `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.supFile)}">📎<input id="chatFile2" type="file" accept="${esc(fileAccept)}" hidden></label>` : '') +
+        : `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.photo)}">📷<input id="chatPhoto" type="file" multiple accept="image/*" hidden></label>` +
+          (supplier ? `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.supFile)}">📎<input id="chatFile2" type="file" multiple accept="${esc(fileAccept)}" hidden></label>` : '') +
           `<textarea id="chatText" rows="1" maxlength="2000" placeholder="${esc(TEXTS.type)}"></textarea>` +
           `<button type="button" class="ch-ic ch-mic" data-ch-mic aria-label="${esc(TEXTS.voice)}">🎤</button><button type="button" class="ch-ic ch-send" data-ch-send aria-label="ابعت" hidden>➤</button>`) +
       `</div>`;
@@ -314,33 +314,49 @@
       return blob || file;
     } catch (e) { return file; }
   }
-  async function sendPhoto(file) {
-    if (!file || busy) return;
-    busy = true; say(TEXTS.sending);
+  // one photo; `label` = part of a batch («بيبعت… 3/10»): the batch says «sent» once at its end. true = sent.
+  async function sendPhoto(file, label) {
+    if (!file || busy) return false;
+    busy = true; say(label || TEXTS.sending);
     try {
       const img = supplier ? await shrink(file, 2400, 0.9) : await shrink(file);
       const type = img.type === 'image/png' || img.type === 'image/webp' ? img.type : 'image/jpeg';
       const path = await upload(img, type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg', type);
       const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'photo', p_media: path });
-      if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
-      local.set(d.id, URL.createObjectURL(img)); say('');
-      afterSend();
-    } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
+      if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return false; }
+      local.set(d.id, URL.createObjectURL(img));
+      if (!label) { say(''); afterSend(); }
+      return true;
+    } catch (e) { say(TEXTS.errors.bad_media); return false; } finally { busy = false; }
   }
   // a warehouse's PDF or Excel list (8 MB at most, like the photos)
-  async function sendFile(file) {
-    if (!file || busy) return;
+  async function sendFile(file, label) {
+    if (!file || busy) return false;
     const ext = fileExt(file);
-    if (!ext) return say(TEXTS.errors.bad_kind);
-    if (file.size > 8 * 1024 * 1024) return say(TEXTS.errors.big);
-    busy = true; say(TEXTS.sending);
+    if (!ext) { say(TEXTS.errors.bad_kind); return false; }
+    if (file.size > 8 * 1024 * 1024) { say(TEXTS.errors.big); return false; }
+    busy = true; say(label || TEXTS.sending);
     try {
       const path = await upload(file, ext, FILE_TYPES[ext]);
       const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'file', p_media: path, p_body: cleanName(file.name).slice(0, 120) || null });
-      if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
-      say('');
-      afterSend();
-    } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
+      if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return false; }
+      if (!label) { say(''); afterSend(); }
+      return true;
+    } catch (e) { say(TEXTS.errors.bad_media); return false; } finally { busy = false; }
+  }
+  // several at once (owner 2026-11-14 «ممكن واحد يبعت لي 10 صور عادي»): one after the other, «بيبعت… 3/10», up to 20;
+  // a failure stops there and says why; what went is told once («✓ وصلت», the pharmacy, «الوارد»)
+  async function sendMany(files, one) {
+    const list = files.slice(0, 20);
+    if (!list.length || busy) return;
+    if (list.length === 1) { await one(list[0]); return; }
+    let sent = 0;
+    for (let i = 0; i < list.length; i++) {
+      if (!(await one(list[i], `${TEXTS.sending} ${i + 1}/${list.length}`))) break;
+      sent++;
+    }
+    if (sent === list.length) say('');
+    if (sent) afterSend();
   }
   // the voice note: tap 🎤 to start, ➤ to send, ✕ to drop; it stops by itself at 2 minutes
   const buzz = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* no motor */ } };
@@ -405,10 +421,11 @@
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
   function afterSend() {
-    // a warehouse: to «الوارد» (no «رسالة جديدة من عميل», no answer to wait for)
-    if (supplier) { poll(true); forward(); return; }
-    poll(true); offerNotify();
-    // the pharmacy's phones: «رسالة جديدة من عميل» even with the bot closed (asker-chat; at most once a minute a chat)
+    // a warehouse: to «الوارد», no answer to wait for (no «🔔» offer)
+    if (supplier) forward(); else offerNotify();
+    poll(true);
+    // the pharmacy's phones: «رسالة جديدة من عميل», or «وارد جديد من مخزن» for a warehouse, even with the bot closed
+    // (asker-chat; at most once a minute a chat)
     if (client && client.functions) client.functions.invoke('asker-chat', { body: { action: 'notify', secret } }).catch(() => null);
   }
   function toggleSend() {
@@ -475,8 +492,9 @@
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'chatText') toggleSend(); });
   document.addEventListener('change', (e) => {
     const id = e.target && e.target.id;
-    if (id === 'chatPhoto' || id === 'chatPhoto2') { const f = e.target.files && e.target.files[0]; e.target.value = ''; sendPhoto(f); }
-    if (id === 'chatFile' || id === 'chatFile2') { const f = e.target.files && e.target.files[0]; e.target.value = ''; sendFile(f); }
+    const picked = () => { const f = [...((e.target && e.target.files) || [])]; e.target.value = ''; return f; };
+    if (id === 'chatPhoto' || id === 'chatPhoto2') sendMany(picked(), sendPhoto);
+    if (id === 'chatFile' || id === 'chatFile2') sendMany(picked(), sendFile);
   });
   document.addEventListener('keydown', (e) => {
     if (e.target && e.target.id === 'chatText' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
