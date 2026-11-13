@@ -21,7 +21,7 @@
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
     <script src="store/i18n-en-store.js?v=big-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
-    <script src="store/theme.js?v=theme-20261112a"></script>
+    <script src="store/theme.js?v=acct-20261113b"></script>
   </head>
   <body>
     <p class="trial">نسخة تجريبية</p>
@@ -230,6 +230,12 @@
         <div class="brand">
           <img src="icons/arabic-96.png?v=logo2" alt="لوجو صيدلية عسكر" width="48" height="48" />
           <div><strong>صيدلية عسكر</strong><span id="acctName"></span></div>
+        </div>
+        <!-- the same «الشكل» as the home (language, night, colors): the customer chooses for himself -->
+        <div class="top-btns">
+          <button type="button" class="cart-btn" data-theme-open aria-label="الألوان والوضع الليلي" aria-controls="themeSheet">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></svg>
+          </button>
         </div>
       </header>
       <div id="acctBox"></div>

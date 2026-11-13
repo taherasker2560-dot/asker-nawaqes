@@ -66,6 +66,8 @@
   function bind() {
     if (!$('themeSheet')) return;
     $('themeBtn')?.addEventListener('click', () => open(true));
+    // the same button on «حسابي» (a customer's own account, owner 2026-11-13 «براحته»)
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-theme-open]')) open(true); });
     $('themeSheet').addEventListener('click', (e) => { if (e.target.closest('[data-theme-close]')) open(false); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('themeSheet').hidden) open(false); });
     $('themePick').addEventListener('click', (e) => {

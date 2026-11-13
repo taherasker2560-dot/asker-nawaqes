@@ -88,6 +88,15 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.deepEqual(await page.$$eval('.ac-k',e=>e.map(x=>x.textContent)),['دفعة 500 ج']);
  // «حسابي» in the tabs and on the home
  assert.ok(await page.isVisible('.tabbar a[data-go="account"]'));
+ // day by default; the customer chooses night, colors and language himself from «حسابي» too (owner: «براحته»)
+ assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('night')),false,'day by default');
+ await page.click('[data-view="account"] [data-theme-open]');
+ await page.waitForSelector('#themeSheet:not([hidden])');
+ await page.check('#themeNight');
+ assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('night')),true);
+ await page.uncheck('#themeNight');
+ await page.click('#themeClose');
+ await page.waitForSelector('#themeSheet[hidden]',{state:'attached'});
  // installing on his phone: the page's manifest is his own (the icon opens on his account); no install offer here = the steps
  const mf=await page.evaluate(async()=>{const h=document.querySelector('link[rel="manifest"]').href;return {blob:h.startsWith('blob:'),m:await (await fetch(h)).json()}});
  assert.ok(mf.blob,'his own manifest');assert.equal(mf.m.start_url,base+'store.html#me='+tok);assert.equal(mf.m.display,'standalone');
