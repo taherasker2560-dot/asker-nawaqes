@@ -126,7 +126,8 @@
     payments: 'المدفوعات',
     title: 'حسابي',
     every10: 'بيتحدث كل 10 دقايق',
-    install: '📲 نزّل حسابك على موبايلك',
+    install: '📲 ثبّت التطبيق الآن',
+    installWhy: 'عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
@@ -279,19 +280,22 @@
     }
     const b = balanceWords(st.c.balance), now = new Date();
     const upd = updatedText(st.data_at, now);
-    let html = st.stopped ? `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>` : '';
+    // first thing on the page, big (owner 2026-11-13: «زرار كبير مكتوب عليه ثبت التطبيق الان»); not in the installed app
+    let html = '';
+    if (!standalone()) {
+      html += `<button type="button" class="ac-btn ac-install" data-acct-install>${esc(TEXTS.install)}</button>` +
+        (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
+    }
+    if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
     html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` +
       (upd ? `<div class="hint-sm">${esc(upd)} · ${esc(TEXTS.every10)}</div>` : '') +
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
-    html += `<a href="#search" class="hero-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
+    html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
     const wa = waHref();
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
       (wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>';
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
-    // not when it is already the installed app
-    if (!standalone()) html += `<button type="button" class="hero-btn ac-install" data-acct-install>${esc(TEXTS.install)}</button>`;
-    if (installNote) html += `<p class="hint-sm center ac-install-note">${esc(installNote)}</p>`;
     const chip = (f, label) => `<button type="button" class="chip${st.filter === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
     html += `<div class="ac-chips" role="group">${chip('all', TEXTS.all)}${chip('sales', TEXTS.sales)}${chip('payments', TEXTS.payments)}</div>`;
     const shown = movesFor(st.moves, st.filter);

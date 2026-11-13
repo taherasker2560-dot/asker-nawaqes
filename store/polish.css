@@ -164,7 +164,6 @@ html.night .ac-big.paid { color: var(--ok, #7fd3a6); }
 .ac-two div { flex: 1; padding: 8px; border-radius: 12px; background: var(--field); text-align: center; font-size: 13px; color: var(--muted); }
 .ac-two b { display: block; font-size: 17px; color: var(--ink); }
 .ac-two b.paid { color: #1b7f3b; }
-.ac-order { display: flex; justify-content: center; margin: 14px 16px 0; min-height: 50px; background: #1fa855; color: #fff; font-size: 17px; }
 .ac-row { display: flex; gap: 10px; justify-content: center; margin: 12px 16px 0; }
 .ac-row .share { flex: 1; justify-content: center; text-decoration: none; }
 .ac-chips { display: flex; gap: 8px; margin: 16px 16px 4px; }
@@ -186,5 +185,11 @@ html.night .ac-big.paid { color: var(--ok, #7fd3a6); }
 .ac-pay.off { opacity: 0.45; }
 .done-pay { font-weight: 700; color: var(--accent) !important; }
 .note.bad { color: var(--bad, #c62828); font-weight: 600; }
-.ac-install { display: flex; justify-content: center; margin: 12px 16px 0; min-height: 48px; background: var(--grad); color: #fff; font-size: 16px; }
-.ac-install-note { margin: 8px 16px 0; font-size: 13.5px; line-height: 1.7; color: var(--ink); }
+/* the account page's two big buttons: their own colors in day and night (the store's .hero-btn turns white at night) */
+#acctBox .ac-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 32px); margin: 14px 16px 0; min-height: 54px; padding: 0 16px; border: 0; border-radius: 16px; color: #fff; font: inherit; font-size: 17px; font-weight: 800; text-decoration: none; box-shadow: var(--sh-1); }
+#acctBox .ac-btn:active { transform: scale(0.97); }
+#acctBox .ac-order { background: #1fa855; }
+#acctBox .ac-install { min-height: 64px; font-size: 20px; background: var(--grad); }
+#acctBox .ac-install-why { margin: 6px 16px 0; }
+#acctBox .ac-install-note { margin: 10px 16px 0; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft, #ebf1f9); color: var(--ink); font-size: 15px; font-weight: 700; line-height: 1.8; text-align: center; }
+html.night #acctBox .ac-install-note { background: rgba(255, 255, 255, 0.08); }
