@@ -159,6 +159,28 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 },{home:true});
 
+run('Customer link on the pharmacy\'s phone (the bot signed in): a look only, back to the bot, nothing kept (owner: «طلعني من البوت»)',async({page,base})=>{
+ const tok='c'.repeat(64);
+ await page.evaluate(([c,m,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[]}));
+  localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"access_token":"x"}');
+  localStorage.setItem('asker_store_customer',t)},[CUSTOMERS,MOVES,tok]);
+ await page.goto(base+'store.html#me='+tok);await page.reload();
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ // the customer's account is shown, with the way back to the bot; no install, no own manifest
+ assert.equal(await text(page,'#acctName'),'حسابك يا أحمد محمود · كود 101');
+ assert.equal(await page.getAttribute('#acctBox .ac-back','href'),'asker-nawaqes-arabic.html');
+ assert.equal(await page.$('[data-acct-install]'),null);
+ assert.equal(await page.getAttribute('link[rel="manifest"]','href'),'manifest-store.json');
+ // nothing kept on the phone (the one kept before is gone); this tab only
+ assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('asker_store_customer'),sessionStorage.getItem('asker_store_customer')]),[null,tok]);
+ // the store opened from the bot later (a new tab) is the store, not that customer's account
+ await page.evaluate(()=>sessionStorage.clear());
+ await page.goto(base+'store.html?from=bot');await page.reload();
+ await page.waitForSelector('[data-view="home"]:not([hidden])');
+ assert.ok(await page.isHidden('.tabbar a[data-go="account"]'));
+ await page.evaluate(()=>{localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token');localStorage.removeItem('__fakeTables')});
+},{home:true});
+
 run('Customer link install: iPhone gets the big guide; Firefox with no Chrome (back from the hand-off) shows its steps at once',async({page,base})=>{
  const tok='c'.repeat(64);
  await page.evaluate(([c,m,t])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[]})),[CUSTOMERS,MOVES,tok]);

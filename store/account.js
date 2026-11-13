@@ -137,6 +137,9 @@
     guide2: 'انزل واختار «إضافة إلى الشاشة الرئيسية»',
     guide3: 'دوس «إضافة» فوق',
     guideOk: 'تمام',
+    // the pharmacy's own phone (the bot signed in): a look only
+    backBot: '→ رجوع للبوت',
+    preview: 'ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
@@ -199,10 +202,18 @@
   root.AskerStoreAccountLib = api;
 
   // ---------- the page ----------
+  // the pharmacy's own phone = the bot is signed in here (the owner or a staff member; the bot keeps its sign-in under
+  // sb-…-auth-token on this same site). A customer's link opened there is only a look at that account: nothing kept on the
+  // phone (this tab only), no own manifest, no install, a way back to the bot (owner 2026-11-13: «طلعني من البوت … ومش
+  // عارف اخرج منه»: the bot is installed with the same scope, so the link opened inside the bot's window and stayed).
+  const pharmacyPhone = (() => { try { return Object.keys(localStorage).some((k) => /^sb-[a-z0-9]+-auth-token$/.test(k)); } catch (e) { return false; } })();
+  const box = () => (pharmacyPhone ? sessionStorage : localStorage);
   const keep = {
-    get() { try { return localStorage.getItem(KEY) || null; } catch (e) { return null; } },
-    set(v) { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window */ } },
+    get() { try { return box().getItem(KEY) || null; } catch (e) { return null; } },
+    set(v) { try { if (v) box().setItem(KEY, v); else box().removeItem(KEY); } catch (e) { /* private window */ } },
   };
+  // a customer's link kept on the pharmacy's phone before this: forgotten
+  if (pharmacyPhone) { try { localStorage.removeItem(KEY); } catch (e) { /* private window */ } }
   // the link just opened: keep the secret, take it out of the address (it is never shown or shared again), open «حسابي»
   // (#me= from WhatsApp; ?me= when another browser sent him to Chrome)
   const fromLink = tokenFromHash(location.hash) || tokenFromSearch(location.search);
@@ -215,11 +226,9 @@
   }
   let token = keep.get();
   if (token && !/^[0-9a-f]{64}$/.test(token)) { keep.set(null); token = null; }
-  // opened from the phone's home screen (an icon installed before this, on the store's page): straight to his account
+  // (no jump to «حسابي» on a plain open any more: inside the installed bot that took the owner's store away; the customer's
+  // own icon starts on his link anyway)
   const standalone = () => !!((root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
-  if (token && !fromLink && !location.hash && standalone()) {
-    try { history.replaceState(null, '', location.pathname + location.search + '#account'); } catch (e) { /* stays on the home */ }
-  }
   // his own manifest: installing from this phone makes an icon that opens on his account
   const manifestLink = document.querySelector('link[rel="manifest"]');
   const storeManifest = manifestLink && manifestLink.getAttribute('href');
@@ -233,7 +242,7 @@
       manifestLink.setAttribute('href', manifestUrl);
     } catch (e) { /* the store's own manifest stays */ }
   }
-  useManifest(true);
+  useManifest(!pharmacyPhone);
   // Chrome's «install» (store/store.js keeps it for the home's box too); null when the phone does not offer it
   let installEvt = null, installNote = '', installBusy = false, guide = false;
   const waiters = [];
@@ -319,7 +328,10 @@
     const upd = updatedText(st.data_at, now);
     // first thing on the page, big (owner 2026-11-13: «زرار كبير مكتوب عليه ثبت التطبيق الان»); not in the installed app
     let html = '';
-    if (!standalone()) {
+    if (pharmacyPhone) {
+      // the owner (or staff) looking at a customer's account: back to the bot, nothing installed or kept
+      html += `<a class="ac-btn ac-back" href="asker-nawaqes-arabic.html">${esc(TEXTS.backBot)}</a><p class="hint-sm center ac-install-why">${esc(TEXTS.preview)}</p>`;
+    } else if (!standalone()) {
       // one button, one tap (owner: «يا اما تثبت التطبيق يا اما تاخده للسكة اللي هيثبت بها التطبيق مباشر … فلاحين»)
       const again = handedOff && !installNote;
       html += `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +

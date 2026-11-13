@@ -267,6 +267,8 @@ window.AskerEN = {
   "انزل واختار «إضافة إلى الشاشة الرئيسية»": "Scroll down and choose «Add to Home Screen»",
   "دوس «إضافة» فوق": "Tap «Add» at the top",
   "تمام": "OK",
+  "→ رجوع للبوت": "→ Back to the bot",
+  "ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.": "This is the customer's account as he sees it. On your phone it is not kept or installed.",
   "عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية": "So you open your account and order from us in one tap from your home screen",
   "على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.": "On iPhone: tap the Share button ⬆️, then «Add to Home Screen». If it is not there, open the link in Safari.",
   "في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».": "In Firefox: tap ⋮, then «Install» or «Add to Home screen».",
