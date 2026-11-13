@@ -67,6 +67,7 @@
     photo: '📷 صورة',
     voice: '🎤 فويس',
     recording: 'بيسجّل… دوس ➤ عشان يتبعت',
+    micAsk: 'بيفتح المايك… لو الموبايل سألك اسمح',
     cancel: 'لغي',
     sending: 'بيبعت…',
     notifyAsk: '🔔 دوس هنا عشان يجيلك إشعار لما نرد عليك',
@@ -104,7 +105,7 @@
     set(v) { try { if (v) box().setItem(KEY, v); else box().removeItem(KEY); } catch (e) { /* private window */ } },
   };
   let client = null, secret = keep.get(), name = '', msgs = [], lastId = 0, timer = null, busy = false, error = '', opening = false;
-  let rec = null, notify = '';
+  let rec = null, recStarting = false, notify = '';
   const local = new Map(); // message id -> blob URL of what was sent from this page (photo / voice)
   if (secret && !/^[0-9a-f]{64}$/.test(secret)) { keep.set(null); secret = null; }
 
@@ -150,6 +151,7 @@
         const d = await rpc('ar_chat_read', { p_secret: secret, p_after: lastId });
         if (d.ok) {
           name = d.name || name;
+          if ($('chatWho') && name) $('chatWho').textContent = `${TEXTS.sub} · ${name}`;
           let changed = false;
           for (const m of d.messages || []) {
             const i = msgs.findIndex((x) => x.id === m.id);
@@ -204,8 +206,11 @@
       `<p id="chatNotify" class="ch-notify"${notify ? '' : ' hidden'}>${esc(notify)}</p>` +
       `<p id="chatMsg" class="form-msg bad ch-err"${error ? '' : ' hidden'}>${esc(error)}</p>` +
       `<div class="ch-bar">` +
-      (rec
-        ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec">● <b id="chatRecT">0:00</b> ${esc(TEXTS.recording)}</span><button type="button" class="ch-ic ch-mic on" data-ch-recsend aria-label="${esc(TEXTS.voice)}">➤</button>`
+      // the mic answers the tap at once (owner 2026-11-14: «لما أدوس عليه أحس إن هو اتفعل»): red, and the seconds running
+      (recStarting
+        ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec wait"><i class="ch-dot"></i>${esc(TEXTS.micAsk)}</span><button type="button" class="ch-ic ch-mic on" disabled aria-label="${esc(TEXTS.voice)}">🎤</button>`
+        : rec
+        ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec"><i class="ch-dot"></i><b id="chatRecT">0:00</b> ${esc(TEXTS.recording)}</span><button type="button" class="ch-ic ch-mic on" data-ch-recsend aria-label="${esc(TEXTS.voice)}">➤</button>`
         : `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.photo)}">📷<input id="chatPhoto" type="file" accept="image/*" hidden></label>` +
           `<textarea id="chatText" rows="1" maxlength="2000" placeholder="${esc(TEXTS.type)}"></textarea>` +
           `<button type="button" class="ch-ic ch-mic" data-ch-mic aria-label="${esc(TEXTS.voice)}">🎤</button><button type="button" class="ch-ic ch-send" data-ch-send aria-label="ابعت" hidden>➤</button>`) +
@@ -264,16 +269,22 @@
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
   // the voice note: tap 🎤 to start, ➤ to send, ✕ to drop; it stops by itself at 2 minutes
+  const buzz = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* no motor */ } };
   async function startRec() {
-    if (rec || busy) return;
+    if (rec || recStarting || busy) return;
     // the sound engine is made inside the tap itself: made after the microphone question it can stay asleep and record
     // nothing (owner's test 2026-11-14: a voice note that never came)
     const A = root.AudioContext || root.webkitAudioContext;
     let ctx = null;
     try { ctx = new A(); ctx.resume && ctx.resume(); } catch (e) { say(TEXTS.errors.mic); return; }
+    // at once: the bar turns red and says the phone may ask about the microphone
+    recStarting = true; say(''); buzz(30); draw();
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); } catch (e) { try { ctx.close(); } catch (x) { /* gone */ } say(TEXTS.errors.mic); return; }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }); } catch (e) { recStarting = false; try { ctx.close(); } catch (x) { /* gone */ } draw(); say(TEXTS.errors.mic); return; }
+    if (!recStarting) { stream.getTracks().forEach((t) => t.stop()); try { ctx.close(); } catch (x) { /* gone */ } return; } // ✕ meanwhile
+    recStarting = false;
     if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (e) { /* tried */ } }
+    buzz(60);
     const src = ctx.createMediaStreamSource(stream), proc = ctx.createScriptProcessor(4096, 1, 1), chunks = [];
     proc.onaudioprocess = (e) => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
     src.connect(proc); proc.connect(ctx.destination);
@@ -286,6 +297,7 @@
     }, 250);
   }
   async function stopRec(send) {
+    if (recStarting && !send) { recStarting = false; draw(); return; } // ✕ while the phone was still asking
     const r = rec;
     if (!r) return;
     rec = null;
@@ -394,7 +406,9 @@
   root.AskerStoreChat = {
     attach(c) { client = c; },
     // store.js view('chat')
-    open() { open(); },
-    close() { clearTimeout(timer); if (rec) stopRec(false); },
+    // the messages page takes the whole screen like WhatsApp: the store's bottom tabs hide (owner 2026-11-14: the bar was
+    // half under them and could not send); the header's arrow goes back
+    open() { document.body.classList.add('ch-open'); open(); },
+    close() { document.body.classList.remove('ch-open'); clearTimeout(timer); if (rec || recStarting) stopRec(false); },
   };
 })(typeof window === 'undefined' ? globalThis : window);

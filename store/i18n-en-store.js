@@ -273,6 +273,7 @@ window.AskerEN = {
   "🎤 فويس": "🎤 Voice note",
   "🎤 فويس {0}": "🎤 Voice note {0}",
   "بيسجّل… دوس ➤ عشان يتبعت": "Recording… tap ➤ to send",
+  "بيفتح المايك… لو الموبايل سألك اسمح": "Opening the microphone… if the phone asks, allow it",
   "لغي": "Cancel",
   "بيبعت…": "Sending…",
   "🔔 دوس هنا عشان يجيلك إشعار لما نرد عليك": "🔔 Tap here to get a notification when we answer",
