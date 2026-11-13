@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=switch-20261112a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=staff-20261113a" />
+    <link rel="stylesheet" href="ar/look.css?v=preview-20261113a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=out-20261113a"></script>
+    <script src="ar/i18n-en.js?v=preview-20261113a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -101,6 +101,11 @@
       </section>
       <div id="app" class="hidden">
         <p id="versionWarn" class="status bad hidden"></p>
+        <!-- the owner looking at the bot as one of his staff sees it (ar/staff.js, owner 2026-11-13) -->
+        <div id="previewBar" class="preview-bar hidden">
+          <span id="previewText"></span>
+          <button id="previewBack" type="button">رجوع لحسابي</button>
+        </div>
         <!-- «ثبّت البوت»: the same icon on the phone (ar/staff.js) -->
         <div id="installBar" class="install-bar hidden">
           <span>ثبّت البوت على موبايلك عشان يفتح من الأيقونة</span>
@@ -686,7 +691,7 @@
     <script src="ar/data-age.js?v=heartbeat-20261109a"></script>
     <script src="ar/fuzzy.js?v=search-20261108a"></script>
     <script src="ar/app.js?v=staff-20261113a"></script>
-    <script src="ar/staff.js?v=out-20261113a"></script>
+    <script src="ar/staff.js?v=preview-20261113a"></script>
     <script src="ar/suppliers.js?v=home-20261112a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/order-drafts.js?v=switch-20261112a"></script>

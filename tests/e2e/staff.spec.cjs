@@ -21,6 +21,18 @@ run('Staff: the owner adds a person, opens sections, sends the link, stops him',
  assert.deepEqual((await table('ar_staff'))[0].perms,['tempsale','expiry']);
  await page.uncheck('#stfRows [data-perm="expiry"]');
  await page.waitForFunction(()=>window.__tables.ar_staff[0].perms.length===1);
+ // «شوف البوت زي ما هيشوفه»: his home and sections on this phone, without signing out; «رجوع لحسابي» ends it
+ await page.click('#stfRows [data-stf-preview]');
+ await page.waitForFunction(()=>document.documentElement.classList.contains('staff'));
+ assert.match(await text(page,'#previewBar'),/بتشوف البوت زي ما موظف تجربة هيشوفه/);
+ assert.deepEqual(await page.$$eval('#staffHomePanel [data-stf-go]',b=>b.map(x=>x.dataset.stfGo)),['tempsale']);
+ assert.ok(await page.$eval('#settingsPanel',e=>e.classList.contains('hidden')));
+ await page.click('#previewBack');
+ assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('staff')),false);
+ assert.ok(await page.$eval('#previewBar',e=>e.classList.contains('hidden')));
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker-role')&&JSON.parse(localStorage.getItem('asker-role')).me),null,'the preview is never kept as his role');
+ await page.click('#settingsBtn');
+ await page.waitForSelector('#staffAdmin:not(.hidden)');
  // a new link, then stopped
  await page.click('#stfRows [data-stf-link]');
  await page.waitForFunction(()=>/الرابط القديم مبقاش شغال/.test(document.getElementById('stfStatus').textContent));

@@ -131,7 +131,8 @@
     html.classList.toggle('staff-off', on && !me.active);
     html.classList.toggle('can-search', !on || can('search'));
     $('staffAdmin')?.classList.toggle('hidden', on);
-    $('staffOut')?.classList.toggle('hidden', !on);
+    // the way out of a staff account (not in the owner's preview: «رجوع لحسابي» is there)
+    $('staffOut')?.classList.toggle('hidden', !on || !!(me && me.preview));
     $('logoutBtn')?.classList.toggle('staff-hide', on);
     if (!on) { document.querySelectorAll('.staff-hidden').forEach((x) => x.classList.remove('staff-hidden')); return; }
     const tabs = me.active ? allowedTabs(me.perms) : [];
@@ -187,6 +188,7 @@
       <div class="stf-acts">
         ${s.active ? '<button type="button" data-stf-link>ابعتله رابط الدخول على الواتس</button><button type="button" class="secondary" data-stf-stop>وقّف الحساب</button>'
           : '<button type="button" data-stf-link>شغّله تاني وابعتله رابط جديد</button>'}
+        <button type="button" class="secondary" data-stf-preview>👁 شوف البوت زي ما هيشوفه</button>
       </div>
       <details data-stf-log><summary>اللي عمله</summary><div class="stf-log"></div></details>
     </div>`;
@@ -248,6 +250,7 @@
       if (!card) return;
       const s = staffList.find((x) => x.user_id === card.dataset.stf);
       if (!s) return;
+      if (b.hasAttribute('data-stf-preview')) return preview(s);
       try {
         if (b.hasAttribute('data-stf-link')) {
           const d = await call({ action: 'link', user_id: s.user_id });
@@ -262,6 +265,25 @@
         }
       } catch (err) { say('stfStatus', (err && err.message) || String(err), 'bad'); }
     });
+  }
+
+  // ---------- 3b) the owner sees the bot as one of his staff sees it (owner 2026-11-13: «اشوف انا بعمل ايه فيه»): the same
+  // sections, home and buttons, on this phone only, without signing out; «رجوع لحسابي» ends it. The data stays the owner's
+  // (the database shows a staff member only his part), so it is the layout that is shown, not his data.
+  function preview(s) {
+    me = { user_id: s.user_id, name: s.name, perms: s.perms || [], active: !!s.active, preview: true };
+    $('settingsPanel')?.classList.add('hidden');
+    apply();
+    $('previewText').textContent = `بتشوف البوت زي ما ${s.name} هيشوفه`;
+    $('previewBar').classList.remove('hidden');
+    if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('home');
+  }
+  function endPreview() {
+    me = null;
+    $('previewBar').classList.add('hidden');
+    apply();
+    loadAdmin();
+    if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('home');
   }
 
   // ---------- 4) «ثبّت البوت على موبايلك»: the same icon as the owner's ----------
@@ -290,6 +312,7 @@
       showInstall();
     });
     $('installNo')?.addEventListener('click', () => { try { localStorage.setItem('asker-install-no', String(Date.now())); } catch (e) {} showInstall(); });
+    $('previewBack')?.addEventListener('click', endPreview);
     // out of a staff account (in ⚙️ only, so it is not pressed by mistake): back to the sign-in page
     $('staffLogout')?.addEventListener('click', async () => {
       if (!root.confirm('تخرج من الحساب ده؟')) return;
