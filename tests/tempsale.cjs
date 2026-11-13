@@ -11,7 +11,8 @@ assert.equal(T.stickerCode('101060',true),1060);assert.equal(T.stickerCode('9493
 // the sticker's barcode itself: 1 + code (5) + expiry month + year (the owner's scan 1634760729 = code 63476, 07/2029)
 assert.equal(T.stickerCode('1634760729',true),63476);assert.deepEqual(T.stickerRead('1634760729'),{code:63476,exp:'2029-07'});
 assert.deepEqual(T.stickerRead('1010600328'),{code:1060,exp:'2028-03'});assert.deepEqual(T.stickerRead('101060'),{code:1060,exp:null});
-assert.equal(T.stickerRead('1634761329'),null,'month 13: not a sticker');assert.equal(T.stickerRead('2634760729'),null);assert.equal(T.stickerRead('163476072'),null);
+assert.equal(T.stickerRead('1634761329'),null,'month 13: not a sticker');assert.equal(T.stickerRead('1634036085'),null,'the owner\'s misread (month 60)');
+assert.equal(T.stickerRead('1634760799'),null,'year 2099: a misread');assert.equal(T.stickerRead('2634760729'),null);assert.equal(T.stickerRead('163476072'),null);
 assert.equal(T.stickerCode('1634760729'),63476,'typed too');assert.equal(T.stickerCode('A101060',true),null);assert.equal(T.stickerCode(' 163070 ',true),63070);
 // price of one box, or one unit when the box splits
 assert.equal(T.priceOf(66.7,1,'unit'),66.7,'a box that does not split');assert.equal(T.priceOf(108,2,'unit'),54);assert.equal(T.priceOf(100,3,'unit'),33.33);assert.equal(T.priceOf(100,3,'pack'),100);

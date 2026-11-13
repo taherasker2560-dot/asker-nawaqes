@@ -49,6 +49,20 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.evaluate(()=>window.AskerTempSale.scanned('1048750729',true,'itf'));
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/صلاحية 07\/2029/);
  await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');
+ // from the camera (owner: «بعض مرة بيقرا كده»): an ITF value counts after 3 reads in a row; a misread is ignored quietly;
+ // the same sticker kept in front of the camera adds one box only
+ const before=await text(page,'#tsFind');
+ for(let i=0;i<3;i++)await page.evaluate(()=>window.AskerTempSale.scanned('1634036085',false,'itf'));
+ assert.equal(await text(page,'#tsFind'),before,'a misread says nothing');
+ const q1=()=>text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b');
+ const was=Number(await q1());
+ await page.evaluate(()=>{window.AskerTempSale.scanned('1010600328',false,'itf');window.AskerTempSale.scanned('1010600328',false,'itf')});
+ assert.equal(Number(await q1()),was,'two ITF reads are not enough');
+ await page.evaluate(()=>window.AskerTempSale.scanned('1010600328',false,'itf'));
+ assert.equal(Number(await q1()),was+1,'the third adds one box');
+ for(let i=0;i<6;i++)await page.evaluate(()=>window.AskerTempSale.scanned('1010600328',false,'itf'));
+ assert.equal(Number(await q1()),was+1,'still in view: no more boxes');
+ await page.click('#tsCart .ts-line[data-i="1"] [data-ts-minus]');
  // a short or long reading is never taken as a code; the number read is shown
  await page.evaluate(()=>window.AskerTempSale.scanned('9493',true,'itf'));
  assert.match(await text(page,'#tsFind'),/الكاميرا قرت 9493 \(itf\): ده مش رقم ملصق فارمافلاي/,'the number and its barcode kind are shown');

@@ -29,7 +29,9 @@
   function stickerRead(raw) {
     const s = String(raw || '').trim();
     const m = s.match(/^1(\d{5})(0[1-9]|1[0-2])(\d{2})$/);
-    if (m) return Number(m[1]) ? { code: Number(m[1]), exp: `20${m[3]}-${m[2]}` } : null;
+    // a year far from now is a misread too (stickers are printed on stock that has a real expiry)
+    const y = m ? 2000 + Number(m[3]) : 0, now = new Date().getFullYear();
+    if (m) return Number(m[1]) && y >= now - 3 && y <= now + 15 ? { code: Number(m[1]), exp: `20${m[3]}-${m[2]}` } : null;
     if (/^1\d{5}$/.test(s)) return Number(s) - 100000 ? { code: Number(s) - 100000, exp: null } : null;
     return null;
   }
@@ -346,19 +348,35 @@
     busy = false;
   }
   // sure = the camera read the same value twice in a row (tests and a typed reading pass true)
+  // Owner 2026-11-13 («بعض مرة بيقرا كده … مش هينفع», a misread 1634036085 of the sticker 1634760729):
+  // - the sticker's kind (ITF) has no check digit, so its value must come 3 times in a row (other kinds 2);
+  // - a reading that is not a sticker (or names no item) is a misread: ignored quietly, the camera keeps looking; only a
+  //   steady barcode of another kind (a factory EAN on the box) is told, once;
+  // - the same sticker still in front of the camera counts once: it must leave the view (GONE_MS) to add one more box.
+  const NEED = { itf: 3 }, GONE_MS = 2000;
+  let streak = 0, toldRaw = '';
   async function scanned(raw, sure, format) {
     raw = String(raw || '').trim();
     const now = Date.now();
     if (!raw) return;
-    if (!sure && !(raw === seenRaw && now - seenAt < 1500)) { seenRaw = raw; seenAt = now; return; }
-    seenRaw = '';
-    if (raw === lastRaw && now - lastAt < 2500) return;
-    lastRaw = raw; lastAt = now;
-    // every reading is kept on this phone (the last 20), to learn the stickers' barcode; never sent anywhere
+    if (raw === lastRaw && now - lastAt < GONE_MS) { lastAt = now; return; }
+    if (!sure) {
+      if (raw === seenRaw && now - seenAt < 1200) streak++; else { seenRaw = raw; streak = 1; }
+      seenAt = now;
+      if (streak < (NEED[format] || 2)) return;
+    }
+    seenRaw = ''; streak = 0;
+    // every counted reading is kept on this phone (the last 20), to learn the barcodes; never sent anywhere
     const shown = raw + (format ? ` (${format})` : '');
     keep('asker-ts-raw', [shown, ...load('asker-ts-raw', []).filter((x) => x !== shown)].slice(0, 20));
     const sr = stickerRead(raw), it = sr ? await itemByCode(sr.code) : null;
-    if (!it) { beep(false); return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad'); }
+    if (!it) {
+      if (!sure && (format === 'itf' || toldRaw === raw)) return; // a misread of the sticker's bars: keep looking
+      toldRaw = raw;
+      beep(false);
+      return say('tsFind', `الكاميرا قرت ${shown}: ده مش رقم ملصق فارمافلاي. اكتب الرقم اللي فوق الباركود في «الكود».`, 'bad');
+    }
+    lastRaw = raw; lastAt = now;
     beep(true);
     const line = add(it);
     // the sticker carries its own batch's expiry: the line shows that one (as PharmaFly does when it sells that batch)
