@@ -127,3 +127,23 @@ html.night .promo span span { color: #fdba74; }
 #seen .item-side { max-width: none; flex-direction: row; align-items: center; justify-content: space-between; margin-top: auto; }
 #seen .add { min-height: 34px; padding: 0 12px; }
 html[lang="en"] #seen .item .ar { display: none !important; }
+
+/* ---------- an item with no photo: a card in its section's color (2026-11-13) ---------- */
+.thumb.card, .sh-pic.card { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #fff; border: 0; background: linear-gradient(135deg, #475569, #1e293b); }
+.thumb.card::after, .sh-pic.card::after { content: ''; position: absolute; inset-inline-start: -30%; bottom: -45%; width: 90%; aspect-ratio: 1; border-radius: 50%; background: rgba(255, 255, 255, 0.12); pointer-events: none; }
+.thumb.card svg, .sh-pic.card svg { width: 34%; max-width: 54px; height: auto; aspect-ratio: 1; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.cd-nm { position: relative; z-index: 1; max-width: 92%; font-weight: 700; font-size: 12.5px; line-height: 1.25; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .2px; }
+.cd-st { position: absolute; z-index: 1; top: 7px; inset-inline-start: 7px; padding: 1px 7px; border-radius: 99px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.4); font-size: 10.5px; font-weight: 700; }
+.cd-lg { position: absolute; z-index: 1; bottom: 5px; inset-inline-end: 8px; font-size: 9.5px; opacity: .85; }
+.card.c-meds { background: linear-gradient(135deg, #1d4ed8, #0a3a8c); }
+.card.c-vit { background: linear-gradient(135deg, #16a34a, #14532d); }
+.card.c-care { background: linear-gradient(135deg, #db2777, #9d174d); }
+.card.c-baby { background: linear-gradient(135deg, #f97316, #c2410c); }
+.card.c-supplies { background: linear-gradient(135deg, #0d9488, #115e59); }
+/* the small list thumbnails (cart, alternatives): icon only */
+.thumb.card .cd-lg, .thumb.card .cd-nm, .thumb.card .cd-st { display: none; }
+#results .thumb.card .cd-lg, #popular .thumb.card .cd-lg, #seen .thumb.card .cd-lg, #results .thumb.card .cd-nm, #popular .thumb.card .cd-nm, #seen .thumb.card .cd-nm, #results .thumb.card .cd-st, #popular .thumb.card .cd-st, #seen .thumb.card .cd-st { display: block; }
+#results .thumb.card { height: 128px; }
+.sh-pic.card .cd-nm { font-size: 18px; }
+.sh-pic.card .cd-st { font-size: 13px; top: 12px; inset-inline-start: 12px; }
+.sh-pic.card .cd-lg { font-size: 12px; bottom: 10px; inset-inline-end: 12px; }
