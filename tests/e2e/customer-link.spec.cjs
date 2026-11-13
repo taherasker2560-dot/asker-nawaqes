@@ -88,6 +88,16 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.deepEqual(await page.$$eval('.ac-k',e=>e.map(x=>x.textContent)),['دفعة 500 ج']);
  // «حسابي» in the tabs and on the home
  assert.ok(await page.isVisible('.tabbar a[data-go="account"]'));
+ // installing on his phone: the page's manifest is his own (the icon opens on his account); no install offer here = the steps
+ const mf=await page.evaluate(async()=>{const h=document.querySelector('link[rel="manifest"]').href;return {blob:h.startsWith('blob:'),m:await (await fetch(h)).json()}});
+ assert.ok(mf.blob,'his own manifest');assert.equal(mf.m.start_url,base+'store.html#me='+tok);assert.equal(mf.m.display,'standalone');
+ await page.click('[data-acct-install]');
+ assert.match(await text(page,'.ac-install-note'),/دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق»/);
+ // Chrome offers to install: one tap
+ await page.evaluate(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
+ await page.click('[data-acct-install]');
+ await page.waitForFunction(()=>window.__prompted===true);
+ await page.waitForFunction(()=>/اتنزّل/.test(document.querySelector('.ac-install-note')?.textContent||''));
  // the order: his name from the pharmacy (no name box), his number filled, on his account by default
  await page.goto(base+'store.html#cart');
  await page.waitForSelector('#payBox:not([hidden]) input[value="account"]');
@@ -123,5 +133,6 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  await page.waitForFunction(()=>/الرابط ده مبقاش شغال/.test(document.getElementById('acctBox')?.textContent||''));
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_customer')),null);
  assert.ok(await page.isHidden('.tabbar a[data-go="account"]'));
+ assert.match(await page.evaluate(()=>document.querySelector('link[rel="manifest"]').getAttribute('href')),/^manifest-store\.json$/,'back to the store\'s own manifest');
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 },{home:true});

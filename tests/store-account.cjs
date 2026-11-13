@@ -69,4 +69,17 @@ const today = new Date(2026, 10, 13, 20, 10);
 assert.match(A.updatedText(new Date(2026, 10, 13, 20, 8).toISOString(), today), /^آخر تحديث النهارده 8:08 م$/);
 assert.match(A.updatedText(new Date(2026, 10, 12, 9, 5).toISOString(), today), /^آخر تحديث امبارح 9:05 ص$/);
 assert.equal(A.updatedText(null, today), '');
+// installing on his phone: the icon opens on his account (the store's manifest, start page = his link, all absolute)
+const mf = A.manifestFor(tok, 'https://taherasker2560-dot.github.io/asker-nawaqes/store.html#account');
+assert.equal(mf.start_url, 'https://taherasker2560-dot.github.io/asker-nawaqes/store.html#me=' + tok);
+assert.equal(mf.scope, 'https://taherasker2560-dot.github.io/asker-nawaqes/');
+assert.equal(mf.id, 'store.html');
+assert.equal(mf.display, 'standalone');
+assert.equal(mf.name, 'صيدلية عسكر');
+assert.ok(mf.icons.length === 4 && mf.icons.every((i) => i.src.startsWith('https://taherasker2560-dot.github.io/asker-nawaqes/icons/')));
+// iPhone / iPad (an iPad says «MacIntel» with touch) get the Safari steps
+assert.equal(A.isIos('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)', 'iPhone', 5), true);
+assert.equal(A.isIos('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 'MacIntel', 5), true);
+assert.equal(A.isIos('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 'MacIntel', 0), false);
+assert.equal(A.isIos('Mozilla/5.0 (Linux; Android 14; SM-A566B)', 'Linux armv81', 5), false);
 console.log('PASS: store account (customer link) helpers');

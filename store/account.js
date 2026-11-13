@@ -126,8 +126,30 @@
     payments: 'المدفوعات',
     title: 'حسابي',
     every10: 'بيتحدث كل 10 دقايق',
+    install: '📲 نزّل حسابك على موبايلك',
+    installIos: 'على الآيفون: دوس زرار المشاركة ⬆️ في سفاري، وبعدين «إضافة إلى الشاشة الرئيسية».',
+    installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
+    installed: 'اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.',
   };
-  const api = { tokenFromHash, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, TEXTS, KEY };
+  // installing on his phone (owner 2026-11-13 «والعميل يثبته عنده ازاى»): the app's icon opens on HIS account. The manifest
+  // is the store's own (manifest-store.json) with the start page carrying his link; all addresses absolute (it is read from
+  // a blob: address on the phone).
+  function manifestFor(token, pageUrl) {
+    const page = new URL('store.html', String(pageUrl || '').replace(/#.*$/, ''));
+    const abs = (p) => new URL(p, page).href;
+    return {
+      id: 'store.html', name: 'صيدلية عسكر', short_name: 'صيدلية عسكر', description: 'حسابك في صيدلية عسكر', lang: 'ar', dir: 'rtl',
+      start_url: page.href + '#me=' + token, scope: abs('./'), display: 'standalone', background_color: '#f3f6fc', theme_color: '#0a4aa6',
+      icons: [
+        { src: abs('icons/arabic-192.png?v=logo2'), sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: abs('icons/arabic-512.png?v=logo2'), sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: abs('icons/arabic-maskable-192.png?v=logo2'), sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+        { src: abs('icons/arabic-maskable-512.png?v=logo2'), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    };
+  }
+  const isIos = (ua, platform, touch) => /iPad|iPhone|iPod/.test(String(ua || '')) || (platform === 'MacIntel' && Number(touch) > 1);
+  const api = { tokenFromHash, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, TEXTS, KEY };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') { root.AskerStoreAccountLib = api; return; }
   root.AskerStoreAccountLib = api;
@@ -145,6 +167,29 @@
   }
   let token = keep.get();
   if (token && !/^[0-9a-f]{64}$/.test(token)) { keep.set(null); token = null; }
+  // opened from the phone's home screen (an icon installed before this, on the store's page): straight to his account
+  const standalone = () => !!((root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
+  if (token && !fromLink && !location.hash && standalone()) {
+    try { history.replaceState(null, '', location.pathname + location.search + '#account'); } catch (e) { /* stays on the home */ }
+  }
+  // his own manifest: installing from this phone makes an icon that opens on his account
+  const manifestLink = document.querySelector('link[rel="manifest"]');
+  const storeManifest = manifestLink && manifestLink.getAttribute('href');
+  let manifestUrl = null;
+  function useManifest(on) {
+    if (!manifestLink) return;
+    if (manifestUrl) { URL.revokeObjectURL(manifestUrl); manifestUrl = null; }
+    if (!on || !token) { manifestLink.setAttribute('href', storeManifest); return; }
+    try {
+      manifestUrl = URL.createObjectURL(new Blob([JSON.stringify(manifestFor(token, location.href))], { type: 'application/manifest+json' }));
+      manifestLink.setAttribute('href', manifestUrl);
+    } catch (e) { /* the store's own manifest stays */ }
+  }
+  useManifest(true);
+  // Chrome's «install» (store/store.js keeps it for the home's box too); null when the phone does not offer it
+  let installEvt = null, installNote = '';
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; draw(); });
+  window.addEventListener('appinstalled', () => { installEvt = null; installNote = TEXTS.installed; draw(); });
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   let client = null;
@@ -169,7 +214,7 @@
       const { data, error } = await client.rpc('ar_customer_view', args);
       if (error) throw error;
       if (!data || !data.ok) {
-        if (data && data.error === 'link') { keep.set(null); token = null; st.c = null; showLinked(false); st.error = TEXTS.link; return; }
+        if (data && data.error === 'link') { keep.set(null); token = null; st.c = null; showLinked(false); useManifest(false); st.error = TEXTS.link; return; }
         throw new Error('bad');
       }
       if (!older) {
@@ -230,6 +275,9 @@
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
       (wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>';
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
+    // not when it is already the installed app
+    if (!standalone()) html += `<button type="button" class="hero-btn ac-install" data-acct-install>${esc(TEXTS.install)}</button>`;
+    if (installNote) html += `<p class="hint-sm center ac-install-note">${esc(installNote)}</p>`;
     const chip = (f, label) => `<button type="button" class="chip${st.filter === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
     html += `<div class="ac-chips" role="group">${chip('all', TEXTS.all)}${chip('sales', TEXTS.sales)}${chip('payments', TEXTS.payments)}</div>`;
     const shown = movesFor(st.moves, st.filter);
@@ -281,7 +329,25 @@
     draw();
   }
 
+  // «نزّل حسابك على موبايلك»: Chrome installs in one tap; elsewhere the steps (iPhone: Safari keeps the page's address,
+  // so the address carries his link while he adds it)
+  async function install() {
+    if (installEvt) {
+      const e = installEvt;
+      installEvt = null;
+      try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = TEXTS.installAndroid; }
+      draw();
+      return;
+    }
+    if (isIos(navigator.userAgent, navigator.platform, navigator.maxTouchPoints)) {
+      try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ }
+      installNote = TEXTS.installIos;
+    } else installNote = TEXTS.installAndroid;
+    draw();
+  }
+
   document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-acct-install]')) { install(); return; }
     const f = e.target.closest('[data-acct-filter]');
     if (f) { st.filter = f.dataset.acctFilter; draw(); return; }
     const it = e.target.closest('[data-acct-items]');
@@ -311,7 +377,7 @@
     // the server said he is stopped (the owner stopped him meanwhile): cash from now on
     stoppedNow() { st.stopped = true; st.pay = 'cash'; drawPay(); load(false); },
     // the server said the link is no longer valid
-    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; showLinked(false); drawPay(); draw(); },
+    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; showLinked(false); useManifest(false); drawPay(); draw(); },
     // after an order: the account may have changed
     refresh() { if (token) load(false); },
   };

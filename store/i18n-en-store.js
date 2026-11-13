@@ -258,7 +258,11 @@ window.AskerEN = {
   "الطلب هيتحط على حسابك في الصيدلية": "The order goes on your account at the pharmacy",
   "حسابك اتوقف، فالطلب ده كاش عند الاستلام. دوس «إرسال الطلب» تاني": "Your account was stopped, so this order is cash on delivery. Tap «Send order» again",
   "الرابط ده مبقاش شغال. اطلب رابط جديد من الصيدلية، أو اكتب اسمك وابعت الطلب عادي": "This link no longer works. Ask the pharmacy for a new one, or type your name and send the order as usual",
-  "اختار طريقة الدفع": "Choose how to pay"
+  "اختار طريقة الدفع": "Choose how to pay",
+  "📲 نزّل حسابك على موبايلك": "📲 Put your account on your phone",
+  "على الآيفون: دوس زرار المشاركة ⬆️ في سفاري، وبعدين «إضافة إلى الشاشة الرئيسية».": "On iPhone: tap the Share button ⬆️ in Safari, then «Add to Home Screen».",
+  "دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».": "Tap ⋮ at the top in Chrome, then «Install app» or «Add to Home screen».",
+  "اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.": "Installed: you'll find «Asker Pharmacy» on your home screen, and it opens on your account."
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",
