@@ -193,3 +193,5 @@ html.night .ac-big.paid { color: var(--ok, #7fd3a6); }
 #acctBox .ac-install-why { margin: 6px 16px 0; }
 #acctBox .ac-install-note { margin: 10px 16px 0; padding: 12px 14px; border-radius: 14px; background: var(--accent-soft, #ebf1f9); color: var(--ink); font-size: 15px; font-weight: 700; line-height: 1.8; text-align: center; }
 html.night #acctBox .ac-install-note { background: rgba(255, 255, 255, 0.08); }
+#acctBox .ac-chrome { background: #1a73e8; }
+#acctBox .ac-or { margin: 10px 16px 0; font-weight: 700; }

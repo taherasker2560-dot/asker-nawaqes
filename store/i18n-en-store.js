@@ -260,6 +260,8 @@ window.AskerEN = {
   "الرابط ده مبقاش شغال. اطلب رابط جديد من الصيدلية، أو اكتب اسمك وابعت الطلب عادي": "This link no longer works. Ask the pharmacy for a new one, or type your name and send the order as usual",
   "اختار طريقة الدفع": "Choose how to pay",
   "📲 ثبّت التطبيق الآن": "📲 Install the app now",
+  "🌐 ثبّته بدوسة من جوجل كروم": "🌐 Install in one tap from Google Chrome",
+  "أو ثبّته من المتصفح ده:": "Or install it from this browser:",
   "عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية": "So you open your account and order from us in one tap from your home screen",
   "على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.": "On iPhone: tap the Share button ⬆️, then «Add to Home Screen». If it is not there, open the link in Safari.",
   "في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».": "In Firefox: tap ⋮, then «Install» or «Add to Home screen».",

@@ -136,6 +136,11 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  const w2=await page.evaluate(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_customer_place_order').map(x=>x.args.p_pay));
  assert.deepEqual(w2,['cash']);
  assert.equal(await text(page,'#donePay'),'الدفع كاش عند الاستلام');
+ // sent over from another browser to Chrome (?me=…): the same account, and the secret leaves the address
+ await page.evaluate(()=>localStorage.removeItem('asker_store_customer'));
+ await page.goto(base+'store.html?me='+tok);
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ assert.deepEqual(await page.evaluate(()=>[location.search,location.hash,localStorage.getItem('asker_store_customer')]),['','#account',tok]);
  // a link that no longer works: said, and the phone forgets it
  await page.evaluate(()=>localStorage.setItem('asker_store_customer','d'.repeat(64)));
  await page.goto(base+'store.html#account');await page.reload();

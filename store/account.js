@@ -128,6 +128,8 @@
     every10: 'بيتحدث كل 10 دقايق',
     install: '📲 ثبّت التطبيق الآن',
     installWhy: 'عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية',
+    openChrome: '🌐 ثبّته بدوسة من جوجل كروم',
+    orHere: 'أو ثبّته من المتصفح ده:',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
@@ -164,7 +166,26 @@
     if (/Chrome\//.test(u)) return TEXTS.installAndroid;
     return TEXTS.installOther;
   }
-  const api = { tokenFromHash, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
+  // an Android browser other than Chrome (Firefox, Samsung, …): it can open the same account in Google Chrome, where the
+  // install is one tap (owner 2026-11-13: «يظهر له الخيار بين الفايرفوكس وبين … بتاع جوجل»)
+  const offerChrome = (ua) => /Android/i.test(String(ua || '')) && /Firefox|SamsungBrowser|OPR\/|Opera|EdgA\/|YaBrowser|UCBrowser|MiuiBrowser|HuaweiBrowser|HeyTap/.test(String(ua || ''));
+  // the link that opens this page in Chrome on Android (an intent: link cannot carry the #me= part, so the secret rides in
+  // ?me=, which the page takes out of the address at once); with no Chrome on the phone it opens here again
+  function chromeIntent(pageUrl, token) {
+    const page = new URL('store.html', String(pageUrl || '').replace(/[?#].*$/, ''));
+    const back = page.href + '?me=' + token;
+    return `intent://${page.host}${page.pathname}?me=${token}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(back)};end`;
+  }
+  function tokenFromSearch(s) {
+    const m = /[?&]me=([0-9a-f]{64})(?:&|$)/.exec(String(s || ''));
+    return m ? m[1] : null;
+  }
+  // the address without ?me=… (other parts kept)
+  function dropMe(s) {
+    const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^me=/.test(p));
+    return rest.length ? '?' + rest.join('&') : '';
+  }
+  const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') { root.AskerStoreAccountLib = api; return; }
   root.AskerStoreAccountLib = api;
@@ -175,10 +196,11 @@
     set(v) { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) { /* private window */ } },
   };
   // the link just opened: keep the secret, take it out of the address (it is never shown or shared again), open «حسابي»
-  const fromLink = tokenFromHash(location.hash);
+  // (#me= from WhatsApp; ?me= when another browser sent him to Chrome)
+  const fromLink = tokenFromHash(location.hash) || tokenFromSearch(location.search);
   if (fromLink) {
     keep.set(fromLink);
-    try { history.replaceState(null, '', location.pathname + location.search + '#account'); } catch (e) { location.hash = 'account'; }
+    try { history.replaceState(null, '', location.pathname + dropMe(location.search) + '#account'); } catch (e) { location.hash = 'account'; }
   }
   let token = keep.get();
   if (token && !/^[0-9a-f]{64}$/.test(token)) { keep.set(null); token = null; }
@@ -284,6 +306,9 @@
     let html = '';
     if (!standalone()) {
       html += `<button type="button" class="ac-btn ac-install" data-acct-install>${esc(TEXTS.install)}</button>` +
+        (installNote && installNote !== TEXTS.installed && offerChrome(navigator.userAgent)
+          ? `<a class="ac-btn ac-chrome" href="${esc(chromeIntent(location.href, token))}">${esc(TEXTS.openChrome)}</a><p class="hint-sm center ac-or">${esc(TEXTS.orHere)}</p>`
+          : '') +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
     }
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
