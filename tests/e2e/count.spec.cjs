@@ -18,6 +18,7 @@ run('Count: sections, correct or the difference per batch, a wrong section, rand
  // inside a section: the batches as PharmaFly holds them
  await page.click('#ctSecList [data-ct-open="3"]');
  assert.match(await text(page,'#ctItems [data-ct="63476"]'),/صلاحية 07\/2029 · الجهاز: 2[\s\S]*صلاحية 08\/2029 · الجهاز: 9/);
+ assert.equal(await page.$('#ctItems .ct-where'),null,'the section line is for the random count only');
  // the dates are mixed up: one box less of 07/2029, one more of 08/2029
  await page.click('#ctItems [data-ct="63476"] [data-ct-edit]');
  await page.click('#ctItems [data-ct="63476"] [data-ct-key="2029-07"] [data-ct-dec]');
@@ -42,13 +43,20 @@ run('Count: sections, correct or the difference per batch, a wrong section, rand
  await page.click('[data-ct-back]');
  await page.evaluate(()=>window.AskerCount.scanned('1001320829',true,'itf'));
  await page.waitForSelector('#ctHits [data-ct="132"]');
- // a wrong section: the cream is moved to «أقراص وكبسول»
- await page.click('#ctHits [data-ct="132"] [data-ct-edit]');
- await page.selectOption('#ctHits [data-ct="132"] [data-ct-sec]','3');
+ // the card shows the section PharmaFly has it in, as the list of all sections (owner 2026-11-13); picking another one
+ // opens the editor with «اتغير من كذا لكذا»: the cream is moved to «أقراص وكبسول»
+ const selName=s=>page.$eval(s,e=>e.options[e.selectedIndex].textContent);
+ assert.equal(await selName('#ctHits [data-ct="132"] .ct-where [data-ct-move]'),'كريمات');
+ await page.selectOption('#ctHits [data-ct="132"] [data-ct-move]','3');
+ assert.equal(await selName('#ctHits [data-ct="132"] [data-ct-sec]'),'أقراص وكبسول');
+ assert.match(await text(page,'#ctHits [data-ct="132"]'),/القسم اتغير من كريمات لـ أقراص وكبسول/);
  await page.click('#ctHits [data-ct="132"] [data-ct-save]');
  await page.waitForFunction(()=>window.__tables.ar_count_entries.length===3);
  const e3=(await table('ar_count_entries')).find(e=>e.item_id===132);
  assert.equal(e3.result,'diff');assert.equal(e3.section_from,33);assert.equal(e3.section_to,3);assert.deepEqual(e3.diffs,[]);
+ // after saving the card keeps the new section and says what changed
+ assert.equal(await selName('#ctHits [data-ct="132"] [data-ct-move]'),'أقراص وكبسول');
+ assert.match(await text(page,'#ctHits [data-ct="132"] .ct-res'),/القسم اتغير من كريمات لـ أقراص وكبسول/);
  // typing the sticker number finds the item too
  await page.fill('#ctQ','163476');
  assert.match(await text(page,'#ctHits'),/ITEM ONE TAB[\s\S]*فيه فرق/);
@@ -57,7 +65,7 @@ run('Count: sections, correct or the difference per batch, a wrong section, rand
  assert.match(await text(page,'#ctResSum'),/3 صنف فيهم فرق/);
  const one=await text(page,`#ctResRows [data-ct-entry="${e1.id}"]`);
  assert.match(one,/ناقص علبة من صلاحية 07\/2029[\s\S]*زايد علبة في صلاحية 08\/2029[\s\S]*التاريخ متلخبط/);
- assert.match(await text(page,`#ctResRows [data-ct-entry="${e3.id}"]`),/القسم يتغيّر: كريمات ← أقراص وكبسول/);
+ assert.match(await text(page,`#ctResRows [data-ct-entry="${e3.id}"]`),/القسم اتغير من كريمات لـ أقراص وكبسول/);
  await page.click(`#ctResRows [data-ct-entry="${e1.id}"] [data-ct-applied]`);
  assert.equal((await table('ar_count_entries')).find(e=>e.id===e1.id).status,'applied');
  assert.match(await text(page,'#ctResSum'),/2 صنف فيهم فرق/);

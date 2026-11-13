@@ -40,6 +40,7 @@ window.AskerEN = {
   "✓ مظبوط": "✓ Correct",
   "+ صلاحية مش متسجّلة": "+ An expiry not in PharmaFly",
   "القسم:": "Section:",
+  "القسم اتغير من {0} لـ {1}": "Section changed from {0} to {1}",
   "زايد": "More",
   "الشهر": "Month",
   "السنة": "Year",

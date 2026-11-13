@@ -1327,6 +1327,9 @@ details.stf-card[open] > summary { margin-bottom: 6px; }
 .ct-res .sec, .ct-r .sec { color: #7a4a00; }
 .ct-new select, .ct-sec select { min-height: 32px; }
 .ct-sec { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-weight: 600; font-size: 13.5px; }
+.ct-where { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; padding: 6px 10px; background: var(--soft, rgba(10, 74, 166, .06)); border-radius: 10px; font-weight: 600; font-size: 13.5px; }
+.ct-where select { flex: 1; min-height: 34px; }
+.ct-item > .sec { margin-top: 6px; color: var(--warn, #b45309); font-weight: 600; font-size: 13.5px; }
 .ct-acts { display: flex; gap: 8px; margin-top: 8px; }
 .ct-acts button { flex: 1; margin: 0; }
 .ct-okb { background: #1fa855 !important; color: #fff !important; }

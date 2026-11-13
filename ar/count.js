@@ -178,7 +178,11 @@
   function secOptions(cur) {
     return sections.map((s) => `<option value="${esc(s.i)}"${Number(s.i) === Number(cur) ? ' selected' : ''}>${esc(secName(s.i, s.n))}</option>`).join('');
   }
-  function itemCard(it) {
+  const secLabel = (id) => secName(id, (sections.find((s) => Number(s.i) === Number(id)) || {}).n);
+  const movedLine = (from, to) => `<div class="sec">القسم اتغير من ${esc(secLabel(from))} لـ ${esc(secLabel(to))}</div>`;
+  // withSec (random count, owner 2026-11-13): the section PharmaFly has it in, as a list of all the sections: picking
+  // another one opens the editor with «اتغير من كذا لكذا»
+  function itemCard(it, withSec) {
     const e = lastOf().get(it.i), editing = editId === it.i, lines = sysLines(it);
     const who = e ? (e.created_by && root.AskerStaff && root.AskerStaff.nameOf(e.created_by)) || '' : '';
     const tag = !e ? '' : e.result === 'ok' ? '<span class="ct-tag ok">مظبوط</span>' : '<span class="ct-tag diff">فيه فرق</span>';
@@ -186,15 +190,17 @@
       <div class="ct-h"><strong class="notr">${esc(nameOf(it))}</strong>${tag}</div>
       ${arName.get(it.i) ? `<div class="ct-en notr" dir="ltr">${esc(it.n)}</div>` : ''}
       <small class="hint">كود ${esc(it.i)}${e ? ` · اتجرد${who ? ' · ' + esc(who) : ''}${isQueued(e) ? ' · لسه ما اتبعتش' : ''}` : ''}</small>`;
+    if (withSec && !editing) html += `<label class="ct-where">القسم: <select data-ct-move aria-label="القسم">${secOptions(e && e.section_to != null ? e.section_to : it.s)}</select></label>`;
     if (!editing) {
       html += lines.map((l) => `<div class="ct-b"><span>${esc(l.text)}</span></div>`).join('');
-      if (e && e.result === 'diff') html += `<div class="ct-res">${(e.diffs || []).map((d) => `<div class="${d.d < 0 ? 'neg' : 'pos'}">${esc(diffLine(d, e.parts || it.p))}</div>`).join('')}${e.section_to != null ? `<div class="sec">القسم يتغيّر لـ ${esc(secName(e.section_to, (sections.find((s) => Number(s.i) === Number(e.section_to)) || {}).n))}</div>` : ''}</div>`;
+      if (e && e.result === 'diff') html += `<div class="ct-res">${(e.diffs || []).map((d) => `<div class="${d.d < 0 ? 'neg' : 'pos'}">${esc(diffLine(d, e.parts || it.p))}</div>`).join('')}${e.section_to != null ? movedLine(e.section_from != null ? e.section_from : it.s, e.section_to) : ''}</div>`;
       html += `<div class="ct-acts">${e ? '<button type="button" class="secondary" data-ct-edit>عدّل</button>' : '<button type="button" class="ct-okb" data-ct-ok>✓ مظبوط</button><button type="button" class="secondary" data-ct-edit>فيه فرق</button>'}</div>`;
     } else {
       html += lines.map((l) => `<div class="ct-b"><span>${esc(l.text)}</span><span class="ct-steps">${stepper(l.key, edits[l.key] || 0, it.p, 'k')}${it.p > 1 ? stepper(l.key, edits[l.key] || 0, it.p, 'u') : ''}</span></div>`).join('');
       html += extra.map((x, i) => `<div class="ct-b ct-new" data-ct-extra="${i}"><span><select data-ct-xm aria-label="الشهر">${Array.from({ length: 12 }, (_, m) => `<option${Number((x.x || '').slice(5)) === m + 1 ? ' selected' : ''}>${String(m + 1).padStart(2, '0')}</option>`).join('')}</select> / <select data-ct-xy aria-label="السنة">${Array.from({ length: 10 }, (_, k) => new Date().getFullYear() - 1 + k).map((y) => `<option${Number((x.x || '').slice(0, 4)) === y ? ' selected' : ''}>${y}</option>`).join('')}</select></span><span class="ct-steps">${stepper('+' + i, x.d || 0, it.p, 'k')}${it.p > 1 ? stepper('+' + i, x.d || 0, it.p, 'u') : ''}</span></div>`).join('');
       html += `<button type="button" class="linklike" data-ct-addx>+ صلاحية مش متسجّلة</button>
         <label class="ct-sec">القسم: <select data-ct-sec>${secOptions(secTo != null ? secTo : it.s)}</select></label>
+        ${secTo != null && Number(secTo) !== Number(it.s) ? movedLine(it.s, secTo) : ''}
         <div class="ct-acts"><button type="button" data-ct-save>احفظ</button><button type="button" class="secondary" data-ct-cancel>إلغاء</button></div>`;
     }
     return html + '</div>';
@@ -230,13 +236,13 @@
     const n = { todo: all.filter((it) => !last.has(it.i)).length, done: all.filter((it) => last.has(it.i)).length, diff: all.filter((it) => last.has(it.i) && last.get(it.i).result === 'diff').length };
     $('ctFilters').innerHTML = [['todo', 'لسه'], ['done', 'اتجرد'], ['diff', 'فيه فرق']].map(([k, l]) => `<button type="button" class="chip${filter === k ? ' on' : ''}" data-ct-filter="${k}">${l} ${n[k]}</button>`).join('');
     const list = sectionItems();
-    $('ctItems').innerHTML = list.slice(0, shown).map(itemCard).join('') +
+    $('ctItems').innerHTML = list.slice(0, shown).map((it) => itemCard(it, false)).join('') +
       (list.length > shown ? `<button type="button" class="secondary ct-more" data-ct-more>اعرض ${Math.min(PAGE, list.length - shown)} كمان</button>` : '') +
       (!list.length ? `<p class="hint">${filter === 'todo' ? 'القسم ده اتجرد كله ✓' : 'مفيش أصناف هنا'}</p>` : '');
   }
   function drawRandom() {
     const q = $('ctQ').value.trim(), F = root.AskerFuzzy, box = $('ctHits');
-    if (!q) { box.innerHTML = randomId && byId.get(randomId) ? itemCard(byId.get(randomId)) : ''; return; }
+    if (!q) { box.innerHTML = randomId && byId.get(randomId) ? itemCard(byId.get(randomId), true) : ''; return; }
     const code = root.AskerTempSaleLib ? root.AskerTempSaleLib.stickerCode(q) : Number(q) || null;
     let hits = [];
     if (code && byId.get(code)) hits = [byId.get(code)];
@@ -244,7 +250,7 @@
       const rows = items.map((it) => ({ i: it.i, a: arName.get(it.i) || '', n: it.n }));
       hits = F.rank(q, rows, (r) => [F.fold(r.a), F.fold(r.n)], 8).map((r) => byId.get(r.i));
     }
-    box.innerHTML = hits.map(itemCard).join('') || '<p class="hint">مفيش صنف عليه رصيد بالاسم أو الكود ده</p>';
+    box.innerHTML = hits.map((it) => itemCard(it, true)).join('') || '<p class="hint">مفيش صنف عليه رصيد بالاسم أو الكود ده</p>';
   }
   function drawResults() {
     const last = lastOf(), me = staffNow();
@@ -260,7 +266,7 @@
         <div class="ct-h"><strong class="notr">${esc(name)}</strong><small class="hint">${who ? 'جرده ' + esc(who) : 'جردته انت'}${e.status === 'applied' ? ' · اتطبق' : ''}${e.queued ? ' · لسه ما اتبعتش' : ''}</small></div>
         ${(e.diffs || []).map((d) => `<div class="${d.d < 0 ? 'neg' : 'pos'}">${esc(diffLine(d, e.parts || 1))}</div>`).join('')}
         ${mixedDates(e.diffs) ? '<small class="hint">= التاريخ متلخبط، العدد نفسه مظبوط</small>' : ''}
-        ${e.section_to != null ? `<div class="sec">القسم يتغيّر: ${esc(secName(e.section_from))} ← ${esc(secName(e.section_to, (sections.find((s) => Number(s.i) === Number(e.section_to)) || {}).n))}</div>` : ''}
+        ${e.section_to != null ? movedLine(e.section_from, e.section_to) : ''}
         ${e.note ? `<small class="hint notr">${esc(e.note)}</small>` : ''}
         ${!me && e.status === 'pending' && !e.queued ? '<div class="ct-acts"><button type="button" data-ct-applied>اتطبق في فارمافلاي</button><button type="button" class="secondary" data-ct-drop>الغيه</button></div>' : ''}
       </div>`;
@@ -338,6 +344,15 @@
   }
 
   // ---------- events ----------
+  // the editor opens with the item's last difference (if any) already in it
+  function startEdit(it) {
+    const e2 = lastOf().get(it.i);
+    editId = it.i; edits = {}; extra = []; secTo = null;
+    if (e2 && e2.result === 'diff') {
+      for (const d of e2.diffs || []) { if ((it.b || []).some((b) => (b.x || '-') === (d.x || '-'))) edits[d.x || '-'] = d.d; else extra.push({ x: d.x, d: d.d }); }
+      if (e2.section_to != null) secTo = e2.section_to;
+    }
+  }
   function bind() {
     const panel = $('countPanel');
     if (!panel || panel.dataset.bound) return;
@@ -347,7 +362,9 @@
     panel.addEventListener('change', (e) => {
       const t = e.target, card = t.closest('[data-ct]');
       if (!card) return;
-      if (t.matches('[data-ct-sec]')) secTo = Number(t.value);
+      const it = byId.get(Number(card.dataset.ct));
+      if (it && t.matches('[data-ct-move]')) { startEdit(it); secTo = Number(t.value); return draw(); }
+      if (t.matches('[data-ct-sec]')) { secTo = Number(t.value); return draw(); }
       const row = t.closest('[data-ct-extra]');
       if (row) {
         const x = extra[Number(row.dataset.ctExtra)], m = row.querySelector('[data-ct-xm]').value, y = row.querySelector('[data-ct-xy]').value;
@@ -365,15 +382,7 @@
       if (t.hasAttribute('data-ct-more')) { shown += PAGE; return drawSection(); }
       const card = t.closest('[data-ct]'), it = card ? byId.get(Number(card.dataset.ct)) : null;
       if (it && t.hasAttribute('data-ct-ok')) return save(it, entry({ id: idFor(it), at: new Date().toISOString(), item: it, edits: {}, extra: [], sectionTo: null }));
-      if (it && t.hasAttribute('data-ct-edit')) {
-        const e2 = lastOf().get(it.i);
-        editId = it.i; edits = {}; extra = []; secTo = null;
-        if (e2 && e2.result === 'diff') {
-          for (const d of e2.diffs || []) { if ((it.b || []).some((b) => (b.x || '-') === (d.x || '-'))) edits[d.x || '-'] = d.d; else extra.push({ x: d.x, d: d.d }); }
-          if (e2.section_to != null) secTo = e2.section_to;
-        }
-        return draw();
-      }
+      if (it && t.hasAttribute('data-ct-edit')) { startEdit(it); return draw(); }
       if (it && t.hasAttribute('data-ct-cancel')) { editId = null; return draw(); }
       if (it && t.hasAttribute('data-ct-addx')) { const y = new Date().getFullYear() + 1; extra.push({ x: `${y}-01`, d: it.p > 1 ? it.p : 1 }); return draw(); }
       if (it && (t.hasAttribute('data-ct-inc') || t.hasAttribute('data-ct-dec'))) {
