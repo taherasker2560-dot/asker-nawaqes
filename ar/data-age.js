@@ -59,15 +59,25 @@
     if (h < 48) return 'من ' + say(h, 'ساعة', 'ساعتين', 'ساعات', 'ساعة');
     return 'من ' + say(Math.floor(h / 24), 'يوم', 'يومين', 'أيام', 'يوم');
   }
+  // «5:00 م» when it is the same Cairo day as ref, else the full «امبارح 11:45 م»
+  function whenAfter(ms, ref, now) {
+    const p = cairoParts(ms);
+    if (dayNo(p) !== dayNo(cairoParts(ref))) return when(ms, now);
+    return `${p.hour % 12 || 12}:${two(p.minute)} ${p.hour < 12 ? 'ص' : 'م'}`;
+  }
   // row: { at, data_at } of the newest send of any kind from ar_sync_log, or null. listRow (optional): the newest send of the
   // shortage list itself (null = none yet); the list goes twice a day only, so it is shown apart. Returns what the strip shows.
+  // Owner 2026-11-13 («أيوه الوقتين»): the strip says when the bot was last updated AND when the last sale was
+  // («آخر تحديث النهارده 5:16 م · آخر بيع 5:00 م»): with no sale for a while the old line looked like no update at all.
+  // «من …» counts from the update; the colour still goes by the sale data (6 / 12 hours), as before.
   function describe(row, now = Date.now(), listRow = undefined) {
     const data = cairoEpoch(row && row.data_at),
       sent = cairoEpoch(row && row.at);
     if (!row || !isFinite(data)) return { level: 'none', text: 'لسه مفيش نواقص اتبعتت من اللاب', ago: '', details: [] };
     const age = now - data,
       level = age < WARN_HOURS * HOUR ? 'good' : age < BAD_HOURS * HOUR ? 'warn' : 'bad';
-    const text = (level === 'bad' ? 'الداتا قديمة: آخر نسخة ' : 'داتا الصيدلية: ') + when(data, now);
+    const both = isFinite(sent) ? 'آخر تحديث ' + when(sent, now) + ' · آخر بيع ' + whenAfter(data, sent, now) : 'آخر بيع ' + when(data, now);
+    const text = (level === 'bad' ? 'الداتا قديمة: ' : '') + both;
     const details = [];
     if (isFinite(sent)) details.push('آخر مرة اللاب بعت: ' + when(sent, now));
     if (listRow === undefined) details.push('النواقص محسوبة على نسخة الصيدلية: ' + when(data, now));
@@ -78,7 +88,7 @@
       // listRow === false: the list's own send is older than the newest sends that were read
       details.push(isFinite(ls) ? 'آخر تحديث للنواقص: ' + when(ls, now) + (isFinite(ld) ? ' (على نسخة ' + when(ld, now) + ')' : '') : listRow === false ? 'آخر تحديث للنواقص: من أكتر من 5 أيام' : 'النواقص لسه ما اتحدثتش');
     }
-    return { level, text, ago: ago(age), details };
+    return { level, text, ago: ago(isFinite(sent) ? now - sent : age), details };
   }
   const api = { cairoEpoch, describe, when, ago, WARN_HOURS, BAD_HOURS };
   if (typeof module !== 'undefined') module.exports = api;

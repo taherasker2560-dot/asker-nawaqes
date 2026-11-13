@@ -1109,6 +1109,8 @@ window.AskerEN = {
   "من غير صلاحية": "with no expiry",
   "آخر رصيد": "last stock",
   "آخر تحديث": "last updated",
+  "آخر بيع": "last sale",
+  "الداتا قديمة:": "Data is old:",
   "لسه ماتترجمتش": "not translated yet",
   "محتاجة مراجعة": "needs review",
   "محتاج مراجعة": "needs review",

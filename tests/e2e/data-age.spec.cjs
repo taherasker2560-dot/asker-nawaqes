@@ -19,22 +19,26 @@ run('data age strip',async({page})=>{
 
  // fresh: green
  await setRows([{dataMin:20,sentMin:19}]);await waitLevel('good');
- assert.match(await text(page,'#dataAgeText'),/^داتا الصيدلية: (النهارده|امبارح) \d{1,2}:\d\d (ص|م)$/);
- assert.equal(await text(page,'#dataAgeAgo'),'من 20 دقيقة');
+ // owner 2026-11-13 «أيوه الوقتين»: the update time and the last sale; «من …» counts from the update
+ assert.match(await text(page,'#dataAgeText'),/^آخر تحديث (النهارده|امبارح) \d{1,2}:\d\d (ص|م) · آخر بيع ((النهارده|امبارح) )?\d{1,2}:\d\d (ص|م)$/);
+ assert.equal(await text(page,'#dataAgeAgo'),'من 19 دقيقة');
+ // no sale for 2 hours but updated 3 minutes ago: still green, and «من 3 دقايق» (the update), not «من ساعتين»
+ await setRows([{dataMin:120,sentMin:3,status:'STORE_OK'}]);await page.waitForFunction(()=>document.getElementById('dataAgeAgo').textContent==='من 3 دقايق',null,{timeout:5000});
+ assert.match(await level(),/dataage good/);
  assert.ok(!(await page.isVisible('#dataAgeMore')),'details closed at first');
 
  // 8 hours: yellow
  await setRows([{dataMin:8*60,sentMin:30}]);await waitLevel('warn');
- assert.equal(await text(page,'#dataAgeAgo'),'من 8 ساعات');
+ assert.equal(await text(page,'#dataAgeAgo'),'من 30 دقيقة');
 
  // the list goes twice a day only: a fresh store / stock send keeps the strip green although the list's own send is 20 hours old
  await setRows([{dataMin:30,sentMin:29,status:'STORE_OK'},{dataMin:20*60,sentMin:20*60}]);await waitLevel('good');
- assert.equal(await text(page,'#dataAgeAgo'),'من 30 دقيقة');
+ assert.equal(await text(page,'#dataAgeAgo'),'من 29 دقيقة');
 
  // 17 hours: red, and a dry run or a refused send never counts as fresh data
  await setRows([{dataMin:5,sentMin:5,dry:true},{dataMin:5,sentMin:5,status:'rejected'},{dataMin:17*60,sentMin:60}]);await waitLevel('bad');
- assert.match(await text(page,'#dataAgeText'),/^الداتا قديمة: آخر نسخة/);
- assert.equal(await text(page,'#dataAgeAgo'),'من 17 ساعة');
+ assert.match(await text(page,'#dataAgeText'),/^الداتا قديمة: آخر تحديث .+ · آخر بيع /);
+ assert.equal(await text(page,'#dataAgeAgo'),'من ساعة');
 
  // tap: the detail lines (last send, the laptop's data, the list's own update); tap again: closed
  await page.click('#dataAge');

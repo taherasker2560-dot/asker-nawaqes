@@ -33,7 +33,7 @@
     if ($('kShort')) $('kShort').textContent = short ? short.toLocaleString('en-US') : '—';
     const ordered = new Set((d.orders || []).map((o) => o.name_key)).size;
     if ($('kOrdered')) $('kOrdered').textContent = short || ordered ? String(ordered) : '—';
-    // «داتا الصيدلية: النهارده 10:45 ص» → «10:45 ص», and «من 5 دقايق» under it
+    // «آخر تحديث النهارده 10:45 ص · آخر بيع 10:40 ص» → «10:45 ص» (the update), and «من 5 دقايق» under it
     const m = /(\d{1,2}:\d\d)\s*([صم])/.exec($('dataAgeText')?.textContent || '');
     if ($('kAge')) $('kAge').textContent = m ? m[1] + ' ' + m[2] : '—';
     if ($('kAgo')) $('kAgo').textContent = $('dataAgeAgo')?.textContent || 'آخر داتا';

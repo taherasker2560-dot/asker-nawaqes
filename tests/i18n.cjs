@@ -22,4 +22,7 @@ for(const [a,e] of Object.entries(exact)){assert.equal(ph(a),ph(e),'placeholders
 assert.ok(Object.keys(exact).length>600&&Object.keys(phrases).length>50);
 I._use(global.AskerEN);
 assert.equal(t('الرئيسية'),'Home');assert.equal(t('ملوش رصيد'),'Out of stock');
+// the data line (owner 2026-11-13 «أيوه الوقتين»), with the real dictionary
+assert.equal(t('آخر تحديث النهارده 5:16 م · آخر بيع 5:00 م'),'last updated today 5:16 PM · last sale 5:00 PM');
+assert.equal(t('الداتا قديمة: آخر تحديث النهارده 4:31 م · آخر بيع امبارح 11:45 م'),'Data is old: last updated today 4:31 PM · last sale yesterday 11:45 PM');
 console.log('i18n ok');

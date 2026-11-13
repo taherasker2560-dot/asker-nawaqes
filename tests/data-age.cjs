@@ -12,23 +12,28 @@ const now = A.cairoEpoch('2026-11-06 16:50:00');
 const row = (data_at, at = '2026-11-06T14:31:00+00:00') => ({ at, data_at });
 
 // green: under 6 hours
+// owner 2026-11-13 «أيوه الوقتين»: the update time and the last sale; «من …» counts from the update; the colour by the sale data
 let d = A.describe(row('2026-11-06 16:30:00'), now);
 assert.equal(d.level, 'good');
-assert.equal(d.text, 'داتا الصيدلية: النهارده 4:30 م');
-assert.equal(d.ago, 'من 20 دقيقة');
+assert.equal(d.text, 'آخر تحديث النهارده 4:31 م · آخر بيع 4:30 م');
+assert.equal(d.ago, 'من 19 دقيقة');
 assert.deepEqual(d.details, ['آخر مرة اللاب بعت: النهارده 4:31 م', 'النواقص محسوبة على نسخة الصيدلية: النهارده 4:30 م']);
 
-// yellow: 6 to 12 hours
+// yellow: 6 to 12 hours (the sale), although the laptop sent 19 minutes ago
 d = A.describe(row('2026-11-06 08:15:00'), now);
 assert.equal(d.level, 'warn');
-assert.equal(d.text, 'داتا الصيدلية: النهارده 8:15 ص');
-assert.equal(d.ago, 'من 8 ساعات');
+assert.equal(d.text, 'آخر تحديث النهارده 4:31 م · آخر بيع 8:15 ص');
+assert.equal(d.ago, 'من 19 دقيقة');
 
-// red: over 12 hours (today: the share was unreachable from 01:15 to 14:40)
+// red: over 12 hours (today: the share was unreachable from 01:15 to 14:40); the sale on another day keeps its day word
 d = A.describe(row('2026-11-05 23:45:18'), now);
 assert.equal(d.level, 'bad');
-assert.equal(d.text, 'الداتا قديمة: آخر نسخة امبارح 11:45 م');
-assert.equal(d.ago, 'من 17 ساعة');
+assert.equal(d.text, 'الداتا قديمة: آخر تحديث النهارده 4:31 م · آخر بيع امبارح 11:45 م');
+assert.equal(d.ago, 'من 19 دقيقة');
+// no laptop send time: the sale alone, «من …» from the sale
+d = A.describe({ data_at: '2026-11-06 16:30:00' }, now);
+assert.equal(d.text, 'آخر بيع النهارده 4:30 م');
+assert.equal(d.ago, 'من 20 دقيقة');
 
 // edges: exactly 6 hours is yellow, exactly 12 is red, just under each keeps the colour before
 assert.equal(A.describe(row('2026-11-06 10:50:00'), now).level, 'warn');
