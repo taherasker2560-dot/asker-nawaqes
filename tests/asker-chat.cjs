@@ -170,20 +170,29 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
         assert.ok(Math.abs(now - 2 * 864e5 - since('received_at')) < 5000, 'the inbox photos after 2 days (owner 2026-11-14 «كل يوم أو كل يومين بالكتير»)');
         return new Response(JSON.stringify([{ id: 'i1', file_path: '2026-10-01/aaa.jpg' }, { id: 'i2', file_path: 'docs/2026-10-01/inv.jpg' }]));
       }
+      // the inbox's day folders: a trial day with no rows (3+ days old) goes; today's and the invoices (docs) stay
+      if (u.pathname === '/storage/v1/object/list/ar-inbox') {
+        const p = JSON.parse(o.body).prefix, today = new Date(now).toISOString().slice(0, 10), twoAgo = new Date(now - 2 * 864e5).toISOString().slice(0, 10);
+        if (p === '') return new Response(JSON.stringify([{ name: '2026-10-29', id: null }, { name: twoAgo, id: null }, { name: today, id: null }, { name: 'docs', id: null }]));
+        assert.equal(p, '2026-10-29', 'only a folder older than 3 days is opened');
+        return new Response(JSON.stringify([{ name: 'x.jpg', id: 'u1' }, { name: 'y.jpg', id: 'u2' }]));
+      }
       if (u.pathname.startsWith('/storage/v1/object/') && o.method === 'DELETE') return new Response('[]');
       if (o.method === 'DELETE' || o.method === 'PATCH') return new Response(null, { status: 204 });
       throw Error('unexpected ' + url);
     };
     const r = await F.handle(req({ action: 'cleanup' }, null), env, f), b = await r.json();
-    assert.deepEqual(b, { ok: true, messages: 2, files: 1, warehouseFiles: 1, inboxFiles: 1 });
+    assert.deepEqual(b, { ok: true, messages: 2, files: 1, warehouseFiles: 1, inboxFiles: 1, oldFiles: 2 });
     const del = calls.filter((c) => c.method === 'DELETE');
     assert.deepEqual(del.map((c) => [c.path, c.body && c.body.prefixes, c.q]), [
       ['/storage/v1/object/ar-chat', ['c/2026-11-01/a.jpg'], ''], ['/rest/v1/ar_chat_messages', null, '?id=in.(1,2)'],
       ['/storage/v1/object/ar-chat', ['c/2026-11-14/w.jpg'], ''], ['/storage/v1/object/ar-inbox', ['2026-10-01/aaa.jpg'], ''],
-      ['/rest/v1/ar_chat_drafts', null, del[4] && del[4].q]]);
-    assert.ok(Math.abs(now - 30 * 864e5 - Date.parse(del[4].q.split('created_at=lt.')[1])) < 5000, 'the suggestions after 30 days');
+      ['/storage/v1/object/ar-inbox', ['2026-10-29/x.jpg', '2026-10-29/y.jpg'], ''],
+      ['/rest/v1/ar_chat_drafts', null, del[5] && del[5].q]]);
+    assert.ok(Math.abs(now - 30 * 864e5 - Date.parse(del[5].q.split('created_at=lt.')[1])) < 5000, 'the suggestions after 30 days');
     assert.deepEqual(calls.filter((c) => c.method === 'PATCH').map((c) => [c.path, c.q, c.body]), [
-      ['/rest/v1/ar_chat_messages', '?id=in.(9)', { media: null }], ['/rest/v1/ar_inbox', '?id=in.(i1)', { file_path: null }]]);
+      ['/rest/v1/ar_chat_messages', '?id=in.(9)', { media: null }], ['/rest/v1/ar_inbox', '?id=in.(i1)', { file_path: null }],
+      ['/rest/v1/ar_inbox', '?file_path=like.2026-10-29/*', { file_path: null }]]);
     assert.ok(!JSON.stringify(calls).includes('docs/2026-10-01/inv.jpg"]'), 'the invoices are never deleted');
   }
   console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes or a warehouse sends, «what» for the bot\'s worker, the nightly clean-up');

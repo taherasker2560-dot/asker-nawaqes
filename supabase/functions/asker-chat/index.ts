@@ -137,8 +137,9 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   // ---------- the nightly clean-up (owner 2026-11-14 «في حاجات كتيرة المفروض بتتمسح», his choice «ب: 7 أيام») ----------
   // pg_cron calls it at 04:00 Cairo (migration 202611141600). Only what is past its time goes, so a call at any other moment
   // changes nothing early: messages with their photos / voice notes / files after 7 days; a warehouse's files an hour after
-  // they went to «الوارد» (their copy stays there); the inbox's photos after 2 days. The invoices (ar-inbox docs/, kept on
-  // the laptop in «المشتريات») and the customers' statements are never touched. At most 500 of each a call.
+  // they went to «الوارد» (their copy stays there); the inbox's photos (the reps' lists) after 2 days. The invoices
+  // (ar-inbox docs/: SYNC_PURCHASES removes them once they are in «المشتريات» on the laptop) and the customers' statements are
+  // never touched here. At most 500 of each a call.
   if (body.action === 'cleanup') {
     const ago = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
     const removeFiles = async (bucket: string, paths: string[]) => {
@@ -147,7 +148,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       return r.ok;
     };
     const ids = (xs: { id: unknown }[]) => xs.map((x) => String(x.id)).join(',');
-    const out = { messages: 0, files: 0, warehouseFiles: 0, inboxFiles: 0 };
+    const out = { messages: 0, files: 0, warehouseFiles: 0, inboxFiles: 0, oldFiles: 0 };
     // 1) messages older than 7 days (customers' and warehouses'), their files first
     const old = await rows(`/rest/v1/ar_chat_messages?select=id,media&at=lt.${ago(CHAT_KEEP_MS)}&order=id&limit=500`) as { id: number; media: string | null }[];
     if (old.length) {
@@ -169,6 +170,24 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (inbox.length && await removeFiles('ar-inbox', inbox.map((x) => x.file_path))) {
       const p = await call(`/rest/v1/ar_inbox?id=in.(${inbox.map((x) => x.id).join(',')})`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ file_path: null }) });
       if (p.ok) out.inboxFiles = inbox.length;
+    }
+    // 3b) an inbox day folder (yyyy-mm-dd, UTC) older than 3 days: whatever is still in it goes, row or not. The trial days'
+    // lists (10-29 → 11-02) never had a row, so step 3 could not see them (owner 2026-11-14: the inbox is the reps' daily
+    // lists, «المسح بتاعها عادي»). Only once step 3 left nothing behind; rows still pointing there are cleared. The invoices
+    // (docs/) are not a day folder: they leave the bot only when they are safe on the laptop (SYNC_PURCHASES step 7).
+    if (inbox.length < 500) {
+      const cut = new Date(Date.now() - INBOX_KEEP_MS - 864e5).toISOString().slice(0, 10);
+      const list = async (prefix: string) => {
+        const r = await call('/storage/v1/object/list/ar-inbox', { method: 'POST', headers: { ...sh, ...json }, body: JSON.stringify({ prefix, limit: 1000, offset: 0 }) });
+        return r.ok ? await r.json().catch(() => []) as { name: string; id: string | null }[] : [];
+      };
+      const days = (await list('')).map((x) => x.name).filter((n) => /^\d{4}-\d\d-\d\d$/.test(n) && n < cut).sort().slice(0, 10);
+      for (const d of days) {
+        const files = (await list(d)).filter((x) => x.id).map((x) => `${d}/${x.name}`);
+        if (files.length && !await removeFiles('ar-inbox', files)) continue;
+        out.oldFiles += files.length;
+        await call(`/rest/v1/ar_inbox?file_path=like.${d}/*`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ file_path: null }) });
+      }
     }
     // 4) the bot's suggestions after 30 days (enough to judge the trial week); a chat's go with it
     await call(`/rest/v1/ar_chat_drafts?created_at=lt.${ago(DRAFT_KEEP_MS)}`, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
