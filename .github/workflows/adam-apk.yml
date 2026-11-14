@@ -1,0 +1,79 @@
+# Builds «آدم», the owner's voice assistant app (adam-android/), on GitHub's machines (not on the owner's laptop). The APK holds no
+# secret: the server address, key and device key are put on the phone from the laptop over adb. The finished APK is attached to a
+# pre-release called «adam-build» (replaced by each build) so the laptop can download it without logging in.
+name: adam-apk
+on:
+  push:
+    branches: [main, adam-voice]
+    paths:
+      - 'adam-android/**'
+      - '.github/workflows/adam-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: adam-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      # the small English speech model that hears the word (Vosk, Apache 2.0); cached after the first build
+      - name: Speech model (cached)
+        uses: actions/cache@v4
+        with:
+          path: adam-android/app/src/main/assets/vosk-model.zip
+          key: vosk-model-small-en-us-0.15
+      - name: Download the speech model
+        run: |
+          mkdir -p adam-android/app/src/main/assets
+          if [ ! -s adam-android/app/src/main/assets/vosk-model.zip ]; then
+            curl -fL --retry 4 --retry-delay 5 -o adam-android/app/src/main/assets/vosk-model.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+          fi
+          ls -l adam-android/app/src/main/assets/vosk-model.zip
+      # one signing key for every build (made the first time, kept in the cache), so a new build updates the app in place
+      - name: Signing key (cached)
+        id: ks
+        uses: actions/cache@v4
+        with:
+          path: ~/adam.keystore
+          key: adam-keystore-v1
+      - name: Make the signing key
+        if: steps.ks.outputs.cache-hit != 'true'
+        run: |
+          keytool -genkeypair -keystore ~/adam.keystore -storepass adam-sideload -keypass adam-sideload -alias adam -keyalg RSA -keysize 2048 -validity 9125 -dname "CN=Adam sideload"
+      - name: Build the app
+        working-directory: adam-android
+        env:
+          ADAM_KEYSTORE: /home/runner/adam.keystore
+          ADAM_KS_PASS: adam-sideload
+        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+      - name: Show the errors (on failure)
+        if: failure()
+        run: |
+          grep -E '^e: |error:|FAILED|What went wrong|Could not|Unresolved|AAPT' /tmp/build.log | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+      - name: The APK
+        run: |
+          cp adam-android/app/build/outputs/apk/debug/app-debug.apk adam.apk
+          ls -l adam.apk
+          sha256sum adam.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adam-apk
+          path: adam.apk
+      - name: Attach to the pre-release «adam-build»
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete adam-build --yes --cleanup-tag || true
+          gh release create adam-build adam.apk --prerelease --target "$GITHUB_SHA" --title "Adam build ($GITHUB_SHA)" --notes "The Android app of Adam (the owner's voice assistant). Built by the adam-apk workflow from commit $GITHUB_SHA."
