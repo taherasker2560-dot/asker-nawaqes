@@ -88,8 +88,51 @@
     if (pushState === 'bad') return '<p class="status bad">الموبايل ما سمحش بالإشعار. اسمح للبوت بالإشعارات من إعدادات المتصفح وجرّب تاني.</p><button type="button" class="secondary ch-push" data-chat-push>🔔 جرّب تاني</button>';
     return '';
   }
-  // the open chat: { c, msgs, urls: {path: signedUrl}, busy, error, note, account }
+  // the open chat: { c, msgs, urls: {path: signedUrl}, busy, error, note, account, draft, editing }
   let st = null;
+  // part 2 (owner 2026-11-14 «خليه يرد على كل حاجة … لو ما عجبتنيش الرسالة هعدلها او همسحها»): the bot's suggestions
+  let ready = new Set(), autoKinds = [], autoOpen = false, stats = null;
+  const KIND_AR = { availability: 'متوفر؟ بكام؟', account: 'حسابي', order: 'طلبي فين', rx: 'روشتة', dose: 'جرعة واستخدام', money: 'فلوس ودفع', complaint: 'شكوى', other: 'سلام وحاجات تانية' };
+  async function loadDraft(me) {
+    try {
+      const { data } = await db().from('ar_chat_drafts').select('id,for_msg,kind,body,facts,status').eq('chat_id', me.c.id).eq('status', 'ready').order('id', { ascending: false }).range(0, 0);
+      const d = (data || [])[0] || null;
+      if ((d && d.id) !== (me.draft && me.draft.id)) { me.draft = d; if (st === me) drawChat(); }
+    } catch (e) { /* before migration 202611141800 */ }
+  }
+  // the trial week's numbers: how often each kind went as it was / was edited / was skipped (the last 30 days)
+  async function loadStats() {
+    try {
+      const { data } = await db().from('ar_chat_drafts').select('kind,status').gte('created_at', new Date(Date.now() - 30 * 864e5).toISOString()).range(0, 1999);
+      const s = {};
+      for (const d of data || []) { const k = (s[d.kind] = s[d.kind] || { sent: 0, edited: 0, skipped: 0, auto: 0 }); if (d.status in k) k[d.status]++; }
+      stats = s;
+    } catch (e) { stats = {}; }
+    if (!st) drawList();
+  }
+  function autoHtml() {
+    if (!ownerHere()) return '';
+    const on = autoKinds.length;
+    const head = on ? `🤖 الرد التلقائي شغال على ${on} نوع` : '🤖 أسبوع التجربة: البوت بيكتب الرد بس، وإنت اللي بتبعت';
+    if (!autoOpen) return `<button type="button" class="secondary small ch-auto-btn" data-chat-auto>${esc(head)} ▾</button>`;
+    const rows = Object.keys(KIND_AR).map((k) => {
+      const n = (stats && stats[k]) || { sent: 0, edited: 0, skipped: 0, auto: 0 };
+      return `<label class="ch-auto-row"><input type="checkbox" data-auto-kind="${k}"${autoKinds.includes(k) ? ' checked' : ''}> <b>${esc(KIND_AR[k])}</b>` +
+        `<span class="hint">اتبعت زي ما هو ${n.sent} · اتعدّل ${n.edited} · اتساب ${n.skipped}${n.auto ? ` · راح لوحده ${n.auto}` : ''}</span></label>`;
+    }).join('');
+    return `<div class="ch-auto"><button type="button" class="secondary small ch-auto-btn" data-chat-auto>${esc(head)} ▴</button>` +
+      `<p class="hint">علّم النوع اللي البوت يبعته لوحده من غير ما يستناك. الأرقام من آخر 30 يوم.</p>${rows}</div>`;
+  }
+  async function setAuto(kind, on) {
+    const next = on ? [...new Set([...autoKinds, kind])] : autoKinds.filter((k) => k !== kind);
+    try {
+      const { data, error } = await db().rpc('ar_chat_auto_set', { p_kinds: next });
+      if (error) throw new Error(error.message || String(error));
+      if (data && data.ok) autoKinds = data.auto_kinds || next;
+      listNote = '';
+    } catch (e) { listNote = 'ماتحفظش: ' + ((e && e.message) || e); }
+    drawList();
+  }
 
   async function loadChats() {
     if (!db() || loading) return;
@@ -100,6 +143,15 @@
       if (error) throw new Error(error.message || String(error));
       chats = data || []; failed = '';
       if (st) { const c = chats.find((x) => x.id === st.c.id); if (c) st.c = c; }
+      // the chats whose answer the bot has written («🤖 الرد جاهز»), and the switches of the auto answer (part 2)
+      try {
+        const [r, s] = await Promise.all([
+          db().from('ar_chat_drafts').select('chat_id').eq('status', 'ready').range(0, 499),
+          db().from('ar_chat_settings').select('auto_kinds').eq('id', 1).maybeSingle(),
+        ]);
+        ready = new Set(((r && r.data) || []).map((x) => x.chat_id));
+        if (s && s.data) autoKinds = s.data.auto_kinds || [];
+      } catch (e) { /* before migration 202611141800, or staff without it */ }
     } catch (e) {
       failed = (e && e.message) || String(e);
     } finally {
@@ -131,6 +183,7 @@
       me.error = (e && e.message) || String(e);
     }
     if (st === me) drawChat();
+    if (st === me) loadDraft(me);
   }
   async function loadAccount(me) {
     if (!me.c.customer_id) return;
@@ -147,7 +200,7 @@
     return `<button type="button" class="ch-row${Number(c.waiting) > 0 ? ' wait' : ''}" data-chat="${esc(c.id)}">` +
       `<span class="ch-av">${esc((who || '؟').trim().charAt(0))}</span>` +
       `<span class="ch-main"><strong class="notr">${esc(who)}</strong>${tag ? ` <small>· ${tag}</small>` : ''}<span class="ch-last notr">${esc(c.last_from === 'pharmacy' ? 'إنت: ' : '')}${esc(c.last_text || '')}</span></span>` +
-      `<span class="ch-side"><small>${esc(whenText(c.last_at, now))}</small>${Number(c.waiting) > 0 ? `<b class="ch-n">${esc(c.waiting)}</b>` : ''}</span></button>`;
+      `<span class="ch-side"><small>${esc(whenText(c.last_at, now))}</small>${Number(c.waiting) > 0 ? `<b class="ch-n">${esc(c.waiting)}</b>` : ''}${ready.has(c.id) ? '<span class="ch-bot">🤖 الرد جاهز</span>' : ''}</span></button>`;
   }
   function drawList() {
     const box = $('chatPanel');
@@ -159,7 +212,7 @@
     box.innerHTML = '<h2>الرسايل</h2>' +
       `<p class="hint">العملاء بيكتبولك من صفحة الرسايل بتاعتنا (الرابط في رسالة الترحيب على الواتس، و«💬 كلّمنا» في حساب العميل). لما ترد بيجيلهم إشعار.</p>` +
       `<p class="hint">الرسايل بتتمسح لوحدها بعد 7 أيام.</p>` +
-      pushHtml() +
+      pushHtml() + autoHtml() +
       (listNote ? `<p class="status good">${esc(listNote)}</p>` : '') +
       `<div class="chips">${chip('waiting', `مستنية رد <b>${n}</b>`)}${chip('all', `الكل <b>${people}</b>`)}${houses ? chip('wh', `🏬 المخازن <b>${houses}</b>`) : ''}</div>` +
       (list.length ? list.map((c) => rowHtml(c, now)).join('') : `<p class="hint">${filter === 'waiting' ? 'مفيش حد مستني رد.' : 'لسه محدش كتب.'}</p>`) +
@@ -183,7 +236,7 @@
     const box = $('chatPanel');
     if (!box || !st) return;
     const c = st.c, who = c.supplier || c.name || showPhone(c.phone);
-    const draft = $('chatReply') ? $('chatReply').value : (st.draft || '');
+    const draft = $('chatReply') ? $('chatReply').value : (st.draft_text || '');
     const wa = c.phone ? `https://wa.me/2${c.phone}` : '';
     const acct = c.supplier
       ? `<div class="ch-acct"><span>🏬 مخزن${c.phone ? ` · <b dir="ltr">${esc(showPhone(c.phone))}</b>` : ''}</span><span>قوايمه بتروح «الوارد»</span></div>`
@@ -194,6 +247,7 @@
       `<h2 class="notr">${esc(who)}</h2>` + acct +
       `<div class="ch-thread" id="chatThread">${st.msgs.map(msgHtml).join('') || '<p class="hint">مفيش رسايل.</p>'}</div>` +
       (st.error ? `<p class="status bad">${esc(st.error)}</p>` : '') +
+      draftHtml() +
       `<div class="ch-reply"><textarea id="chatReply" rows="2" maxlength="2000" placeholder="اكتب الرد…"></textarea>` +
       `<button type="button" data-chat-send${st.busy ? ' disabled' : ''}>${st.busy ? 'بيبعت…' : 'ابعت'}</button></div>` +
       (st.note ? `<p class="status ${st.noteBad ? 'bad' : 'good'}">${esc(st.note)}</p>` : '') +
@@ -206,6 +260,42 @@
     if (th) th.scrollTop = th.scrollHeight;
   }
   function draw() { if (st) drawChat(); else drawList(); }
+  // «🤖 الرد المقترح»: what the bot wrote, what it used, and ابعت / عدّل / سيبه
+  function draftHtml() {
+    const d = st && st.draft;
+    if (!d || st.editing === d.id) return '';
+    const facts = Array.isArray(d.facts) && d.facts.length ? `<div class="hint ch-facts notr">${d.facts.map(esc).join('<br>')}</div>` : '';
+    return `<div class="ch-draft"><h4>🤖 الرد المقترح <small>· ${esc(KIND_AR[d.kind] || '')}</small></h4><p class="notr">${esc(d.body).replace(/\n/g, '<br>')}</p>${facts}` +
+      `<div class="btns"><button type="button" class="ch-dsend" data-draft-send${st.busy ? ' disabled' : ''}>ابعت</button>` +
+      `<button type="button" class="secondary" data-draft-edit${st.busy ? ' disabled' : ''}>عدّل</button>` +
+      `<button type="button" class="secondary" data-draft-skip${st.busy ? ' disabled' : ''}>سيبه</button></div></div>`;
+  }
+  async function draftDone(id, outcome, final) {
+    try { await db().rpc('ar_chat_draft_done', { p_id: id, p_outcome: outcome, p_final: final || null }); } catch (e) { /* the answer itself went */ }
+    ready.delete(st && st.c.id);
+  }
+  function editDraft() {
+    const me = st;
+    if (!me || !me.draft) return;
+    me.editing = me.draft.id; me.draft_text = me.draft.body; drawChat();
+    const t = $('chatReply');
+    if (t) { t.value = me.draft.body; t.focus(); }
+  }
+  async function skipDraft() {
+    const me = st;
+    if (!me || !me.draft || me.busy) return;
+    const id = me.draft.id;
+    me.draft = null; me.editing = null; drawChat();
+    await draftDone(id, 'skipped');
+  }
+  function sendDraft() {
+    const me = st;
+    if (!me || !me.draft || me.busy) return;
+    const t = $('chatReply');
+    if (t) t.value = me.draft.body;
+    me.editing = me.draft.id; me.asIs = true;
+    send();
+  }
 
   function openChat(id) {
     const c = (chats || []).find((x) => x.id === id);
@@ -213,18 +303,24 @@
     st = { c, msgs: [], urls: {}, busy: false, error: '', note: '', account: null };
     try { history.pushState({ chatOpen: id }, ''); } catch (e) { /* no history */ }
     drawChat(); window.scrollTo?.(0, 0);
-    loadMsgs(); loadAccount(st);
+    loadMsgs(); loadAccount(st); loadDraft(st);
   }
   function closeChat() { st = null; drawList(); loadChats(); }
   async function send() {
     const me = st, t = $('chatReply'), body = (t && t.value || '').trim();
     if (!me || me.busy || !body) return;
-    me.busy = true; me.draft = body; me.note = ''; drawChat();
+    me.busy = true; me.draft_text = body; me.note = ''; drawChat();
     try {
       const { data, error } = await db().rpc('ar_chat_reply', { p_chat: me.c.id, p_body: body });
       if (error) throw new Error(error.message || String(error));
       if (!data || !data.ok) throw new Error((data && data.error) || 'ما اتبعتش');
-      me.draft = ''; if ($('chatReply')) $('chatReply').value = '';
+      me.draft_text = ''; if ($('chatReply')) $('chatReply').value = '';
+      // the bot's suggestion: sent as it is, or edited (any answer of the pharmacy's own while one waits counts as edited)
+      if (me.draft) {
+        const d = me.draft, same = body.trim() === String(d.body).trim();
+        me.draft = null; me.editing = null; me.asIs = false;
+        await draftDone(d.id, same ? 'sent' : 'edited', same ? null : body);
+      }
       // the customer's phone(s): a notification (nothing in it but «ردينا عليك»)
       let told = false, failedPush = 0;
       try {
@@ -364,6 +460,10 @@
       if (e.target.closest('[data-chat-del]')) { removeChat(); return; }
       const dm = e.target.closest('[data-chat-delmsg]');
       if (dm) { removeMessage(dm.dataset.chatDelmsg); return; }
+      if (e.target.closest('[data-draft-send]')) { sendDraft(); return; }
+      if (e.target.closest('[data-draft-edit]')) { editDraft(); return; }
+      if (e.target.closest('[data-draft-skip]')) { skipDraft(); return; }
+      if (e.target.closest('[data-chat-auto]')) { autoOpen = !autoOpen; drawList(); if (autoOpen) loadStats(); return; }
       if (e.target.closest('[data-chat-sup]')) { openSup(); return; }
       if (e.target.closest('[data-chat-supno]')) { if (st) { st.sup = false; drawChat(); } return; }
       const sn = e.target.closest('[data-chat-supname]');
@@ -378,6 +478,10 @@
         if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('customers');
         if (root.AskerCustomers) root.AskerCustomers.load().then(() => root.AskerCustomers.statement(id));
       }
+    });
+    panel.addEventListener('change', (e) => {
+      const k = e.target && e.target.dataset && e.target.dataset.autoKind;
+      if (k) setAuto(k, e.target.checked);
     });
     window.addEventListener('popstate', () => { if (st) closeChat(); });
   }

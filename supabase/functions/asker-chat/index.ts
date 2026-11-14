@@ -10,9 +10,13 @@
 //                                      warehouse's chat (its list from the link): owner and staff with «الوارد».
 //   POST {action:'what', endpoint}     (the bot's worker ar/sw.js, with its own saved push address): what the push was about.
 //   POST {action:'cleanup'}            (pg_cron at night): what is past its time is deleted (messages 7 days, inbox photos 30).
+//   POST {action:'draft', secret}      (the customer's page after he sends): the bot's suggested answer (draft.ts), kept in
+//                                      ar_chat_drafts; sent at once only for a kind the owner let go alone (auto_kinds).
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), GEMINI_API_KEY, GEMINI_MODEL
 // (optional), VAPID_PRIVATE_JWK, VAPID_PUBLIC_KEY, VAPID_SUBJECT, ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the customer's page has no sign-in; the owner's and staff's calls are checked here).
+
+import { makeDraft, type Chat } from './draft.ts';
 
 type Env = Record<string, string | undefined>;
 export const OWNER_ID = 'ff6c33dc-9dc5-4e2f-95bb-5d449e231f1c';
@@ -164,6 +168,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const p = await call(`/rest/v1/ar_inbox?id=in.(${inbox.map((x) => x.id).join(',')})`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ file_path: null }) });
       if (p.ok) out.inboxFiles = inbox.length;
     }
+    // 4) the bot's suggestions after 30 days (enough to judge the trial week); a chat's go with it
+    await call(`/rest/v1/ar_chat_drafts?created_at=lt.${ago(INBOX_KEEP_MS)}`, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
     console.log('asker-chat cleanup', JSON.stringify(out));
     return reply(200, { ok: true, ...out }, headers);
   }
@@ -207,6 +213,42 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const targets = subs.filter((s) => s.user_id === (env.OWNER_ID || OWNER_ID) || ok.has(s.user_id));
     const r = await pushAll(targets.map((s) => s.endpoint), 'ar_chat_staff_push');
     return reply(200, { ok: true, ...r }, headers);
+  }
+
+  // ---------- the bot's suggested answer (part 2, draft.ts): the customer's page asks right after he sends ----------
+  // Kept in ar_chat_drafts (the older waiting suggestion of that chat becomes 'old'). A kind the owner let go out by itself
+  // (ar_chat_settings.auto_kinds; empty during the trial) is sent at once as the pharmacy's answer, and his phone is told.
+  if (body.action === 'draft') {
+    const secret = String(body.secret || '');
+    if (!/^[0-9a-f]{64}$/.test(secret)) return reply(400, { error: 'bad', message: 'الطلب ناقص.' }, headers);
+    if (!env.GEMINI_API_KEY) return reply(503, { error: 'not-configured' }, headers);
+    const chat = (await rows('/rest/v1/ar_chats?select=id,customer_id,name,phone,supplier&secret=eq.' + secret + '&limit=1'))[0] as (Chat & { supplier?: string | null }) | undefined;
+    if (!chat?.id) return reply(404, { error: 'chat' }, headers);
+    if (chat.supplier) return reply(200, { ok: true, skipped: 'warehouse' }, headers);
+    let made: Awaited<ReturnType<typeof makeDraft>>;
+    try { made = await makeDraft({ env, fetchImpl, base, sh, rows }, chat); } catch (e) {
+      console.log('asker-chat draft', String((e as Error)?.message || e).slice(0, 200));
+      return reply(200, { ok: false, error: 'draft' }, headers);
+    }
+    if (!made.draft) return reply(200, { ok: true, skipped: made.skipped }, headers);
+    const d = made.draft, w = { ...sh, ...json, Prefer: 'return=representation' };
+    const settings = (await rows('/rest/v1/ar_chat_settings?select=auto_kinds&id=eq.1'))[0] as { auto_kinds?: string[] } | undefined;
+    const auto = !!settings?.auto_kinds?.includes(d.kind);
+    await call(`/rest/v1/ar_chat_drafts?chat_id=eq.${chat.id}&status=eq.ready`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'old' }) });
+    const ins = await call('/rest/v1/ar_chat_drafts', { method: 'POST', headers: w, body: JSON.stringify({ chat_id: chat.id, for_msg: d.for_msg, kind: d.kind, body: d.body, facts: d.facts, status: auto ? 'auto' : 'ready', decided_at: auto ? new Date().toISOString() : null }) });
+    if (ins.status === 409) return reply(200, { ok: true, skipped: 'done' }, headers);
+    if (!ins.ok) return reply(502, { error: 'save' }, headers);
+    const [saved] = await ins.json() as { id: number }[];
+    if (auto) {
+      // the pharmacy's answer, sent by the bot (sent_by empty), and the customer's phone told
+      await call('/rest/v1/ar_chat_messages', { method: 'POST', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ chat_id: chat.id, sender: 'pharmacy', kind: 'text', body: d.body }) });
+      await call('/rest/v1/ar_chats?id=eq.' + chat.id, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ last_at: new Date().toISOString(), last_from: 'pharmacy', waiting: 0, last_text: d.body.slice(0, 200) }) });
+      if (env.VAPID_PRIVATE_JWK && env.VAPID_PUBLIC_KEY) {
+        const subs = await rows('/rest/v1/ar_chat_push?select=endpoint&chat_id=eq.' + chat.id) as { endpoint: string }[];
+        await pushAll(subs.map((s) => s.endpoint), 'ar_chat_push');
+      }
+    }
+    return reply(200, { ok: true, id: saved?.id, kind: d.kind, auto }, headers);
   }
 
   // ---------- the owner's and staff's actions ----------

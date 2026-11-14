@@ -29,8 +29,9 @@ run('Messages: a cash customer writes his name and number once, sends text and a
  assert.ok(await page.isVisible('[data-ch-send]'));assert.ok(await page.isHidden('[data-ch-mic]'));
  await page.press('#chatText','Enter');
  await page.waitForFunction(()=>/عندكم بانادول كولد؟/.test(document.querySelector('#chatList .ch-b.me')?.textContent||''));
- // the pharmacy's phones are told (asker-chat «notify»)
+ // the pharmacy's phones are told (asker-chat «notify»), and the bot writes the answer (asker-chat «draft», part 2)
  await page.waitForFunction(()=>window.__invokes.some(x=>x.startsWith('chat:notify')));
+ await page.waitForFunction(()=>window.__invokes.some(x=>x.startsWith('chat:draft')));
  // a photo: uploaded to the private bucket under c/<day>/<random>.png, then sent
  await page.setInputFiles('#chatPhoto',{name:'rx.png',mimeType:'image/png',buffer:PNG});
  await page.waitForSelector('#chatList .ch-b.me img.ch-photo');

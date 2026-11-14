@@ -428,13 +428,18 @@
       // the words of the voice note (the function asker-chat asks Gemini); the next reads show them. A warehouse's voice
       // note goes to «الوارد» once its words are there.
       const words = client.functions.invoke('asker-chat', { body: { action: 'voice', secret, id: d.id } }).catch(() => null);
-      afterSend();
-      if (supplier) words.then(forward);
+      afterSend(true);
+      words.then(() => (supplier ? forward() : askDraft()));
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
-  function afterSend() {
+  // the bot writes the pharmacy's answer (part 2, asker-chat «draft»); the pharmacy sends, edits or skips it in the bot
+  function askDraft() {
+    if (client && client.functions && secret && !supplier) client.functions.invoke('asker-chat', { body: { action: 'draft', secret } }).catch(() => null);
+  }
+  // `later`: a voice note, whose words come a moment after (the draft and «الوارد» wait for them)
+  function afterSend(later) {
     // a warehouse: to «الوارد»; the pharmacy can answer it too, so «🔔» is offered to everyone (owner 2026-11-14)
-    if (supplier) forward();
+    if (!later) { if (supplier) forward(); else askDraft(); }
     offerNotify(); poll(true);
     // the pharmacy's phones: «رسالة جديدة من عميل», or «وارد جديد من مخزن» for a warehouse, even with the bot closed
     // (asker-chat; at most once a minute a chat)

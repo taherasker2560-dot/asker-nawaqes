@@ -179,7 +179,9 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
     const del = calls.filter((c) => c.method === 'DELETE');
     assert.deepEqual(del.map((c) => [c.path, c.body && c.body.prefixes, c.q]), [
       ['/storage/v1/object/ar-chat', ['c/2026-11-01/a.jpg'], ''], ['/rest/v1/ar_chat_messages', null, '?id=in.(1,2)'],
-      ['/storage/v1/object/ar-chat', ['c/2026-11-14/w.jpg'], ''], ['/storage/v1/object/ar-inbox', ['2026-10-01/aaa.jpg'], '']]);
+      ['/storage/v1/object/ar-chat', ['c/2026-11-14/w.jpg'], ''], ['/storage/v1/object/ar-inbox', ['2026-10-01/aaa.jpg'], ''],
+      ['/rest/v1/ar_chat_drafts', null, del[4] && del[4].q]]);
+    assert.ok(Math.abs(now - 30 * 864e5 - Date.parse(del[4].q.split('created_at=lt.')[1])) < 5000, 'the suggestions after 30 days');
     assert.deepEqual(calls.filter((c) => c.method === 'PATCH').map((c) => [c.path, c.q, c.body]), [
       ['/rest/v1/ar_chat_messages', '?id=in.(9)', { media: null }], ['/rest/v1/ar_inbox', '?id=in.(i1)', { file_path: null }]]);
     assert.ok(!JSON.stringify(calls).includes('docs/2026-10-01/inv.jpg"]'), 'the invoices are never deleted');
