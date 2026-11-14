@@ -50,6 +50,11 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.deepEqual(D.itemTerms('علبة ابيمول ٥٠٠'), ['ابيمول', '٥٠٠']);
   assert.match(decodeURIComponent(D.itemsPath(['ابيمول', '٥٠٠'])), /or\(name\.ilike\.\*500\*,arabic_name\.ilike\.\*٥٠٠\*\)/);
   assert.doesNotMatch(D.REPLY_PROMPT, /واعرض نشوفله بديل/, 'no words that get copied as they are');
+  // the total is always said (the live answer wrote the lines and left it out)
+  const bf = ['الحساب:\nA · 1 شريط × 29 ج = 29 ج\nB · 1 علبة × 24 ج = 24 ج\nالإجمالي: 53 ج'];
+  assert.equal(D.withTotal('بخصوص طلبك:\nA 29 ج\nB 24 ج\nتحب نجهزهولك؟', bf), 'بخصوص طلبك:\nA 29 ج\nB 24 ج\nالإجمالي: 53 ج\nتحب نجهزهولك؟');
+  assert.equal(D.withTotal('A و B، الإجمالي 53 ج', bf), 'A و B، الإجمالي 53 ج', 'already said');
+  assert.equal(D.withTotal('متوفر', ['X: متوفر']), 'متوفر', 'no bill, nothing added');
   assert.equal(D.itemFact({ id: 3, name: 'Y', status: 'on_order', price: null }, { item_id: 3, price: 33 }), 'Y: بالطلب · 33 ج');
   assert.equal(D.accountFact(7174.5, false), 'حسابه: عليه 7,174.5 ج');
   assert.equal(D.accountFact(-200, true), 'حسابه: له 200 ج · الآجل موقوف');

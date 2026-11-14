@@ -146,6 +146,16 @@ export function billFacts(lines: { asked: Asked; item: Item | null; choices: Ite
   if (bill.length) out.unshift('الحساب:\n' + bill.join('\n') + `\nالإجمالي: ${money(Math.round(total * 100) / 100)}`);
   return out;
 }
+// the bill's total is always in the answer (the live test 2026-11-14 wrote the lines and left the total out): added before a
+// closing question when the answer does not say it
+export function withTotal(body: string, facts: string[]): string {
+  const bill = facts.find((f) => f.startsWith('الحساب:'));
+  const total = bill && (bill.match(/الإجمالي: (.+)$/) || [])[1];
+  if (!body || !total || body.includes(total)) return body;
+  const lines = body.split('\n'), last = lines[lines.length - 1];
+  if (lines.length > 1 && /[؟?]\s*$/.test(last)) { lines.splice(lines.length - 1, 0, `الإجمالي: ${total}`); return lines.join('\n'); }
+  return `${body}\nالإجمالي: ${total}`;
+}
 export function accountFact(balance: number, stopped: boolean): string {
   const b = Number(balance) || 0;
   return (b > 0.5 ? `حسابه: عليه ${money(b)}` : b < -0.5 ? `حسابه: له ${money(-b)}` : 'حسابه: خالص') + (stopped ? ' · الآجل موقوف' : '');
@@ -241,7 +251,7 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   // the greeting only once (owner 2026-11-14: «الكلام دافى بس فى اول المحادثه»): the pharmacy answered him before = not first
   const first = !history.some((m) => m.sender === 'pharmacy');
   const out = await gem(env, fetchImpl, [{ text: REPLY_PROMPT + '\n\nاسم العميل: ' + (chat.name || 'مش معروف') + '\nأول رد في المحادثة: ' + (first ? 'أيوه' : 'لأ') + '\n\nالمحادثة:\n' + talk + '\n\nهو عايز: ' + String(ask.summary || '') + '\n\nfacts:\n' + (facts.join('\n') || '(مفيش)') }, ...photos], REPLY_SCHEMA);
-  const body = String(out.body || '').replace(/\s+\n/g, '\n').trim().slice(0, 2000);
+  const body = withTotal(String(out.body || '').replace(/\s+\n/g, '\n').trim(), facts).slice(0, 2000);
   if (!body) throw new Error('empty answer');
   return { draft: { for_msg: last.id, kind, body, facts: facts.slice(0, 24) } };
 }
