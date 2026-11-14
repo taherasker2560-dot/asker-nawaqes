@@ -281,6 +281,8 @@
     $('customersPanel')?.classList.toggle('hidden', tab !== 'customers');
     $('vendorsPanel')?.classList.toggle('hidden', tab !== 'vendors');
     $('salesPanel')?.classList.toggle('hidden', tab !== 'sales');
+    // «حركة البيع» (ar/sales.js, owner 2026-11-14): one year of sales
+    if (tab === 'sales') window.AskerSales?.open();
   }
   document.querySelectorAll('.subbar [data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-group]').forEach((b) => (b.onclick = () => showTab(lastTab[b.dataset.group])));

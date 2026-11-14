@@ -1507,3 +1507,53 @@ html.night .ch-mv h4 { color: #f3dfa8; }
 .pill.link { background: var(--accent-soft, #e8eefb); color: var(--accent, #0a4aa6); }
 .sup-row .sup-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .sup-row [data-send-link] { background: #1fa855; color: #fff; }
+
+/* «حركة البيع» (owner 2026-11-14, ar/sales.js) */
+.sa-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.sa-head h2 { margin: 0; }
+.sa-periods, .sa-kinds { margin: 10px 0 0; flex-wrap: wrap; }
+.sa-range { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.sa-range label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.sa-range input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); }
+.sa-who { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 8px 12px; border-radius: 14px; background: rgba(var(--glow), 0.08); font-weight: 700; }
+.sa-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 4px; }
+.sa-s { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 9px 12px; box-shadow: var(--sh-1); }
+.sa-s b { display: block; font-size: 19px; text-align: start; font-variant-numeric: tabular-nums; }
+.sa-s > span { font-size: 12px; color: var(--muted); }
+.sa-s.cash b { color: #166534; }
+.sa-s.credit b { color: #9a3412; }
+.sa-s.ret b { color: #b91c1c; }
+html.night .sa-s.cash b { color: #4ade80; }
+html.night .sa-s.credit b { color: #fdba74; }
+html.night .sa-s.ret b { color: #fca5a5; }
+.sa-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 6px; padding: 6px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.sa-bars i { flex: 1; min-width: 2px; background: var(--crimson); border-radius: 3px 3px 0 0; opacity: 0.85; }
+.sa-bl { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 2px 6px 4px; }
+.sa-item { margin: 10px 0 4px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--sh-1); }
+.sa-item-n { font-weight: 800; }
+.sa-item-n small { display: block; font-weight: 400; color: var(--muted); }
+.sa-item p { margin: 6px 0 0; line-height: 1.7; }
+.sa-item b { color: var(--crimson); }
+.sa-top3 { margin: 4px 0; }
+#saFindBox { margin-top: 10px; }
+.sa-hits { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.sa-hit, .sa-cust { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); }
+.sa-hit small, .sa-cust small { color: var(--muted); font-size: 12px; }
+.sa-hit em { font-style: normal; font-size: 12px; color: var(--crimson); }
+.sa-custbtn { margin-top: 10px; }
+.sa-custpick { margin-top: 8px; }
+.sa-custlist { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; max-height: 320px; overflow-y: auto; }
+.sa-inv { margin: 7px 0; padding: 9px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-1); cursor: pointer; }
+.sa-inv.open { border-color: rgba(var(--glow), 0.5); }
+.sa-inv-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sa-inv-s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.sa-m { font-variant-numeric: tabular-nums; }
+.sa-m.neg { color: #b91c1c; }
+.sa-tag { display: inline-block; border-radius: 10px; padding: 1px 8px; font-size: 12px; font-weight: 700; margin-inline-start: 4px; }
+.sa-tag.cash { background: #e7f6ec; color: #166534; }
+.sa-tag.credit { background: #fdeee6; color: #9a3412; }
+.sa-tag.ret { background: #fde8e8; color: #b91c1c; }
+.sa-lines { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.sa-lines td { padding: 5px 2px; border-top: 1px solid var(--line); vertical-align: top; }
+.sa-lines td small { display: block; color: var(--muted); }
+.sa-lines td.n { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
