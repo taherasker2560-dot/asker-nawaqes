@@ -65,6 +65,14 @@ run('Messages: a credit customer comes from his account («💬 كلّمنا»),
  await page.waitForSelector('#chatText');
  assert.equal(await text(page,'#chatWho'),'بنرد عليك هنا · أحمد محمود');
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_chats.map(c=>[c.customer_id,c.name])),[[101,'أحمد محمود']]);
+ // «مش إنت؟» (owner 2026-11-14: his test went under a customer's account kept on his phone): the phone forgets the account and
+ // the chat, and the number is asked again
+ assert.match(await text(page,'#chatList .ch-me'),/بتكلمنا باسم أحمد محمود · مش إنت؟/);
+ page.once('dialog',d=>{assert.match(d.message(),/الموبايل هينسى الاسم ده والمحادثة دي/);d.accept()});
+ await page.click('[data-ch-notme]');
+ await page.waitForSelector('#chatForm #chatPhone');
+ assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('asker_store_customer'),localStorage.getItem('asker_store_chat')]),[null,null]);
+ assert.equal(await page.evaluate(()=>window.AskerStoreAccount.linked()),false);
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 },{home:true});
 

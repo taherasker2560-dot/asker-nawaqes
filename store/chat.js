@@ -80,6 +80,10 @@
     supFileSub: 'PDF أو إكسل',
     got: '✓ وصلت',
     file: '📄 ملف',
+    // someone else's name on this phone (owner 2026-11-14: his test went under a customer's account kept on his phone)
+    asWho: 'بتكلمنا باسم',
+    notMe: 'مش إنت؟',
+    notMeAsk: 'الموبايل هينسى الاسم ده والمحادثة دي، وتكتب رقمك من الأول. تمام؟',
     phone: 'رقم الموبايل',
     start: 'ابدأ',
     type: 'اكتب رسالتك…',
@@ -243,7 +247,10 @@
     const list = $('chatList');
     if (!list) return;
     const atEnd = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-    list.innerHTML = (supplier ? `<p class="ch-ok">${esc(TEXTS.supOk)}</p>` : `<p class="ch-hello">${esc(TEXTS.hello)}</p>`) + msgs.map(bubble).join('');
+    const who = supplier || name;
+    list.innerHTML = (supplier ? `<p class="ch-ok">${esc(TEXTS.supOk)}</p>` : `<p class="ch-hello">${esc(TEXTS.hello)}</p>`) +
+      (who && !pharmacyPhone ? `<p class="ch-me"><span>${esc(TEXTS.asWho)}</span> <b class="notr">${esc(who)}</b> · <button type="button" class="linklike" data-ch-notme>${esc(TEXTS.notMe)}</button></p>` : '') +
+      msgs.map(bubble).join('');
     if (atEnd || !list.dataset.seen) { list.scrollTop = list.scrollHeight; list.dataset.seen = '1'; window.scrollTo(0, document.body.scrollHeight); }
   }
   function draw() {
@@ -504,6 +511,11 @@
     if (e.target.closest('[data-ch-mic]')) { startRec(); return; }
     if (e.target.closest('[data-ch-recsend]')) { stopRec(true); return; }
     if (e.target.closest('[data-ch-cancel]')) { stopRec(false); return; }
+    if (e.target.closest('[data-ch-notme]')) {
+      if (!root.confirm(TEXTS.notMeAsk)) return;
+      if (root.AskerStoreAccount && root.AskerStoreAccount.forget) root.AskerStoreAccount.forget();
+      forgetChat(); return;
+    }
     if (e.target.closest('#chatNotify.ask')) { subscribe(true); }
   });
   document.addEventListener('input', (e) => { if (e.target && e.target.id === 'chatText') toggleSend(); });
@@ -518,7 +530,15 @@
   });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && shown()) poll(true); });
 
+  // this phone forgets the chat (and the name and number typed for it): the number is asked again
+  function forgetChat() {
+    keep.set(null); secret = null; supplier = ''; name = ''; msgs = []; lastId = 0; forwarded = false; askName = false; error = ''; notify = '';
+    local.clear(); clearTimeout(timer);
+    try { localStorage.removeItem('asker_store_me'); } catch (e) { /* private window */ }
+    draw();
+  }
   root.AskerStoreChat = {
+    forget: forgetChat,
     attach(c) { client = c; },
     // store.js view('chat')
     // the messages page takes the whole screen like WhatsApp: the store's bottom tabs hide (owner 2026-11-14: the bar was

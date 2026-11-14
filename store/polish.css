@@ -262,3 +262,7 @@ html.night .ch-ok { background: #183524; border-color: #2f6b45; color: #bdf0cd; 
 .ch-doc { display: flex; align-items: center; gap: 8px; }
 .ch-doc b { font-size: 24px; }
 .ch-doc span { direction: ltr; text-align: right; }
+/* «بتكلمنا باسم … · مش إنت؟» (owner 2026-11-14) */
+.ch-me { margin: 0 4px 8px; font-size: 13px; color: var(--muted, #6b7280); text-align: center; }
+.ch-me .linklike, .ac-notmine { background: none; border: 0; padding: 0; color: var(--accent-text, var(--accent)); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.ac-notmine { font-size: 13px; margin-top: 10px; }

@@ -112,6 +112,9 @@
     pdfBad: 'الكشف ما اتعملش. جرب تاني.',
     call: '📞 كلّمنا',
     chat: '💬 كلّمنا',
+    // a customer's link opened on someone else's phone (owner 2026-11-14: his test messages went under a customer's name)
+    notMine: 'مش ده حسابك؟',
+    forgetAsk: 'الموبايل هينسى الحساب ده. لو هو حسابك، افتح الرابط تاني من الواتس. تمام؟',
     older: 'اعرض أقدم',
     loading: 'بيجيب حسابك…',
     none: 'مفيش حركات في حسابك.',
@@ -356,7 +359,8 @@
     const wa = waHref();
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
-      (root.AskerStoreChat ? `<a class="share" href="#chat">${esc(TEXTS.chat)}</a>` : wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>';
+      (root.AskerStoreChat ? `<a class="share" href="#chat">${esc(TEXTS.chat)}</a>` : wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>' +
+      (pharmacyPhone ? '' : `<p class="center"><button type="button" class="linklike ac-notmine" data-acct-forget>${esc(TEXTS.notMine)}</button></p>`);
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
     const chip = (f, label) => `<button type="button" class="chip${st.filter === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
     html += `<div class="ac-chips" role="group">${chip('all', TEXTS.all)}${chip('sales', TEXTS.sales)}${chip('payments', TEXTS.payments)}</div>`;
@@ -450,13 +454,23 @@
       return;
     }
     if (e.target.closest('[data-acct-older]')) { load(true); return; }
+    if (e.target.closest('[data-acct-forget]')) {
+      if (!root.confirm(TEXTS.forgetAsk)) return;
+      forget();
+      if (root.AskerStoreChat && root.AskerStoreChat.forget) root.AskerStoreChat.forget();
+      location.hash = '';
+      return;
+    }
     if (e.target.closest('[data-acct-pdf]')) { pdf(); }
   });
   document.addEventListener('change', (e) => {
     if (e.target && e.target.name === 'acctPay') { st.pay = e.target.value; drawPay(); }
   });
 
+  // this phone forgets the customer's link (it was someone else's): the store is a plain store again
+  function forget() { keep.set(null); token = null; st.c = null; st.moves = []; showLinked(false); useManifest(false); drawPay(); draw(); }
   root.AskerStoreAccount = {
+    forget,
     // store.js: the client, once it is made (the first load starts here)
     attach(c) { client = c; if (token) { showLinked(true); drawPay(); load(false); } },
     // store.js view('account')

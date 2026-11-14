@@ -320,7 +320,12 @@ window.AskerEN = {
   "📄 ملف": "📄 File",
   "اكتب اسمك كمان، أول مرة بس": "Write your name too, the first time only",
   "الملف ده مش مدعوم. ابعت صورة أو PDF أو إكسل": "This file is not supported. Send a photo, a PDF or an Excel file",
-  "الملف أكبر من ٨ ميجا": "The file is bigger than 8 MB"
+  "الملف أكبر من ٨ ميجا": "The file is bigger than 8 MB",
+  "مش ده حسابك؟": "Not your account?",
+  "الموبايل هينسى الحساب ده. لو هو حسابك، افتح الرابط تاني من الواتس. تمام؟": "This phone will forget this account. If it is yours, open the link again from WhatsApp. OK?",
+  "بتكلمنا باسم": "You are writing as",
+  "مش إنت؟": "Not you?",
+  "الموبايل هينسى الاسم ده والمحادثة دي، وتكتب رقمك من الأول. تمام؟": "This phone will forget this name and this chat, and you write your number again. OK?"
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",
