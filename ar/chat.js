@@ -114,13 +114,14 @@
     if (!ownerHere()) return '';
     const on = autoKinds.length;
     const head = on ? `🤖 الرد التلقائي شغال على ${on} نوع` : '🤖 أسبوع التجربة: البوت بيكتب الرد بس، وإنت اللي بتبعت';
-    if (!autoOpen) return `<button type="button" class="secondary small ch-auto-btn" data-chat-auto>${esc(head)} ▾</button>`;
+    // the arrow in its own piece: the words alone are translated in English
+    if (!autoOpen) return `<button type="button" class="secondary small ch-auto-btn" data-chat-auto><span>${esc(head)}</span> <span aria-hidden="true">▾</span></button>`;
     const rows = Object.keys(KIND_AR).map((k) => {
       const n = (stats && stats[k]) || { sent: 0, edited: 0, skipped: 0, auto: 0 };
       return `<label class="ch-auto-row"><input type="checkbox" data-auto-kind="${k}"${autoKinds.includes(k) ? ' checked' : ''}> <b>${esc(KIND_AR[k])}</b>` +
         `<span class="hint">اتبعت زي ما هو ${n.sent} · اتعدّل ${n.edited} · اتساب ${n.skipped}${n.auto ? ` · راح لوحده ${n.auto}` : ''}</span></label>`;
     }).join('');
-    return `<div class="ch-auto"><button type="button" class="secondary small ch-auto-btn" data-chat-auto>${esc(head)} ▴</button>` +
+    return `<div class="ch-auto"><button type="button" class="secondary small ch-auto-btn" data-chat-auto><span>${esc(head)}</span> <span aria-hidden="true">▴</span></button>` +
       `<p class="hint">علّم النوع اللي البوت يبعته لوحده من غير ما يستناك. الأرقام من آخر 30 يوم.</p>${rows}</div>`;
   }
   async function setAuto(kind, on) {
