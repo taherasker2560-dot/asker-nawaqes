@@ -66,7 +66,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   // the action, end to end
   const env = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'g' };
   const SECRET = 'a'.repeat(64), CHAT = '11111111-2222-4333-8444-555555555555';
-  function fake({ msgs, auto = [], have = false, customer = 101 }) {
+  function fake({ msgs, auto = [], have = false, customer = 101, phoneAcct = false }) {
     const gem = [], drafts = [], sent = [], patched = [];
     const f = async (url, o = {}) => {
       const u = new URL(url), q = decodeURIComponent(u.search);
@@ -84,7 +84,8 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
       if (u.pathname === '/rest/v1/ar_chat_drafts' && o.method === 'POST') { const r = JSON.parse(o.body); drafts.push(r); return new Response(JSON.stringify([{ id: 9 }]), { status: 201 }); }
       if (u.pathname === '/rest/v1/ar_store_items') { assert.match(q, /PANADOL/); return new Response(JSON.stringify([{ id: 1, name: 'PANADOL COLD & FLU', arabic_name: 'بانادول كولد', status: 'available', price: 59 }])); }
       if (u.pathname === '/rest/v1/ar_stock') return new Response(JSON.stringify([{ item_id: 1, packs: 12, price: 59 }]));
-      if (u.pathname === '/rest/v1/ar_customers') return new Response(JSON.stringify([{ balance: 7174.5 }]));
+      if (u.pathname === '/rest/v1/ar_customer_phones') { assert.match(q, /phone=eq\.201012345678/); return new Response(JSON.stringify(phoneAcct ? [{ customer_id: 202 }] : [])); }
+      if (u.pathname === '/rest/v1/ar_customers') return new Response(JSON.stringify([{ id: q.includes('id=eq.202') ? 202 : 101, name: 'طاهر عسكر', balance: 7174.5 }]));
       if (u.pathname === '/rest/v1/ar_customer_stops') return new Response('[]');
       if (u.pathname === '/rest/v1/ar_store_orders') { assert.match(q, customer ? /customer_id=eq\.101/ : /phone=eq\.01012345678/); return new Response(JSON.stringify([{ id: 77, status: 'new', total: 66.7, created_at: '2026-11-13T20:00:00Z' }])); }
       if (u.pathname === '/rest/v1/ar_chat_settings') return new Response(JSON.stringify([{ auto_kinds: auto }]));
@@ -126,6 +127,13 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   // a cash customer asking about his account: told he has none (no made-up balance)
   f = fake({ msgs, customer: null }); await F.handle(req({ action: 'draft', secret: SECRET }), env, f);
   assert.ok(!f.drafts[0].facts.some((x) => /حسابه/.test(x)));
+  // a cash chat whose number is a credit customer's (owner 2026-11-14, «أ»): Gemini is told only that we found his account and
+  // that its link comes on WhatsApp; the amount and the name are for the pharmacy only (shown first under the answer)
+  f = fake({ msgs, customer: null, phoneAcct: true }); await F.handle(req({ action: 'draft', secret: SECRET }), env, f);
+  assert.equal(f.drafts[0].facts[0], '📇 الرقم ده متسجل على حساب آجل: طاهر عسكر · كود 202 · عليه 7,174.5 ج');
+  assert.ok(f.drafts[0].facts.includes(D.PHONE_ACCOUNT_FACT));
+  for (const g of f.gem) { const t = JSON.stringify(g); assert.ok(!t.includes('7,174.5') && !t.includes('7174') && !t.includes('طاهر عسكر'), 'never given to Gemini'); }
+  assert.match(f.gem[1].contents[0].parts[0].text, /ما تقولش أي مبلغ ولا اسم الحساب/);
   // a wrong secret
   assert.equal((await F.handle(req({ action: 'draft', secret: 'b'.repeat(64) }), env, fake({ msgs }))).status, 404);
   console.log('PASS: chat draft: the answer from our facts only (items + stock, account, orders), kept for ابعت/عدّل/سيبه, alone only for a kind turned on');

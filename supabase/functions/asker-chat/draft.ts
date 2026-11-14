@@ -52,6 +52,7 @@ export const REPLY_PROMPT = [
   '- حسابه: المبلغ اللي عليه بالظبط من facts. ولو حسابه موقوف ما تقولش موقوف، قول إننا هنكلمه بخصوص الحساب.',
   '- طلبه: حالته ورقمه من facts.',
   '- روشتة: اذكر الأصناف اللي اتقرت وحالة كل واحد وسعره، وقول إن الصيدلي هيراجع الروشتة.',
+  '- صورة صنف أو علبة: لو الصنف اللي في الصورة نفسه في facts قول حالته وسعره، ولو مش هو بالظبط قول إنه مش عندنا واعرض أقرب الأصناف اللي في facts بأسعارها.',
   '- جرعة أو استخدام: اكتب الاستخدام المعتاد بشكل عام ومختصر، وقول إن الصيدلي يقدر يأكدله حسب السن والوزن.',
   '- فلوس أو شكوى: اعتذر بلطف وقول إننا هنراجع ونرد عليه في أقرب وقت.',
   '- سلام أو أي حاجة تانية: رد مناسب وقصير.',
@@ -156,6 +157,17 @@ export function withTotal(body: string, facts: string[]): string {
   if (lines.length > 1 && /[؟?]\s*$/.test(last)) { lines.splice(lines.length - 1, 0, `الإجمالي: ${total}`); return lines.join('\n'); }
   return `${body}\nالإجمالي: ${total}`;
 }
+// the credit customer whose saved number this is (ar_customer_phones keeps 201xxxxxxxxx)
+export const PHONE_ACCOUNT_FACT = 'رقمه متسجل على حساب آجل عندنا، بس مش متأكدين إنه هو صاحب الرقم: ما تقولش أي مبلغ ولا اسم الحساب، وقوله إننا لقينا حسابه وهنبعتله رابط حسابه على الواتس على نفس الرقم يشوف فيه رصيده وكشفه';
+async function phoneAccount(rows: (p: string) => Promise<unknown[]>, phone: string): Promise<{ id: number; name: string; balance: number; stopped: boolean } | null> {
+  if (!/^01\d{9}$/.test(phone)) return null;
+  const p = (await rows(`/rest/v1/ar_customer_phones?select=customer_id&phone=eq.2${phone}&limit=1`))[0] as { customer_id?: number } | undefined;
+  if (!p?.customer_id) return null;
+  const c = (await rows(`/rest/v1/ar_customers?select=id,name,balance&id=eq.${p.customer_id}&limit=1`))[0] as { id: number; name: string; balance: number } | undefined;
+  if (!c) return null;
+  const stopped = (await rows(`/rest/v1/ar_customer_stops?select=customer_id&customer_id=eq.${c.id}&limit=1`)).length > 0;
+  return { id: c.id, name: c.name, balance: Number(c.balance) || 0, stopped };
+}
 export function accountFact(balance: number, stopped: boolean): string {
   const b = Number(balance) || 0;
   return (b > 0.5 ? `حسابه: عليه ${money(b)}` : b < -0.5 ? `حسابه: له ${money(-b)}` : 'حسابه: خالص') + (stopped ? ' · الآجل موقوف' : '');
@@ -241,11 +253,21 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   const seen = new Set<number>();
   for (const it of found) { if (seen.has(it.id)) continue; seen.add(it.id); facts.push(itemFact(it, stock.find((s) => s.item_id === it.id))); }
   facts.unshift(...billFacts(asked.filter((a) => a.hits.length).map((a) => ({ asked: a.asked, ...pickItem(a.asked, a.hits) })), stock));
+  // shown to the pharmacy under the answer, never given to Gemini (an amount for a number nobody checked)
+  const ownerFacts: string[] = [];
   if (chat.customer_id) {
     const c = (await rows(`/rest/v1/ar_customers?select=balance&id=eq.${chat.customer_id}&limit=1`))[0] as { balance?: number } | undefined;
     const stopped = (await rows(`/rest/v1/ar_customer_stops?select=customer_id&customer_id=eq.${chat.customer_id}&limit=1`)).length > 0;
     if (c) facts.push(accountFact(Number(c.balance), stopped));
-  } else if (kind === 'account') facts.push('العميل ده كاش، مالوش حساب آجل عندنا');
+  } else {
+    // a number typed on the page that is a credit customer's (owner 2026-11-14, his choice «أ»): he is told we found his
+    // account and that its link comes on WhatsApp to that number; the amount only for the pharmacy
+    const acct = chat.phone ? await phoneAccount(rows, chat.phone) : null;
+    if (acct) {
+      facts.push(PHONE_ACCOUNT_FACT);
+      ownerFacts.push(`📇 الرقم ده متسجل على حساب آجل: ${acct.name} · كود ${acct.id} · ${accountFact(acct.balance, acct.stopped).replace(/^حسابه: /, '')}`);
+    } else if (kind === 'account') facts.push('العميل ده كاش، مالوش حساب آجل عندنا');
+  }
   const orFilter = chat.customer_id ? `customer_id=eq.${chat.customer_id}` : chat.phone ? `phone=eq.${chat.phone}` : '';
   if (orFilter) for (const o of await rows(`/rest/v1/ar_store_orders?select=id,status,total,created_at&${orFilter}&order=id.desc&limit=3`) as { id: number; status: string; total: number; created_at: string }[]) facts.push(orderFact(o));
   // the greeting only once (owner 2026-11-14: «الكلام دافى بس فى اول المحادثه»): the pharmacy answered him before = not first
@@ -253,5 +275,5 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   const out = await gem(env, fetchImpl, [{ text: REPLY_PROMPT + '\n\nاسم العميل: ' + (chat.name || 'مش معروف') + '\nأول رد في المحادثة: ' + (first ? 'أيوه' : 'لأ') + '\n\nالمحادثة:\n' + talk + '\n\nهو عايز: ' + String(ask.summary || '') + '\n\nfacts:\n' + (facts.join('\n') || '(مفيش)') }, ...photos], REPLY_SCHEMA);
   const body = withTotal(String(out.body || '').replace(/\s+\n/g, '\n').trim(), facts).slice(0, 2000);
   if (!body) throw new Error('empty answer');
-  return { draft: { for_msg: last.id, kind, body, facts: facts.slice(0, 24) } };
+  return { draft: { for_msg: last.id, kind, body, facts: [...ownerFacts, ...facts].slice(0, 24) } };
 }

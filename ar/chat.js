@@ -186,6 +186,33 @@
     if (st === me) drawChat();
     if (st === me) loadDraft(me);
   }
+  // a cash chat whose number is a credit customer's (owner 2026-11-14, his choice «أ»): his account link goes to that number
+  // on WhatsApp (the number typed on the page is not checked; WhatsApp to it is)
+  async function loadPhoneAccount(me) {
+    if (me.c.customer_id || me.c.supplier || !/^01\d{9}$/.test(String(me.c.phone || ''))) return;
+    try {
+      const { data: p } = await db().from('ar_customer_phones').select('customer_id').eq('phone', '2' + me.c.phone).limit(1);
+      const id = p && p[0] && p[0].customer_id;
+      if (!id) return;
+      const { data: c } = await db().from('ar_customers').select('id,name').eq('id', id).limit(1);
+      if (c && c[0]) { me.phoneAcct = c[0]; if (st === me) drawChat(); }
+    } catch (e) { /* staff without «العملاء» */ }
+  }
+  async function sendAccountLink() {
+    const me = st, a = me && me.phoneAcct;
+    if (!a || me.busy) return;
+    try {
+      const { data, error } = await db().rpc('ar_customer_link', { p_customer: a.id, p_new: false });
+      if (error) throw new Error(error.message || String(error));
+      if (!data || !data.ok || !data.token) throw new Error((data && data.error) || 'مفيش رابط');
+      const L = root.AskerCustomersLib, url = L.linkUrl(location.href, data.token);
+      window.open(`https://wa.me/2${me.c.phone}?text=${encodeURIComponent(L.linkMessage(a.name, url))}`, '_blank', 'noopener');
+      Object.assign(me, { note: 'اتفتحت محادثته في الواتس ومعاها رابط حسابه: دوس إرسال هناك.', noteBad: false });
+    } catch (e) {
+      Object.assign(me, { note: 'ما اتفتحش: ' + ((e && e.message) || e), noteBad: true });
+    }
+    if (st === me) drawChat();
+  }
   async function loadAccount(me) {
     if (!me.c.customer_id) return;
     try {
@@ -243,7 +270,9 @@
       ? `<div class="ch-acct"><span>🏬 مخزن${c.phone ? ` · <b dir="ltr">${esc(showPhone(c.phone))}</b>` : ''}</span><span>قوايمه بتروح «الوارد»</span></div>`
       : c.customer_id
       ? `<div class="ch-acct"><span>آجل · كود ${esc(c.customer_id)}</span>${st.account ? `<span><b>${esc(Number(st.account.balance) > 0.5 ? `عليه ${Number(st.account.balance).toLocaleString('en-US', { maximumFractionDigits: 2 })} ج` : 'خالص')}</b> · <button type="button" class="linklike" data-chat-statement>الكشف</button></span>` : ''}</div>`
-      : `<div class="ch-acct"><span>كاش${c.phone ? ` · <b dir="ltr">${esc(showPhone(c.phone))}</b>` : ''}</span>${wa ? `<a href="${esc(wa)}" target="_blank" rel="noopener">📱 واتس</a>` : ''}</div>`;
+      : `<div class="ch-acct"><span>كاش${c.phone ? ` · <b dir="ltr">${esc(showPhone(c.phone))}</b>` : ''}</span>${wa ? `<a href="${esc(wa)}" target="_blank" rel="noopener">📱 واتس</a>` : ''}</div>` +
+        (st.phoneAcct ? `<div class="ch-acct ch-phoneacct"><span>📇 رقمه متسجل على حساب آجل: <b class="notr">${esc(st.phoneAcct.name)}</b> · كود ${esc(st.phoneAcct.id)}</span>` +
+          (ownerHere() ? `<button type="button" class="linklike" data-chat-acctlink>🔗 ابعتله رابط حسابه على الواتس</button>` : '') + '</div>' : '');
     box.innerHTML = `<button type="button" class="secondary small cu-back" data-chat-back>→ رجوع للرسايل</button>` +
       `<h2 class="notr">${esc(who)}</h2>` + acct +
       `<div class="ch-thread" id="chatThread">${st.msgs.map(msgHtml).join('') || '<p class="hint">مفيش رسايل.</p>'}</div>` +
@@ -304,7 +333,7 @@
     st = { c, msgs: [], urls: {}, busy: false, error: '', note: '', account: null };
     try { history.pushState({ chatOpen: id }, ''); } catch (e) { /* no history */ }
     drawChat(); window.scrollTo?.(0, 0);
-    loadMsgs(); loadAccount(st); loadDraft(st);
+    loadMsgs(); loadAccount(st); loadDraft(st); loadPhoneAccount(st);
   }
   function closeChat() { st = null; drawList(); loadChats(); }
   async function send() {
@@ -461,6 +490,7 @@
       if (e.target.closest('[data-chat-del]')) { removeChat(); return; }
       const dm = e.target.closest('[data-chat-delmsg]');
       if (dm) { removeMessage(dm.dataset.chatDelmsg); return; }
+      if (e.target.closest('[data-chat-acctlink]')) { sendAccountLink(); return; }
       if (e.target.closest('[data-draft-send]')) { sendDraft(); return; }
       if (e.target.closest('[data-draft-edit]')) { editDraft(); return; }
       if (e.target.closest('[data-draft-skip]')) { skipDraft(); return; }

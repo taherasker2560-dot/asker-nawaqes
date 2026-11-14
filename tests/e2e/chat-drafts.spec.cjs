@@ -15,7 +15,9 @@ run('Suggested answers: «🤖 الرد جاهز», ابعت / عدّل / سيب
   ar_chat_drafts:[{id:31,chat_id:'c1',for_msg:1,kind:'availability',body:'أيوه متوفر بـ 59 ج، تحب نجهزهولك؟',facts:['PANADOL COLD & FLU (بانادول كولد): متوفر · 59 ج · 12 علبة'],status:'ready',created_at:i1},
    {id:32,chat_id:'c2',for_msg:2,kind:'availability',body:'فيتامين سي بـ 45 ج',facts:['VITACID C: متوفر · 45 ج'],status:'ready',created_at:i2},
    {id:33,chat_id:'c3',for_msg:3,kind:'other',body:'العفو يا فندم',facts:[],status:'ready',created_at:i3}],
-  ar_chat_settings:[{id:1,auto_kinds:[]}],ar_chat_push:[]})},[iso(1),iso(2),iso(3)]);
+  ar_chat_settings:[{id:1,auto_kinds:[]}],ar_chat_push:[],
+  // سامية's number is a credit customer's (owner 2026-11-14, «أ»): her account link goes to that number on WhatsApp
+  ar_customer_phones:[{customer_id:202,phone:'201011112222'}],ar_customers:[{id:202,name:'سامية عبد الله',credit_limit:1000,balance:350}],ar_customer_links:[]})},[iso(1),iso(2),iso(3)]);
  await page.click('[data-group="care"]');await page.waitForSelector('#chatPanel .ch-row');
  // the list: the chats whose answer is written
  await page.waitForFunction(()=>document.querySelectorAll('#chatPanel .ch-bot').length===3);
@@ -26,6 +28,14 @@ run('Suggested answers: «🤖 الرد جاهز», ابعت / عدّل / سيب
  assert.equal(await page.$$eval('[data-auto-kind]',(e)=>e.length),8);
  // ابعت: as it is
  await page.click('#chatPanel [data-chat="c1"]');await page.waitForSelector('.ch-draft');
+ // her number is on a credit account: shown to the pharmacy, and her account link goes to that number on WhatsApp
+ await page.waitForSelector('.ch-phoneacct');
+ assert.match(await text(page,'.ch-phoneacct'),/رقمه متسجل على حساب آجل: سامية عبد الله · كود 202/);
+ await page.evaluate(()=>{window.__opened=[];window.open=(u)=>window.__opened.push(u)});
+ await page.click('[data-chat-acctlink]');
+ await page.waitForFunction(()=>window.__opened.length===1);
+ const wa=await page.evaluate(()=>window.__opened[0]);
+ assert.match(wa,/^https:\/\/wa\.me\/201011112222\?text=/);assert.match(decodeURIComponent(wa),/store\.html#me=[0-9a-f]{64}/);
  assert.match(await text(page,'.ch-draft'),/الرد المقترح.*متوفر؟ بكام؟.*أيوه متوفر بـ 59 ج، تحب نجهزهولك؟.*PANADOL COLD & FLU \(بانادول كولد\): متوفر · 59 ج · 12 علبة/);
  await page.click('[data-draft-send]');
  await page.waitForFunction(()=>/اتبعت/.test(document.getElementById('chatPanel').textContent));
