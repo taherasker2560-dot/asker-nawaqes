@@ -79,13 +79,15 @@
   function card(it) {
     const ar = String(it.arabic_name || '').trim();
     const others = otherText(it.other, it.parts).map((t) => `<div class="st-other">${esc(t)}</div>`).join('');
-    return `<div class="st-item">
+    // the item's photo on the side (ar/item-media.js, owner 2026-11-14); tapping it shows the photo big and the description
+    const pic = root.AskerItemMedia && it.item_id != null ? root.AskerItemMedia.thumb(it.item_id, it.name, ar || it.name) : '';
+    return `<div class="st-item${pic ? ' im-row' : ''}">${pic}<div class="im-main">
       <strong>${esc(ar || it.name)}</strong>
       ${ar ? `<div class="st-en" dir="ltr">${esc(it.name)}</div>` : ''}
       <div class="st-qty">${esc(qtyText(it.packs, it.units, it.parts))}</div>
       ${others}
       <div class="hint">${esc(expText(it.exp_near))}${num(it.price) ? ' · ' + esc(num(it.price)) + ' ج' : ''}</div>
-    </div>`;
+    </div></div>`;
   }
   function draw() {
     if (!$('stQ')) return;

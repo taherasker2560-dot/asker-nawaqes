@@ -1,0 +1,22 @@
+// The item's photo and description inside the bot (owner 2026-11-14): same photos and texts as the store, his fixes first.
+const assert = require('node:assert/strict');
+const M = require('../ar/item-media.js');
+const pics = { 5: '5.jpg', 6: '6.webp' };
+const edits = { 6: { img: 'e/6-abcdef012345.jpg' }, 7: { img_off: true }, 8: { descr: { h: 'نصه هو' } }, 9: { desc_off: true } };
+assert.equal(M.photoOf(5, pics, edits), 'store/img/5.jpg');
+assert.equal(M.photoOf(6, pics, edits), M.IMG_URL + 'e/6-abcdef012345.jpg', 'his photo wins');
+assert.equal(M.photoOf(7, { 7: '7.jpg' }, edits), null, 'he removed it');
+assert.equal(M.photoOf(99, pics, edits), null);
+const shard = { t: [{ h: 'جملة', u: ['أ'], f: [], w: ['ب'] }], i: { 8: 0, 9: 0, 10: 0 } };
+assert.deepEqual(M.descFrom(8, shard, edits), { h: 'نصه هو' }, 'his text wins');
+assert.equal(M.descFrom(9, shard, edits), null, 'he hid it');
+assert.equal(M.descFrom(10, shard, edits).h, 'جملة');
+assert.equal(M.descFrom(11, shard, edits), null);
+const h = M.descHtml(shard.t[0]);
+assert.match(h, /im-hook" translate="no">جملة/); assert.match(h, /بيستخدم في/); assert.doesNotMatch(h, /مميزاته/); assert.match(h, /im-sec warn/);
+assert.match(M.descHtml(null), /مفيش بيان/);
+assert.match(M.thumbHtml(5, 'PANADOL 500', pics, edits), /data-im="5".*<img src="store\/img\/5\.jpg"/);
+assert.match(M.thumbHtml(99, 'ANGIOFOX TAB 25MG', pics, edits), /im-none.*>ANGIOFOX TAB</);
+assert.equal(M.thumbHtml(null, 'X', pics, edits), '');
+assert.equal(M.short('<b>x</b> 10MG'), '<B>X</B>'); assert.doesNotMatch(M.thumbHtml(1, '<b>x</b>', {}, {}), /<b>/, 'escaped');
+console.log('item-media ok');

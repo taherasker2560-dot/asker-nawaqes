@@ -259,6 +259,7 @@
     const table = lists ? offerRows(it).map((r) => `<tr class="${r.best ? 'best' : ''}"><td>${esc(r.name)}${r.best ? ' ✓ الأعلى' : ''}${r.less != null ? ` <span class="less">(أقل ${r.less}%)</span>` : ''}</td><td class="d">${r.disc != null ? r.disc + '%' : '—'}</td></tr>`).join('') : '';
     return `<div class="hs-item" data-k="${esc(it.key)}">
       <div class="hs-top">
+        ${root.AskerItemMedia && it.id != null ? root.AskerItemMedia.thumb(it.id, it.en, it.ar || it.en) : ''}
         <div class="hs-names"><strong>${esc(it.ar || it.en)}</strong>${it.ar && it.en ? `<div class="hs-en" dir="ltr">${esc(it.en)}</div>` : ''}</div>
         <button type="button" class="hs-pen" data-edit aria-label="عدّل الاسم العربي" title="عدّل الاسم العربي">${PEN}</button>
       </div>
