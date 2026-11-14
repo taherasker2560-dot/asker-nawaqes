@@ -1,3 +1,10 @@
 supabase/functions/read-supplier-image/catalog.json
 *.catalog.json
 node_modules/
+
+# Adam's Android app: build output and the downloaded speech model (the build fetches it)
+adam-android/.gradle/
+adam-android/build/
+adam-android/app/build/
+adam-android/local.properties
+adam-android/app/src/main/assets/vosk-model.zip
