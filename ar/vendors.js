@@ -96,7 +96,12 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   const PAGE = 100, FRESH_MS = 5 * 60 * 1000;
   let list = null, loadedAt = 0, loading = null, view = 'year', failText = '';
-  let st = null;       // the open statement: { v, range, kind, rows, done, busy, sum, open:Set }
+  let st = null;       // the open statement: { v, range, kind, rows, done, busy, sum, open:Set, seq }
+  // the dates he chose stay (owner 2026-11-14: «اما باجي اغير التاريخ … ما بيثبت … بيرجع تاني على اللي انت حاطه»): for the
+  // next supplier too and after the page opens again (kept on this phone only)
+  const RANGE_KEY = 've-range';
+  let lastRange = null;
+  try { const r = JSON.parse(localStorage.getItem(RANGE_KEY) || 'null'); if (r && rangeArgs(r)) lastRange = { from: r.from, to: r.to }; } catch (e) {}
   let it = null;       // the item history: { item, kind, rows, done, busy, sum }
   const names = new Map(), findState = { seq: 0, timer: null, hits: [] };
   const missing = (e) => /schema cache|does not exist|Could not find/i.test(String(e && (e.message || e)));
@@ -159,9 +164,11 @@
   }
   async function loadMoves(more) {
     const me = st;
-    if (!me || me.busy || (more && me.done)) return;
+    if (!me || (more && (me.busy || me.done))) return;
     const r = rangeArgs(me.range);
     if (!r) return;
+    // a new range or kind replaces a load still on its way (its answer is dropped)
+    const token = (me.seq = (me.seq || 0) + 1);
     me.busy = true; me.error = ''; drawSt();
     try {
       let q = db().from('ar_vendor_moves').select('id,at,kind,code,inv_date,amount,total,balance,lines')
@@ -172,23 +179,23 @@
       if (!more) tasks.push(db().rpc('ar_vendor_period', { p_vendor: me.v.id, p_from: r.from, p_to: r.to }));
       const [res, sum] = await Promise.all(tasks);
       if (res.error) throw res.error;
-      if (st !== me) return;
+      if (st !== me || me.seq !== token) return;
       const got = res.data || [];
       me.rows = more ? me.rows.concat(got) : got;
       me.done = got.length < PAGE;
-      if (sum && !sum.error) me.sum = sum.data;
+      if (!more) me.sum = sum && !sum.error ? sum.data : null;
       // the returns show their items at once; the names of every line shown
       await itemNames(me.rows.flatMap((m) => (m.lines || []).map((l) => l.i)));
     } catch (e) {
-      if (st === me) me.error = missing(e) ? 'الموردين لسه مش متاحين: محتاج تفعيل على السيرفر الأول.' : 'مقدرتش أجيب الحركة: ' + (e && e.message);
+      if (st === me && me.seq === token) me.error = missing(e) ? 'الموردين لسه مش متاحين: محتاج تفعيل على السيرفر الأول.' : 'مقدرتش أجيب الحركة: ' + (e && e.message);
     } finally {
-      if (st === me) { me.busy = false; drawSt(); }
+      if (st === me && me.seq === token) { me.busy = false; drawSt(); }
     }
   }
   function openStatement(id) {
     const v = vendorOf(id);
     if (!v) return;
-    st = { v, range: defaultRange(), kind: null, rows: [], done: false, busy: false, sum: null, open: new Set() };
+    st = { v, range: lastRange ? { from: lastRange.from, to: lastRange.to } : defaultRange(), kind: null, rows: [], done: false, busy: false, sum: null, open: new Set(), seq: 0 };
     it = null;
     show('st');
     $('veFrom').value = st.range.from; $('veTo').value = st.range.to;
@@ -345,9 +352,16 @@
       if (e.target.closest('#veItemMore')) { loadItem(true); return; }
     });
     panel.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-ve-move]')) { e.preventDefault(); e.target.click(); } });
-    const range = () => { if (!st) return; st.range = { from: $('veFrom').value, to: $('veTo').value }; st.rows = []; st.done = false; loadMoves(false); };
-    $('veFrom')?.addEventListener('change', range);
-    $('veTo')?.addEventListener('change', range);
+    const range = () => {
+      if (!st) return;
+      const r = { from: $('veFrom').value, to: $('veTo').value };
+      if (!rangeArgs(r)) return;   // a field emptied while choosing: keep what is shown
+      st.range = r; lastRange = r;
+      try { localStorage.setItem(RANGE_KEY, JSON.stringify(r)); } catch (e) {}
+      st.rows = []; st.done = false; st.open.clear(); loadMoves(false);
+    };
+    // the phone's date picker may only send «input»: both are listened to
+    for (const ev of ['change', 'input']) { $('veFrom')?.addEventListener(ev, range); $('veTo')?.addEventListener(ev, range); }
     $('veQ')?.addEventListener('input', (e) => find(e.target.value));
     window.addEventListener('popstate', () => { if (st || it) closeStatement(); });
   }

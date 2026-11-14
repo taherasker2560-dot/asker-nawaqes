@@ -53,6 +53,19 @@ run('Suppliers: balances, a statement with returns and expiry, an item\'s purcha
  await page.click('[data-ve-kind="return"]');
  await page.waitForFunction(()=>document.querySelectorAll('#veMoves .ve-move').length===1);
  assert.match(await text(page,'#veStSum'),/المرتجعات اللي راحت له في الفترة دي: 1 مرتجع · 180 ج/);
+ // an older start date (owner: «اما باجي اغير التاريخ … ما بيثبت»): the older invoice comes, and the dates stay for the next
+ // supplier and after the page opens again
+ await page.click('[data-ve-kind=""]');
+ const old=at(500).slice(0,10);
+ await page.fill('#veFrom',old);
+ await page.waitForFunction(()=>document.querySelectorAll('#veMoves .ve-move').length===5);
+ assert.equal(await page.$eval('#veFrom',e=>e.value),old);
+ await page.click('#veSt [data-ve-back]');
+ await page.click('[data-ve-open="2278"]');
+ await page.waitForSelector('#veMoves .ve-move');
+ assert.equal(await page.$eval('#veFrom',e=>e.value),old,'the chosen dates stay for the next supplier');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ve-range')).from),old,'and are kept on this phone');
+ await page.evaluate(()=>localStorage.removeItem('ve-range'));
  // back to the suppliers
  await page.click('#veSt [data-ve-back]');
  await page.waitForFunction(()=>!document.getElementById('veListView').classList.contains('hidden'));
