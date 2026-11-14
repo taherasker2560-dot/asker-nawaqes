@@ -25,9 +25,11 @@ window.__invokes=[];
 const functions={invoke:async(name,{body})=>{
  // a warehouse's messages page → «الوارد» (arabic-shortages ?chat=1, migration 202611141400): each message once, via 'link'
  if(name==='arabic-shortages?chat=1'){window.__invokes.push('chatinbox');const c=(tables.ar_chats||[]).find(x=>x.secret===body.secret);if(!c||!c.supplier)return {data:{ok:false,error:'not-supplier'},error:null};
-  const ms=(tables.ar_chat_messages||[]).filter(m=>m.chat_id===c.id&&m.sender==='customer'&&!m.inbox_at&&(m.kind!=='voice'||m.body));
+  // two a call, like the real one's few a call: the page asks again while some are left
+  const all=(tables.ar_chat_messages||[]).filter(m=>m.chat_id===c.id&&m.sender==='customer'&&!m.inbox_at&&(m.kind!=='voice'||m.body)),ms=all.slice(0,2);
+  window.__forwardLeft=all.length-ms.length;
   ms.forEach(m=>{m.inbox_at=new Date().toISOString();(tables.ar_inbox||(tables.ar_inbox=[])).push({id:'li'+m.id,received_at:m.at,sender:'رابط المخزن',supplier:c.supplier,kind:m.kind==='photo'?'image':m.kind==='file'?'pdf':'text',body_text:m.kind==='file'?null:m.body,file_path:null,status:'new',error:null,rows:[],sure:0,review:0,maybe:null,via:'link',chat_msg:m.id})});
-  return {data:{ok:true,done:ms.length},error:null}}
+  return {data:{ok:true,done:ms.length,left:all.length-ms.length},error:null}}
  if(name==='asker-chat'){window.__invokes.push('chat:'+body.action+':'+(body.chat_id||body.id));return {data:{ok:true,sent:(tables.ar_chat_push||[]).filter(p=>p.chat_id===body.chat_id).length,gone:0,failed:0},error:null}}
  if(name==='asker-staff'){window.__invokes.push('staff:'+body.action);const st=tables.ar_staff||(tables.ar_staff=[]);
   if(body.action==='create'){const id='stf'+(st.length+1);st.push({user_id:id,name:body.name,perms:body.perms||[],active:true,last_seen_at:null,created_at:new Date().toISOString()});return {data:{user_id:id,link:'https://x/a.html#staff='+'a'.repeat(64)},error:null}}

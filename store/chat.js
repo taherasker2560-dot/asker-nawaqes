@@ -133,9 +133,21 @@
   // a warehouse's chat (its name in the bot), and whether the name box is asked (a number that is not a warehouse's)
   let supplier = '', askName = false, forwarded = false;
   const whoText = () => (supplier ? `${TEXTS.supWho} · ${supplier}` : secret && name ? `${TEXTS.sub} · ${name}` : TEXTS.sub);
-  // what a warehouse sent goes to «الوارد»: the function reads what this chat sent and is not there yet
-  function forward() {
-    if (client && client.functions && secret) client.functions.invoke('arabic-shortages?chat=1', { body: { secret } }).catch(() => null);
+  // what a warehouse sent goes to «الوارد»: the function reads what this chat sent and is not there yet, a few at a time
+  // (each photo is read), so the page asks again while some are left (owner 2026-11-14: 6 photos, 2 waited)
+  let forwarding = false, forwardAgain = false;
+  async function forward() {
+    if (!client || !client.functions || !secret) return;
+    if (forwarding) { forwardAgain = true; return; }
+    forwarding = true;
+    try {
+      for (let i = 0; i < 10; i++) {
+        forwardAgain = false;
+        let left = 0;
+        try { const r = await client.functions.invoke('arabic-shortages?chat=1', { body: { secret } }); left = (r && r.data && r.data.left) || 0; } catch (e) { break; }
+        if (!left && !forwardAgain) break;
+      }
+    } finally { forwarding = false; }
   }
   const local = new Map(); // message id -> blob URL of what was sent from this page (photo / voice)
   if (secret && !/^[0-9a-f]{64}$/.test(secret)) { keep.set(null); secret = null; }
