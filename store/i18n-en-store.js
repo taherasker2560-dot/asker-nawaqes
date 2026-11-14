@@ -5,6 +5,12 @@
 window.AskerEN = {
  "exact": {
   "صيدلية عسكر": "Asker Pharmacy",
+  "✏️ عدّل": "✏️ Edit",
+  "✖ اقفل التعديل": "✖ Close editing",
+  "بيستخدم في": "Used for",
+  "مميزاته": "Features",
+  "تنبيهات وأضرار": "Warnings and side effects",
+  "المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.": "This information is for introduction only and does not replace asking the pharmacist or the doctor.",
   "لوجو صيدلية عسكر": "Asker Pharmacy logo",
   "نسخة تجريبية": "Trial version",
   "الرئيسية": "Home",

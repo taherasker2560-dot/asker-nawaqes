@@ -15,11 +15,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
     <link rel="stylesheet" href="store/look.css?v=en-20261112d" />
-    <link rel="stylesheet" href="store/polish.css?v=notme-20261114a" />
+    <link rel="stylesheet" href="store/polish.css?v=edit-20261114a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=look-20261112a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=notme-20261114a"></script>
+    <script src="store/i18n-en-store.js?v=edit-20261114a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=acct-20261113b"></script>
   </head>
@@ -279,6 +279,8 @@
       <div class="sheet-card">
         <button type="button" class="sheet-x" data-close aria-label="اقفل">×</button>
         <div id="shPic" class="sh-pic"></div>
+        <button type="button" id="shEditBtn" class="sh-edit-btn" hidden>✏️ عدّل</button>
+        <div id="shEdit" class="sh-edit" hidden></div>
         <h2 id="shName" dir="ltr"></h2>
         <p id="shAr" class="sh-ar"></p>
         <div class="sh-row"><span id="shPrice" class="price"></span><span id="shBadge" class="badge"></span></div>
@@ -293,6 +295,7 @@
           <button type="button" id="shAdd" class="add"></button>
         </div>
         <a id="shRxBtn" href="#cart" class="hero-btn" hidden>ابعت الروشتة</a>
+        <div id="shDesc" class="sh-desc"></div>
         <button type="button" id="shShare" class="share">
           <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
           ابعت الصنف لحد
@@ -332,7 +335,8 @@
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
     <script src="store/account.js?v=notme-20261114a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=chat-20261113a"></script>
+    <script src="store/store.js?v=edit-20261114a"></script>
+    <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>
 </html>

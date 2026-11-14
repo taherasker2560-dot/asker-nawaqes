@@ -21,6 +21,8 @@ for(const v of S.SECTIONS)check(v.name);
 for(const v of S.NEEDS)check(v.name);
 for(const v of Object.values(S.ORDER_STATUS))check(typeof v==='string'?v:v.label);
 for(const v of Object.values(S.ERRORS))check(v);
+// item description titles and its note (2026-11-14); the description text itself stays Arabic (translate=no)
+for(const [,t] of S.DESC_SECTIONS)check(t);check('المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.');check('✖ اقفل التعديل');
 // «حسابي» (store/account.js, 2026-11-13): its fixed texts and the ones it builds
 const A=require('../store/account.js');
 for(const v of Object.values(A.TEXTS))check(v);
