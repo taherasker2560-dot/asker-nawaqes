@@ -27,6 +27,12 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- the apps that open the bot's web address (his installed bot app is a Chrome WebAPK) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
         <package android:name="com.whatsapp" />
     </queries>
 

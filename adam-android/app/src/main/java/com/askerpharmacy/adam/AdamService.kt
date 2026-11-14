@@ -376,7 +376,7 @@ class AdamService : Service() {
                 .setStyle(Notification.BigTextStyle().bigText(text))
                 .setAutoCancel(true)
             if (openUrl != null) {
-                val pi = PendingIntent.getActivity(this, 1, Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                val pi = PendingIntent.getActivity(this, 1, Actions.viewIntent(this, openUrl), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
                 b.setContentIntent(pi)
                 b.addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_menu_view), "افتح", pi).build())
             }
