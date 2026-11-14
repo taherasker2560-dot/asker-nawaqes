@@ -219,7 +219,21 @@
     const pr = it.status === 'available' && Number(it.price) > 0 ? ` بـ ${money(it.price)} جنيه` : '';
     return `${nm}${pr} من صيدلية عسكر، اطلبه من هنا: ${link}`;
   }
-  const api = { cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  // بيان الصنف (2026-11-14): جملة تسويقية + بيستخدم في / مميزاته / تنبيهات، وتحته إن ده مش بديل عن الصيدلي
+  const DESC_SECTIONS = [['u', 'بيستخدم في', ''], ['f', 'مميزاته', ''], ['w', 'تنبيهات وأضرار', ' warn']];
+  function descHtml(d) {
+    if (!d || typeof d !== 'object') return '';
+    const e = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const list = (a) => (Array.isArray(a) ? a.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5) : []);
+    const parts = DESC_SECTIONS.map(([k, title, cls]) => {
+      const l = list(d[k]);
+      return l.length ? `<div class="ds-sec${cls}"><h4>${title}</h4><ul>${l.map((x) => `<li translate="no">${e(x)}</li>`).join('')}</ul></div>` : '';
+    }).join('');
+    const h = String(d.h || '').trim();
+    if (!h && !parts) return '';
+    return `${h ? `<p class="ds-hook" translate="no">${e(h)}</p>` : ''}${parts}<p class="ds-note">المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.</p>`;
+  }
+  const api = { descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -233,6 +247,7 @@
   // «الرسايل» (store/chat.js, owner 2026-11-13): our own messages page
   const chat = root.AskerStoreChat || null;
   const COLS = 'id,name,arabic_name,status,price,cat,needs_rx';
+  const DESC_SHARDS = 20, DESC_VER = '20261114a';
   const PAGE = 40;
   const $ = (id) => document.getElementById(id);
   // the name read out for an item (screen readers, photo text): the English name in English, else the Arabic one if any
@@ -274,9 +289,40 @@
     baby: '<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M10.5 8h.01M13.5 8h.01"/>',
     supplies: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M12 11v5M9.5 13.5h5"/>',
   };
+  // تعديلات صاحب الصيدلية من الموقع نفسه (ar_store_edits، 2026-11-14): صورة تانية / من غير صورة / بيان بتاعه / من غير بيان
+  let edits = {};
+  const EDIT_IMG = SUPABASE_URL + '/storage/v1/object/public/ar-store-img/';
+  function picSrc(it) {
+    const e = edits[it.id];
+    if (e && e.img_off) return null;
+    if (e && e.img) return EDIT_IMG + e.img;
+    return pics[it.id] ? 'store/img/' + pics[it.id] : null;
+  }
+  async function loadEdits() {
+    try {
+      const { data, error } = await client.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off');
+      if (error || !Array.isArray(data)) return;
+      edits = {}; for (const r of data) edits[r.item_id] = r;
+      drawList(!$('more').hidden); if (sheetItem) drawSheet();
+    } catch (e) { /* the table is not there yet: the site works as before */ }
+  }
+  // بيان الصنف (2026-11-14): store/desc/<id % 20>.json = {t: [{h,u,f,w}], i: {id: رقم البيان}}، بيتحمّل لما تفتح صنف بس
+  const descShards = {};
+  function descShard(id) {
+    const n = Number(id) % DESC_SHARDS;
+    if (!descShards[n]) descShards[n] = fetch(`store/desc/${n}.json?v=${DESC_VER}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    return descShards[n];
+  }
+  async function descOf(id) {
+    const e = edits[id];
+    if (e && e.desc_off) return null;
+    if (e && e.descr) return e.descr;
+    const s = await descShard(id);
+    return s && s.i && s.i[id] != null ? s.t[s.i[id]] || null : null;
+  }
   function thumb(it) {
-    const f = pics[it.id];
-    if (f) return `<div class="thumb" data-open="${it.id}"><img src="store/img/${esc(f)}" alt="" loading="lazy"></div>`;
+    const src = picSrc(it);
+    if (src) return `<div class="thumb" data-open="${it.id}"><img src="${esc(src)}" alt="" loading="lazy"></div>`;
     return `<div class="thumb card c-${cardInfo(it).sec}" data-open="${it.id}" aria-hidden="true">${cardHtml(it)}</div>`;
   }
   function cardHtml(it) {
@@ -290,6 +336,7 @@
       if (r.ok) pics = await r.json();
     } catch (e) { pics = {}; }
     drawList(!$('more').hidden);
+    if (sheetItem) drawSheet(); // an item opened from a link before the photo list came
   }
 
   function saveCart() {
@@ -516,9 +563,11 @@
   function drawSheet() {
     const it = sheetItem;
     if (!it) return;
-    const f = pics[it.id], st = STATUS[it.status] || STATUS.on_order;
+    const f = picSrc(it), st = STATUS[it.status] || STATUS.on_order;
     $('shPic').className = 'sh-pic' + (f ? '' : ' card c-' + cardInfo(it).sec);
-    $('shPic').innerHTML = f ? `<img src="store/img/${esc(f)}" alt="صورة ${esc(label(it))}">` : cardHtml(it);
+    $('shPic').innerHTML = f ? `<img src="${esc(f)}" alt="صورة ${esc(label(it))}">` : cardHtml(it);
+    drawDesc(it);
+    if (root.AskerStoreEdit) root.AskerStoreEdit.onSheet(it);
     $('shName').textContent = it.name;
     $('shAr').textContent = it.arabic_name || '';
     $('shAr').hidden = !it.arabic_name;
@@ -539,6 +588,20 @@
         <button type="button" class="add sm" data-add="${a.id}">${cart.find((x) => x.id === a.id) ? 'في السلة +' : 'ضيف'}</button></div>`).join('')}
       <span class="hint-sm">اتأكد مع الصيدلي قبل ما تغيّر الدوا</span></div>` : '';
   }
+  async function drawDesc(it) {
+    const box = $('shDesc');
+    if (!box) return;
+    if (box.dataset.id !== String(it.id)) { box.innerHTML = ''; box.dataset.id = it.id; }
+    const d = await descOf(it.id);
+    if (sheetItem !== it) return;
+    box.innerHTML = descHtml(d);
+  }
+  // for store/edit.js (the owner's «✏️ عدّل»)
+  root.AskerStore = {
+    client, SUPABASE_URL, SUPABASE_KEY, EDIT_IMG,
+    edits: () => edits, picSrc, descOf, pics: () => pics,
+    setEdit(id, row) { if (row) edits[id] = row; else delete edits[id]; drawList(!$('more').hidden); if (sheetItem) drawSheet(); },
+  };
   function sheetAdd() {
     const it = sheetItem;
     if (!it || !canAdd(it)) return;
@@ -854,4 +917,5 @@
   }
   loadPopular();
   loadPics();
+  loadEdits();
 })(typeof window === 'undefined' ? globalThis : window);

@@ -266,3 +266,28 @@ html.night .ch-ok { background: #183524; border-color: #2f6b45; color: #bdf0cd; 
 .ch-me { margin: 0 4px 8px; font-size: 13px; color: var(--muted, #6b7280); text-align: center; }
 .ch-me .linklike, .ac-notmine { background: none; border: 0; padding: 0; color: var(--accent-text, var(--accent)); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .ac-notmine { font-size: 13px; margin-top: 10px; }
+
+/* بيان الصنف + «✏️ عدّل» لصاحب الصيدلية (owner 2026-11-14) */
+.sh-desc:empty { display: none; }
+.sh-desc { margin-top: 12px; text-align: start; }
+.ds-hook { margin: 0 0 8px; padding: 10px 12px; border-radius: 14px; background: var(--accent-soft); font-weight: 600; font-size: 14px; line-height: 1.65; }
+.ds-sec { border-top: 1px solid var(--line); padding: 8px 2px; }
+.ds-sec h4 { margin: 0 0 4px; font-size: 13.5px; }
+.ds-sec ul { margin: 0; padding-inline-start: 20px; font-size: 13.5px; line-height: 1.75; }
+.ds-sec.warn h4 { color: #b45309; }
+.ds-note { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
+.sh-edit-btn { display: block; margin: 8px auto 0; border: 0; border-radius: 99px; padding: 6px 16px; background: #13213a; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.sh-edit { margin-top: 10px; padding: 12px; border: 1px dashed var(--accent); border-radius: 18px; background: var(--card); text-align: start; }
+.sh-edit h3 { margin: 4px 0 8px; font-size: 14px; }
+.ed-cands { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
+.ed-c { flex: 0 0 84px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px; border: 2px solid var(--line); border-radius: 12px; background: #fff; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer; }
+.ed-c img { width: 72px; height: 72px; object-fit: contain; }
+.ed-c.on { border-color: #16a34a; color: #16a34a; cursor: default; justify-content: center; min-height: 92px; }
+.ed-btn { display: block; width: 100%; margin: 0 0 7px; padding: 10px; border: 0; border-radius: 14px; background: var(--accent-soft); color: var(--accent-text, var(--accent)); font: inherit; font-size: 13.5px; font-weight: 700; text-align: center; cursor: pointer; }
+.ed-btn.red { background: #fdecec; color: #b91c1c; }
+.ed-form label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+.ed-form textarea { display: block; width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 13.5px; background: var(--card); color: inherit; resize: vertical; }
+.ed-note { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: #16a34a; text-align: center; }
+.ed-note.bad { color: #b91c1c; }
+/* a long item page (with its description) scrolls; nothing in it is squeezed, the photo included */
+.sheet-card > * { flex-shrink: 0; }
