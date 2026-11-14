@@ -62,6 +62,9 @@
                 <action android:name="com.askerpharmacy.adam.SET_CONFIG" />
                 <action android:name="com.askerpharmacy.adam.ASK" />
                 <action android:name="com.askerpharmacy.adam.STOP" />
+                <action android:name="com.askerpharmacy.adam.SET_VOICE" />
+                <action android:name="com.askerpharmacy.adam.VOICES" />
+                <action android:name="com.askerpharmacy.adam.SAY" />
             </intent-filter>
         </receiver>
 

@@ -4,7 +4,7 @@
 name: adam-apk
 on:
   push:
-    branches: [main, adam-voice]
+    branches: [main, 'adam-**']
     paths:
       - 'adam-android/**'
       - '.github/workflows/adam-apk.yml'
