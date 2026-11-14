@@ -18,7 +18,8 @@ export const EXTRACT_PROMPT = [
   'kind واحدة بس: availability (بيسأل عن صنف موجود ولا بكام، أو عايز يطلب أصناف)، account (حسابه أو اللي عليه)، order (طلبه وصل فين)،',
   'rx (بعت روشتة أو صورة روشتة)، dose (جرعة أو طريقة استخدام دوا)، money (دفع أو فلوس أو فاتورة)، complaint (شكوى أو زعل)، other (سلام أو أي حاجة تانية).',
   'items: كل دوا أو منتج اتذكر في الرسايل المستنية رد أو اتقرا من صورة روشتة أو علبة: name زي ما اتكتب أو اتقرا، english اسمه التجاري بالإنجليزي',
-  'لو تعرفه (مع التركيز والشكل لو باينين، زي PANADOL COLD & FLU أو AUGMENTIN 1G TAB)، qty العدد لو اتقال.',
+  'لو تعرفه (مع التركيز والشكل لو باينين، زي PANADOL COLD & FLU أو AUGMENTIN 1G TAB، والتركيز اللي قاله زي ٥٠٠ أو ٣٠٠ لازم يبقى فيه)، qty العدد (لو ما قالش: 1)،',
+  'unit: part لو طلب شريط أو أمبول أو كيس أو حباية/وحدة، وbox لو طلب علبة أو ما حددش.',
   'summary: سطر واحد بالعربي: هو عايز إيه.',
 ].join('\n');
 export const EXTRACT_SCHEMA = {
@@ -26,19 +27,23 @@ export const EXTRACT_SCHEMA = {
   properties: {
     kind: { type: 'STRING', enum: [...KINDS] },
     summary: { type: 'STRING' },
-    items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, qty: { type: 'INTEGER' } }, required: ['name'] } },
+    items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, qty: { type: 'INTEGER' }, unit: { type: 'STRING', enum: ['box', 'part'] } }, required: ['name'] } },
   },
   required: ['kind', 'items'],
 };
 export const REPLY_PROMPT = [
   'إنت صيدلي في صيدلية عسكر بترد على عميل في صفحة الرسايل بتاعتنا، بالعامية المصرية، ومن غير ما تقول إنك بوت.',
-  'الأسلوب: دافي ولطيف زي صيدلي بيحب زباينه، مش ناشف ولا رسمي. ابدأ بتحية قصيرة (أهلًا بيك، أو أهلًا يا فندم، أو باسمه لو معروف)،',
-  'واستخدم كلام زي «من عينينا» و«تحت أمرك» و«ألف سلامة عليك» لما يناسب، واختم بسؤال لطيف. ممكن إيموجي واحد خفيف (😊 أو 🌿) لو مناسب.',
-  'الطول: من سطرين لـ 5 سطور.',
+  'الأسلوب: لطيف ومحترم، مش ناشف ولا رسمي، ومن غير مجاملات زيادة.',
+  '- لو «أول رد في المحادثة: أيوه»: ابدأ بتحية قصيرة دافية (أهلًا بيك، أو أهلًا يا فندم، أو باسمه لو معروف).',
+  '- لو «أول رد في المحادثة: لأ»: ادخل في الموضوع على طول، من غير تحية ومن غير «يا فندم» في كل جملة ومن غير اعتذار من غير سبب.',
+  '- اختم بسؤال قصير لو محتاج رد منه (زي: تحب نجهزهم؟).',
+  'الطول: سطر لـ 4 سطور، وأطول بس لو فيه حساب أصناف.',
   'القواعد:',
   '- استخدم المعلومات اللي في facts بس. ما تألفش سعر ولا وجود صنف ولا رصيد ولا حالة طلب.',
   '- صنف متوفر: اسمه وسعره بالجنيه (مثلا 59 ج)، واسأله تحب نجهزهولك أو نبعتهولك.',
-  '- لو طلب شريط أو أمبول أو وحدة (مش علبة)، قوله سعر الشريط أو الوحدة من facts، مش سعر العلبة. ولو العدد اللي طلبه معروف، احسبله الإجمالي.',
+  '- لو طلب شريط أو أمبول أو وحدة (مش علبة)، قوله سعر الشريط أو الوحدة من facts، مش سعر العلبة.',
+  '- لو في facts «الحساب»: اكتبه زي ما هو بالظبط، صنف في سطر (الاسم، الكمية، السعر)، وبعدين الإجمالي. ما تحسبش إنت حاجة ولا تغيّر رقم.',
+  '  ولو فيه أصناف في «محتاج يحدد» اسأله يقصد أنهي واحد منهم (بأسعارهم)، ولو فيه «مش متوفر» قوله.',
   '- صنف بالطلب: قول إنه بالطلب ونقدر نجيبهوله، واسأله يحب نطلبه.',
   '- صنف مش متوفر أو مش لاقيينه في facts: قول إنه مش متوفر دلوقتي، واعرض نشوفله بديل.',
   '- لو في facts أكتر من صنف قريب من اللي طلبه ومش واضح أنهي: اسأله يقصد أنهي.',
@@ -81,6 +86,43 @@ export function itemFact(it: Item, st?: Stock): string {
     : parts > 1 ? ` · العلبة ${money(price)} (فيها ${parts}) · ${partWord(it.name)} ${money(Math.round((Number(price) / parts) * 100) / 100)}`
     : ` · ${money(price)}`;
   return `${it.name}${it.arabic_name ? ` (${it.arabic_name})` : ''}: ${STATUS_AR[it.status] || it.status}${priceText}` + (st?.packs ? ` · ${Number(st.packs)} علبة` : '');
+}
+const ascii = (s: string) => String(s || '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+// which store item he means (owner 2026-11-14 «لما العميل يطلب كذا صنف مرة واحدة يجهزله حسابهم كام»): every number he said
+// (500, 300) must be in the name, then the most of his words; one best (or one in stock among the best) is chosen, else
+// he is asked which (choices)
+export function pickItem(asked: { name?: string; english?: string }, hits: Item[]): { item: Item | null; choices: Item[] } {
+  if (!hits.length) return { item: null, choices: [] };
+  const words = searchTerms(ascii(`${asked.english || ''} ${asked.name || ''}`)).map((w) => w.toUpperCase());
+  const nums = [...new Set(words.filter((w) => /^\d+(\.\d+)?$/.test(w)))], names = words.filter((w) => !/^\d/.test(w));
+  const text = (it: Item) => ascii(`${it.name} ${it.arabic_name || ''}`).toUpperCase();
+  let left = hits.filter((it) => nums.every((n) => new RegExp(`(^|[^0-9.])${n.replace('.', '\\.')}([^0-9]|$)`).test(text(it))));
+  if (!left.length) return { item: null, choices: hits.slice(0, 4) };
+  const score = (it: Item) => names.filter((w) => text(it).includes(w)).length;
+  const best = Math.max(...left.map(score));
+  left = left.filter((it) => score(it) === best);
+  if (left.length === 1) return { item: left[0], choices: [] };
+  const inStock = left.filter((it) => it.status === 'available');
+  if (inStock.length === 1) return { item: inStock[0], choices: [] };
+  return { item: null, choices: (inStock.length ? inStock : left).slice(0, 4) };
+}
+type Asked = { name?: string; english?: string; qty?: number; unit?: string };
+// the bill, worked out here (never by Gemini): each chosen item in stock × what he asked (a strip / a box), and the total
+export function billFacts(lines: { asked: Asked; item: Item | null; choices: Item[] }[], stock: Stock[]): string[] {
+  const out: string[] = [], bill: string[] = [];
+  let total = 0;
+  for (const { asked, item, choices } of lines) {
+    const label = asked.name || asked.english || '';
+    if (!item) { if (choices.length) out.push(`محتاج يحدد «${label}»: ` + choices.map((c) => `${c.name}${c.price != null && c.status !== 'unavailable' ? ` ${money(c.price)}` : ''} (${STATUS_AR[c.status] || c.status})`).join('، ')); continue; }
+    if (item.status !== 'available' || item.price == null) { out.push(`${item.status === 'on_order' ? 'بالطلب' : 'مش متوفر'}: ${item.name}`); continue; }
+    const st = stock.find((s) => s.item_id === item.id), parts = Number(st?.parts) || 1, qty = Math.max(1, Math.min(100, Math.round(Number(asked.qty) || 1)));
+    const part = asked.unit === 'part' && parts > 1, each = part ? Math.round((Number(item.price) / parts) * 100) / 100 : Number(item.price);
+    const unitWord = part ? partWord(item.name).replace(/^ال/, '') : 'علبة', sum = Math.round(each * qty * 100) / 100;
+    total += sum;
+    bill.push(`${item.name}${item.arabic_name ? ` (${item.arabic_name})` : ''} · ${qty} ${unitWord} × ${money(each)} = ${money(sum)}`);
+  }
+  if (bill.length) out.unshift('الحساب:\n' + bill.join('\n') + `\nالإجمالي: ${money(Math.round(total * 100) / 100)}`);
+  return out;
 }
 export function accountFact(balance: number, stopped: boolean): string {
   const b = Number(balance) || 0;
@@ -146,22 +188,23 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   const talk = talkText(history, waiting[0].id);
   const ask = await gem(env, fetchImpl, [{ text: EXTRACT_PROMPT + '\n\nالمحادثة:\n' + talk }, ...photos], EXTRACT_SCHEMA);
   const kind: Kind = (KINDS as readonly string[]).includes(String(ask.kind)) ? ask.kind as Kind : 'other';
-  const named = (Array.isArray(ask.items) ? ask.items : []).slice(0, MAX_ITEMS) as { name?: string; english?: string; qty?: number }[];
-  // the facts: each named item in the store (with its boxes in stock), his account, his orders
+  const named = (Array.isArray(ask.items) ? ask.items : []).slice(0, MAX_ITEMS) as Asked[];
+  // the facts: each named item in the store (with its boxes in stock), the bill, his account, his orders
   const facts: string[] = [];
-  const found: Item[] = [];
+  const found: Item[] = [], asked: { asked: Asked; hits: Item[] }[] = [];
   for (const n of named) {
-    let terms = searchTerms(n.english || n.name || '').slice(0, 2), hits: Item[] = [];
+    let terms = searchTerms(n.english || n.name || '').slice(0, 3), hits: Item[] = [];
     if (terms.length) hits = await rows('/rest/v1/' + itemsPath(terms)) as Item[];
     if (!hits.length && terms.length > 1) hits = await rows('/rest/v1/' + itemsPath(terms.slice(0, 1))) as Item[];
     if (!hits.length && n.english && n.name) { terms = searchTerms(n.name).slice(0, 2); if (terms.length) hits = await rows('/rest/v1/' + itemsPath(terms)) as Item[]; }
     if (!hits.length) facts.push(`${n.name}: مش لاقيينه في أصنافنا`);
-    found.push(...hits);
+    found.push(...hits); asked.push({ asked: n, hits });
   }
   const ids = [...new Set(found.map((x) => x.id))];
   const stock = ids.length ? await rows(`/rest/v1/ar_stock?select=item_id,packs,units,parts,price&item_id=in.(${ids.join(',')})`) as Stock[] : [];
   const seen = new Set<number>();
   for (const it of found) { if (seen.has(it.id)) continue; seen.add(it.id); facts.push(itemFact(it, stock.find((s) => s.item_id === it.id))); }
+  facts.unshift(...billFacts(asked.filter((a) => a.hits.length).map((a) => ({ asked: a.asked, ...pickItem(a.asked, a.hits) })), stock));
   if (chat.customer_id) {
     const c = (await rows(`/rest/v1/ar_customers?select=balance&id=eq.${chat.customer_id}&limit=1`))[0] as { balance?: number } | undefined;
     const stopped = (await rows(`/rest/v1/ar_customer_stops?select=customer_id&customer_id=eq.${chat.customer_id}&limit=1`)).length > 0;
@@ -169,8 +212,10 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   } else if (kind === 'account') facts.push('العميل ده كاش، مالوش حساب آجل عندنا');
   const orFilter = chat.customer_id ? `customer_id=eq.${chat.customer_id}` : chat.phone ? `phone=eq.${chat.phone}` : '';
   if (orFilter) for (const o of await rows(`/rest/v1/ar_store_orders?select=id,status,total,created_at&${orFilter}&order=id.desc&limit=3`) as { id: number; status: string; total: number; created_at: string }[]) facts.push(orderFact(o));
-  const out = await gem(env, fetchImpl, [{ text: REPLY_PROMPT + '\n\nاسم العميل: ' + (chat.name || 'مش معروف') + '\n\nالمحادثة:\n' + talk + '\n\nهو عايز: ' + String(ask.summary || '') + '\n\nfacts:\n' + (facts.join('\n') || '(مفيش)') }, ...photos], REPLY_SCHEMA);
+  // the greeting only once (owner 2026-11-14: «الكلام دافى بس فى اول المحادثه»): the pharmacy answered him before = not first
+  const first = !history.some((m) => m.sender === 'pharmacy');
+  const out = await gem(env, fetchImpl, [{ text: REPLY_PROMPT + '\n\nاسم العميل: ' + (chat.name || 'مش معروف') + '\nأول رد في المحادثة: ' + (first ? 'أيوه' : 'لأ') + '\n\nالمحادثة:\n' + talk + '\n\nهو عايز: ' + String(ask.summary || '') + '\n\nfacts:\n' + (facts.join('\n') || '(مفيش)') }, ...photos], REPLY_SCHEMA);
   const body = String(out.body || '').replace(/\s+\n/g, '\n').trim().slice(0, 2000);
   if (!body) throw new Error('empty answer');
-  return { draft: { for_msg: last.id, kind, body, facts: facts.slice(0, 20) } };
+  return { draft: { for_msg: last.id, kind, body, facts: facts.slice(0, 24) } };
 }

@@ -20,6 +20,24 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.equal(D.partWord('AUGMENTIN 1GM 14 F.C.T'), 'الشريط');assert.equal(D.partWord('VOLTAREN 75MG 6 AMP'), 'الأمبول');
   assert.equal(D.partWord('SMECTA 30 SACHETS'), 'الكيس');assert.equal(D.partWord('BABY SHAMPOO'), 'الوحدة');
   assert.match(D.REPLY_PROMPT, /مش ناشف/);assert.match(D.REPLY_PROMPT, /سعر الشريط أو الوحدة من facts، مش سعر العلبة/);
+  // several items at once: the right one picked, the bill worked out here (owner 2026-11-14 «يجهزله حسابهم كام»)
+  const EX = { id: 68432, name: 'PANADOL EXTRA 48 TAB', arabic_name: 'بانادول اكسترا ٤٨ قرص', status: 'available', price: 116 };
+  const EXo = { id: 9, name: '*PANADOL EXTRA 24TAB S.A.', status: 'on_order', price: null };
+  const AD = { id: 2, name: 'PANADOL ADVANCE 48TAB', status: 'available', price: 92 }, CF = { id: 3, name: 'PANADOL COLD/FLU DAY TAP', status: 'available', price: 76 };
+  const AB5 = { id: 5, name: 'ABIMOL 500MG 20TAB', arabic_name: 'ابيمول ٥٠٠ مجم ٢٠ قرص', status: 'available', price: 24 }, ABX = { id: 6, name: 'ABIMOL EXTRA 20TAB', status: 'available', price: 28 };
+  assert.equal(D.pickItem({ name: 'بنادول اكسترا', english: 'PANADOL EXTRA' }, [EX, EXo]).item.id, 68432, 'the one in stock among the best');
+  assert.equal(D.pickItem({ name: 'ابيمول ٥٠٠', english: 'ABIMOL 500MG' }, [ABX, AB5]).item.id, 5, 'the number he said decides');
+  const amb = D.pickItem({ name: 'بنادول', english: 'PANADOL' }, [EX, AD, CF]);
+  assert.equal(amb.item, null); assert.deepEqual(amb.choices.map((c) => c.id), [68432, 2, 3], 'he is asked which');
+  const facts = D.billFacts([
+    { asked: { name: 'بنادول اكسترا', qty: 2, unit: 'part' }, item: EX, choices: [] },
+    { asked: { name: 'ابيمول ٥٠٠', unit: 'box' }, item: AB5, choices: [] },
+    { asked: { name: 'بنادول' }, item: null, choices: [AD, CF] },
+    { asked: { name: 'بنادول اكسترا ٢٤' }, item: EXo, choices: [] }], [{ item_id: 68432, parts: 4 }, { item_id: 5, parts: 2 }]);
+  assert.deepEqual(facts, ['الحساب:\nPANADOL EXTRA 48 TAB (بانادول اكسترا ٤٨ قرص) · 2 شريط × 29 ج = 58 ج\nABIMOL 500MG 20TAB (ابيمول ٥٠٠ مجم ٢٠ قرص) · 1 علبة × 24 ج = 24 ج\nالإجمالي: 82 ج',
+    'محتاج يحدد «بنادول»: PANADOL ADVANCE 48TAB 92 ج (متوفر)، PANADOL COLD/FLU DAY TAP 76 ج (متوفر)', 'بالطلب: *PANADOL EXTRA 24TAB S.A.']);
+  // the greeting only in the first answer
+  assert.match(D.REPLY_PROMPT, /أول رد في المحادثة: لأ.*ادخل في الموضوع على طول/s);
   assert.equal(D.itemFact({ id: 3, name: 'Y', status: 'on_order', price: null }, { item_id: 3, price: 33 }), 'Y: بالطلب · 33 ج');
   assert.equal(D.accountFact(7174.5, false), 'حسابه: عليه 7,174.5 ج');
   assert.equal(D.accountFact(-200, true), 'حسابه: له 200 ج · الآجل موقوف');
@@ -68,12 +86,14 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.equal(f.drafts.length, 1);
   const d = f.drafts[0];
   assert.deepEqual([d.chat_id, d.for_msg, d.kind, d.body, d.status], [CHAT, 11, 'availability', 'أيوه متوفر بـ 59 ج، تحب نجهزهولك؟', 'ready']);
-  assert.deepEqual(d.facts, ['PANADOL COLD & FLU (بانادول كولد): متوفر · 59 ج · 12 علبة', 'حسابه: عليه 7,174.5 ج', 'طلب رقم 77: وصل الصيدلية · 66.7 ج · 2026-11-13']);
+  assert.deepEqual(d.facts, ['الحساب:\nPANADOL COLD & FLU (بانادول كولد) · 1 علبة × 59 ج = 59 ج\nالإجمالي: 59 ج',
+    'PANADOL COLD & FLU (بانادول كولد): متوفر · 59 ج · 12 علبة', 'حسابه: عليه 7,174.5 ج', 'طلب رقم 77: وصل الصيدلية · 66.7 ج · 2026-11-13']);
+  assert.match(f.gem[1].contents[0].parts[0].text, /أول رد في المحادثة: لأ/, 'the pharmacy answered before: no greeting');
   assert.equal(f.sent.length, 0, 'the trial: nothing goes alone');
   assert.match(f.patched[0], /chat_id=eq\..*status=eq\.ready/, 'the older waiting suggestion becomes old');
   // the second Gemini call is given the facts and the rules, the first one the talk with the waiting messages marked
   assert.match(f.gem[0].contents[0].parts[0].text, /العميل \(مستنية رد\): عندكم بانادول كولد؟/);
-  assert.match(f.gem[1].contents[0].parts[0].text, /facts:\nPANADOL COLD & FLU/);
+  assert.match(f.gem[1].contents[0].parts[0].text, /facts:\nالحساب:\nPANADOL COLD & FLU/);
   assert.match(f.gem[1].contents[0].parts[0].text, /ما تألفش سعر/);
   // a kind the owner turned on goes at once as the pharmacy's answer
   f = fake({ msgs, auto: ['availability'] }); b = await (await F.handle(req({ action: 'draft', secret: SECRET }), env, f)).json();
