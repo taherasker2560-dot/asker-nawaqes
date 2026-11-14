@@ -17,8 +17,9 @@ object Config {
     fun botUrl(c: Context): String = p(c).getString("bot", DEFAULT_BOT) ?: DEFAULT_BOT
 
     /** The voice he chose (the engine's voice name, empty = the phone's default), its pitch (1.0 = normal, lower = deeper) and speed. */
-    fun voice(c: Context): String = p(c).getString("voice", "") ?: ""
-    fun pitch(c: Context): Float = p(c).getFloat("pitch", 0.85f)
+    // the owner's pick (2026-11-15, after hearing the four offline Arabic voices of Google's engine): number 4, a man's voice
+    fun voice(c: Context): String = p(c).getString("voice", "ar-xa-x-are-local") ?: "ar-xa-x-are-local"
+    fun pitch(c: Context): Float = p(c).getFloat("pitch", 1.0f)
     fun rate(c: Context): Float = p(c).getFloat("rate", 1.0f)
 
     fun saveVoice(c: Context, voice: String?, pitch: Float?, rate: Float?) {
