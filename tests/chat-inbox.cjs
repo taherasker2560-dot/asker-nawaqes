@@ -18,7 +18,8 @@ function fake({msgs,files={}}){const calls=[],saved=[],stored=[];const page=(u,a
   if(url.includes('/rest/v1/ar_chat_messages?')){assert.match(u,/chat_id=eq\.c1&sender=eq\.customer&inbox_at=is\.null&at=gte\./);return page(url,msgs.filter(m=>!m.inbox_at).map(({id,kind,body,media})=>({id,kind,body,media})))}
   if(url.includes('/storage/v1/object/ar-chat/')){const p=url.split('/ar-chat/')[1];return files[p]?new Response(files[p],{headers:{'content-type':p.endsWith('.pdf')?'application/pdf':'image/jpeg'}}):new Response('{}',{status:404})}
   if(url.includes('/storage/v1/object/ar-inbox/')){stored.push(url.split('/ar-inbox/')[1]);return new Response('{}')}
-  if(url.includes('/rest/v1/ar_inbox?select=id&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(()=>({id:'x'})));
+  if(url.includes('/rest/v1/ar_inbox?select=id,received_at,supplier,status&file_path=like.'))return page(url,saved.filter(r=>r.file_path&&url.includes(r.file_path.split('/')[1].split('.')[0])).map(r=>({id:r.id||'x',received_at:r.received_at||new Date().toISOString(),supplier:r.supplier,status:r.status||'new'})));
+  if(url.includes('/rest/v1/ar_inbox?id=eq.')&&o.method==='PATCH'){const id=decodeURIComponent(url.split('id=eq.')[1]);const r=saved.find(x=>x.id===id);if(r)Object.assign(r,JSON.parse(o.body));return new Response(null,{status:204})}
   if(url.includes('/rest/v1/ar_inbox')&&o.method==='POST'){const row=JSON.parse(o.body);if(saved.some(r=>r.chat_msg===row.chat_msg))return new Response('{}',{status:409});saved.push(row);return new Response('',{status:201})}
   if(url.includes('/rest/v1/ar_shortages'))return page(url,shortages);
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
@@ -46,10 +47,21 @@ r=await F.handle(post({secret:W}),env,f);j=await r.json();assert.deepEqual(j.don
 // a PDF; a file that cannot be fetched is given back for the next call; the same photo again is kept once
 msgs=[{id:5,kind:'file',body:'عروض.pdf',media:`c/${day}/22222222-2222-4333-8444-555555555555.pdf`},{id:6,kind:'photo',body:null,media:`c/${day}/22222222-2222-4333-8444-666666666666.jpg`},{id:7,kind:'photo',body:null,media:`c/${day}/22222222-2222-4333-8444-777777777777.jpg`}];
 f=fake({msgs,files:{[msgs[0].media]:PDF,[msgs[2].media]:JPG}});
-f.saved.push({chat_msg:99,file_path:'2026-11-13/'+require('node:crypto').createHash('sha256').update(JPG).digest('hex').slice(0,32)+'.jpg'});
-r=await F.handle(post({secret:W}),env,f);j=await r.json();assert.deepEqual(j.done,{5:'ok',6:'file',7:'duplicate'});
+// the same photo came yesterday from WhatsApp (another name, seen, hidden): it comes back as today's, under this warehouse,
+// from the link, and is said again (owner 2026-11-14 «بعت … ما وصلوش حاجة أصلا»)
+const HASH=require('node:crypto').createHash('sha256').update(JPG).digest('hex').slice(0,32),old=new Date(Date.now()-864e5).toISOString();
+f.saved.push({id:'old1',chat_msg:99,supplier:'واتس قديم',sender:'واتس',status:'seen',received_at:old,hidden_at:old,announced_at:old,via:null,file_path:'2026-11-13/'+HASH+'.jpg'});
+r=await F.handle(post({secret:W}),env,f);j=await r.json();assert.deepEqual(j.done,{5:'ok',6:'file',7:'again'});
 assert.equal(f.saved[1].kind,'pdf');assert.match(f.saved[1].file_path,/\.pdf$/);
 assert.equal(msgs[1].inbox_at,null,'given back');assert.ok(msgs[2].inbox_at);
+const o1=f.saved.find(x=>x.id==='old1');
+assert.deepEqual([o1.supplier,o1.sender,o1.via,o1.chat_msg,o1.status,o1.hidden_at,o1.announced_at],[SUP,'رابط المخزن','link',7,'new',null,null]);
+assert.ok(Date.now()-Date.parse(o1.received_at)<5000,'today\'s');
+assert.equal(f.saved.length,2,'no second row for the same photo (the PDF and the old row only)');
+// the same photo again a minute later from the same warehouse: only a repeat
+msgs.push({id:8,kind:'photo',body:null,media:`c/${day}/22222222-2222-4333-8444-888888888888.jpg`});f.files=null;
+f=fake({msgs,files:{[msgs[3].media]:JPG}});f.saved.push({...o1});
+j=await (await F.handle(post({secret:W}),env,f)).json();assert.equal(j.done[8],'duplicate');
 // at most 4 a call (a long list of photos goes over the next calls)
 msgs=Array.from({length:6},(_,i)=>({id:10+i,kind:'text',body:'بروفين ٤٠٠ '+i,media:null}));f=fake({msgs});
 j=await (await F.handle(post({secret:W}),env,f)).json();assert.equal(Object.keys(j.done).length,4);assert.equal(j.left,2);

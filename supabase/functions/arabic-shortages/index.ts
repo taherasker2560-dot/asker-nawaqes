@@ -1049,9 +1049,17 @@ async function linkItem(env: Env, fetchImpl: typeof fetch, base: string, sh: Rec
   let filePath: string | null = null;
   if (kind !== 'text') {
     const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-    // the same photo/file already in the inbox (sent twice, or from WhatsApp too): kept once
-    const dup = await restAll<{ id: string }>(env, sh, fetchImpl, 'ar_inbox?select=id&file_path=like.*' + hash + '*');
-    if (dup.length) return 'duplicate';
+    // the same photo/file already in the inbox (sent twice, or from WhatsApp too): read once. Sent again from the link after
+    // a while (the same list again; owner 2026-11-14 «بعت … ما وصلوش حاجة أصلا»): that row comes back as today's, under this
+    // warehouse, from the link, and is said again. The same one again within minutes is only a repeat.
+    const dup = await restAll<{ id: string; received_at: string; supplier: string | null; status: string }>(env, sh, fetchImpl, 'ar_inbox?select=id,received_at,supplier,status&file_path=like.*' + hash + '*');
+    if (dup.length) {
+      const d = dup[0];
+      if (d.supplier === supplier && Date.parse(d.received_at) > Date.now() - DUP_SILENT_MS) return 'duplicate';
+      const back = { received_at: new Date().toISOString(), hidden_at: null, sender: 'رابط المخزن', supplier, maybe: null, via: 'link', chat_msg: m.id, announced_at: null, status: d.status === 'seen' ? 'new' : d.status };
+      const w = await fetchImpl(`${base}/rest/v1/ar_inbox?id=eq.${encodeURIComponent(d.id)}`, { method: 'PATCH', body: JSON.stringify(back), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      return w.ok ? 'again' : 'save';
+    }
     const ext = kind === 'pdf' ? 'pdf' : kind === 'sheet' ? ((m.media || '').match(SHEET)?.[1] || (bytes[0] === 0xd0 ? 'xls' : 'xlsx')).toLowerCase() : 'jpg';
     filePath = `${new Date().toISOString().slice(0, 10)}/${hash}.${ext}`;
     const type = kind === 'pdf' ? 'application/pdf' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream';
