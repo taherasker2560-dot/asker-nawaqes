@@ -3,6 +3,15 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
+  "صورة الصنف وبيانه": "Item photo and description",
+  "مفيش بيان للصنف ده لسه. تقدر تكتبه من «✏️ عدّل».": "No description for this item yet. You can write one from «✏️ Edit».",
+  "✏️ عدّل الصورة أو البيان": "✏️ Edit the photo or the description",
+  "✖ اقفل التعديل": "✖ Close editing",
+  "بيستخدم في": "Used for",
+  "مميزاته": "Features",
+  "تنبيهات وأضرار": "Warnings and side effects",
+  "صورة الصنف": "Item photo",
+  "البيان": "Description",
   "بيعة جديدة": "New sale",
   "البيعات": "Sales",
   "تدخّل الصنف إزاي": "How to enter the item",

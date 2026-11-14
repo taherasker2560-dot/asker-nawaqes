@@ -1599,3 +1599,37 @@ small.ve-code { display: block; }
 .ve-lines td.exp { color: #9a3412; font-weight: 700; white-space: nowrap; }
 html.night .ve-lines td.exp { color: #fdba74; }
 .ve-ih { background: var(--card); border-radius: 12px; }
+/* صورة الصنف وبيانه جوه البوت (ar/item-media.js، owner 2026-11-14) */
+.hs-top { align-items: flex-start; }
+.im-th { flex: 0 0 56px; width: 56px; height: 56px; padding: 2px; margin-inline-end: 10px; border: 1px solid var(--line); border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
+.im-th img { width: 100%; height: 100%; object-fit: contain; }
+.im-th.im-none { background: linear-gradient(135deg, #1d4ed8, #0a3a8c); color: #fff; font: 700 9px/1.15 inherit; text-align: center; word-break: break-word; }
+.st-item.im-row { display: flex; align-items: flex-start; }
+.st-item.im-row .im-main { flex: 1; min-width: 0; }
+.im-sheet { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center; }
+.im-sheet[hidden] { display: none; }
+.im-bg { position: absolute; inset: 0; background: rgba(10, 20, 40, 0.45); }
+.im-card { position: relative; width: min(560px, 100%); max-height: 92vh; overflow-y: auto; background: var(--card); color: var(--ink); border-radius: 22px 22px 0 0; padding: 16px 16px 24px; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.2); }
+.im-x { position: absolute; top: 10px; inset-inline-end: 10px; width: 34px; height: 34px; border: 0; border-radius: 99px; background: var(--tint); color: var(--ink); font-size: 20px; cursor: pointer; z-index: 1; }
+.im-big { height: 220px; border: 1px solid var(--line); border-radius: 16px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 10px; }
+.im-big img { max-width: 92%; max-height: 92%; object-fit: contain; }
+.im-big span { color: #fff; background: linear-gradient(135deg, #1d4ed8, #0a3a8c); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; }
+.im-title { margin: 0 0 2px; font-size: 16px; }
+.im-desc { margin-top: 10px; }
+.im-hook { margin: 0 0 8px; padding: 9px 11px; border-radius: 12px; background: var(--tint); font-weight: 600; font-size: 14px; line-height: 1.65; }
+.im-sec { border-top: 1px solid var(--line); padding: 7px 2px; }
+.im-sec h4 { margin: 0 0 3px; font-size: 13.5px; }
+.im-sec ul { margin: 0; padding-inline-start: 20px; font-size: 13.5px; line-height: 1.7; }
+.im-sec.warn h4 { color: #b45309; }
+.im-edit-btn { display: block; width: 100%; margin-top: 12px; border: 0; border-radius: 99px; padding: 9px; background: #13213a; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+#imEdit { margin-top: 10px; padding: 12px; border: 1px dashed var(--crimson); border-radius: 16px; }
+#imEdit h4 { margin: 4px 0 8px; }
+.im-cands { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; }
+.im-c { flex: 0 0 84px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px; border: 2px solid var(--line); border-radius: 12px; background: #fff; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer; }
+.im-c img { width: 72px; height: 72px; object-fit: contain; }
+.im-btn { display: block; width: 100%; margin: 0 0 7px; padding: 10px; border: 0; border-radius: 14px; background: var(--tint); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 700; text-align: center; cursor: pointer; }
+.im-btn.red { background: #fdecec; color: #b91c1c; }
+.im-l { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }
+.im-l textarea { display: block; width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 13.5px; background: var(--card); color: inherit; resize: vertical; }
+.im-note { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: #16a34a; text-align: center; }
+.im-note.bad { color: #b91c1c; }
