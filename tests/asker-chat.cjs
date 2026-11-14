@@ -167,7 +167,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
         return new Response(JSON.stringify([{ id: 9, media: 'c/2026-11-14/w.jpg' }]));
       }
       if (u.pathname === '/rest/v1/ar_inbox' && !o.method) {
-        assert.ok(Math.abs(now - 30 * 864e5 - since('received_at')) < 5000, '30 days');
+        assert.ok(Math.abs(now - 2 * 864e5 - since('received_at')) < 5000, 'the inbox photos after 2 days (owner 2026-11-14 «كل يوم أو كل يومين بالكتير»)');
         return new Response(JSON.stringify([{ id: 'i1', file_path: '2026-10-01/aaa.jpg' }, { id: 'i2', file_path: 'docs/2026-10-01/inv.jpg' }]));
       }
       if (u.pathname.startsWith('/storage/v1/object/') && o.method === 'DELETE') return new Response('[]');

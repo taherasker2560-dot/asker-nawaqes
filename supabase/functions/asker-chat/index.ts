@@ -9,7 +9,7 @@
 //                                      staff with «خدمة العملاء» (ar_chat_staff_push), at most once a minute per chat; a
 //                                      warehouse's chat (its list from the link): owner and staff with «الوارد».
 //   POST {action:'what', endpoint}     (the bot's worker ar/sw.js, with its own saved push address): what the push was about.
-//   POST {action:'cleanup'}            (pg_cron at night): what is past its time is deleted (messages 7 days, inbox photos 30).
+//   POST {action:'cleanup'}            (pg_cron at night): what is past its time is deleted (messages 7 days, inbox photos 2).
 //   POST {action:'draft', secret}      (the customer's page after he sends): the bot's suggested answer (draft.ts), kept in
 //                                      ar_chat_drafts; sent at once only for a kind the owner let go alone (auto_kinds).
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), GEMINI_API_KEY, GEMINI_MODEL
@@ -24,8 +24,10 @@ const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const DEFAULT_SUBJECT = 'https://taherasker2560-dot.github.io/asker-nawaqes/';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const TIMEOUT_MS = 15000, GEMINI_TIMEOUT_MS = 45000, MAX_AUDIO = 8 * 1024 * 1024;
-// how long things are kept (the nightly clean-up): messages 7 days (owner 2026-11-14 «ب: 7 أيام»), the inbox's photos 30 days
-export const CHAT_KEEP_MS = 7 * 864e5, INBOX_KEEP_MS = 30 * 864e5;
+// how long things are kept (the nightly clean-up): messages 7 days (owner 2026-11-14 «ب: 7 أيام»); the inbox's photos 2 days
+// (owner 2026-11-14: «صور الوارد دي حاجة مؤقتة … اختار منها بتاعت النهاردة بس … المسح بتاعها عادي ممكن يبقى كل يوم أو كل
+// يومين بالكتير»; what was read from them stays); the bot's suggestions 30 days (the trial week's numbers)
+export const CHAT_KEEP_MS = 7 * 864e5, INBOX_KEEP_MS = 2 * 864e5, DRAFT_KEEP_MS = 30 * 864e5;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const VOICE_PROMPT = 'ده فويس من عميل لصيدلية في مصر. اكتب الكلام اللي اتقال بالظبط بالعامية المصرية زي ما اتقال، ' +
   'وأسامي الأدوية زي ما اتنطقت، من غير أي زيادة أو شرح أو علامات تنصيص. لو مفيش كلام مفهوم اكتب: (مش واضح)';
@@ -135,7 +137,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   // ---------- the nightly clean-up (owner 2026-11-14 «في حاجات كتيرة المفروض بتتمسح», his choice «ب: 7 أيام») ----------
   // pg_cron calls it at 04:00 Cairo (migration 202611141600). Only what is past its time goes, so a call at any other moment
   // changes nothing early: messages with their photos / voice notes / files after 7 days; a warehouse's files an hour after
-  // they went to «الوارد» (their copy stays there); the inbox's photos after 30 days. The invoices (ar-inbox docs/, kept on
+  // they went to «الوارد» (their copy stays there); the inbox's photos after 2 days. The invoices (ar-inbox docs/, kept on
   // the laptop in «المشتريات») and the customers' statements are never touched. At most 500 of each a call.
   if (body.action === 'cleanup') {
     const ago = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
@@ -161,7 +163,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const p = await call(`/rest/v1/ar_chat_messages?id=in.(${ids(read)})`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ media: null }) });
       if (p.ok) out.warehouseFiles = read.length;
     }
-    // 3) the inbox's photos / files after 30 days (the row and what was read from it stay)
+    // 3) the inbox's photos / files after 2 days (the row and what was read from it stay)
     const inbox = (await rows(`/rest/v1/ar_inbox?select=id,file_path&received_at=lt.${ago(INBOX_KEEP_MS)}&file_path=not.is.null&order=received_at&limit=500`) as { id: string; file_path: string }[])
       .filter((x) => !x.file_path.startsWith('docs/'));
     if (inbox.length && await removeFiles('ar-inbox', inbox.map((x) => x.file_path))) {
@@ -169,7 +171,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       if (p.ok) out.inboxFiles = inbox.length;
     }
     // 4) the bot's suggestions after 30 days (enough to judge the trial week); a chat's go with it
-    await call(`/rest/v1/ar_chat_drafts?created_at=lt.${ago(INBOX_KEEP_MS)}`, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
+    await call(`/rest/v1/ar_chat_drafts?created_at=lt.${ago(DRAFT_KEEP_MS)}`, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
     console.log('asker-chat cleanup', JSON.stringify(out));
     return reply(200, { ok: true, ...out }, headers);
   }
