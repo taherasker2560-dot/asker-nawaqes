@@ -103,7 +103,8 @@
     el.textContent = text || '';
     el.className = 'status' + (kind ? ' ' + kind : '');
   }
-  const missing = (e) => /ar_sales|function|schema cache|does not exist|Could not find/i.test(String(e && (e.message || e)));
+  // the server's functions not there yet (a refusal is said as it is: «permission denied» = not signed in as the owner)
+  const missing = (e) => /schema cache|does not exist|Could not find/i.test(String(e && (e.message || e)));
   function args(extra) {
     const r = range(st.period, new Date(), st.custom);
     return Object.assign({ p_from: r.from, p_to: r.to, p_item: st.item ? st.item.id : null, p_customer: st.customer ? st.customer.id : null }, extra || {});
