@@ -38,6 +38,18 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
     'محتاج يحدد «بنادول»: PANADOL ADVANCE 48TAB 92 ج (متوفر)، PANADOL COLD/FLU DAY TAP 76 ج (متوفر)', 'بالطلب: *PANADOL EXTRA 24TAB S.A.']);
   // the greeting only in the first answer
   assert.match(D.REPLY_PROMPT, /أول رد في المحادثة: لأ.*ادخل في الموضوع على طول/s);
+  // his live test (2026-11-14 05:00): «شريطين بروفين ٤٠٠» = a box sold by the tablet: not priced as a strip, he is told;
+  // «علبة ابيمول ٥٠٠»: the amount word is not searched, the number is searched as 500 and ٥٠٠
+  assert.equal(D.partWord('BRUFEN 400 30 TAB', 30), 'القرص'); assert.equal(D.partWord('PANADOL ADVANCE 48TAB', 4), 'الشريط');
+  assert.equal(D.partWord('BRUFEN 600MG 30T', 3), 'الشريط'); assert.equal(D.partWord('NEXIUM 40MG 14 CAPS', 14), 'الكبسولة');
+  const BR = { id: 7, name: 'BRUFEN 400 30 TAB', status: 'available', price: 78 };
+  assert.deepEqual(D.billFacts([{ asked: { name: 'بروفين ٤٠٠', qty: 2, unit: 'strip' }, item: BR, choices: [] }], [{ item_id: 7, parts: 30 }]),
+    ['BRUFEN 400 30 TAB: بيتباع بالقرص مش بالشريط: القرص 2.6 ج، والعلبة (فيها 30) 78 ج. اسأله عايز كام']);
+  assert.deepEqual(D.billFacts([{ asked: { name: 'بروفين ٤٠٠', qty: 4, unit: 'piece' }, item: BR, choices: [] }], [{ item_id: 7, parts: 30 }]),
+    ['الحساب:\nBRUFEN 400 30 TAB · 4 قرص × 2.6 ج = 10.4 ج\nالإجمالي: 10.4 ج']);
+  assert.deepEqual(D.itemTerms('علبة ابيمول ٥٠٠'), ['ابيمول', '٥٠٠']);
+  assert.match(decodeURIComponent(D.itemsPath(['ابيمول', '٥٠٠'])), /or\(name\.ilike\.\*500\*,arabic_name\.ilike\.\*٥٠٠\*\)/);
+  assert.doesNotMatch(D.REPLY_PROMPT, /واعرض نشوفله بديل/, 'no words that get copied as they are');
   assert.equal(D.itemFact({ id: 3, name: 'Y', status: 'on_order', price: null }, { item_id: 3, price: 33 }), 'Y: بالطلب · 33 ج');
   assert.equal(D.accountFact(7174.5, false), 'حسابه: عليه 7,174.5 ج');
   assert.equal(D.accountFact(-200, true), 'حسابه: له 200 ج · الآجل موقوف');

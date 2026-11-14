@@ -18,8 +18,9 @@ export const EXTRACT_PROMPT = [
   'kind واحدة بس: availability (بيسأل عن صنف موجود ولا بكام، أو عايز يطلب أصناف)، account (حسابه أو اللي عليه)، order (طلبه وصل فين)،',
   'rx (بعت روشتة أو صورة روشتة)، dose (جرعة أو طريقة استخدام دوا)، money (دفع أو فلوس أو فاتورة)، complaint (شكوى أو زعل)، other (سلام أو أي حاجة تانية).',
   'items: كل دوا أو منتج اتذكر في الرسايل المستنية رد أو اتقرا من صورة روشتة أو علبة: name زي ما اتكتب أو اتقرا، english اسمه التجاري بالإنجليزي',
-  'لو تعرفه (مع التركيز والشكل لو باينين، زي PANADOL COLD & FLU أو AUGMENTIN 1G TAB، والتركيز اللي قاله زي ٥٠٠ أو ٣٠٠ لازم يبقى فيه)، qty العدد (لو ما قالش: 1)،',
-  'unit: part لو طلب شريط أو أمبول أو كيس أو حباية/وحدة، وbox لو طلب علبة أو ما حددش.',
+  'لو تعرفه (مع التركيز والشكل لو باينين، زي PANADOL COLD & FLU أو AUGMENTIN 1G TAB، والتركيز اللي قاله زي ٥٠٠ أو ٣٠٠ لازم يبقى فيه)،',
+  'ومن غير كلمات الكمية زي علبة وشريط وحباية في name ولا في english. qty العدد (لو ما قالش: 1؛ شريطين = 2)،',
+  'unit: strip لو طلب شريط أو أمبول أو كيس، piece لو طلب حباية أو قرص أو كبسولة، box لو طلب علبة أو ما حددش.',
   'summary: سطر واحد بالعربي: هو عايز إيه.',
 ].join('\n');
 export const EXTRACT_SCHEMA = {
@@ -27,7 +28,7 @@ export const EXTRACT_SCHEMA = {
   properties: {
     kind: { type: 'STRING', enum: [...KINDS] },
     summary: { type: 'STRING' },
-    items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, qty: { type: 'INTEGER' }, unit: { type: 'STRING', enum: ['box', 'part'] } }, required: ['name'] } },
+    items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { name: { type: 'STRING' }, english: { type: 'STRING' }, qty: { type: 'INTEGER' }, unit: { type: 'STRING', enum: ['box', 'strip', 'piece'] } }, required: ['name'] } },
   },
   required: ['kind', 'items'],
 };
@@ -45,7 +46,8 @@ export const REPLY_PROMPT = [
   '- لو في facts «الحساب»: اكتبه زي ما هو بالظبط، صنف في سطر (الاسم، الكمية، السعر)، وبعدين الإجمالي. ما تحسبش إنت حاجة ولا تغيّر رقم.',
   '  ولو فيه أصناف في «محتاج يحدد» اسأله يقصد أنهي واحد منهم (بأسعارهم)، ولو فيه «مش متوفر» قوله.',
   '- صنف بالطلب: قول إنه بالطلب ونقدر نجيبهوله، واسأله يحب نطلبه.',
-  '- صنف مش متوفر أو مش لاقيينه في facts: قول إنه مش متوفر دلوقتي، واعرض نشوفله بديل.',
+  '- صنف مش متوفر أو مش لاقيينه في facts: قول إنه مش متوفر دلوقتي، واسأله: تحب نشوفلك بديل؟',
+  '- لو في facts إن الصنف «بيتباع بالقرص» أو «بالشريط» غير اللي طلبه: قوله إزاي بيتباع وبكام، واسأله عايز كام.',
   '- لو في facts أكتر من صنف قريب من اللي طلبه ومش واضح أنهي: اسأله يقصد أنهي.',
   '- حسابه: المبلغ اللي عليه بالظبط من facts. ولو حسابه موقوف ما تقولش موقوف، قول إننا هنكلمه بخصوص الحساب.',
   '- طلبه: حالته ورقمه من facts.',
@@ -57,24 +59,38 @@ export const REPLY_PROMPT = [
 ].join('\n');
 export const REPLY_SCHEMA = { type: 'OBJECT', properties: { body: { type: 'STRING' } }, required: ['body'] };
 
+const ascii = (s: string) => String(s || '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 // the store's own search words (store/store.js searchTerms): letters and digits, 2+ letters, at most 5 words
 export function searchTerms(q: string): string[] {
   const words = String(q || '').replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/[^0-9A-Za-zء-ي٠-٩ ]+/g, ' ').split(/\s+/).filter((w) => w.length >= 2);
   return [...new Set(words)].slice(0, 5);
 }
-// PostgREST: every word in the name or the Arabic name (ا may be أ or إ there); available first, the popular first
+// words that say how much, not which item («علبة ابيمول ٥٠٠» was not found: «علبة» is in no name)
+const AMOUNT_WORDS = new Set(['علبة', 'علبه', 'علبتين', 'علب', 'شريط', 'شريطين', 'شرايط', 'حباية', 'حبايه', 'حبايتين', 'حبايات', 'قرص', 'اقراص', 'كبسولة', 'كبسوله',
+  'امبول', 'امبولة', 'كيس', 'اكياس', 'عاوز', 'عايز', 'محتاج', 'عندكم', 'عندكو', 'بكام', 'سعر', 'كام', 'BOX', 'STRIP', 'STRIPS']);
+export const itemTerms = (q: string) => searchTerms(q).filter((w) => !AMOUNT_WORDS.has(w) && !AMOUNT_WORDS.has(w.toUpperCase()));
+// PostgREST: every word in the name or the Arabic name (ا may be أ or إ there; a number is written 500 in the name and ٥٠٠ in
+// the Arabic name); available first, the popular first
 export function itemsPath(terms: string[]): string {
-  const or = (w: string) => { const v = /[ء-ي]/.test(w) ? w.replace(/ا/g, '_') : w; return `or(name.ilike.*${v}*,arabic_name.ilike.*${v}*)`; };
+  const or = (w: string) => {
+    if (/^[0-9٠-٩.]+$/.test(w)) { const a = ascii(w), ar = a.replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]); return `or(name.ilike.*${a}*,arabic_name.ilike.*${ar}*)`; }
+    const v = /[ء-ي]/.test(w) ? w.replace(/ا/g, '_') : w; return `or(name.ilike.*${v}*,arabic_name.ilike.*${v}*)`;
+  };
   return 'ar_store_items?select=id,name,arabic_name,status,price&hidden=is.false&and=(' + encodeURIComponent(terms.map(or).join(',')) + ')&order=status.asc,popular_rank.asc.nullslast&limit=4';
 }
 const money = (n: unknown) => `${Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 })} ج`;
 type Item = { id: number; name: string; arabic_name?: string | null; status: string; price?: number | null };
 type Stock = { item_id: number; packs?: number | null; units?: number | null; parts?: number | null; price?: number | null };
-// what one part of a box is called (owner 2026-11-14: «عاوز شريط بنادول اكسترا» was answered with the box)
-export function partWord(name: string): string {
+// what one part of a box is called (owner 2026-11-14: «عاوز شريط بنادول اكسترا» was answered with the box). PharmaFly's
+// parts are the box's units: a 48-tablet box in 4 parts = strips, a 30-tablet box in 30 parts = single tablets.
+export function partWord(name: string, parts = 0): string {
   const n = String(name || '').toUpperCase();
-  if (/\b(TABS?|CAPS?|CAPSULES?|TABLETS?|F\.?C\.?T|EFF)\b|قرص|كبسول/.test(n)) return 'الشريط';
-  if (/\bAMPS?\b|AMPOULE|أمبول|امبول/.test(n)) return 'الأمبول';
+  const m = /(\d+)\s*(F\.?C\.?T|TABS?|TABLETS?|CAPS?|CAPSULES?|T|C)\b/.exec(n);
+  if (m || /\b(TABS?|CAPS?|CAPSULES?|TABLETS?|F\.?C\.?T|EFF)\b|قرص|كبسول/.test(n)) {
+    if (m && parts > 1 && Number(m[1]) === parts) return /^C/.test(m[2]) ? 'الكبسولة' : 'القرص';
+    return 'الشريط';
+  }
+  if (/\bAMPS?\b|\d\s*AMP|AMPOULE|أمبول|امبول/.test(n)) return 'الأمبول';
   if (/SACHETS?|كيس/.test(n)) return 'الكيس';
   if (/\bVIALS?\b|فيال/.test(n)) return 'الفيال';
   return 'الوحدة';
@@ -83,17 +99,16 @@ export function itemFact(it: Item, st?: Stock): string {
   const price = it.price ?? st?.price, parts = Number(st?.parts) || 1, there = it.status !== 'unavailable';
   // a box sold in parts (strips, ampoules…): the box's price and the part's, so a customer asking for one strip is told its price
   const priceText = price == null || !there ? ''
-    : parts > 1 ? ` · العلبة ${money(price)} (فيها ${parts}) · ${partWord(it.name)} ${money(Math.round((Number(price) / parts) * 100) / 100)}`
+    : parts > 1 ? ` · العلبة ${money(price)} (فيها ${parts}) · ${partWord(it.name, parts)} ${money(Math.round((Number(price) / parts) * 100) / 100)}`
     : ` · ${money(price)}`;
   return `${it.name}${it.arabic_name ? ` (${it.arabic_name})` : ''}: ${STATUS_AR[it.status] || it.status}${priceText}` + (st?.packs ? ` · ${Number(st.packs)} علبة` : '');
 }
-const ascii = (s: string) => String(s || '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 // which store item he means (owner 2026-11-14 «لما العميل يطلب كذا صنف مرة واحدة يجهزله حسابهم كام»): every number he said
 // (500, 300) must be in the name, then the most of his words; one best (or one in stock among the best) is chosen, else
 // he is asked which (choices)
 export function pickItem(asked: { name?: string; english?: string }, hits: Item[]): { item: Item | null; choices: Item[] } {
   if (!hits.length) return { item: null, choices: [] };
-  const words = searchTerms(ascii(`${asked.english || ''} ${asked.name || ''}`)).map((w) => w.toUpperCase());
+  const words = itemTerms(ascii(`${asked.english || ''} ${asked.name || ''}`)).map((w) => w.toUpperCase());
   const nums = [...new Set(words.filter((w) => /^\d+(\.\d+)?$/.test(w)))], names = words.filter((w) => !/^\d/.test(w));
   const text = (it: Item) => ascii(`${it.name} ${it.arabic_name || ''}`).toUpperCase();
   let left = hits.filter((it) => nums.every((n) => new RegExp(`(^|[^0-9.])${n.replace('.', '\\.')}([^0-9]|$)`).test(text(it))));
@@ -116,8 +131,15 @@ export function billFacts(lines: { asked: Asked; item: Item | null; choices: Ite
     if (!item) { if (choices.length) out.push(`محتاج يحدد «${label}»: ` + choices.map((c) => `${c.name}${c.price != null && c.status !== 'unavailable' ? ` ${money(c.price)}` : ''} (${STATUS_AR[c.status] || c.status})`).join('، ')); continue; }
     if (item.status !== 'available' || item.price == null) { out.push(`${item.status === 'on_order' ? 'بالطلب' : 'مش متوفر'}: ${item.name}`); continue; }
     const st = stock.find((s) => s.item_id === item.id), parts = Number(st?.parts) || 1, qty = Math.max(1, Math.min(100, Math.round(Number(asked.qty) || 1)));
-    const part = asked.unit === 'part' && parts > 1, each = part ? Math.round((Number(item.price) / parts) * 100) / 100 : Number(item.price);
-    const unitWord = part ? partWord(item.name).replace(/^ال/, '') : 'علبة', sum = Math.round(each * qty * 100) / 100;
+    const pw = partWord(item.name, parts), single = pw === 'القرص' || pw === 'الكبسولة', eachPart = Math.round((Number(item.price) / parts) * 100) / 100;
+    // a strip asked of a box sold by the tablet (or one tablet of a box sold in strips): not guessed, he is told how it is sold
+    const wantStrip = asked.unit === 'strip' || asked.unit === 'part', wantPiece = asked.unit === 'piece';
+    if (parts > 1 && ((wantStrip && single) || (wantPiece && !single))) {
+      out.push(`${item.name}: بيتباع ب${single ? 'القرص' : 'الشريط'} مش ب${single ? 'الشريط' : 'القرص'}: ${pw} ${money(eachPart)}، والعلبة (فيها ${parts}) ${money(item.price)}. اسأله عايز كام`);
+      continue;
+    }
+    const part = (wantStrip || wantPiece) && parts > 1, each = part ? eachPart : Number(item.price);
+    const unitWord = part ? pw.replace(/^ال/, '') : 'علبة', sum = Math.round(each * qty * 100) / 100;
     total += sum;
     bill.push(`${item.name}${item.arabic_name ? ` (${item.arabic_name})` : ''} · ${qty} ${unitWord} × ${money(each)} = ${money(sum)}`);
   }
@@ -193,10 +215,14 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   const facts: string[] = [];
   const found: Item[] = [], asked: { asked: Asked; hits: Item[] }[] = [];
   for (const n of named) {
-    let terms = searchTerms(n.english || n.name || '').slice(0, 3), hits: Item[] = [];
+    let terms = itemTerms(n.english || n.name || '').slice(0, 3), hits: Item[] = [];
     if (terms.length) hits = await rows('/rest/v1/' + itemsPath(terms)) as Item[];
     if (!hits.length && terms.length > 1) hits = await rows('/rest/v1/' + itemsPath(terms.slice(0, 1))) as Item[];
-    if (!hits.length && n.english && n.name) { terms = searchTerms(n.name).slice(0, 2); if (terms.length) hits = await rows('/rest/v1/' + itemsPath(terms)) as Item[]; }
+    if (!hits.length && n.english && n.name) {
+      terms = itemTerms(n.name).slice(0, 2);
+      if (terms.length) hits = await rows('/rest/v1/' + itemsPath(terms)) as Item[];
+      if (!hits.length && terms.length > 1) hits = await rows('/rest/v1/' + itemsPath(terms.slice(0, 1))) as Item[];
+    }
     if (!hits.length) facts.push(`${n.name}: مش لاقيينه في أصنافنا`);
     found.push(...hits); asked.push({ asked: n, hits });
   }
