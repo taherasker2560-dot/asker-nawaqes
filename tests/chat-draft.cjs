@@ -14,6 +14,12 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.match(p, /hidden=is\.false/); assert.match(p, /order=status\.asc,popular_rank\.asc\.nullslast/);
   assert.equal(D.itemFact({ id: 1, name: 'PANADOL COLD & FLU', arabic_name: 'بانادول كولد', status: 'available', price: 59 }, { item_id: 1, packs: 12 }), 'PANADOL COLD & FLU (بانادول كولد): متوفر · 59 ج · 12 علبة');
   assert.equal(D.itemFact({ id: 2, name: 'X', status: 'unavailable', price: 10 }), 'X: مش متوفر', 'no price for what is not there');
+  // a box sold in strips (owner 2026-11-14 «عاوز شريط بنادول اكسترا … بيقوله بالعلبه رغم ان الصنف متوفر وحدات»)
+  assert.equal(D.itemFact({ id: 68432, name: 'PANADOL EXTRA 48 TAB', status: 'available', price: 116 }, { item_id: 68432, packs: 64, units: 1, parts: 4, price: 116 }),
+    'PANADOL EXTRA 48 TAB: متوفر · العلبة 116 ج (فيها 4) · الشريط 29 ج · 64 علبة');
+  assert.equal(D.partWord('AUGMENTIN 1GM 14 F.C.T'), 'الشريط');assert.equal(D.partWord('VOLTAREN 75MG 6 AMP'), 'الأمبول');
+  assert.equal(D.partWord('SMECTA 30 SACHETS'), 'الكيس');assert.equal(D.partWord('BABY SHAMPOO'), 'الوحدة');
+  assert.match(D.REPLY_PROMPT, /مش ناشف/);assert.match(D.REPLY_PROMPT, /سعر الشريط أو الوحدة من facts، مش سعر العلبة/);
   assert.equal(D.itemFact({ id: 3, name: 'Y', status: 'on_order', price: null }, { item_id: 3, price: 33 }), 'Y: بالطلب · 33 ج');
   assert.equal(D.accountFact(7174.5, false), 'حسابه: عليه 7,174.5 ج');
   assert.equal(D.accountFact(-200, true), 'حسابه: له 200 ج · الآجل موقوف');
