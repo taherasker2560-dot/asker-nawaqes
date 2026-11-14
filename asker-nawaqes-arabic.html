@@ -15,7 +15,7 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=scopes-20261113a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=sales-20261114a" />
+    <link rel="stylesheet" href="ar/look.css?v=vendors-20261114a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
     <script src="ar/i18n-en.js?v=acct-20261114a"></script>
@@ -550,9 +550,55 @@
           </div>
           <div id="cuSt" class="hidden"></div>
         </section>
+        <!-- «الموردين» (owner 2026-11-14, ar/vendors.js): balances, a supplier's statement from a date to a date with the
+             returns and their expiry, and «الصنف ده جه من مين؟» -->
         <section id="vendorsPanel" class="card hidden">
-          <h2>الموردين</h2>
-          <p class="hint">قريب: هنصمم الشاشة دي سوا.</p>
+          <div id="veListView">
+            <h2>الموردين</h2>
+            <div id="veTotal"></div>
+            <button id="veItemBtn" type="button" class="secondary small ve-itembtn">🔎 الصنف ده جه من مين؟</button>
+            <div class="chips ve-views" role="group" aria-label="الموردين"
+              ><button type="button" class="chip on" data-ve-view="year">اتعاملنا معاهم السنة دي</button
+              ><button type="button" class="chip" data-ve-view="all">الكل</button>
+            </div>
+            <p id="veStatus" class="status"></p>
+            <div id="veRows"></div>
+            <p class="hint">الرصيد = الفواتير − المرتجعات − الدفعات اللي متسجلة في فارمافلاي (اتطابق مع شاشة فارمافلاي). بيتحدّث مع باقي البوت.</p>
+          </div>
+          <div id="veSt" class="hidden">
+            <button type="button" class="secondary small" data-ve-back>→ الموردين</button>
+            <div id="veStHead" class="ve-sthead"></div>
+            <div class="sa-range ve-range"><label>من <input id="veFrom" type="date" /></label><label>لحد <input id="veTo" type="date" /></label></div>
+            <div class="chips ve-kinds" role="group" aria-label="نوع الحركة"
+              ><button type="button" class="chip on" data-ve-kind="">الكل</button
+              ><button type="button" class="chip" data-ve-kind="purchase">الفواتير</button
+              ><button type="button" class="chip" data-ve-kind="return">المرتجعات</button
+              ><button type="button" class="chip" data-ve-kind="payment">الدفعات</button>
+            </div>
+            <div id="veStSum"></div>
+            <p id="veStStatus" class="status"></p>
+            <div id="veMoves"></div>
+            <button id="veMore" type="button" class="secondary hidden">حركة أقدم</button>
+          </div>
+          <div id="veItem" class="hidden">
+            <button type="button" class="secondary small" data-ve-back>→ الموردين</button>
+            <h2>الصنف ده جه من مين؟</h2>
+            <div id="veFindBox">
+              <div class="search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <input id="veQ" type="search" autocomplete="off" aria-label="دوّر على صنف" placeholder="دوّر على صنف…" />
+              </div>
+              <div id="veFind"></div>
+            </div>
+            <div id="veItemHead"></div>
+            <div id="veItemKinds" class="chips ve-kinds hidden" role="group" aria-label="مشتريات ولا مرتجعات"
+              ><button type="button" class="chip on" data-ve-ikind="purchase">المشتريات</button
+              ><button type="button" class="chip" data-ve-ikind="return">المرتجعات</button>
+            </div>
+            <p id="veItemStatus" class="status"></p>
+            <div id="veItemRows"></div>
+            <button id="veItemMore" type="button" class="secondary hidden">أقدم (لحد 2018)</button>
+          </div>
         </section>
         <!-- «حركة البيع» (owner 2026-11-14, ar/sales.js): one year of sales, cash and credit apart, an item inside the invoices,
              a credit customer's purchases -->
@@ -772,7 +818,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
     <script src="ar/cache.js?v=wait-20261113a"></script>
-    <script src="ar/app.js?v=sales-20261114a"></script>
+    <script src="ar/app.js?v=vendors-20261114a"></script>
     <script src="ar/staff.js?v=chat-20261113a"></script>
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -789,6 +835,7 @@
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
     <script src="ar/customers.js?v=link-20261113a"></script>
 <script src="ar/sales.js?v=sales-20261114b"></script>
+<script src="ar/vendors.js?v=vendors-20261114a"></script>
     <script src="ar/tempsale.js?v=link-20261113a"></script>
     <script src="ar/chat.js?v=acct-20261114a"></script>
     <script src="ar/count.js?v=acct-20261113a"></script>
