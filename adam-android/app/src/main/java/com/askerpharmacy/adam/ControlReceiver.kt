@@ -3,11 +3,12 @@ package com.askerpharmacy.adam
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Base64
 
 /**
  * Commands from the laptop over adb (the receiver is protected by the DUMP permission, which only adb / the system hold):
  *   SET_CONFIG  url, api, key, bot   the server's address, its public key, this phone's device key, the bot's page
- *   ASK         text                 a typed question (as if he said it after «آدم»)
+ *   ASK         text | b64           a typed question (as if he said it after «آدم»); b64 = the same text in UTF-8 base64 (for Arabic over adb)
  *   STOP                             switch the listening service off
  */
 class ControlReceiver : BroadcastReceiver() {
@@ -18,7 +19,11 @@ class ControlReceiver : BroadcastReceiver() {
                 resultData = if (Config.ready(context)) "config ok" else "config incomplete"
             }
             "com.askerpharmacy.adam.ASK" -> {
-                val t = intent.getStringExtra("text")?.trim() ?: ""
+                var t = intent.getStringExtra("text")?.trim() ?: ""
+                val b = intent.getStringExtra("b64")
+                if (!b.isNullOrEmpty()) {
+                    try { t = String(Base64.decode(b, Base64.DEFAULT), Charsets.UTF_8).trim() } catch (e: Exception) { }
+                }
                 if (t.isNotEmpty() && AdamService.running) {
                     context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_TEXT).putExtra("text", t))
                     resultData = "asked"

@@ -6,9 +6,9 @@ run('Adam: the address opens a section, the search, the color, and gives the col
  const ready=()=>page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
  const visible=(id)=>page.evaluate(id=>!document.getElementById(id).classList.contains('hidden'),id);
  // a section
- await page.goto(url('go:tempsale'));await ready();
- await page.waitForFunction(()=>!document.getElementById('tempSalePanel').classList.contains('hidden'),null,{timeout:8000});
- assert.ok(await visible('tempSalePanel'));
+ await page.goto(url('go:expiry'));await ready();
+ await page.waitForFunction(()=>!document.getElementById('expiryPanel').classList.contains('hidden'),null,{timeout:8000});
+ assert.ok(await visible('expiryPanel'));
  assert.equal(await page.evaluate(()=>location.search),'','the command leaves the address');
  // the search on top
  await page.goto(url('find:FLAGYL'));await ready();
