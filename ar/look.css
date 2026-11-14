@@ -1481,6 +1481,7 @@ html.night .so-acct.on { color: #a9c6f2; }
 button.ch-del { display: block; margin: 14px auto 0; color: #c62828; }
 /* the warehouses' link (owner 2026-11-14): «🏬 ده مندوب مخزن؟» in a chat, «🔗 من الرابط» in the inbox, the link per warehouse */
 button.ch-sup { display: block; margin: 12px auto 0; }
+button.ch-x { min-height: 0; padding: 0 4px; margin-inline-start: 6px; border: 0; background: none; font-size: 13px; line-height: 1; opacity: 0.7; cursor: pointer; }
 .ch-mv { margin: 12px 0 0; padding: 12px; border-radius: 14px; background: #fffbea; border: 2px solid #e0b84a; }
 .ch-mv h4 { margin: 0 0 4px; color: #8a5a00; }
 .ch-mv .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }

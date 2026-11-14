@@ -22,12 +22,13 @@
     if (diff === 1) return `امبارح ${clock(t)}`;
     return `${pad(t.getDate())}/${pad(t.getMonth() + 1)}`;
   }
-  // the list: waiting for an answer = the customer wrote last; newest first
+  // the list: waiting for an answer = the customer wrote last; newest first. The warehouses' chats (their lists go to
+  // «الوارد») have their own chip «🏬 المخازن» (owner 2026-11-14 «المورد يكلمني عادي على الرسائل وأكلمه وأرد عليه»).
   function pickChats(chats, filter) {
-    const list = (chats || []).filter((c) => filter !== 'waiting' || Number(c.waiting) > 0);
+    const list = (chats || []).filter((c) => (filter === 'wh' ? !!c.supplier : !c.supplier) && (filter !== 'waiting' || Number(c.waiting) > 0));
     return list.sort((a, b) => String(b.last_at).localeCompare(String(a.last_at)));
   }
-  const waitingCount = (chats) => (chats || []).filter((c) => Number(c.waiting) > 0).length;
+  const waitingCount = (chats) => (chats || []).filter((c) => !c.supplier && Number(c.waiting) > 0).length;
   // «0101 234 5678»
   const showPhone = (p) => (/^01\d{9}$/.test(String(p || '')) ? `${p.slice(0, 4)} ${p.slice(4, 7)} ${p.slice(7)}` : String(p || ''));
   const mmss = (s) => `${Math.floor((s || 0) / 60)}:${pad(Math.floor((s || 0) % 60))}`;
@@ -94,8 +95,8 @@
     if (!db() || loading) return;
     loading = true;
     try {
-      // a warehouse's chat is not here: what it sends goes to «الوارد» (migration 202611141400)
-      const { data, error } = await db().from('ar_chats').select('id,customer_id,name,phone,last_at,last_from,waiting,last_text').is('supplier', null).order('last_at', { ascending: false }).range(0, 299);
+      // a warehouse's chat (migration 202611141400) is under «🏬 المخازن»: what it sends goes to «الوارد», and it can be answered
+      const { data, error } = await db().from('ar_chats').select('id,customer_id,name,phone,last_at,last_from,waiting,last_text,supplier').order('last_at', { ascending: false }).range(0, 299);
       if (error) throw new Error(error.message || String(error));
       chats = data || []; failed = '';
       if (st) { const c = chats.find((x) => x.id === st.c.id); if (c) st.c = c; }
@@ -141,8 +142,8 @@
   }
 
   function rowHtml(c, now) {
-    const who = c.name || showPhone(c.phone);
-    const tag = c.customer_id ? `آجل ${esc(c.customer_id)}` : c.phone ? `كاش` : '';
+    const who = c.supplier || c.name || showPhone(c.phone);
+    const tag = c.supplier ? '🏬 مخزن' : c.customer_id ? `آجل ${esc(c.customer_id)}` : c.phone ? `كاش` : '';
     return `<button type="button" class="ch-row${Number(c.waiting) > 0 ? ' wait' : ''}" data-chat="${esc(c.id)}">` +
       `<span class="ch-av">${esc((who || '؟').trim().charAt(0))}</span>` +
       `<span class="ch-main"><strong class="notr">${esc(who)}</strong>${tag ? ` <small>· ${tag}</small>` : ''}<span class="ch-last notr">${esc(c.last_from === 'pharmacy' ? 'إنت: ' : '')}${esc(c.last_text || '')}</span></span>` +
@@ -153,12 +154,14 @@
     if (!box) return;
     if (chats == null) { box.innerHTML = failed ? `<p class="status bad">مقدرتش أجيب الرسايل: ${esc(failed)}</p>` : '<p class="status">بيجيب الرسايل…</p>'; return; }
     const n = waitingCount(chats), list = pickChats(chats, filter), now = new Date();
+    const people = chats.filter((c) => !c.supplier).length, houses = chats.length - people;
     const chip = (f, label) => `<button type="button" class="chip${filter === f ? ' on' : ''}" data-chat-filter="${f}">${label}</button>`;
     box.innerHTML = '<h2>الرسايل</h2>' +
       `<p class="hint">العملاء بيكتبولك من صفحة الرسايل بتاعتنا (الرابط في رسالة الترحيب على الواتس، و«💬 كلّمنا» في حساب العميل). لما ترد بيجيلهم إشعار.</p>` +
+      `<p class="hint">الرسايل بتتمسح لوحدها بعد 7 أيام.</p>` +
       pushHtml() +
       (listNote ? `<p class="status good">${esc(listNote)}</p>` : '') +
-      `<div class="chips">${chip('waiting', `مستنية رد <b>${n}</b>`)}${chip('all', `الكل <b>${chats.length}</b>`)}</div>` +
+      `<div class="chips">${chip('waiting', `مستنية رد <b>${n}</b>`)}${chip('all', `الكل <b>${people}</b>`)}${houses ? chip('wh', `🏬 المخازن <b>${houses}</b>`) : ''}</div>` +
       (list.length ? list.map((c) => rowHtml(c, now)).join('') : `<p class="hint">${filter === 'waiting' ? 'مفيش حد مستني رد.' : 'لسه محدش كتب.'}</p>`) +
       (failed ? `<p class="status bad">مقدرتش أجيب الرسايل: ${esc(failed)}</p>` : '');
   }
@@ -172,15 +175,19 @@
       inner += m.body ? `<span class="ch-words">اتكتب: «<span class="notr">${esc(m.body)}</span>»</span>` : '<span class="ch-words">بيتكتب…</span>';
     } else inner = `<span class="ch-text notr">${esc(m.body)}</span>`;
     const by = mine && m.sent_by && root.AskerStaff && root.AskerStaff.nameOf ? root.AskerStaff.nameOf(m.sent_by) : '';
-    return `<div class="ch-b ${mine ? 'us' : 'them'}">${mine ? `<span class="ch-who">${esc(by || 'الصيدلية')}</span>` : ''}${inner}<small>${esc(whenText(m.at, new Date()))}</small></div>`;
+    // one message deleted (the owner only; owner 2026-11-14 «عايز اوبشن ان انا اقدر امسح كمان رسائل العملاء»)
+    const del = ownerHere() ? ` <button type="button" class="ch-x" data-chat-delmsg="${esc(m.id)}" aria-label="امسح الرسالة">🗑</button>` : '';
+    return `<div class="ch-b ${mine ? 'us' : 'them'}">${mine ? `<span class="ch-who">${esc(by || 'الصيدلية')}</span>` : ''}${inner}<small>${esc(whenText(m.at, new Date()))}${del}</small></div>`;
   }
   function drawChat() {
     const box = $('chatPanel');
     if (!box || !st) return;
-    const c = st.c, who = c.name || showPhone(c.phone);
+    const c = st.c, who = c.supplier || c.name || showPhone(c.phone);
     const draft = $('chatReply') ? $('chatReply').value : (st.draft || '');
     const wa = c.phone ? `https://wa.me/2${c.phone}` : '';
-    const acct = c.customer_id
+    const acct = c.supplier
+      ? `<div class="ch-acct"><span>🏬 مخزن${c.phone ? ` · <b dir="ltr">${esc(showPhone(c.phone))}</b>` : ''}</span><span>قوايمه بتروح «الوارد»</span></div>`
+      : c.customer_id
       ? `<div class="ch-acct"><span>آجل · كود ${esc(c.customer_id)}</span>${st.account ? `<span><b>${esc(Number(st.account.balance) > 0.5 ? `عليه ${Number(st.account.balance).toLocaleString('en-US', { maximumFractionDigits: 2 })} ج` : 'خالص')}</b> · <button type="button" class="linklike" data-chat-statement>الكشف</button></span>` : ''}</div>`
       : `<div class="ch-acct"><span>كاش${c.phone ? ` · <b dir="ltr">${esc(showPhone(c.phone))}</b>` : ''}</span>${wa ? `<a href="${esc(wa)}" target="_blank" rel="noopener">📱 واتس</a>` : ''}</div>`;
     box.innerHTML = `<button type="button" class="secondary small cu-back" data-chat-back>→ رجوع للرسايل</button>` +
@@ -271,7 +278,7 @@
   // warehouse (or a new one) once: the number is saved for it, every chat of that number becomes the warehouse's, and
   // its messages go to «الوارد» (arabic-shortages reads them); the chat leaves this list.
   function supHtml() {
-    if (!ownerHere() || !st || st.c.customer_id || !st.c.phone) return '';
+    if (!ownerHere() || !st || st.c.customer_id || st.c.supplier || !st.c.phone) return '';
     if (!st.sup) return `<button type="button" class="secondary small ch-sup" data-chat-sup${st.busy ? ' disabled' : ''}>🏬 ده مندوب مخزن؟</button>`;
     const names = st.supNames;
     return `<div class="ch-mv"><h4>🏬 ده مندوب مخزن؟</h4><p class="hint">اختار مخزنه مرة واحدة: رقمه يتسجل، والقايمة دي واللي بعدها يروحوا «الوارد» ويتقروا.</p>` +
@@ -303,7 +310,8 @@
       if (!data || !data.ok) throw new Error(data && data.error === 'exists' ? tr('الاسم ده موجود، اختاره من القايمة') : (data && data.error) || 'ماتسجلش');
       // what he sent goes to «الوارد» now (read in the background)
       db().functions.invoke('arabic-shortages?chat=1', { body: { secret: data.secret } }).catch(() => null);
-      chats = (chats || []).filter((c) => c.customer_id || c.phone !== me.c.phone);
+      // the chat moves under «🏬 المخازن» (still answerable there)
+      for (const c of chats || []) if (!c.customer_id && c.phone === me.c.phone) Object.assign(c, { supplier: data.supplier, waiting: 0 });
       listNote = 'اتسجل كمندوب مخزن، ورسايله رايحة الوارد.';
       st = null;
       try { if (history.state && history.state.chatOpen) history.replaceState(null, ''); } catch (e) { /* no history */ }
@@ -312,6 +320,28 @@
       Object.assign(me, { busy: false, note: 'ماتسجلش: ' + ((e && e.message) || e), noteBad: true });
       if (st === me) drawChat();
     }
+  }
+  // one message: its photo / voice note / file from the bucket first, then the message (ar_chat_delete_message, owner only)
+  async function removeMessage(id) {
+    const me = st;
+    if (!me || me.busy) return;
+    const m = me.msgs.find((x) => String(x.id) === String(id));
+    if (!m || !root.confirm(tr('تمسح الرسالة دي؟ مش هترجع.'))) return;
+    me.busy = true; me.note = ''; drawChat();
+    try {
+      if (m.media) {
+        const rm = await db().storage.from('ar-chat').remove([m.media]);
+        if (rm && rm.error) throw new Error(rm.error.message || String(rm.error));
+      }
+      const { data, error } = await db().rpc('ar_chat_delete_message', { p_id: m.id });
+      if (error) throw new Error(error.message || String(error));
+      if (!data || !data.ok) throw new Error('ما اتمسحتش');
+      me.msgs = me.msgs.filter((x) => x !== m);
+      Object.assign(me, { busy: false, note: 'اتمسحت الرسالة.', noteBad: false });
+    } catch (e) {
+      Object.assign(me, { busy: false, note: 'ما اتمسحتش: ' + ((e && e.message) || e), noteBad: true });
+    }
+    if (st === me) drawChat();
   }
   function tick() {
     const panel = $('carePanel');
@@ -332,6 +362,8 @@
       if (e.target.closest('[data-chat-send]')) { send(); return; }
       if (e.target.closest('[data-chat-push]')) { turnPushOn(); return; }
       if (e.target.closest('[data-chat-del]')) { removeChat(); return; }
+      const dm = e.target.closest('[data-chat-delmsg]');
+      if (dm) { removeMessage(dm.dataset.chatDelmsg); return; }
       if (e.target.closest('[data-chat-sup]')) { openSup(); return; }
       if (e.target.closest('[data-chat-supno]')) { if (st) { st.sup = false; drawChat(); } return; }
       const sn = e.target.closest('[data-chat-supname]');

@@ -106,6 +106,17 @@ run('Messages in the bot: «خدمة العملاء» lists who waits, opens a c
  await page.click('[data-chat-back]');await page.waitForSelector('#chatPanel .ch-row');
  await page.click('[data-chat-filter="waiting"]');
  assert.match(await text(page,'#chatPanel'),/مفيش حد مستني رد/);
+ // the messages go by themselves after 7 days (owner 2026-11-14 «ب: 7 أيام»), and one message can go by hand: its photo first
+ assert.match(await text(page,'#chatPanel'),/الرسايل بتتمسح لوحدها بعد 7 أيام/);
+ await page.click('[data-chat-filter="all"]');
+ await page.click('#chatPanel [data-chat="c1"]');await page.waitForSelector('[data-chat-delmsg="2"]');
+ page.once('dialog',d=>{assert.match(d.message(),/تمسح الرسالة دي؟/);d.accept()});
+ await page.click('[data-chat-delmsg="2"]');
+ await page.waitForFunction(()=>/اتمسحت الرسالة/.test(document.getElementById('chatPanel').textContent));
+ assert.deepEqual(await page.evaluate(()=>window.__removed),['c/2026-11-13/11111111-2222-4333-8444-555555555555.jpg']);
+ assert.equal((await table('ar_chat_messages')).some(m=>m.id===2),false);
+ assert.equal((await page.$$('#chatThread img.ch-photo')).length,0);
+ await page.click('[data-chat-back]');await page.waitForSelector('#chatPanel .ch-row');
  // «🗑 امسح المحادثة» (owner 2026-11-14): asks first, removes its photo and voice note, then the chat and its messages
  await page.click('[data-chat-filter="all"]');
  await page.click('#chatPanel [data-chat="c1"]');await page.waitForSelector('[data-chat-del]');

@@ -1025,6 +1025,11 @@ export async function handleChatInbox(req: Request, env: Env, fetchImpl: typeof 
     try { r = await linkItem(env, fetchImpl, base, sh, chat.supplier, m); } catch (e) { log('chat-inbox-error', t0, { m: String((e as Error).message || e).slice(0, 80) }); }
     // not kept (the file could not be fetched, the save failed): given back, so the next call tries it again
     if (r === 'file' || r === 'save' || r === 'error') await patch(m.id, null, '');
+    // kept: the page's copy of the file goes (its copy is in «الوارد», ar-inbox; owner 2026-11-14, the server's space)
+    else if (m.media) {
+      const del = await fetchImpl(`${base}/storage/v1/object/ar-chat/${m.media}`, { method: 'DELETE', headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+      if (del?.ok) await fetchImpl(`${base}/rest/v1/ar_chat_messages?id=eq.${m.id}`, { method: 'PATCH', body: JSON.stringify({ media: null }), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+    }
     done[m.id] = r;
   }
   log('chat-inbox', t0, { waiting: todo.length, done });

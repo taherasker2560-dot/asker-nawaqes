@@ -9,12 +9,15 @@ const W='a'.repeat(64),C='b'.repeat(64),SUP='مخزن تجربة (حسن)';
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];
 const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠ مجم ٣٠ قرص',status:'approved'}];
 const JPG=new Uint8Array([255,216,255,224,1,2,3]),PDF=new TextEncoder().encode('%PDF-1.4 list');
-function fake({msgs,files={}}){const calls=[],saved=[],stored=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
+function fake({msgs,files={}}){const calls=[],saved=[],stored=[],removed=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
  const f=async(url,o={})=>{calls.push({url,o});const u=decodeURIComponent(url);
   if(url.includes('/rest/v1/ar_chats?'))return page(url,u.includes('secret=eq.'+W)?[{id:'c1',supplier:SUP}]:u.includes('secret=eq.'+C)?[{id:'c2',supplier:null}]:[]);
-  if(url.includes('/rest/v1/ar_chat_messages')&&o.method==='PATCH'){const id=+u.match(/id=eq\.(\d+)/)[1],m=msgs.find(x=>x.id===id),v=JSON.parse(o.body).inbox_at;
+  if(url.includes('/rest/v1/ar_chat_messages')&&o.method==='PATCH'){const id=+u.match(/id=eq\.(\d+)/)[1],m=msgs.find(x=>x.id===id),b=JSON.parse(o.body);
+   if('media' in b){if(m)m.media=b.media;return new Response(null,{status:204})}
+   const v=b.inbox_at;
    if(u.includes('inbox_at=is.null')){if(!m||m.inbox_at)return new Response('[]');m.inbox_at=v;return new Response(JSON.stringify([{id}]))}
    m.inbox_at=v;return new Response('[]')}
+  if(url.includes('/storage/v1/object/ar-chat/')&&o.method==='DELETE'){removed.push(url.split('/ar-chat/')[1]);return new Response('{}')}
   if(url.includes('/rest/v1/ar_chat_messages?')){assert.match(u,/chat_id=eq\.c1&sender=eq\.customer&inbox_at=is\.null&at=gte\./);return page(url,msgs.filter(m=>!m.inbox_at).map(({id,kind,body,media})=>({id,kind,body,media})))}
   if(url.includes('/storage/v1/object/ar-chat/')){const p=url.split('/ar-chat/')[1];return files[p]?new Response(files[p],{headers:{'content-type':p.endsWith('.pdf')?'application/pdf':'image/jpeg'}}):new Response('{}',{status:404})}
   if(url.includes('/storage/v1/object/ar-inbox/')){stored.push(url.split('/ar-inbox/')[1]);return new Response('{}')}
@@ -25,7 +28,7 @@ function fake({msgs,files={}}){const calls=[],saved=[],stored=[];const page=(u,a
   if(url.includes('/rest/v1/ar_names'))return page(url,names);
   if(url.includes('/rest/v1/ar_answers')||url.includes('/rest/v1/ar_fixes')||url.includes('/rest/v1/ar_ignored'))return page(url,[]);
   if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})}]}}]}));
-  throw Error('unexpected '+url)};Object.assign(f,{calls,saved,stored});return f}
+  throw Error('unexpected '+url)};Object.assign(f,{calls,saved,stored,removed});return f}
 const post=(body,origin='https://taherasker2560-dot.github.io')=>new Request('https://p.supabase.co/functions/v1/arabic-shortages?chat=1',{method:'POST',headers:{origin,'content-type':'application/json',authorization:'Bearer anon'},body:JSON.stringify(body)});
 const day='2026-11-14';
 // a warehouse's chat: text, a photo, a voice note with its words, one still without, and a PDF
@@ -40,6 +43,9 @@ assert.deepEqual(f.saved.map(x=>[x.chat_msg,x.kind,x.supplier,x.sender,x.via,x.s
 assert.equal(f.saved[0].body_text,'فلاجيل شراب ١٢٥\nحاجة تانية');assert.equal(f.saved[0].rows.length,2);
 assert.match(f.saved[1].file_path,/^\d{4}-\d\d-\d\d\/[0-9a-f]{32}\.jpg$/);assert.deepEqual(f.stored,[f.saved[1].file_path],'the photo kept in ar-inbox like WhatsApp\'s');
 assert.equal(msgs[3].inbox_at,undefined,'a voice note waits for its words');
+// the page's copy of what was read goes (its copy is in «الوارد»): the photo and the voice note's file, media emptied
+assert.deepEqual(f.removed.sort(),[`c/${day}/11111111-2222-4333-8444-555555555555.jpg`,`c/${day}/11111111-2222-4333-8444-666666666666.wav`]);
+assert.equal(msgs[1].media,null);assert.equal(msgs[2].media,null);assert.ok(msgs[3].media,'the voice note still waiting keeps its file');
 assert.ok(msgs.slice(0,3).every(m=>m.inbox_at),'taken once');
 // again: nothing new is read (and the voice note, once it has its words, goes)
 msgs[3].body='كونكور ٥';r=await F.handle(post({secret:W}),env,f);j=await r.json();assert.deepEqual(j.done,{4:'ok'});

@@ -38,7 +38,10 @@ run('Warehouse link: the rep writes his saved number once (no name), sends a pho
  const inv=await page.evaluate(()=>window.__invokes);
  assert.ok(inv.includes('chatinbox'));assert.ok(inv.some(x=>x.startsWith('chat:notify')),'«وارد جديد من مخزن» on the pharmacy\'s phones');
  assert.equal(await page.evaluate(()=>window.__tables.ar_chats[0].waiting),0);
- assert.ok(await page.isHidden('#chatNotify'));
+ // one photo icon in the bar (the file is the big button above): the mic stays on the screen (owner 2026-11-14)
+ assert.equal(await page.$('#chatFile2'),null);
+ const bar=await page.$eval('.ch-bar',(b)=>{const r=b.getBoundingClientRect(),m=b.querySelector('[data-ch-mic]').getBoundingClientRect();return [r.right,m.left,m.right];});
+ assert.ok(bar[2]<=bar[0]+1&&bar[1]>=0,'the mic is fully on the screen: '+bar);
  // next time on this phone: straight into his page
  await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify(window.__tables)));
  await page.reload();await page.waitForSelector('.ch-big');
@@ -107,4 +110,13 @@ run('«🏬 ده مندوب مخزن؟»: a new rep who wrote as a customer is s
  assert.equal((await table('ar_chats')).find((c)=>c.id==='c9').supplier,'مخزن تجربة (حسن)');
  assert.ok((await page.evaluate(()=>window.__invokes)).includes('chatinbox'));
  assert.deepEqual((await table('ar_inbox')).map((r)=>[r.supplier,r.kind,r.via]),[['مخزن تجربة (حسن)','text','link'],['مخزن تجربة (حسن)','image','link']]);
+ // the warehouses' chats under «🏬 المخازن»: the owner can talk to the rep (owner 2026-11-14 «أكلمه وأرد عليه عادي»)
+ await page.click('[data-chat-filter="wh"]');await page.waitForSelector('#chatPanel [data-chat="c9"]');
+ assert.match(await text(page,'#chatPanel [data-chat="c9"]'),/مخزن تجربة \(حسن\).*🏬 مخزن/);
+ await page.click('#chatPanel [data-chat="c9"]');await page.waitForSelector('#chatThread .ch-b');
+ assert.match(await text(page,'.ch-acct'),/🏬 مخزن.*قوايمه بتروح «الوارد»/);
+ assert.equal(await page.$('[data-chat-sup]'),null,'already a warehouse');
+ await page.fill('#chatReply','وصلت يا أستاذ محمود، شكرًا');await page.click('[data-chat-send]');
+ await page.waitForFunction(()=>/اتبعت/.test(document.getElementById('chatPanel').textContent));
+ const last=(await table('ar_chat_messages')).pop();assert.deepEqual([last.chat_id,last.sender,last.body],['c9','pharmacy','وصلت يا أستاذ محمود، شكرًا']);
 },{home:true});

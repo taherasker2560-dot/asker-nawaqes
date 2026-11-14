@@ -280,8 +280,8 @@
         ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec wait"><i class="ch-dot"></i>${esc(TEXTS.micAsk)}</span><button type="button" class="ch-ic ch-mic on" disabled aria-label="${esc(TEXTS.voice)}">🎤</button>`
         : rec
         ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec"><i class="ch-dot"></i><b id="chatRecT">0:00</b> ${esc(TEXTS.recording)}</span><button type="button" class="ch-ic ch-mic on" data-ch-recsend aria-label="${esc(TEXTS.voice)}">➤</button>`
+        // (a warehouse's file is the big «📄 ابعت ملف» above: one more icon here pushed the mic off the screen, owner 2026-11-14)
         : `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.photo)}">📷<input id="chatPhoto" type="file" multiple accept="image/*" hidden></label>` +
-          (supplier ? `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.supFile)}">📎<input id="chatFile2" type="file" multiple accept="${esc(fileAccept)}" hidden></label>` : '') +
           `<textarea id="chatText" rows="1" maxlength="2000" placeholder="${esc(TEXTS.type)}"></textarea>` +
           `<button type="button" class="ch-ic ch-mic" data-ch-mic aria-label="${esc(TEXTS.voice)}">🎤</button><button type="button" class="ch-ic ch-send" data-ch-send aria-label="ابعت" hidden>➤</button>`) +
       `</div>`;
@@ -433,9 +433,9 @@
     } catch (e) { say(TEXTS.errors.bad_media); } finally { busy = false; }
   }
   function afterSend() {
-    // a warehouse: to «الوارد», no answer to wait for (no «🔔» offer)
-    if (supplier) forward(); else offerNotify();
-    poll(true);
+    // a warehouse: to «الوارد»; the pharmacy can answer it too, so «🔔» is offered to everyone (owner 2026-11-14)
+    if (supplier) forward();
+    offerNotify(); poll(true);
     // the pharmacy's phones: «رسالة جديدة من عميل», or «وارد جديد من مخزن» for a warehouse, even with the bot closed
     // (asker-chat; at most once a minute a chat)
     if (client && client.functions) client.functions.invoke('asker-chat', { body: { action: 'notify', secret } }).catch(() => null);

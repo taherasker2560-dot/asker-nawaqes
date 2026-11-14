@@ -155,5 +155,34 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   // a push address the pharmacy never saved: nothing said
   assert.equal((await what(fake3({ known: false }))).status, 404);
   assert.equal((await F.handle(req({ action: 'what', endpoint: 'http://x' }, null), env, fake3())).status, 400);
-  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes or a warehouse sends, «what» for the bot\'s worker');
+  // the nightly clean-up (owner 2026-11-14, «ب: 7 أيام»): only what is past its time, files first, the invoices never
+  {
+    const now = Date.now(), calls = [];
+    const f = async (url, o = {}) => {
+      const u = new URL(url); calls.push({ path: u.pathname, q: decodeURIComponent(u.search), method: o.method || 'GET', body: o.body ? JSON.parse(o.body) : null });
+      const since = (k) => Date.parse(decodeURIComponent((u.search.match(new RegExp(k + '=lt\\.([^&]+)')) || [])[1] || ''));
+      if (u.pathname === '/rest/v1/ar_chat_messages' && !o.method) {
+        if (u.searchParams.get('at')) { assert.ok(Math.abs(now - 7 * 864e5 - since('at')) < 5000, '7 days'); return new Response(JSON.stringify([{ id: 1, media: 'c/2026-11-01/a.jpg' }, { id: 2, media: null }])); }
+        assert.ok(Math.abs(now - 3600e3 - since('inbox_at')) < 5000, 'an hour after «الوارد»'); assert.equal(u.searchParams.get('media'), 'not.is.null');
+        return new Response(JSON.stringify([{ id: 9, media: 'c/2026-11-14/w.jpg' }]));
+      }
+      if (u.pathname === '/rest/v1/ar_inbox' && !o.method) {
+        assert.ok(Math.abs(now - 30 * 864e5 - since('received_at')) < 5000, '30 days');
+        return new Response(JSON.stringify([{ id: 'i1', file_path: '2026-10-01/aaa.jpg' }, { id: 'i2', file_path: 'docs/2026-10-01/inv.jpg' }]));
+      }
+      if (u.pathname.startsWith('/storage/v1/object/') && o.method === 'DELETE') return new Response('[]');
+      if (o.method === 'DELETE' || o.method === 'PATCH') return new Response(null, { status: 204 });
+      throw Error('unexpected ' + url);
+    };
+    const r = await F.handle(req({ action: 'cleanup' }, null), env, f), b = await r.json();
+    assert.deepEqual(b, { ok: true, messages: 2, files: 1, warehouseFiles: 1, inboxFiles: 1 });
+    const del = calls.filter((c) => c.method === 'DELETE');
+    assert.deepEqual(del.map((c) => [c.path, c.body && c.body.prefixes, c.q]), [
+      ['/storage/v1/object/ar-chat', ['c/2026-11-01/a.jpg'], ''], ['/rest/v1/ar_chat_messages', null, '?id=in.(1,2)'],
+      ['/storage/v1/object/ar-chat', ['c/2026-11-14/w.jpg'], ''], ['/storage/v1/object/ar-inbox', ['2026-10-01/aaa.jpg'], '']]);
+    assert.deepEqual(calls.filter((c) => c.method === 'PATCH').map((c) => [c.path, c.q, c.body]), [
+      ['/rest/v1/ar_chat_messages', '?id=in.(9)', { media: null }], ['/rest/v1/ar_inbox', '?id=in.(i1)', { file_path: null }]]);
+    assert.ok(!JSON.stringify(calls).includes('docs/2026-10-01/inv.jpg"]'), 'the invoices are never deleted');
+  }
+  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes or a warehouse sends, «what» for the bot\'s worker, the nightly clean-up');
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -9,6 +9,7 @@
 //                                      staff with «خدمة العملاء» (ar_chat_staff_push), at most once a minute per chat; a
 //                                      warehouse's chat (its list from the link): owner and staff with «الوارد».
 //   POST {action:'what', endpoint}     (the bot's worker ar/sw.js, with its own saved push address): what the push was about.
+//   POST {action:'cleanup'}            (pg_cron at night): what is past its time is deleted (messages 7 days, inbox photos 30).
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), GEMINI_API_KEY, GEMINI_MODEL
 // (optional), VAPID_PRIVATE_JWK, VAPID_PUBLIC_KEY, VAPID_SUBJECT, ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the customer's page has no sign-in; the owner's and staff's calls are checked here).
@@ -19,6 +20,8 @@ const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const DEFAULT_SUBJECT = 'https://taherasker2560-dot.github.io/asker-nawaqes/';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const TIMEOUT_MS = 15000, GEMINI_TIMEOUT_MS = 45000, MAX_AUDIO = 8 * 1024 * 1024;
+// how long things are kept (the nightly clean-up): messages 7 days (owner 2026-11-14 «ب: 7 أيام»), the inbox's photos 30 days
+export const CHAT_KEEP_MS = 7 * 864e5, INBOX_KEEP_MS = 30 * 864e5;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const VOICE_PROMPT = 'ده فويس من عميل لصيدلية في مصر. اكتب الكلام اللي اتقال بالظبط بالعامية المصرية زي ما اتقال، ' +
   'وأسامي الأدوية زي ما اتنطقت، من غير أي زيادة أو شرح أو علامات تنصيص. لو مفيش كلام مفهوم اكتب: (مش واضح)';
@@ -123,6 +126,46 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     // written once: a second call never overwrites
     await call(`/rest/v1/ar_chat_messages?id=eq.${id}&body=is.null`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ body: text }) });
     return reply(200, { ok: true, text }, headers);
+  }
+
+  // ---------- the nightly clean-up (owner 2026-11-14 «في حاجات كتيرة المفروض بتتمسح», his choice «ب: 7 أيام») ----------
+  // pg_cron calls it at 04:00 Cairo (migration 202611141600). Only what is past its time goes, so a call at any other moment
+  // changes nothing early: messages with their photos / voice notes / files after 7 days; a warehouse's files an hour after
+  // they went to «الوارد» (their copy stays there); the inbox's photos after 30 days. The invoices (ar-inbox docs/, kept on
+  // the laptop in «المشتريات») and the customers' statements are never touched. At most 500 of each a call.
+  if (body.action === 'cleanup') {
+    const ago = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
+    const removeFiles = async (bucket: string, paths: string[]) => {
+      if (!paths.length) return true;
+      const r = await call(`/storage/v1/object/${bucket}`, { method: 'DELETE', headers: { ...sh, ...json }, body: JSON.stringify({ prefixes: paths }) });
+      return r.ok;
+    };
+    const ids = (xs: { id: unknown }[]) => xs.map((x) => String(x.id)).join(',');
+    const out = { messages: 0, files: 0, warehouseFiles: 0, inboxFiles: 0 };
+    // 1) messages older than 7 days (customers' and warehouses'), their files first
+    const old = await rows(`/rest/v1/ar_chat_messages?select=id,media&at=lt.${ago(CHAT_KEEP_MS)}&order=id&limit=500`) as { id: number; media: string | null }[];
+    if (old.length) {
+      const files = old.map((m) => m.media).filter((p): p is string => !!p);
+      if (await removeFiles('ar-chat', files)) {
+        const d = await call(`/rest/v1/ar_chat_messages?id=in.(${ids(old)})`, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
+        if (d.ok) { out.messages = old.length; out.files = files.length; }
+      }
+    }
+    // 2) a warehouse's files already in «الوارد» (arabic-shortages also removes them when it reads them)
+    const read = await rows(`/rest/v1/ar_chat_messages?select=id,media&inbox_at=lt.${ago(3600e3)}&media=not.is.null&order=id&limit=500`) as { id: number; media: string }[];
+    if (read.length && await removeFiles('ar-chat', read.map((m) => m.media))) {
+      const p = await call(`/rest/v1/ar_chat_messages?id=in.(${ids(read)})`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ media: null }) });
+      if (p.ok) out.warehouseFiles = read.length;
+    }
+    // 3) the inbox's photos / files after 30 days (the row and what was read from it stay)
+    const inbox = (await rows(`/rest/v1/ar_inbox?select=id,file_path&received_at=lt.${ago(INBOX_KEEP_MS)}&file_path=not.is.null&order=received_at&limit=500`) as { id: string; file_path: string }[])
+      .filter((x) => !x.file_path.startsWith('docs/'));
+    if (inbox.length && await removeFiles('ar-inbox', inbox.map((x) => x.file_path))) {
+      const p = await call(`/rest/v1/ar_inbox?id=in.(${inbox.map((x) => x.id).join(',')})`, { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ file_path: null }) });
+      if (p.ok) out.inboxFiles = inbox.length;
+    }
+    console.log('asker-chat cleanup', JSON.stringify(out));
+    return reply(200, { ok: true, ...out }, headers);
   }
 
   // ---------- what a push was about (owner 2026-11-14 «وصلت البوت … بس مفيش صوت اشعار»): pushes carry nothing, so the
