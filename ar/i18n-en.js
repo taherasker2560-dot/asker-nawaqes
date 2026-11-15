@@ -3,6 +3,21 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
+  "الحقائب": "Bags",
+  "الحقائب التانية": "Other bags",
+  "ناقص في حقيبة": "short in the bag",
+  "منهم {0} بقالهم أكتر من {1} أيام": "{0} of them short for more than {1} days",
+  "عندك {0} · اتباع في شهر {1} · المطلوب {2}": "In stock {0} · sold in a month {1} · to order {2}",
+  "عندك {0} · الحد الأدنى {1} · اتباع في شهر {2} · المطلوب {3}": "In stock {0} · minimum {1} · sold in a month {2} · to order {3}",
+  "ناقص بقاله {0} يوم": "short for {0} days",
+  "ناقص من النهارده": "short since today",
+  "ما اتشراش قبل كده": "never bought before",
+  "الحقائب لسه ما اتحسبتش: هتظهر مع تحديث اللاب الجاي.": "The bags are not counted yet: they show with the laptop's next update.",
+  "حقائب الموردين غير «نواقص يوميه»: الناقص بقاعدة فارمافلاي، من غير النواقص العامة والمتأجل، وبس اللي اتباع في آخر شهر أو عليه حد أدنى.": "Supplier bags other than the daily bag: short by PharmaFly's rule, without the general shortages and the postponed, and only what sold in the last month or has a minimum.",
+  "العدّ بدأ يوم {0}: الصنف اللي يفضل ناقص أكتر من {1} أيام بيقلب أحمر.": "Counting since {0}: an item short for more than {1} days turns red.",
+  "مفيش نواقص في الحقائب التانية.": "No shortages in the other bags.",
+  "صنف ناقص من أكتر من 7 أيام": "An item short for more than 7 days",
+  "{0} صنف في الحقائب التانية ناقصين من أكتر من 7 أيام": "{0} items in the other bags short for more than 7 days",
   "آدم غيّر اللون": "Adam changed the color",
   "رجّعه": "Undo",
   "رجّعت اللون": "Color put back",

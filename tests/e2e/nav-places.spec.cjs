@@ -17,7 +17,8 @@ run('bottom bar: five sections, «الرئيسية» first, «المشتريات
  await page.click('[data-group="purchases"]');
  assert.ok(await vis(page,'shortPanel'));assert.ok(!(await vis(page,'homePanel')));assert.ok(await vis(page,'hsQ'),'the search stays on top of every section');
  assert.deepEqual(await names(page,'[data-pgroup]'),['نواقص','طلبيات','مخزون']);
- assert.deepEqual(await names(page,'[data-pfor="short"] [data-tab]'),['النواقص','الوارد','الترجمة']);
+ // «الحقائب» (2026-11-15): the other bags' shortages, owner only
+ assert.deepEqual(await names(page,'[data-pfor="short"] [data-tab]'),['النواقص','الوارد','الترجمة','الحقائب']);
  assert.deepEqual(await names(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن']);
  assert.deepEqual(await names(page,'[data-pfor="stock"] [data-tab]'),['المخزون','جرد المخزون','الصلاحيات'],'«الصلاحيات» (2026-11-12) sits with the stock');
  assert.ok(await page.isVisible('[data-pfor="short"]'));assert.ok(!(await page.isVisible('[data-pfor="orders"]')));

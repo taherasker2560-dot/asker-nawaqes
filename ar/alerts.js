@@ -5,7 +5,10 @@
         sold with no stock; sold expired), expired stock still on the system (outside the damaged store), and what expires
         within 3 months. Each item with its batches now, so it can be fixed in PharmaFly by hand (nothing is changed here).
      «الحسابات ← العملاء»: customers above their credit limit and close to it (balance by the verified rule).
-     «الرئيسية»: the «محتاج شغل» card (ar/notify.js adds the incoming, the invoices and the store orders to it). */
+     «الرئيسية»: the «محتاج شغل» card (ar/notify.js adds the incoming, the invoices and the store orders to it).
+     «المشتريات ← نواقص ← الحقائب» (owner 2026-11-15, VISION A «one line per forgotten bag»): the shortages of every bag
+        except «نواقص يوميه» (PharmaFly's own bag rule, without the general shortages and the postponed, only what sold in
+        the last month or has a minimum). One home line per bag; an item short more than 7 days in a row makes it late. */
 (function (root) {
   'use strict';
   const PATH = 'alerts/alerts.json';
@@ -32,10 +35,26 @@
     const store = b.store && b.store !== 1 ? ` (${String(b.store_name || 'مخزن ' + b.store).replace(/^مخزن\s*/, '')})` : '';
     return `${monthOf(b.exp)}: ${q}${store}`;
   }
+  // «2026-10-25» -> «25/10» in the year of `ref`, else «02/11/2025»
+  function dayText(d, ref) {
+    const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(String(d || ''));
+    if (!m) return '';
+    return `${m[3]}/${m[2]}` + (String(ref || '').slice(0, 4) === m[1] ? '' : `/${m[1]}`);
+  }
+  // the other bags (absent in a file from before 2026-11-15: null = not counted yet)
+  function parseBags(b) {
+    if (!b || typeof b !== 'object' || !Array.isArray(b.list)) return null;
+    const list = b.list.filter((x) => x && x.id != null).map((x) => {
+      const items = (Array.isArray(x.items) ? x.items : []).filter((i) => i && i.id != null);
+      return { id: String(x.id), name: String(x.name || '#' + x.id), items, n: items.length, late: items.filter((i) => num(i.days) > num(b.late_days || 7)).length };
+    }).filter((x) => x.n > 0);
+    return { since: b.since || '', lateDays: num(b.late_days) || 7, list };
+  }
   function parse(o) {
     if (!o || typeof o !== 'object' || !o.tasks || !o.expiry || !o.customers) return null;
     const arr = (x) => (Array.isArray(x) ? x : []);
     return {
+      bags: parseBags(o.bags),
       generatedAt: o.generated_at || '', dataAt: o.data_at || '', dayStart: o.day_start || '', soonUntil: o.soon_until || '',
       mix: arr(o.tasks.expiry_mix), negative: arr(o.tasks.negative), expiredSold: arr(o.tasks.expired_sold),
       expired: arr(o.expiry.expired), soon: arr(o.expiry.soon),
@@ -53,10 +72,17 @@
       { key: 'expiredSold', tab: 'expiry', view: 'today', n: today(a.expiredSold), text: 'صنف منتهي اتباع النهارده' },
       { key: 'expired', tab: 'expiry', view: 'expired', n: a.expired.length, text: 'صنف منتهي الصلاحية وليه رصيد' },
       { key: 'over', tab: 'customers', view: '', n: a.customers.over.length, text: 'عميل عدّى الحد' },
+      // one line per bag, the late ones first (the laptop already sorts them so)
+      ...((a.bags && a.bags.list) || []).map((b) => ({
+        key: 'bag', tab: 'bags', view: 'bag:' + b.id, n: b.n, text: 'ناقص في حقيبة', name: b.name, late: b.late,
+        note: b.late ? `منهم ${b.late} بقالهم أكتر من ${a.bags.lateDays} أيام` : '',
+      })),
     ].filter((x) => x.n > 0);
   }
+  // the items short for more than 7 days in a row, all bags together (the notification and the small tab's number)
+  const lateBags = (a) => ((a && a.bags && a.bags.list) || []).reduce((s, b) => s + b.late, 0);
   const value = (list) => list.reduce((s, x) => s + num(x.value), 0);
-  const api = { PATH, parse, todo, when, monthOf, batchText, money, value };
+  const api = { PATH, parse, todo, when, monthOf, batchText, money, value, dayText, lateBags };
   root.AskerAlertsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -66,7 +92,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
   const qtyText = () => (root.AskerStockLib && root.AskerStockLib.qtyText) || null;
-  let data = null, loading = null, loadedAt = 0, view = 'today', failed = '';
+  let data = null, loading = null, loadedAt = 0, view = 'today', failed = '', bagSel = '';
 
   async function load(force) {
     if (!db()) return null;
@@ -160,9 +186,49 @@
       (c.near.length ? `<h3 class="al-h">قربوا من الحد (90% أو أكتر) <b class="al-n">${c.near.length}</b></h3>` + c.near.map((x) => customerRow(x, a)).join('') : '') +
       `<p class="hint">الرصيد = آخر حركة للعميل في فارمافلاي (بيع أو دفع)، والحد من كارت العميل. ${c.prepaid} عميل دافعين مقدّم.</p>`;
   }
+  // «الحقائب»: a chip per bag (all of them by default), each item with its stock, its month's sales, what to order, its
+  // last purchase and since when it is short. Nothing is changed here: the order is made in PharmaFly / on WhatsApp.
+  function bagItem(x, lateDays, ref) {
+    const late = num(x.days) > lateDays;
+    const line = num(x.min) > 0
+      ? `عندك ${num(x.have)} · الحد الأدنى ${num(x.min)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`
+      : `عندك ${num(x.have)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`;
+    const since = num(x.days) > 1 ? `ناقص بقاله ${num(x.days)} يوم` : 'ناقص من النهارده';
+    return `<div class="al-item${late ? ' late' : ''}"><strong dir="auto" class="notr">${esc(x.name)}</strong>` +
+      `<div class="bg-line">${esc(line)}</div>` +
+      `<div class="hint">${x.last_buy ? `<span>${esc('آخر شرا ' + dayText(x.last_buy, ref))}</span>` : '<span>ما اتشراش قبل كده</span>'} · <span class="${late ? 'al-late' : ''}">${esc(since)}</span></div></div>`;
+  }
+  function drawBags() {
+    const box = $('bgList');
+    if (!box) return;
+    const a = data;
+    $('bgAge').textContent = a ? ageText(a) : failed;
+    $('bgAge').className = 'status' + (failed && !a ? ' bad' : '');
+    const chips = $('bgChips');
+    if (!a || !a.bags) {
+      chips.innerHTML = '';
+      box.innerHTML = a ? '<p class="hint">الحقائب لسه ما اتحسبتش: هتظهر مع تحديث اللاب الجاي.</p>' : '';
+      return;
+    }
+    const L = a.bags.list;
+    if (bagSel && !L.some((b) => b.id === bagSel)) bagSel = '';
+    const total = L.reduce((s, b) => s + b.n, 0);
+    chips.innerHTML = L.length
+      ? `<button type="button" data-bag=""${bagSel ? ' class="secondary"' : ''}><span>الكل</span> <b>${total}</b></button>` +
+        L.map((b) => `<button type="button" data-bag="${esc(b.id)}"${bagSel === b.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(b.name)}</bdi> <b>${b.n}</b></button>`).join('')
+      : '';
+    const shown = bagSel ? L.filter((b) => b.id === bagSel) : L;
+    box.innerHTML =
+      '<p class="hint">حقائب الموردين غير «نواقص يوميه»: الناقص بقاعدة فارمافلاي، من غير النواقص العامة والمتأجل، وبس اللي اتباع في آخر شهر أو عليه حد أدنى.</p>' +
+      (a.bags.since ? `<p class="hint">${esc(`العدّ بدأ يوم ${dayText(a.bags.since, a.dataAt)}: الصنف اللي يفضل ناقص أكتر من ${a.bags.lateDays} أيام بيقلب أحمر.`)}</p>` : '') +
+      (shown.length
+        ? shown.map((b) => `<h3 class="al-h"><bdi class="notr">${esc(b.name)}</bdi> <b class="al-n">${b.n}</b></h3>` + b.items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')).join('')
+        : '<p class="hint">مفيش نواقص في الحقائب التانية.</p>');
+  }
   function drawAll() {
     drawExpiry();
     drawCustomers();
+    drawBags();
     root.AskerNotify?.refresh?.();
   }
   function bind() {
@@ -172,9 +238,19 @@
       view = b.dataset.alView;
       drawExpiry();
     });
+    $('bgChips')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-bag]');
+      if (!b) return;
+      bagSel = b.dataset.bag;
+      drawBags();
+    });
   }
-  // open a view from the home card or a notification
-  function show(v) { if (v) view = v; drawExpiry(); }
+  // open a view from the home card or a notification: «bag:<id>» = that bag in «الحقائب», else a view of «الصلاحيات»
+  function show(v) {
+    if (v && /^bag:/.test(v)) { bagSel = v.slice(4); drawBags(); return; }
+    if (v) view = v;
+    drawExpiry();
+  }
   root.AskerAlerts = { open: () => load(false), load, show, data: () => data, todo: () => todo(data) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();

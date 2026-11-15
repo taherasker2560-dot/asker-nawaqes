@@ -15,7 +15,7 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=scopes-20261113a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=media-20261114a" />
+    <link rel="stylesheet" href="ar/look.css?v=bags-20261115a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
     <script src="ar/i18n-en.js?v=media-20261114a"></script>
@@ -170,7 +170,8 @@
           <div class="chips" data-pfor="short" role="group" aria-label="نواقص">
             <button type="button" class="chip on" data-tab="short">النواقص</button
             ><button type="button" class="chip" data-tab="read">الوارد</button
-            ><button type="button" class="chip" data-tab="translate">الترجمة</button>
+            ><button type="button" class="chip" data-tab="translate">الترجمة</button
+            ><button type="button" class="chip" data-tab="bags">الحقائب</button>
           </div>
           <div class="chips" data-pfor="orders" role="group" aria-label="طلبيات" hidden>
             <button type="button" class="chip" data-tab="drafts">الطلبيات</button
@@ -746,6 +747,13 @@
           </div>
           <div id="alExpiry"></div>
         </section>
+        <!-- «الحقائب» (owner 2026-11-15): the shortages of the other bags, from the same alerts file (ar/alerts.js) -->
+        <section id="bagsPanel" class="card hidden">
+          <h2>الحقائب التانية</h2>
+          <p id="bgAge" class="status"></p>
+          <div class="tabs seg sub bg-chips" id="bgChips" role="group" aria-label="الحقائب"></div>
+          <div id="bgList"></div>
+        </section>
         <section id="carePanel" class="card hidden">
           <!-- «الرسايل» from our own messages page (ar/chat.js, owner 2026-11-13) -->
           <div id="chatPanel"></div>
@@ -826,7 +834,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
     <script src="ar/cache.js?v=wait-20261113a"></script>
-    <script src="ar/app.js?v=vendors-20261114a"></script>
+    <script src="ar/app.js?v=bags-20261115a"></script>
     <script src="ar/staff.js?v=chat-20261113a"></script>
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -841,7 +849,7 @@
     <script src="ar/home.js?v=media-20261114a"></script>
     <script src="ar/look.js?v=times-20261113a"></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
-    <script src="ar/alerts.js?v=staff-20261113a"></script>
+    <script src="ar/alerts.js?v=bags-20261115a"></script>
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
     <script src="ar/customers.js?v=link-20261113a"></script>
 <script src="ar/sales.js?v=sales-20261114b"></script>
@@ -850,7 +858,7 @@
     <script src="ar/tempsale.js?v=link-20261113a"></script>
     <script src="ar/chat.js?v=acct-20261114a"></script>
     <script src="ar/count.js?v=acct-20261113a"></script>
-    <script src="ar/notify.js?v=chat-20261113a"></script>
+    <script src="ar/notify.js?v=bags-20261115a"></script>
     <script src="ar/adam.js?v=adam-20261115a"></script>
   </body>
 </html>

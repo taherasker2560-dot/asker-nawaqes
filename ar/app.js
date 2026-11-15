@@ -224,10 +224,10 @@
   // a [data-tab], and a section (and a group of «المشتريات») remembers the small tab you were on.
   const GROUP_OF = {
     home: 'home',
-    short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
+    short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
     customers: 'accounts', vendors: 'accounts', ops: 'accounts', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
   };
-  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
+  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
   const lastPTab = { short: 'short', orders: 'drafts', stock: 'stock' };
   function showTab(tab) {
@@ -250,7 +250,9 @@
     if (tab === 'count') window.AskerCount?.open(); else window.AskerCount?.close();
     // «الصلاحيات» and the customers' limits come from the laptop's alerts file (ar/alerts.js, owner 2026-11-12)
     $('expiryPanel')?.classList.toggle('hidden', tab !== 'expiry');
-    if (tab === 'expiry' || tab === 'customers') window.AskerAlerts?.open();
+    // «الحقائب» (owner 2026-11-15): the other bags' shortages, from the same file
+    $('bagsPanel')?.classList.toggle('hidden', tab !== 'bags');
+    if (tab === 'expiry' || tab === 'customers' || tab === 'bags') window.AskerAlerts?.open();
     // the customers' accounts and statements (ar/customers.js, owner 2026-11-12)
     if (tab === 'customers') window.AskerCustomers?.open();
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');

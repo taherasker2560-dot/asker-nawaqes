@@ -789,6 +789,32 @@ html.night .todo-row b {
 .al-item.warn {
   border-inline-start: 4px solid #e8a33d;
 }
+/* «الحقائب» (owner 2026-11-15): an item short more than 7 days in a row, its bag's home line, and the bag chips */
+.al-item.late {
+  border-inline-start: 4px solid #e5243b;
+}
+.al-late,
+.todo-note {
+  color: #c41a30;
+  font-weight: 700;
+}
+html.night .al-late,
+html.night .todo-note {
+  color: #ff8fa3;
+}
+.todo-note {
+  display: block;
+  font-size: 12.5px;
+}
+.bg-line {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bg-chips {
+  flex-wrap: wrap;
+}
 .al-item strong {
   display: block;
   font-size: 14.5px;
