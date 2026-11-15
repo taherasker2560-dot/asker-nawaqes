@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=scopes-20261113a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=notes-20261115a" />
+    <link rel="stylesheet" href="ar/look.css?v=newitems-20261115b" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=notes-20261115a"></script>
+    <script src="ar/i18n-en.js?v=newitems-20261115a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -259,6 +259,22 @@
         <section id="shortPanel" class="card hidden">
           <div class="grid short-stats" id="shStats"></div>
           <p id="shNote" class="status"></p>
+          <!-- «أصناف جديدة» (owner 2026-11-15, ar/new-items.js): products not in PharmaFly yet; English name + approximate price, translated, kept for their invoice -->
+          <details id="niBox" class="newitems hidden">
+            <summary><span>🆕 أصناف جديدة</span> <b id="niCount" class="ni-count"></b></summary>
+            <div class="ni-form">
+              <input id="niName" type="text" dir="ltr" maxlength="250" autocomplete="off" autocapitalize="characters" placeholder="Product name in English" aria-label="اسم الصنف بالإنجليزي" />
+              <div class="ni-line">
+                <input id="niPrice" type="text" inputmode="decimal" autocomplete="off" placeholder="السعر تقريبًا" aria-label="السعر التقريبي" />
+                <input id="niNote" type="text" maxlength="300" autocomplete="off" placeholder="الشركة / ملاحظة" aria-label="ملاحظة" />
+              </div>
+              <button id="niAdd" type="button">احفظ وترجم</button>
+              <p id="niStatus" class="status" role="status"></p>
+            </div>
+            <div id="niList"></div>
+            <details id="niOld" class="ni-old hidden"><summary><span>اللي وصل واللي اتلغى</span> (<span id="niOldCount">0</span>)</summary><div id="niOldList"></div></details>
+            <p class="hint">الأصناف دي مش في فارمافلاي لسه. بتتحفظ بالاسم الإنجليزي والسعر التقريبي وبتتترجم زي النواقص، ولما فاتورتها تيجي الاسم الإنجليزي بيبقى معانا.</p>
+          </details>
           <div class="search">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             <input id="shSearch" type="search" autocomplete="off" aria-label="دوّر في النواقص" placeholder="دوّر في النواقص (عربي أو إنجليزي)…" />
@@ -868,7 +884,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
     <script src="ar/cache.js?v=wait-20261113a"></script>
-    <script src="ar/app.js?v=cash-20261115a"></script>
+    <script src="ar/app.js?v=newitems-20261115a"></script>
     <script src="ar/staff.js?v=chat-20261113a"></script>
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -892,6 +908,7 @@
 <script src="ar/ops.js?v=ops-20261115a"></script>
 <script src="ar/cash.js?v=cash-20261115b"></script>
 <script src="ar/notes.js?v=notes-20261115a"></script>
+<script src="ar/new-items.js?v=newitems-20261115b"></script>
     <script src="ar/tempsale.js?v=link-20261113a"></script>
     <script src="ar/chat.js?v=acct-20261114a"></script>
     <script src="ar/count.js?v=acct-20261113a"></script>

@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),path=require('node:path');
 const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
 const ORIGIN='https://taherasker2560-dot.github.io',env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon'};
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'},{id:'s3',product_name:'JANUVIA 50MG 28TAB'},{id:'s4',product_name:'JANUVIA 100MG 28TAB'}];
-function fake({names=[],decisions=[],gem,fixes=[],ignored=[],v10aliases=[],v10rej=[],v10fixes=[]}){const calls=[];const f=async(url,o={})=>{calls.push({url,o});
+function fake({names=[],decisions=[],gem,fixes=[],ignored=[],v10aliases=[],v10rej=[],v10fixes=[],fresh=null}){const calls=[];const f=async(url,o={})=>{calls.push({url,o});
  if(url.endsWith('/auth/v1/user'))return new Response(JSON.stringify({email:'owner@example.com'}));
  if(url.includes('/rest/v1/ar_shortages'))return new Response(JSON.stringify(url.includes('offset=0')?shortages:[]));
  if(url.includes('/rest/v1/ar_names')&&o.method==='POST'){f.saved=JSON.parse(o.body);return new Response('',{status:201})}
@@ -12,6 +12,7 @@ function fake({names=[],decisions=[],gem,fixes=[],ignored=[],v10aliases=[],v10re
  const page=a=>new Response(JSON.stringify(url.includes('offset=0')?a:[]));
  if(url.includes('/rest/v1/ar_fixes'))return page(fixes);if(url.includes('/rest/v1/ar_ignored'))return page(ignored);if(url.includes('/rest/v1/name_aliases'))return page(v10aliases);if(url.includes('/rest/v1/name_rejections'))return page(v10rej);if(url.includes('/rest/v1/reading_fixes'))return page(v10fixes);
  if(url.includes('/rest/v1/ar_answers'))return new Response(JSON.stringify(url.includes('offset=0')?decisions:[]));
+ if(url.includes('/rest/v1/ar_new_items')){if(!fresh)return new Response('{}',{status:404});return new Response(JSON.stringify(url.includes('offset=0')?fresh:[]))}
  if(url.startsWith('https://generativelanguage'))return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(gem(JSON.parse(o.body)))}]}}]}));
  throw Error('unexpected '+url)};f.calls=calls;return f}
 const req=body=>new Request('https://p.supabase.co/functions/v1/arabic-shortages',{method:'POST',headers:{origin:ORIGIN,authorization:'Bearer jwt','content-type':'application/json'},body:JSON.stringify(body)});
@@ -20,6 +21,12 @@ let f=fake({names:[{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠
 let r=await F.handle(req({action:'translate',limit:10}),env,f);let b=await r.json();
 assert.equal(r.status,200);assert.equal(b.translated,3);assert.equal(b.remaining,0);assert.ok(!f.saved.some(x=>x.name_key==='BRUFEN 400MG 30TAB'),'approved name kept even though the shortage row is new (s1 came back)');
 assert.equal(f.saved.find(x=>x.name_key==='FLAGYL 125MG SYP').arabic_name,'فلاجيل ١٢٥ مجم شراب');assert.equal(f.saved.find(x=>x.name_key==='FLAGYL 125MG SYP').english_name,'FLAGYL 125MG SYP');assert.ok(f.calls.find(c=>c.url.includes('ar_names')&&c.o.method==='POST').o.headers.Prefer.includes('ignore-duplicates'));
+// the owner's new items (migration 202611152100) are translated with the shortages; an item already translated is not asked again; no table yet = no new items
+f=fake({names:[{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠',status:'approved'},{name_key:'NEWDRUG 10MG 20TAB',arabic_name:'نيو درج ١٠ مجم',status:'approved'}],fresh:[{id:7,name_en:'newdrug 10mg 20tab'},{id:8,name_en:'ZETAPRO 5MG SYRUP'}],gem:b=>{const list=JSON.parse(b.contents[0].parts[0].text.split('\n\n')[1]);return {items:list.map(x=>({i:x.i,ar:x.name.startsWith('ZETA')?'زيتابرو ٥ مجم شراب':'جانوفيا'}))}}});
+r=await F.handle(req({action:'translate',limit:10}),env,f);b=await r.json();
+assert.equal(b.translated,4,'FLAGYL, 2 JANUVIA and the new ZETAPRO');assert.equal(f.saved.find(x=>x.name_key==='ZETAPRO 5MG SYRUP').arabic_name,'زيتابرو ٥ مجم شراب');assert.equal(f.saved.find(x=>x.name_key==='ZETAPRO 5MG SYRUP').status,'suggested');assert.ok(!f.saved.some(x=>x.name_key==='NEWDRUG 10MG 20TAB'),'a new item with an Arabic name is not asked again (key is upper-cased)');
+assert.ok(f.calls.some(c=>c.url.includes('ar_new_items')&&c.url.includes('status=in.(new,ordered)')));
+f=fake({names:[],gem:b=>({items:JSON.parse(b.contents[0].parts[0].text.split('\n\n')[1]).map(x=>({i:x.i,ar:'اسم'}))})});r=await F.handle(req({action:'translate',limit:10}),env,f);b=await r.json();assert.equal(r.status,200,'a server without the new-items table still translates the shortages');assert.equal(b.translated,4);
 // read: Arabic supplier lines matched to shortages through the Arabic names; strength from the English name
 const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'JANUVIA 50MG 28TAB',arabic_name:'جانوفيا ٥٠ مجم ٢٨ قرص',status:'suggested'},{name_key:'JANUVIA 100MG 28TAB',arabic_name:'جانوفيا ١٠٠ مجم ٢٨ قرص',status:'suggested'}];
 const gemRows={rows:[{name:'فلاجيل شراب ١٢٥',english:''},{name:'جانوفيا ٥٠ مجم ٢٨ قرص',english:''},{name:'بانادول اكسترا',english:'PANADOL EXTRA'}]};

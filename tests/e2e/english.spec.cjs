@@ -30,7 +30,7 @@ run('English: the switch, every section in English, names and messages untouched
    {id:'2274',name:'فارما مول',home:true,items:[{id:1,name:'ZURCAL 40MG',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:8},{id:2,name:'NEW ONE',have:0,sold30:0,min:2,need:1,last_buy:null,days:1}]}]}});
   window.__tables.ar_store_orders=[{id:1,status:'new'}];window.__tables.ar_documents=[{id:'d1',status:'new'}];});
  await page.evaluate(()=>window.AskerNotify.tick());
- await page.evaluate(()=>{const iso=m=>new Date(Date.now()-m*6e4).toISOString();window.__tables.ar_notes=[{id:1,text:'اسأل على فاتورة الفتح',place:'pharmacy',status:'open',created_at:iso(3000)},{id:2,text:'كلم المحاسب',place:'any',status:'open',created_at:iso(100)},{id:3,text:'خلصت دي',place:'pharmacy',status:'done',created_at:iso(500),done_at:iso(20)}];window.__tables.ar_presence=[{id:1,at_pharmacy:true,since:iso(5),checked_at:iso(1)}];return window.AskerNotes.refresh()});await page.waitForSelector('#ntList .nt-row');
+ await page.evaluate(()=>{const iso=m=>new Date(Date.now()-m*6e4).toISOString();window.__tables.ar_notes=[{id:1,text:'اسأل على فاتورة الفتح',place:'pharmacy',status:'open',created_at:iso(3000)},{id:2,text:'كلم المحاسب',place:'any',status:'open',created_at:iso(100)},{id:3,text:'خلصت دي',place:'pharmacy',status:'done',created_at:iso(500),done_at:iso(20)}];window.__tables.ar_presence=[{id:1,at_pharmacy:true,since:iso(5),checked_at:iso(1)}];window.__tables.ar_new_items=[{id:1,name_key:'ZETAPRO 5MG SYRUP',name_en:'Zetapro 5mg syrup',price:85.5,note:'Eva',status:'new',created_at:iso(500)},{id:2,name_key:'NEWDRUG 10MG',name_en:'Newdrug 10mg',price:null,note:null,status:'ordered',created_at:iso(900)},{id:3,name_key:'OLDONE',name_en:'Oldone',price:10,note:null,status:'arrived',created_at:iso(9000)}];window.__tables.ar_names=(window.__tables.ar_names||[]).concat([{name_key:'ZETAPRO 5MG SYRUP',english_name:'Zetapro 5mg syrup',arabic_name:'زيتابرو ٥ مجم شراب',status:'suggested'}]);return window.AskerNotes.refresh()});await page.waitForSelector('#ntList .nt-row');
 
  const seen=new Map();
  const scan=async(where)=>{for(const v of await leftArabic(page))if(!ALLOWED.some(r=>r.test(v))&&!seen.has(v))seen.set(v,where)};
@@ -43,7 +43,7 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-group="sales"]');await go('[data-tab="sales"]');await go('.subbar[data-for="sales"] .qa-pin');await scan('home/full');
  await go('[data-group="home"]');await go('#qaEdit');await scan('home/buttons-full');await go('#qaReset');await go('#qaDone');
  await page.fill('#hsQ','FLAGYL');await page.waitForTimeout(900);await scan('search');await go('#hsClear');
- await go('[data-group="purchases"]');await scan('shortages');
+ await go('[data-group="purchases"]');await scan('shortages');await page.evaluate(()=>window.AskerNewItems.open());await page.waitForSelector('#niBox:not(.hidden)');await page.evaluate(()=>{document.getElementById('niBox').open=true});await page.waitForTimeout(300);await scan('new-items');await go('#niOld summary');await scan('new-items/closed');await go('#niList [data-ni-edit]');await scan('new-items/edit');await go('#niAdd');await scan('new-items/empty-name');
  await go('[data-tab="read"]');for(const s of ['manual','companies','today'])await go(`[data-sub="${s}"]`);await scan('read');
  await go('[data-tab="translate"]');await scan('translate');
  await go('[data-tab="bags"]');await page.waitForTimeout(400);await scan('bags');
