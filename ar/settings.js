@@ -5,16 +5,17 @@
    the color's text on the page stay readable. Loaded first, so the color is right before anything shows. */
 (function (root) {
   'use strict';
-  // «أزرق عسكر» first: the blue of the new round logo (owner 2026-11-12), the bot's color unless he picks another one
+  // «برتقالي فاقع» first and the DEFAULT (owner 2026-11-15: «عايز اللون الأساسي يبقى الأورنج الفاقع ده … يبقى عندهم هم الأوبشن يغيروا»): the bot's
+  // color unless someone picks another one. «أزرق عسكر» (the blue of the round logo, the default 2026-11-12 to 11-15) is the second one.
   const PRESETS = [
-    ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
+    ['flame', 'برتقالي فاقع', '#d84315'], ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
     ['purple', 'بنفسجي', '#5b3a8c'], ['violet', 'موف غامق', '#4527a0'], ['indigo', 'نيلي', '#283593'], ['blue', 'أزرق', '#1d4f91'],
     ['sky', 'لبني', '#0277bd'], ['cyan', 'سماوي', '#00838f'], ['teal', 'تركواز', '#0e6b72'], ['emerald', 'زمردي', '#00796b'],
     ['green', 'أخضر', '#1d6f48'], ['leaf', 'أخضر زرعي', '#2e7d32'], ['olive', 'زيتوني', '#556b2f'], ['lime', 'ليموني غامق', '#827717'],
-    ['gold', 'دهبي', '#9a7414'], ['orange', 'برتقالي', '#a8501a'], ['flame', 'برتقالي فاقع', '#d84315'], ['copper', 'نحاسي', '#8d4e2a'],
+    ['gold', 'دهبي', '#9a7414'], ['orange', 'برتقالي', '#a8501a'], ['copper', 'نحاسي', '#8d4e2a'],
     ['brown', 'بني', '#5d4037'], ['gray', 'رمادي', '#3f4650'], ['slate', 'رصاصي', '#455a64'], ['charcoal', 'فحمي', '#263238'],
   ].map(([id, name, hex]) => ({ id, name, hex }));
-  const KEY = 'asker-accent', NIGHT = 'asker-night';
+  const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'flame';
 
   // ---------- colors (pure) ----------
   function hexToRgb(h) { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -61,18 +62,20 @@
   // the stored choice: a ready color's id, or «c:#rrggbb» (any color); the old «night» color (8-color version) = purple at night.
   // The new logo is blue (2026-11-12): once, a phone still on the old default (crimson, the old red logo's color) or on
   // nothing moves to «أزرق عسكر»; any other color he picked stays.
-  const LOOK = 'asker-look-2';
+  // 2026-11-15: the default is the vivid orange now. Once, a phone on nothing, on the old crimson or on «أزرق عسكر» (the default of the last days;
+  // nobody could tell a chosen blue from the default) moves to it; any other color somebody picked stays, and he can change it again.
+  const LOOK = 'asker-look-3';
   function choice() {
     if (read(LOOK, '') !== '1') {
       const was = read(KEY, '');
-      if (!was || was === 'crimson') write(KEY, 'asker');
+      if (!was || was === 'crimson' || was === 'asker') write(KEY, DEFAULT_ID);
       write(LOOK, '1');
     }
-    let a = read(KEY, 'asker'), night = read(NIGHT, '') === '1';
+    let a = read(KEY, DEFAULT_ID), night = read(NIGHT, '') === '1';
     if (a === 'night') { a = 'purple'; night = true; write(KEY, a); write(NIGHT, '1'); }
     const p = PRESETS.find((x) => x.id === a);
     const hex = p ? p.hex : /^c:#[0-9a-f]{6}$/i.test(a) ? a.slice(2) : PRESETS[0].hex;
-    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : 'asker', hex, night };
+    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : DEFAULT_ID, hex, night };
   }
   function apply() {
     const c = choice(), t = palette(c.hex, c.night), s = document.documentElement.style;
@@ -91,7 +94,7 @@
     if (meta) meta.setAttribute('content', c.night ? t.tint : t.main);
     return c;
   }
-  root.AskerSettings = { PRESETS, palette, contrast, apply, choice };
+  root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice };
   if (typeof document === 'undefined') return;
   apply(); // before the page paints
 

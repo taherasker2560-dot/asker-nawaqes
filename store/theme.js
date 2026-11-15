@@ -16,10 +16,10 @@
 
   function choice() {
     const o = owner(), mine = read(KEY, ''), nv = read(NIGHT, '');
-    const a = mine || o.color || 'asker';
+    const a = mine || o.color || S.DEFAULT_ID || 'flame';
     const p = S.PRESETS.find((x) => x.id === a);
     const hex = p ? p.hex : /^c:#[0-9a-f]{6}$/i.test(a) ? a.slice(2) : S.PRESETS[0].hex;
-    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : 'asker', hex, night: nv === '' ? !!o.night : nv === '1', own: !!mine || nv !== '' };
+    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : (S.DEFAULT_ID || 'flame'), hex, night: nv === '' ? !!o.night : nv === '1', own: !!mine || nv !== '' };
   }
   function apply() {
     const c = choice(), t = S.palette(c.hex, c.night), el = document.documentElement, s = el.style;
