@@ -916,6 +916,38 @@ html.night .bg-dup {
   background: rgba(251, 191, 36, 0.15);
   color: #fbbf24;
 }
+.bg-dup-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+.bg-dup-btns button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+.bg-dup-btns .bg-dup-same {
+  background: #9a3412;
+  color: #fff;
+}
+.bg-dups {
+  margin: 8px 0;
+  border-radius: 12px;
+  border: 1px solid #f0c48a;
+  background: var(--card);
+  overflow: hidden;
+}
+.bg-dups > summary {
+  padding: 8px 12px;
+  background: #fff4e5;
+  color: #9a3412;
+  font-weight: 700;
+}
+.bg-dups-row {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
 /* the search card: a warehouse list priced differently from ours (owner 11-15) */
 .hs-listprice {
   margin-top: 2px;
