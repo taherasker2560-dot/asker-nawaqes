@@ -17,8 +17,16 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
         return new Response(JSON.stringify(k === KEY ? 'phone' : k === LAPTOP ? 'laptop' : null));
       }
       if (u.pathname === '/v1beta/models') return new Response(JSON.stringify({ models: [{ name: 'models/gemini-2.5-flash' }, { name: 'models/gemini-2.5-flash-preview-tts' }, { name: 'models/gemini-2.5-pro-preview-tts' }] }));
+      if (u.hostname === 'generativelanguage.googleapis.com' && u.pathname.endsWith(':streamGenerateContent')) {
+        assert.equal(u.searchParams.get('alt'), 'sse');
+        if (gemini === 'busy') return new Response('{"error":{"message":"quota"}}', { status: 429 });
+        // two audio events (4 + 4 bytes), a line that is not audio, and CRLF line ends, as Gemini sends them
+        const ev = (b) => 'data: ' + JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: b.toString('base64') } }] } }] }) + '\r\n\r\n';
+        const enc = new TextEncoder();
+        return new Response(new ReadableStream({ start(c) { c.enqueue(enc.encode(ev(pcm.subarray(0, 4)))); c.enqueue(enc.encode('data: {"usageMetadata":{}}\r\n\r\n' + ev(pcm.subarray(4)).slice(0, 20))); c.enqueue(enc.encode(ev(pcm.subarray(4)).slice(20))); c.close(); } }));
+      }
       if (u.hostname === 'generativelanguage.googleapis.com' && u.pathname.endsWith(':generateContent')) {
-        if (gemini === 'busy') return new Response('{}', { status: 429 });
+        if (gemini === 'busy') return new Response('{"error":{"message":"quota per minute"}}', { status: 429 });
         if (gemini === 'empty') return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'no audio' }] } }] }));
         if (gemini === 'down') throw new Error('network');
         return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm.toString('base64') } }] } }] }));
@@ -44,7 +52,9 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   const gb = JSON.parse(gem(f)[0].o.body);
   assert.equal(gb.generationConfig.responseModalities[0], 'AUDIO');
   assert.equal(gb.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Charon');
-  assert.ok(gb.contents[0].parts[0].text.startsWith(F.DEFAULT_STYLE) && gb.contents[0].parts[0].text.endsWith('64 علبة.'));
+  // no English instruction in front of the words (the owner heard it spoken): the text goes to the voice as it is
+  assert.equal(F.DEFAULT_STYLE, '');
+  assert.equal(gb.contents[0].parts[0].text, 'بنادول إكسترا 48: 116 جنيه، 64 علبة.');
   assert.equal(gem(f)[0].o.headers['x-goog-api-key'], 'g');
   assert.match(gem(f)[0].url, /models\/gemini-2\.5-flash-preview-tts:generateContent/);
 
@@ -78,6 +88,18 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
 
   // Gemini's answers
   for (const [mode, status] of [['busy', 429], ['empty', 502], ['down', 504]]) { r = await F.handle(req({ text: 'x' }), env, fake({ gemini: mode })); assert.equal(r.status, status, mode); }
+  r = await F.handle(req({ text: 'x' }), env, fake({ gemini: 'busy' }));
+  assert.match((await r.json()).detail, /quota per minute/, 'the 429 says why');
+
+  // stream:true: the raw PCM as it is made (the audio events joined, the other lines ignored), the rate in a header
+  f = fake();
+  r = await F.handle(req({ text: 'تمام', stream: true }), env, f);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('x-voice-rate'), '24000');
+  assert.deepEqual([...Buffer.from(await r.arrayBuffer())], [...pcm]);
+  assert.match(f.calls.find((c) => c.url.includes('streamGenerateContent')).url, /gemini-2\.5-flash-preview-tts:streamGenerateContent\?alt=sse/);
+  r = await F.handle(req({ text: 'تمام', stream: true }), env, fake({ gemini: 'busy' }));
+  assert.equal(r.status, 429);
 
   // the speech models of the key
   r = await F.handle(req({ action: 'models' }), env, fake());
