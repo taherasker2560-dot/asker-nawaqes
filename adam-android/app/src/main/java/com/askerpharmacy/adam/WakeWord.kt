@@ -70,10 +70,13 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
                 override fun onPartialResult(hypothesis: String?) = checkPartial(hypothesis)
                 override fun onResult(hypothesis: String?) = check(hypothesis)
                 override fun onFinalResult(hypothesis: String?) = check(hypothesis)
-                override fun onError(exception: Exception?) { log("wake word error: " + exception?.message) }
-                override fun onTimeout() {}
+                // the microphone was lost (another app, a call): the service restarts it (AdamService's check every 15 s)
+                override fun onError(exception: Exception?) { log("wake word error: " + exception?.message); dead = true }
+                override fun onTimeout() { dead = true }
             })
             service = s
+            dead = false
+            startedAt = System.currentTimeMillis()
             true
         } catch (e: Throwable) {
             log("wake word start failed: " + e.message)
@@ -103,9 +106,9 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
             if (text.isEmpty() || !text.contains("adam")) return
             val tokens = text.split(Regex("\\s+"))
             val firstOrLast = tokens.first() == "adam" || tokens.last() == "adam"
-            if (tokens.size > 3 || !firstOrLast) { log("wake ignored, inside a sentence: $text"); return }
-            var conf = 1.0
             val words = o.optJSONArray("result")
+            if (tokens.size > 3 || !firstOrLast) { log("wake ignored, inside a sentence: $text" + timings(words)); return }
+            var conf = 1.0
             if (words != null) {
                 for (i in 0 until words.length()) {
                     val w = words.getJSONObject(i)
@@ -119,8 +122,22 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
         } catch (e: Exception) { }
     }
 
+    /** « | adam 3.1-3.5 0.71, [unk] 3.6-4.0 …»: when each word was heard and how sure, for tuning the rule from the log. */
+    private fun timings(words: org.json.JSONArray?): String {
+        if (words == null || words.length() == 0) return ""
+        val sb = StringBuilder(" |")
+        for (i in 0 until minOf(words.length(), 12)) {
+            val w = words.optJSONObject(i) ?: continue
+            sb.append(' ').append(w.optString("word")).append(' ')
+                .append("%.1f-%.1f %.2f".format(w.optDouble("start"), w.optDouble("end"), w.optDouble("conf")))
+                .append(',')
+        }
+        return sb.toString()
+    }
+
     /** Lets go of the microphone. */
     fun stop() {
+        dead = true
         val s = service ?: return
         service = null
         try { s.stop() } catch (e: Throwable) { }
@@ -128,4 +145,11 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
     }
 
     val ready: Boolean get() = model != null
+
+    /** Listening is over by itself (error / timeout) or was never started: it must be started again. */
+    @Volatile var dead = true
+        private set
+    /** When listening last started (it is renewed every few minutes while nothing happens). */
+    @Volatile var startedAt = 0L
+        private set
 }

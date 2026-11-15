@@ -19,6 +19,18 @@ class Listener(private val ctx: Context, private val handler: Handler, private v
         cancel()
         val r = SpeechRecognizer.createSpeechRecognizer(ctx)
         rec = r
+        // one answer per listen, and ALWAYS one: the phone's speech engine sometimes never calls back (busy, its service restarted);
+        // then Adam would wait for ever and never hear «آدم» again («بنادي عليه ما بيردش», 2026-11-15)
+        var over = false
+        val onText1: (String) -> Unit = { t -> if (!over) { over = true; onText(t) } }
+        val onFail1: (Int) -> Unit = { c -> if (!over) { over = true; onFail(c) } }
+        handler.postDelayed({
+            if (!over && rec === r) {
+                log("listen: no answer from the speech engine, going on")
+                cancel()
+                onFail1(SpeechRecognizer.ERROR_CLIENT)
+            }
+        }, LISTEN_MAX_MS)
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {}
             override fun onBeginningOfSpeech() {}
@@ -30,12 +42,12 @@ class Listener(private val ctx: Context, private val handler: Handler, private v
             override fun onError(error: Int) {
                 log("listen error $error")
                 finish(r)
-                onFail(error)
+                onFail1(error)
             }
             override fun onResults(results: Bundle?) {
                 val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: ""
                 finish(r)
-                if (t.isBlank()) onFail(SpeechRecognizer.ERROR_NO_MATCH) else onText(t.trim())
+                if (t.isBlank()) onFail1(SpeechRecognizer.ERROR_NO_MATCH) else onText1(t.trim())
             }
         })
         val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -63,5 +75,10 @@ class Listener(private val ctx: Context, private val handler: Handler, private v
         rec = null
         try { r.cancel() } catch (e: Throwable) { }
         try { r.destroy() } catch (e: Throwable) { }
+    }
+
+    companion object {
+        /** The longest one listen may take (a long dictation piece is about 30 s; the engine ends by itself well before this). */
+        const val LISTEN_MAX_MS = 75_000L
     }
 }

@@ -95,11 +95,24 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
      * The natural voice first (the bot's server, Gemini's speech: Natural.kt, kept on the phone for repeated lines); the phone's own
      * voice when the server or the net is not there, or the sentence is too long for it.
      */
-    fun say(text: String, then: () -> Unit) {
+    fun say(text: String, after: () -> Unit) {
         val clean = text.trim().take(3500)
-        if (clean.isEmpty()) { handler.post(then); return }
+        if (clean.isEmpty()) { handler.post(after); return }
         stopPlayer()
         val my = ++seq
+        // [after] runs once, and ALWAYS: if the voice never says it is finished (the server, the net or the phone's engine stuck),
+        // the conversation goes on after a generous time instead of Adam staying deaf («بنادي عليه ما بيردش», 2026-11-15)
+        var ran = false
+        val then: () -> Unit = { if (!ran) { ran = true; after() } }
+        handler.postDelayed({
+            if (my == seq && !ran) {
+                log("voice did not finish in time, going on")
+                seq++
+                stopPlayer()
+                try { tts?.stop() } catch (e: Throwable) { }
+                then()
+            }
+        }, 15_000L + clean.length * 120L)
         if (!Config.natural(app) || !Config.ready(app) || clean.length > Natural.MAX) { sayLocal(clean, then); return }
         Thread {
             val cached = Natural.cached(app, clean)

@@ -38,12 +38,16 @@ class AdamService : Service() {
         const val ACTION_VOICE = "com.askerpharmacy.adam.VOICE"      // the chosen voice / pitch / speed changed
         const val ACTION_VOICES = "com.askerpharmacy.adam.VOICES"    // write the Arabic voices of the phone to files/voices.txt
         const val ACTION_SAY = "com.askerpharmacy.adam.SAY"          // say a sentence in the current voice (to try a voice)
+        const val ACTION_STOP_WALK = "com.askerpharmacy.adam.STOP_WALK" // «وقّف» on the notification while a list is read
         const val CH_LISTEN = "adam_listen"
         const val CH_RESULT = "adam_result"
         const val ID_LISTEN = 1
         const val ID_RESULT = 2
         private const val CONVO_MS = 10 * 60 * 1000L
         private const val POLL_MAX_MS = 3 * 3600 * 1000L
+        private const val THINK_MS = 90 * 1000L          // the laptop's answer normally comes in 1-30 s
+        private const val STUCK_MS = 8 * 60 * 1000L      // the voice and the listening have their own limits; this is the last net
+        private const val WAKE_RENEW_MS = 10 * 60 * 1000L
 
         @Volatile
         var running = false
@@ -126,8 +130,45 @@ class AdamService : Service() {
 
     private fun setState(s: String, note: String? = null) {
         state = s
+        stateAt = System.currentTimeMillis()
         notifyListening(note ?: (if (s == "speaking") "بيرد عليك…" else null))
         writeStatus()
+    }
+
+    // ---------- the guard: Adam never stays deaf ----------
+    // Owner 2026-11-15: «يا عم انا بنادي عليه ما بيردش عليا». While Adam speaks, thinks or listens to a request, the word «آدم» is
+    // not listened for; if one of those never ends (the voice, the speech engine or the laptop stuck) he would be deaf for ever.
+    // Every 15 s: listening for the word died (the mic was taken) → started again; renewed every 10 min while nothing happens;
+    // any other state much longer than it can take → back to waiting for «آدم».
+    private var stateAt = 0L
+
+    private fun guard() {
+        if (!alive) return
+        try {
+            val now = System.currentTimeMillis()
+            val age = now - stateAt
+            when (state) {
+                // only the word's listening is started again here (not goIdle, whose own 5-s retry would pile up)
+                "idle" -> if (wake.ready && (wake.dead || now - wake.startedAt > WAKE_RENEW_MS)) {
+                    if (wake.dead) log("guard: listening for the word had stopped, starting it again")
+                    if (!wake.start()) log("guard: the word's listening did not start, again in 15 s")
+                }
+                // the laptop is slow: he is told, and the answer is still spoken when it comes (poll goes on, as when the laptop is off)
+                "thinking" -> if (age > THINK_MS) {
+                    log("guard: no answer in ${age / 1000} s, waiting for it quietly")
+                    current = 0
+                    saySimple("لسه بيدوّر، هقولك أول ما يخلص")
+                } else Unit
+                "speaking", "listening", "confirm" -> if (age > STUCK_MS) {
+                    log("guard: stuck in $state for ${age / 1000} s, back to waiting")
+                    walk = null; current = 0; pendingConfirm = 0
+                    try { speaker.stop() } catch (e: Throwable) { }
+                    try { listener.cancel() } catch (e: Throwable) { }
+                    goIdle()
+                }
+            }
+        } catch (e: Throwable) { log("guard: " + e.message) }
+        main.postDelayed({ guard() }, 15_000)
     }
 
     // ---------- the service ----------
@@ -156,6 +197,7 @@ class AdamService : Service() {
                 if (ok) goIdle() else setState("no-model", "نموذج الكلمة ما اشتغلش")
             }
         }
+        main.postDelayed({ guard() }, 15_000)
         log("service created")
     }
 
@@ -173,7 +215,9 @@ class AdamService : Service() {
                     speaker.say(t) { goIdle() }
                 }
             }
-            ACTION_ASK_AGAIN -> if (wake.ready) { wake.stop(); beginRequestListening() }
+            // «اسأل» on the notification: also cuts a list that is being read (he cannot be heard while Adam speaks)
+            ACTION_ASK_AGAIN -> if (wake.ready) { walk = null; speaker.stop(); listener.cancel(); wake.stop(); beginRequestListening() }
+            ACTION_STOP_WALK -> { walk = null; speaker.stop(); listener.cancel(); log("walk stopped from the notification"); goIdle() }
             ACTION_TEXT -> {
                 val t = intent.getStringExtra("text")?.trim() ?: ""
                 if (t.isNotEmpty() && wake.ready) { wake.stop(); speaker.stop(); listener.cancel(); handleText(t) }
@@ -404,7 +448,8 @@ class AdamService : Service() {
         if (w.optString("mode") == "read") {
             val sb = StringBuilder()
             var n = 0
-            while (walkIdx < items.length() && n < 6) { sb.append(items.getJSONObject(walkIdx).optString("say")).append(". "); walkIdx++; n++ }
+            // 3 at a time, then «أكمّل؟»: while Adam speaks he cannot hear «خلاص» or «آدم» (2026-11-15: 6 at a time was too long)
+            while (walkIdx < items.length() && n < 3) { sb.append(items.getJSONObject(walkIdx).optString("say")).append(". "); walkIdx++; n++ }
             speaker.say(sb.toString()) { if (!alive) return@say; if (walkIdx < items.length()) walkAskMore() else walkEnd() }
         } else {
             val it = items.getJSONObject(walkIdx)
@@ -528,7 +573,7 @@ class AdamService : Service() {
     private fun listeningNotification(note: String?): Notification {
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val ask = PendingIntent.getService(this, 3, Intent(this, AdamService::class.java).setAction(ACTION_ASK_AGAIN), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        return Notification.Builder(this, CH_LISTEN)
+        val b = Notification.Builder(this, CH_LISTEN)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("● آدم صاحي")
             .setContentText(note ?: "قول «آدم» وبعدها طلبك")
@@ -536,7 +581,12 @@ class AdamService : Service() {
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now), "اسأل", ask).build())
-            .build()
+        // while a list is being read he cannot be heard: «وقّف» stops it at once
+        if (walk != null) {
+            val stop = PendingIntent.getService(this, 4, Intent(this, AdamService::class.java).setAction(ACTION_STOP_WALK), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            b.addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel), "وقّف", stop).build())
+        }
+        return b.build()
     }
 
     private fun notifyListening(note: String?) {
