@@ -554,7 +554,15 @@
     if (!g) return;
     const { error } = await db().from('ar_new_items').update({ status: 'ordered', updated_at: new Date().toISOString() }).in('id', g.rows.map((r) => r.x.id));
     if (error) return say('ماتعلّمتش: ' + error.message, 'bad');
-    say('الأصناف الجديدة اتعلّمت اتطلبت.', 'good');
+    // marked under the warehouse it was ordered from, like every other order (ar_orders): the laptop's organized invoice (RENDER_INVOICES.ps1)
+    // then writes «لم يصل» for what that warehouse's invoice does not carry. The plain group has no warehouse: nothing to record.
+    let warn = '';
+    if (g.id) {
+      const at = new Date().toISOString();
+      const r = await db().from('ar_orders').insert(g.rows.map(({ x }) => ({ name_key: x.name_key, product_name: x.name_en, supplier: g.label, ordered_at: at })));
+      if (r.error) warn = r.error.message || String(r.error);
+    }
+    if (warn) say('الأصناف اتعلّمت، بس ما اتسجلش اتطلبت من مين: ' + warn, 'bad'); else say('الأصناف الجديدة اتعلّمت اتطلبت.', 'good');
     await refreshNew();
   }
   $('odNewList')?.addEventListener('click', (e) => {

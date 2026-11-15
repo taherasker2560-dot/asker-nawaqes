@@ -49,6 +49,7 @@ window.AskerEN = {
  "رسالة الأصناف الجديدة اتنسخت: الزقها في محادثة {0}.": "The new products message was copied: paste it into the chat with {0}.",
  "مش في فارمافلاي لسه. اللاب بيدوّر عليها في قوايم المخازن بالاسم والسعر اللي كتبته، وبيقترح المخزن اللي خصمه أحسن. كل مخزن ليه رسالته: انسخها وابعتها بإيدك، ومفيش حاجة بتتبعت لوحدها. اللي مالقيناهوش في أي قايمة، ابعته للمورد اللي تختاره.": "Not in PharmaFly yet. The laptop looks for each one in the warehouses\u0027 lists by the name and price you typed and proposes the warehouse with the best discount. Each warehouse has its own message: copy it and send it yourself, nothing is sent on its own. Whatever is in no list, send to the supplier you choose.",
  "في قايمتهم:": "In their list:",
+ "الأصناف اتعلّمت، بس ما اتسجلش اتطلبت من مين: {0}": "Marked as ordered, but who it was ordered from was not recorded: {0}",
  "خصم {0}%": "{0}% discount",
  "وكمان عند:": "Also at:",
  "مش لاقيه في قوايم المخازن: ابعته للمورد اللي تختاره.": "Not found in the warehouse lists: send it to the supplier you choose.",
