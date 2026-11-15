@@ -278,7 +278,7 @@
     $('docsPanel')?.classList.toggle('hidden', tab !== 'docs');
     if (tab === 'docs') window.AskerDocs?.open();
     $('draftsPanel')?.classList.toggle('hidden', tab !== 'drafts');
-    if (tab === 'drafts') window.AskerOrderDrafts?.open();
+    if (tab === 'drafts') { window.AskerOrderCompare?.open(); window.AskerOrderDrafts?.open(); }
     $('stockPanel')?.classList.toggle('hidden', tab !== 'stock');
     if (tab === 'stock') window.AskerStock?.open();
     $('storeOrdersPanel')?.classList.toggle('hidden', tab !== 'storeorders');
