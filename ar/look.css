@@ -931,7 +931,7 @@ html.night .todo-note {
 .bg-sheet {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 1000;
   display: flex;
   align-items: flex-end;
   background: rgba(15, 27, 51, 0.45);
