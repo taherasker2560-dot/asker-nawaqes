@@ -270,6 +270,7 @@
     $('shortPanel').classList.toggle('hidden', tab !== 'short');
     // names may have changed in the other tabs; never «0 صنف» before the list (saved or from the server) is there
     if (tab === 'short' && (cacheReady || shortages.length)) drawShort();
+    if (tab === 'short') window.AskerNewItems?.open(); // «أصناف جديدة» (owner 2026-11-15)
     $('translatePanel').classList.toggle('hidden', tab !== 'translate');
     $('readPanel').classList.toggle('hidden', tab !== 'read');
     $('suppliersPanel')?.classList.toggle('hidden', tab !== 'suppliers');
@@ -2055,6 +2056,7 @@
   // «الرئيسية» (ar/home.js) reads what this page already loaded: the shortage list, every Arabic name and today's «اتطلب»
   // (new arrays / maps after each reload, so home.js rebuilds its index when one of them is not the same object any more)
   window.AskerApp.lookup = () => ({ shortages, knownNames, orders, nk });
+  window.AskerApp.invoke = invoke; // the translate call, for «أصناف جديدة» (ar/new-items.js)
   // an Arabic name fixed from the search on top (ar/home.js): the shortage list and «الترجمة» show it at once
   window.AskerApp.setName = (row) => {
     if (!row || !row.name_key) return;

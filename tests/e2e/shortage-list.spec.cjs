@@ -3,7 +3,7 @@
 const {run,text,waitStatus,assert}=require('./harness.cjs');
 run('shortage file replaces the list, translations kept',async({page,fixture,table})=>{
  await page.evaluate(()=>window.__tables.ar_names.push({name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠',status:'approved'},{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ شراب',status:'approved'}));
- await page.click('#shortPanel summary'); // the upload now lives under «أدوات»
+ await page.click('#shTools summary'); // the upload now lives under «أدوات»
  await page.setInputFiles('#shxFile',fixture('shortages.xlsx'));await page.waitForSelector('#shxPick:not(.hidden)');
  await page.click('#shxBtn');await page.waitForSelector('#shConfirm:not(.hidden)');
  assert.match(await text(page,'#shStatus'),/3 صنف: 2 جديد، 1 موجودين وهيفضلوا، و2 هيطلعوا/);

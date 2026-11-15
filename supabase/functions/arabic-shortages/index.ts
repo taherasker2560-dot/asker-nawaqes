@@ -1130,10 +1130,14 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   try {
     if (body.action === 'translate') {
       const limit = Math.min(100, Math.max(1, Number(body.limit) || 60));
-      const [shortages, names] = await Promise.all([
+      // the owner's new items (not in PharmaFly yet, «أصناف جديدة» in the shortages tab, migration 202611152100) are translated with the shortages;
+      // a server without that table yet, or a staff member who cannot read it, simply has none
+      const [shortages0, names, fresh] = await Promise.all([
         restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'),
         restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
+        restAll<{ id: number; name_en: string }>(env, auth, fetchImpl, 'ar_new_items?select=id,name_en&status=in.(new,ordered)&order=id').catch(() => [] as { id: number; name_en: string }[]),
       ]);
+      const shortages: Shortage[] = [...shortages0, ...fresh.map((x) => ({ id: 'n' + x.id, product_name: x.name_en }))];
       const have = new Set(names.map((n) => n.name_key)), seen = new Set<string>();
       const missing = shortages.filter((s) => { const k = nameKey(s.product_name); if (have.has(k) || seen.has(k)) return false; seen.add(k); return true; });
       const todo = missing.slice(0, limit);

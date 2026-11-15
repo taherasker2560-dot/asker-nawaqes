@@ -2038,3 +2038,29 @@ html.night .nt-presence.hot { background: #5a3e0c; color: #ffd48a; }
 .nt-row.done .nt-text { text-decoration: line-through; opacity: 0.6; }
 .nt-donebox { margin: 8px 2px 0; color: var(--muted); font-size: 13.5px; }
 .nt-donebox.hidden { display: none; }
+/* ---------- «النواقص ← أصناف جديدة» (ar/new-items.js, owner 2026-11-15) ---------- */
+.newitems { margin: 8px 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.newitems.hidden { display: none; }
+.newitems > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-weight: 700; cursor: pointer; }
+.ni-count:empty { display: none; }
+.ni-count { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--grad); color: #fff; font-size: 12.5px; text-align: center; }
+.newitems > :not(summary) { margin-inline: 12px; }
+.ni-form { display: grid; gap: 6px; }
+.ni-form input[type='text'] { margin: 0; width: 100%; min-width: 0; }
+.ni-line { display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px; }
+.ni-form button { margin: 0; }
+#niStatus:empty { display: none; }
+.ni-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.ni-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ni-en { overflow-wrap: anywhere; font-size: 15px; }
+.ni-ar { overflow-wrap: anywhere; font-weight: 600; }
+.ni-meta { color: var(--muted); font-size: 12.5px; }
+.ni-price { font-weight: 700; color: var(--ink); }
+.ni-acts { flex: none; display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 46%; }
+.ni-acts button { margin: 0; min-height: 34px; }
+.ni-edit { display: flex; gap: 6px; }
+.ni-edit input { flex: 1; min-width: 0; margin: 0; }
+.ni-old { margin: 8px 12px 0; color: var(--muted); font-size: 13.5px; }
+.ni-old.hidden { display: none; }
+.ni-tag { margin: -6px 0 2px; }
+.newitems > .hint { margin-block: 8px 12px; }
