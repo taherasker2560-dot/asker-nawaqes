@@ -5,6 +5,9 @@ window.AskerEN = {
  "exact": {
   "الحقائب": "Bags",
   "الكمية المطلوبة": "Need",
+  "للنواقص العامة": "To general shortages",
+  "أجّل": "Postpone",
+  "النواقص العامة": "General shortages",
   "عندك": "In stock",
   "اتباع في شهر": "Sold in a month",
   "رتّب:": "Sort:",

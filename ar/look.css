@@ -896,6 +896,12 @@ html.night .todo-note {
 .bg-bar #bgMoveBtn {
   flex: 1;
 }
+.bg-bar {
+  flex-wrap: wrap;
+}
+.bg-bar button {
+  padding: 8px 10px;
+}
 .bg-sheet {
   position: fixed;
   inset: 0;

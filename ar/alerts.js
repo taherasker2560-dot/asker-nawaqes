@@ -55,7 +55,8 @@
       return { id, name: String(x.name || '#' + x.id), items, n: items.length, home, homeN: homeItems.length, late: homeItems.filter((i) => num(i.days) > lateDays).length };
     }).filter((x) => x.n > 0);
     const all = (Array.isArray(b.all) && b.all.length ? b.all : list).filter((x) => x && x.id != null).map((x) => ({ id: String(x.id), name: String(x.name || '#' + x.id) }));
-    return { since: b.since || '', lateDays, list, all };
+    // the general shortages' ids ('gs' = «النواقص العامة»): their items are not listed here, only known to close a move there
+    return { since: b.since || '', lateDays, list, all, gs: Array.isArray(b.gs) ? b.gs.map(String) : [] };
   }
   // the bags as the owner sees them: the laptop's file with his moves not yet made in PharmaFly (ar_bag_moves, status pending).
   // An item moved goes to its new bag at once, marked pending (from = where PharmaFly has it); a move whose item the file already
@@ -65,6 +66,7 @@
     const where = new Map();
     const list = bags.list.map((b) => ({ ...b, items: b.items.map((i) => ({ ...i })) }));
     for (const b of list) for (const i of b.items) where.set(String(i.id), b.id);
+    for (const id of bags.gs || []) if (!where.has(id)) where.set(id, 'gs');
     const done = [], moved = new Map();
     for (const m of moves || []) {
       if (!m || m.status !== 'pending') continue;
@@ -282,8 +284,12 @@
           items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
         : '<p class="hint">مفيش أصناف ناقصة في الحقائب.</p>');
     bar.classList.toggle('hidden', !picked.size);
+    // «حوّل» (any bag), and his two quick ones (owner 11-15): «للنواقص العامة» (not found in the market) and «أجّل» («نواقص كل الشركات»)
     bar.innerHTML = picked.size
-      ? `<button type="button" id="bgMoveBtn">${esc(`⇄ حوّل (${picked.size})`)}</button><button type="button" class="secondary" id="bgClear">إلغاء</button>`
+      ? `<button type="button" id="bgMoveBtn">${esc(`⇄ حوّل (${picked.size})`)}</button>` +
+        (bagSel !== 'gs' ? '<button type="button" class="secondary" data-quick="gs">للنواقص العامة</button>' : '') +
+        (bagSel !== 'pv' ? '<button type="button" class="secondary" data-quick="pv">أجّل</button>' : '') +
+        '<button type="button" class="secondary" id="bgClear">إلغاء</button>'
       : '';
     drawSheet();
   }
@@ -373,6 +379,8 @@
       if (sort) { const k = sort.dataset.sort; sortDir = sortKey === k ? -sortDir : -1; sortKey = k; drawBags(); return; }
       if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
       if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
+      const quick = t.closest('[data-quick]');
+      if (quick) { doMove(quick.dataset.quick); return; }
       if (dest) { sheetTo = dest.dataset.to; drawSheet(); return; }
       if (t.closest('#bgBack')) { sheetTo = ''; delete $('bgSheet').dataset.open; drawSheet(); return; }
       if (t.closest('#bgGo')) { doMove(sheetTo); return; }

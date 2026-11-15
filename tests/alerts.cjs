@@ -52,6 +52,12 @@ assert.deepEqual(mv.list.map(b=>[b.id,b.items.map(i=>i.id+(i.pending?'*':'')).jo
 const z=mv.list.find(b=>b.id==='pv').items.find(i=>i.id===1001);assert.equal(z.fromName,'نواقص يوميه');assert.equal(z.move,'m1');
 assert.equal(mv.list[0].items[0].name,'GONE');assert.equal(mv.list[0].items[0].have,3);
 assert.equal(full.bags.list[0].items.length,2,'the file itself is not changed');
+// «للنواقص العامة» ('gs'): pending while PharmaFly still has it in its bag, done once it is among the general shortages
+const withGs={...full.bags,gs:['1002']};
+assert.deepEqual(A.applyMoves({...full.bags,gs:[]},[{id:'g1',item_id:1001,from_bag:'2428',to_bag:'gs',status:'pending'}]).list.map(b=>b.id),['2428','pv','2434','gs']);
+assert.deepEqual(A.applyMoves(withGs,[{id:'g2',item_id:1002,from_bag:'2428',to_bag:'gs',status:'pending'}]).done,[]);
+const gsDone=A.applyMoves({...withGs,list:withGs.list.map(b=>b.id==='2428'?{...b,items:b.items.filter(i=>i.id!==1002)}:b)},[{id:'g2',item_id:1002,from_bag:'2428',to_bag:'gs',status:'pending'}]);
+assert.deepEqual(gsDone.done,['g2'],'PharmaFly has it among the general shortages now');
 // the arrows: largest first, then smallest first
 assert.deepEqual(A.sortItems(full.bags.list[0].items,'need',-1).map(i=>i.id),[1001,1002]);
 assert.deepEqual(A.sortItems(full.bags.list[0].items,'need',1).map(i=>i.id),[1002,1001]);
