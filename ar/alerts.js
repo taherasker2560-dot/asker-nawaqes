@@ -41,14 +41,55 @@
     if (!m) return '';
     return `${m[3]}/${m[2]}` + (String(ref || '').slice(0, 4) === m[1] ? '' : `/${m[1]}`);
   }
-  // the other bags (absent in a file from before 2026-11-15: null = not counted yet)
+  // the bags (absent in a file from before 2026-11-15: null = not counted yet). Since the afternoon of 2026-11-15 the file has
+  // every bag, «نواقص يوميه» (2428) and «نواقص كل الشركات» ('pv') included, with all their short items; `home` = a bag that gets a
+  // home line, counting only what sold in the month or has a minimum (older files: every bag, already counted so)
+  const sells = (i) => num(i.sold30) > 0 || num(i.min) > 0;
   function parseBags(b) {
     if (!b || typeof b !== 'object' || !Array.isArray(b.list)) return null;
+    const lateDays = num(b.late_days) || 7;
     const list = b.list.filter((x) => x && x.id != null).map((x) => {
-      const items = (Array.isArray(x.items) ? x.items : []).filter((i) => i && i.id != null);
-      return { id: String(x.id), name: String(x.name || '#' + x.id), items, n: items.length, late: items.filter((i) => num(i.days) > num(b.late_days || 7)).length };
+      const id = String(x.id), items = (Array.isArray(x.items) ? x.items : []).filter((i) => i && i.id != null);
+      const home = x.home !== false && id !== '2428' && id !== 'pv';
+      const homeItems = home ? items.filter(sells) : [];
+      return { id, name: String(x.name || '#' + x.id), items, n: items.length, home, homeN: homeItems.length, late: homeItems.filter((i) => num(i.days) > lateDays).length };
     }).filter((x) => x.n > 0);
-    return { since: b.since || '', lateDays: num(b.late_days) || 7, list };
+    const all = (Array.isArray(b.all) && b.all.length ? b.all : list).filter((x) => x && x.id != null).map((x) => ({ id: String(x.id), name: String(x.name || '#' + x.id) }));
+    return { since: b.since || '', lateDays, list, all };
+  }
+  // the bags as the owner sees them: the laptop's file with his moves not yet made in PharmaFly (ar_bag_moves, status pending).
+  // An item moved goes to its new bag at once, marked pending (from = where PharmaFly has it); a move whose item the file already
+  // shows in the new bag is done (returned in `done`, the page closes it). An item no longer short keeps the numbers it had.
+  function applyMoves(bags, moves) {
+    if (!bags) return { list: [], done: [] };
+    const where = new Map();
+    const list = bags.list.map((b) => ({ ...b, items: b.items.map((i) => ({ ...i })) }));
+    for (const b of list) for (const i of b.items) where.set(String(i.id), b.id);
+    const done = [], moved = new Map();
+    for (const m of moves || []) {
+      if (!m || m.status !== 'pending') continue;
+      const k = String(m.item_id), now = where.get(k);
+      if (now === String(m.to_bag)) { done.push(m.id); continue; }
+      moved.set(k, m);
+    }
+    const out = new Map(list.map((b) => [b.id, b]));
+    const nameOf = (id) => (bags.all.find((x) => x.id === id) || list.find((x) => x.id === id) || { name: '#' + id }).name;
+    for (const [k, m] of moved) {
+      let item = null;
+      const fromB = out.get(where.get(k));
+      if (fromB) { const at = fromB.items.findIndex((i) => String(i.id) === k); if (at >= 0) item = fromB.items.splice(at, 1)[0]; }
+      if (!item) item = { id: Number(m.item_id), name: m.item_name || '#' + k, ...(m.item || {}) };
+      const to = String(m.to_bag);
+      if (!out.has(to)) { const nb = { id: to, name: nameOf(to), items: [], home: false, homeN: 0, late: 0 }; out.set(to, nb); list.push(nb); }
+      out.get(to).items.push({ ...item, pending: true, from: String(m.from_bag), fromName: nameOf(String(m.from_bag)), move: m.id });
+    }
+    for (const b of list) b.n = b.items.length;
+    return { list: list.filter((b) => b.n > 0), done };
+  }
+  // the items of a bag in the order he chose: a number column, largest first (dir -1) or smallest first (dir 1), like PharmaFly
+  function sortItems(items, key, dir) {
+    const k = ['need', 'have', 'sold30'].includes(key) ? key : 'need', d = dir === 1 ? 1 : -1;
+    return [...items].sort((x, y) => d * (num(x[k]) - num(y[k])) || String(x.name).localeCompare(String(y.name)));
   }
   function parse(o) {
     if (!o || typeof o !== 'object' || !o.tasks || !o.expiry || !o.customers) return null;
@@ -72,9 +113,9 @@
       { key: 'expiredSold', tab: 'expiry', view: 'today', n: today(a.expiredSold), text: 'صنف منتهي اتباع النهارده' },
       { key: 'expired', tab: 'expiry', view: 'expired', n: a.expired.length, text: 'صنف منتهي الصلاحية وليه رصيد' },
       { key: 'over', tab: 'customers', view: '', n: a.customers.over.length, text: 'عميل عدّى الحد' },
-      // one line per bag, the late ones first (the laptop already sorts them so)
-      ...((a.bags && a.bags.list) || []).map((b) => ({
-        key: 'bag', tab: 'bags', view: 'bag:' + b.id, n: b.n, text: 'ناقص في حقيبة', name: b.name, late: b.late,
+      // one line per bag (not the daily one, not «كل الشركات»), the late ones first (the laptop already sorts them so)
+      ...((a.bags && a.bags.list) || []).filter((b) => b.home).map((b) => ({
+        key: 'bag', tab: 'bags', view: 'bag:' + b.id, n: b.homeN, text: 'ناقص في حقيبة', name: b.name, late: b.late,
         note: b.late ? `منهم ${b.late} بقالهم أكتر من ${a.bags.lateDays} أيام` : '',
       })),
     ].filter((x) => x.n > 0);
@@ -82,7 +123,7 @@
   // the items short for more than 7 days in a row, all bags together (the notification and the small tab's number)
   const lateBags = (a) => ((a && a.bags && a.bags.list) || []).reduce((s, b) => s + b.late, 0);
   const value = (list) => list.reduce((s, x) => s + num(x.value), 0);
-  const api = { PATH, parse, todo, when, monthOf, batchText, money, value, dayText, lateBags };
+  const api = { PATH, parse, todo, when, monthOf, batchText, money, value, dayText, lateBags, applyMoves, sortItems };
   root.AskerAlertsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -93,6 +134,9 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   const qtyText = () => (root.AskerStockLib && root.AskerStockLib.qtyText) || null;
   let data = null, loading = null, loadedAt = 0, view = 'today', failed = '', bagSel = '';
+  // «الحقائب»: his open moves (ar_bag_moves), the order he chose, the ticked items, the bag picked in «حوّل», the last moves (undo)
+  let moves = [], movesErr = '', sortKey = 'need', sortDir = -1, sheetTo = '', lastMoved = null, bagMsg = '';
+  const picked = new Set();
 
   async function load(force) {
     if (!db()) return null;
@@ -186,44 +230,127 @@
       (c.near.length ? `<h3 class="al-h">قربوا من الحد (90% أو أكتر) <b class="al-n">${c.near.length}</b></h3>` + c.near.map((x) => customerRow(x, a)).join('') : '') +
       `<p class="hint">الرصيد = آخر حركة للعميل في فارمافلاي (بيع أو دفع)، والحد من كارت العميل. ${c.prepaid} عميل دافعين مقدّم.</p>`;
   }
-  // «الحقائب»: a chip per bag (all of them by default), each item with its stock, its month's sales, what to order, its
-  // last purchase and since when it is short. Nothing is changed here: the order is made in PharmaFly / on WhatsApp.
+  // «الحقائب» (owner 2026-11-15): every bag with what PharmaFly shows short today, «نواقص كل الشركات» as one more bag. He ticks
+  // items and «حوّل» moves them to any bag: the move is recorded in ar_bag_moves and the item shows in its new bag at once
+  // («⏳ لسه في فارمافلاي»); PharmaFly itself is not touched here. The arrows order a bag by a number, largest or smallest first.
   function bagItem(x, lateDays, ref) {
     const late = num(x.days) > lateDays;
     const line = num(x.min) > 0
       ? `عندك ${num(x.have)} · الحد الأدنى ${num(x.min)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`
       : `عندك ${num(x.have)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`;
     const since = num(x.days) > 1 ? `ناقص بقاله ${num(x.days)} يوم` : 'ناقص من النهارده';
-    return `<div class="al-item${late ? ' late' : ''}"><strong dir="auto" class="notr">${esc(x.name)}</strong>` +
+    const k = String(x.id);
+    return `<label class="al-item bg-it${late ? ' late' : ''}${picked.has(k) ? ' on' : ''}"><input type="checkbox" data-pick="${esc(k)}"${picked.has(k) ? ' checked' : ''} />` +
+      `<div><strong dir="auto" class="notr">${esc(x.name)}</strong>` +
+      (x.pending ? ` <span class="bg-pend">⏳ لسه في فارمافلاي</span>` : '') +
       `<div class="bg-line">${esc(line)}</div>` +
-      `<div class="hint">${x.last_buy ? `<span>${esc('آخر شرا ' + dayText(x.last_buy, ref))}</span>` : '<span>ما اتشراش قبل كده</span>'} · <span class="${late ? 'al-late' : ''}">${esc(since)}</span></div></div>`;
+      `<div class="hint">${x.last_buy ? `<span>${esc('آخر شرا ' + dayText(x.last_buy, ref))}</span>` : '<span>ما اتشراش قبل كده</span>'} · <span class="${late ? 'al-late' : ''}">${esc(since)}</span>` +
+      (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div></div></label>';
   }
+  const bagView = () => applyMoves(data && data.bags, moves);
   function drawBags() {
     const box = $('bgList');
     if (!box) return;
     const a = data;
     $('bgAge').textContent = a ? ageText(a) : failed;
     $('bgAge').className = 'status' + (failed && !a ? ' bad' : '');
-    const chips = $('bgChips');
+    const chips = $('bgChips'), bar = $('bgBar');
     if (!a || !a.bags) {
-      chips.innerHTML = '';
+      chips.innerHTML = ''; $('bgSort').innerHTML = ''; bar.classList.add('hidden');
       box.innerHTML = a ? '<p class="hint">الحقائب لسه ما اتحسبتش: هتظهر مع تحديث اللاب الجاي.</p>' : '';
       return;
     }
-    const L = a.bags.list;
-    if (bagSel && !L.some((b) => b.id === bagSel)) bagSel = '';
-    const total = L.reduce((s, b) => s + b.n, 0);
-    chips.innerHTML = L.length
-      ? `<button type="button" data-bag=""${bagSel ? ' class="secondary"' : ''}><span>الكل</span> <b>${total}</b></button>` +
-        L.map((b) => `<button type="button" data-bag="${esc(b.id)}"${bagSel === b.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(b.name)}</bdi> <b>${b.n}</b></button>`).join('')
+    const L = bagView().list;
+    if (!L.some((b) => b.id === bagSel)) { bagSel = L.length ? L[0].id : ''; picked.clear(); }
+    chips.innerHTML = L.map((b) => `<button type="button" data-bag="${esc(b.id)}"${bagSel === b.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(b.name)}</bdi> <b>${b.n}</b></button>`).join('');
+    const arrow = (k) => (sortKey === k ? (sortDir === -1 ? ' ▼' : ' ▲') : '');
+    $('bgSort').innerHTML = L.length
+      ? '<span>رتّب:</span>' + [['need', 'الكمية المطلوبة'], ['have', 'عندك'], ['sold30', 'اتباع في شهر']]
+        .map(([k, t]) => `<button type="button" data-sort="${k}"${sortKey === k ? '' : ' class="secondary"'}><span>${t}</span>${arrow(k)}</button>`).join('')
       : '';
-    const shown = bagSel ? L.filter((b) => b.id === bagSel) : L;
+    const b = L.find((x) => x.id === bagSel);
+    const items = b ? sortItems(b.items, sortKey, sortDir) : [];
+    for (const k of [...picked]) if (!items.some((i) => String(i.id) === k)) picked.delete(k);
     box.innerHTML =
-      '<p class="hint">حقائب الموردين غير «نواقص يوميه»: الناقص بقاعدة فارمافلاي، من غير النواقص العامة والمتأجل، وبس اللي اتباع في آخر شهر أو عليه حد أدنى.</p>' +
-      (a.bags.since ? `<p class="hint">${esc(`العدّ بدأ يوم ${dayText(a.bags.since, a.dataAt)}: الصنف اللي يفضل ناقص أكتر من ${a.bags.lateDays} أيام بيقلب أحمر.`)}</p>` : '') +
-      (shown.length
-        ? shown.map((b) => `<h3 class="al-h"><bdi class="notr">${esc(b.name)}</bdi> <b class="al-n">${b.n}</b></h3>` + b.items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')).join('')
-        : '<p class="hint">مفيش نواقص في الحقائب التانية.</p>');
+      '<p class="hint">الأصناف اللي ظاهرة ناقصة النهارده في فارمافلاي، بنفس قاعدته. علّم الأصناف ودوس «حوّل» عشان تنقلها لحقيبة تانية: التحويل بيتسجل هنا، وفارمافلاي ما بيتلمسش.</p>' +
+      (movesErr ? `<p class="status bad">${esc(movesErr)}</p>` : '') +
+      (lastMoved ? `<div class="bg-toast">✅ <span>${esc(`اتحوّل ${lastMoved.ids.length} صنف لـ`)}</span> <bdi class="notr">${esc(lastMoved.name)}</bdi> <button type="button" class="small secondary" data-undo>تراجع</button></div>` : '') +
+      (bagMsg ? `<p class="status bad">${esc(bagMsg)}</p>` : '') +
+      (b
+        ? `<h3 class="al-h"><bdi class="notr">${esc(b.name)}</bdi> <b class="al-n">${b.n}</b></h3>` +
+          `<label class="bg-all"><input type="checkbox" id="bgAllBox"${items.length && picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
+          items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
+        : '<p class="hint">مفيش أصناف ناقصة في الحقائب.</p>');
+    bar.classList.toggle('hidden', !picked.size);
+    bar.innerHTML = picked.size
+      ? `<button type="button" id="bgMoveBtn">${esc(`⇄ حوّل (${picked.size})`)}</button><button type="button" class="secondary" id="bgClear">إلغاء</button>`
+      : '';
+    drawSheet();
+  }
+  // «حوّل لـ…»: every bag (even an empty one), the one they are in now greyed; a tap picks, the button under moves
+  function drawSheet() {
+    const sh = $('bgSheet');
+    if (!sh) return;
+    if (!sheetTo && !sh.dataset.open) { sh.classList.add('hidden'); sh.innerHTML = ''; return; }
+    const L = bagView().list, count = (id) => (L.find((x) => x.id === id) || { n: 0 }).n;
+    const pick = (data.bags.all.find((x) => x.id === sheetTo) || {}).name;
+    sh.classList.remove('hidden');
+    sh.innerHTML = `<div class="bg-sheet-in" role="dialog" aria-label="حوّل لحقيبة تانية"><h3>${esc(`حوّل ${picked.size} صنف لـ…`)}</h3>` +
+      data.bags.all.map((x) => x.id === bagSel
+        ? `<div class="bg-dest cur"><bdi class="notr">${esc(x.name)}</bdi> <small>هنا دلوقتي</small></div>`
+        : `<button type="button" class="bg-dest${sheetTo === x.id ? ' pick' : ''}" data-to="${esc(x.id)}"><bdi class="notr">${esc(x.name)}</bdi> <small>${count(x.id)}</small></button>`).join('') +
+      `<div class="bg-sheet-btns">${sheetTo ? `<button type="button" id="bgGo"><span>حوّل لـ</span> <bdi class="notr">${esc(pick)}</bdi></button>` : ''}<button type="button" class="secondary" id="bgBack">رجوع</button></div></div>`;
+  }
+  // his open moves; a move PharmaFly already shows is closed here
+  async function loadMoves() {
+    if (!db()) return;
+    try {
+      const { data: rows, error } = await db().from('ar_bag_moves').select('id,item_id,item_name,from_bag,to_bag,item,status,created_at').eq('status', 'pending').order('created_at');
+      if (error) { movesErr = 'التحويلات مش متاحة دلوقتي: ' + (error.message || error); return; }
+      moves = rows || []; movesErr = '';
+      const done = applyMoves(data && data.bags, moves).done;
+      if (done.length) {
+        await db().from('ar_bag_moves').update({ status: 'done', done_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in('id', done);
+        moves = moves.filter((m) => !done.includes(m.id));
+      }
+    } catch (e) { movesErr = 'التحويلات مش متاحة دلوقتي: ' + ((e && e.message) || e); }
+  }
+  async function openBags() { await load(false); await loadMoves(); drawBags(); }
+  // move the ticked items: an item already moved has that move closed first; back to where PharmaFly has it = nothing to record
+  async function doMove(to) {
+    const L = bagView().list, b = L.find((x) => x.id === bagSel);
+    if (!b || !to) return;
+    const real = new Map();
+    for (const bb of data.bags.list) for (const i of bb.items) real.set(String(i.id), bb.id);
+    const chosen = b.items.filter((i) => picked.has(String(i.id)));
+    const close = chosen.filter((i) => i.move).map((i) => i.move);
+    const rows = chosen.map((i) => ({ i, from: real.get(String(i.id)) || i.from || bagSel })).filter((x) => x.from !== to).map(({ i, from }) => ({
+      item_id: Number(i.id), item_name: String(i.name || '').slice(0, 200), from_bag: from, to_bag: to, status: 'pending',
+      item: { have: num(i.have), sold30: num(i.sold30), min: num(i.min), need: num(i.need), last_buy: i.last_buy || null, days: num(i.days) },
+    }));
+    bagMsg = '';
+    try {
+      if (close.length) {
+        const r = await db().from('ar_bag_moves').update({ status: 'cancelled', updated_at: new Date().toISOString() }).in('id', close);
+        if (r.error) throw r.error;
+      }
+      let ids = [];
+      if (rows.length) {
+        const r = await db().from('ar_bag_moves').insert(rows).select('id');
+        if (r.error) throw r.error;
+        ids = (r.data || []).map((x) => x.id);
+      }
+      lastMoved = { ids, closed: close, name: (data.bags.all.find((x) => x.id === to) || { name: to }).name };
+    } catch (e) { bagMsg = 'التحويل ما اتسجلش: ' + ((e && e.message) || e); }
+    picked.clear(); sheetTo = ''; delete $('bgSheet').dataset.open;
+    await loadMoves(); drawBags();
+  }
+  async function undoMove() {
+    if (!lastMoved) return;
+    const { ids } = lastMoved;
+    lastMoved = null;
+    if (ids.length) await db().from('ar_bag_moves').update({ status: 'cancelled', updated_at: new Date().toISOString() }).in('id', ids);
+    await loadMoves(); drawBags();
   }
   function drawAll() {
     drawExpiry();
@@ -238,20 +365,37 @@
       view = b.dataset.alView;
       drawExpiry();
     });
-    $('bgChips')?.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-bag]');
-      if (!b) return;
-      bagSel = b.dataset.bag;
-      drawBags();
+    const panel = $('bagsPanel');
+    panel?.addEventListener('click', (e) => {
+      const t = e.target;
+      const chip = t.closest('[data-bag]'), sort = t.closest('[data-sort]'), dest = t.closest('[data-to]');
+      if (chip) { bagSel = chip.dataset.bag; picked.clear(); lastMoved = null; drawBags(); return; }
+      if (sort) { const k = sort.dataset.sort; sortDir = sortKey === k ? -sortDir : -1; sortKey = k; drawBags(); return; }
+      if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
+      if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
+      if (dest) { sheetTo = dest.dataset.to; drawSheet(); return; }
+      if (t.closest('#bgBack')) { sheetTo = ''; delete $('bgSheet').dataset.open; drawSheet(); return; }
+      if (t.closest('#bgGo')) { doMove(sheetTo); return; }
+      if (t.closest('[data-undo]')) { undoMove(); }
+    });
+    panel?.addEventListener('change', (e) => {
+      const box = e.target.closest('[data-pick]');
+      if (box) { if (box.checked) picked.add(box.dataset.pick); else picked.delete(box.dataset.pick); drawBags(); return; }
+      if (e.target.id === 'bgAllBox') {
+        const b = bagView().list.find((x) => x.id === bagSel);
+        picked.clear();
+        if (e.target.checked && b) for (const i of b.items) picked.add(String(i.id));
+        drawBags();
+      }
     });
   }
   // open a view from the home card or a notification: «bag:<id>» = that bag in «الحقائب», else a view of «الصلاحيات»
   function show(v) {
-    if (v && /^bag:/.test(v)) { bagSel = v.slice(4); drawBags(); return; }
+    if (v && /^bag:/.test(v)) { bagSel = v.slice(4); picked.clear(); drawBags(); return; }
     if (v) view = v;
     drawExpiry();
   }
-  root.AskerAlerts = { open: () => load(false), load, show, data: () => data, todo: () => todo(data) };
+  root.AskerAlerts = { open: () => load(false), load, show, bags: openBags, data: () => data, todo: () => todo(data) };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 })(typeof window === 'undefined' ? globalThis : window);

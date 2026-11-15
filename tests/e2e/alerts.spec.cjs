@@ -11,10 +11,13 @@ const file=()=>({generated_at:new Date().toISOString(),data_at:'2026-11-11T23:59
  expiry:{expired:[{id:68195,name:'SOLONAL FACIAL WASH',price:150,parts:1,exp:'2026-06-28',packs:1,value:150,batches:[{store:1,store_name:'Main',exp:'2026-06-28',packs:1,units:0}]}],
   soon:[{id:9,name:'SOON ITEM',price:100,parts:1,exp:'2027-01-28',packs:2,value:200,batches:[{store:1,exp:'2027-01-28',packs:2,units:0}]}]},
  customers:{owing:781,owed:388218,prepaid:102,over:[{id:5,name:'عميل تجربة',balance:5400.25,limit:1000,over:4400.25,pct:540,last_at:'2026-11-11T11:17:08',last_kind:'sale'}],near:[{id:6,name:'عميل قريب',balance:9500,limit:10000,over:-500,pct:95,last_at:'2026-11-10T10:00:00',last_kind:'payment'}]},
- // the other bags (2026-11-15): one late item (8 days), one new today, one with a minimum and no sale
- bags:{since:'2026-11-03',late_days:7,list:[
-  {id:2274,name:'فارما مول',items:[{id:62386,name:'ZURCAL 40MG 14 TAB',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:8,since:'2026-11-04'}]},
-  {id:2576,name:'zad pharma',items:[{id:66288,name:'ECLATREM FIRMING CREAM',have:1,sold30:0,min:1,need:1,last_buy:'2025-11-02',days:1,since:'2026-11-11'},{id:3,name:'NEVER BOUGHT',have:0,sold30:2,min:0,need:1,last_buy:null,days:2,since:'2026-11-10'}]}]},
+ // the bags (2026-11-15): the daily bag and «كل الشركات» (no home line), one late item (8 days), one with a minimum and no sale,
+ // an empty bag to move to (نقدى)
+ bags:{since:'2026-11-03',late_days:7,all:[{id:'2428',name:'نواقص يوميه'},{id:'pv',name:'نواقص كل الشركات'},{id:'2274',name:'فارما مول'},{id:'2576',name:'zad pharma'},{id:'7',name:'نقدى'}],list:[
+  {id:'2428',name:'نواقص يوميه',home:false,items:[{id:11,name:'DAILY ONE',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:3},{id:12,name:'DAILY TWO',have:9,sold30:30,min:0,need:6,last_buy:'2026-10-25',days:1},{id:13,name:'DAILY THREE',have:5,sold30:10,min:0,need:2,last_buy:null,days:1}]},
+  {id:'pv',name:'نواقص كل الشركات',home:false,items:[{id:21,name:'POSTPONED ONE',have:4,sold30:32,min:0,need:12,last_buy:'2026-10-30',days:1}]},
+  {id:'2274',name:'فارما مول',home:true,items:[{id:62386,name:'ZURCAL 40MG 14 TAB',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:8,since:'2026-11-04'}]},
+  {id:'2576',name:'zad pharma',home:true,items:[{id:66288,name:'ECLATREM FIRMING CREAM',have:1,sold30:0,min:1,need:1,last_buy:'2025-11-02',days:1,since:'2026-11-11'},{id:3,name:'NEVER BOUGHT',have:0,sold30:2,min:0,need:1,last_buy:null,days:2,since:'2026-11-10'}]}]},
  counts:{}});
 run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',async({page})=>{
  await page.evaluate((o)=>{window.__storage['alerts/alerts.json']=JSON.stringify(o);window.__tables.ar_store_orders=[{id:1,status:'new'},{id:2,status:'done'}];window.__tables.ar_documents=[{id:'d1',status:'new'}];},file());
@@ -31,16 +34,45 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('#todoList .todo-row[data-view="bag:2576"]');
  await page.waitForFunction(()=>!document.getElementById('bagsPanel').classList.contains('hidden')&&/ECLATREM/.test(document.getElementById('bgList').textContent));
  assert.equal(await page.$eval('[data-tab="bags"]',b=>b.classList.contains('on')),true);
- assert.deepEqual(await page.$$eval('#bgChips [data-bag]',b=>b.map(x=>[x.textContent.replace(/\s+/g,' ').trim(),x.classList.contains('secondary')])),[['الكل 3',true],['فارما مول 1',true],['zad pharma 2',false]]);
+ const chips=()=>page.$$eval('#bgChips [data-bag]',b=>b.map(x=>[x.textContent.replace(/\s+/g,' ').trim(),x.classList.contains('secondary')]));
+ assert.deepEqual(await chips(),[['نواقص يوميه 3',true],['نواقص كل الشركات 1',true],['فارما مول 1',true],['zad pharma 2',false]],'every bag, «كل الشركات» as one');
  const bagText=await text(page,'#bgList');
- assert.match(bagText,/العدّ بدأ يوم 03\/11: الصنف اللي يفضل ناقص أكتر من 7 أيام بيقلب أحمر/);
- assert.match(bagText,/zad pharma 2 ECLATREM FIRMING CREAM عندك 1 · الحد الأدنى 1 · اتباع في شهر 0 · المطلوب 1 آخر شرا 02\/11\/2025 · ناقص من النهارده/);
+ assert.match(bagText,/ECLATREM FIRMING CREAM عندك 1 · الحد الأدنى 1 · اتباع في شهر 0 · المطلوب 1 آخر شرا 02\/11\/2025 · ناقص من النهارده/);
  assert.match(bagText,/NEVER BOUGHT عندك 0 · اتباع في شهر 2 · المطلوب 1 ما اتشراش قبل كده · ناقص بقاله 2 يوم/);
  assert.doesNotMatch(bagText,/ZURCAL/,'only the chosen bag');
- await page.click('#bgChips [data-bag=""]');
- assert.match(await text(page,'#bgList'),/فارما مول 1 ZURCAL 40MG 14 TAB عندك 1 · اتباع في شهر 33 · المطلوب 16 آخر شرا 25\/10 · ناقص بقاله 8 يوم/);
+ await page.click('#bgChips [data-bag="2274"]');
+ assert.match(await text(page,'#bgList'),/فارما مول 1 علّم الكل ZURCAL 40MG 14 TAB عندك 1 · اتباع في شهر 33 · المطلوب 16 آخر شرا 25\/10 · ناقص بقاله 8 يوم/);
  assert.equal(await page.$$eval('#bgList .al-item.late',r=>r.length),1,'the late item is red');
  assert.equal(await page.$eval('[data-tab="bags"]',b=>b.dataset.badge),'1','the small tab counts the late items');
+ // the daily bag; the arrows: largest «المطلوب» first, again = smallest first, «عندك» = largest first
+ await page.click('#bgChips [data-bag="2428"]');
+ const order=()=>page.$$eval('#bgList .bg-it strong',s=>s.map(x=>x.textContent.trim()));
+ assert.deepEqual(await order(),['DAILY ONE','DAILY TWO','DAILY THREE']);
+ await page.click('#bgSort [data-sort="need"]');assert.deepEqual(await order(),['DAILY THREE','DAILY TWO','DAILY ONE']);
+ await page.click('#bgSort [data-sort="have"]');assert.deepEqual(await order(),['DAILY TWO','DAILY THREE','DAILY ONE']);
+ await page.click('#bgSort [data-sort="need"]');
+ // tick two, «حوّل» shows every other bag (where they are now greyed), pick «نواقص كل الشركات», move
+ await page.click('#bgList [data-pick="11"]');await page.click('#bgList [data-pick="12"]');
+ assert.equal((await page.textContent('#bgMoveBtn')).trim(),'⇄ حوّل (2)');
+ await page.click('#bgMoveBtn');
+ assert.deepEqual(await page.$$eval('#bgSheet [data-to]',b=>b.map(x=>x.dataset.to)),['pv','2274','2576','7']);
+ assert.match(await text(page,'#bgSheet .bg-dest.cur'),/نواقص يوميه هنا دلوقتي/);
+ await page.click('#bgSheet [data-to="pv"]');
+ assert.equal(await text(page,'#bgGo'),'حوّل لـ نواقص كل الشركات');
+ await page.click('#bgGo');
+ await page.waitForFunction(()=>/اتحوّل 2 صنف لـ/.test(document.getElementById('bgList').textContent));
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.map(m=>[m.item_id,m.item_name,m.from_bag,m.to_bag,m.status,m.item.need])),[[11,'DAILY ONE','2428','pv','pending',16],[12,'DAILY TWO','2428','pv','pending',6]]);
+ assert.ok(await page.$eval('#bgSheet',s=>s.classList.contains('hidden')),'the sheet closes');
+ assert.deepEqual(await chips(),[['نواقص يوميه 1',false],['نواقص كل الشركات 3',true],['فارما مول 1',true],['zad pharma 2',true]],'they show in their new bag at once');
+ // undo: both moves cancelled, back in the daily bag
+ await page.click('#bgList [data-undo]');
+ await page.waitForFunction(()=>/نواقص يوميه\s*3/.test(document.getElementById('bgChips').textContent));
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.map(m=>m.status)),['cancelled','cancelled']);
+ // a move to an empty bag makes it show, the item marked «لسه في فارمافلاي» with where it came from
+ await page.click('#bgList [data-pick="13"]');await page.click('#bgMoveBtn');await page.click('#bgSheet [data-to="7"]');await page.click('#bgGo');
+ await page.waitForFunction(()=>/نقدى/.test(document.getElementById('bgChips').textContent));
+ await page.click('#bgChips [data-bag="7"]');
+ assert.match(await text(page,'#bgList'),/DAILY THREE ⏳ لسه في فارمافلاي .* جاي من نواقص يوميه/);
  await page.click('[data-group="home"]');
  // a home row opens «الصلاحيات» on its view
  await page.click('#todoList .todo-row[data-view="expired"]');
@@ -69,8 +101,8 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.evaluate(()=>window.AskerNotify.tick());
  assert.equal(await page.$eval('[data-group="sales"]',b=>b.dataset.badge),'2');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-notify-seen')).store),2);
- // nothing was written to the server
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log/.test(JSON.stringify(w)))),[]);
+ // nothing else was written to the server (only his moves between bags)
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves/.test(JSON.stringify(w)))),[]);
 },{home:true});
 run('alerts: no file yet',async({page})=>{
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');

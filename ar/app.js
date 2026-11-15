@@ -252,7 +252,9 @@
     $('expiryPanel')?.classList.toggle('hidden', tab !== 'expiry');
     // «الحقائب» (owner 2026-11-15): the other bags' shortages, from the same file
     $('bagsPanel')?.classList.toggle('hidden', tab !== 'bags');
-    if (tab === 'expiry' || tab === 'customers' || tab === 'bags') window.AskerAlerts?.open();
+    if (tab === 'expiry' || tab === 'customers') window.AskerAlerts?.open();
+    // and his moves between bags, read only when the tab opens (fast-load: one read per table on start)
+    if (tab === 'bags') window.AskerAlerts?.bags();
     // the customers' accounts and statements (ar/customers.js, owner 2026-11-12)
     if (tab === 'customers') window.AskerCustomers?.open();
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
