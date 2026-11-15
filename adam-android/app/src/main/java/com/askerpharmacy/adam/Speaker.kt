@@ -96,7 +96,7 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
      * voice when the server or the net is not there, or the sentence is too long for it.
      */
     fun say(text: String, after: () -> Unit) {
-        val clean = Titles.strip(text).take(3500)
+        val clean = Egyptian.speak(Titles.strip(text)).take(3500)
         if (clean.isEmpty()) { handler.post(after); return }
         stopPlayer()
         val my = ++seq

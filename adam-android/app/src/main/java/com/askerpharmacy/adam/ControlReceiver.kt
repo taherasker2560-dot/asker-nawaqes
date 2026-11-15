@@ -65,14 +65,14 @@ class ControlReceiver : BroadcastReceiver() {
                 }
                 if (t.isEmpty()) { resultData = "no text"; return }
                 val pending = goAsync()
-                val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+                val answered = java.util.concurrent.atomic.AtomicBoolean(false)
                 var engine: android.speech.tts.TextToSpeech? = null
+                // the answer to adb goes once; the engine is shut only when the sentence is over (2026-11-15: a long sentence was
+                // cut at 9 s by the old timeout, which shut the engine while it was still speaking)
+                val answer = { msg: String -> if (answered.compareAndSet(false, true)) { pending.resultData = msg; pending.finish() } }
                 val finish = { msg: String ->
-                    if (finished.compareAndSet(false, true)) {
-                        pending.resultData = msg
-                        try { engine?.shutdown() } catch (e: Throwable) { }
-                        pending.finish()
-                    }
+                    answer(msg)
+                    try { engine?.shutdown() } catch (e: Throwable) { }
                 }
                 engine = android.speech.tts.TextToSpeech(context.applicationContext, { status ->
                     val e = engine
@@ -86,7 +86,9 @@ class ControlReceiver : BroadcastReceiver() {
                         e.speak(t, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "t")
                     }
                 }, "com.askerpharmacy.adam")
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish("timeout") }, 9000)
+                val h = android.os.Handler(android.os.Looper.getMainLooper())
+                h.postDelayed({ answer("speaking") }, 9000)          // adb gets an answer; the sentence goes on
+                h.postDelayed({ finish("timeout") }, 120_000)        // the engine is let go at the latest after 2 minutes
             }
             "com.askerpharmacy.adam.STOP" -> {
                 if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_STOP))
