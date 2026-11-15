@@ -137,7 +137,7 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  await page.waitForSelector('[data-view="done"]:not([hidden])');
  const w2=await page.evaluate(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_customer_place_order').map(x=>x.args.p_pay));
  assert.deepEqual(w2,['cash']);
- assert.equal(await text(page,'#donePay'),'الدفع كاش عند الاستلام');
+ assert.equal(await text(page,'#donePay'),'الدفع في الصيدلية لما تستلم');
  // sent over from another browser to Chrome by the install button (?me=…&install=1): the same account, the secret leaves
  // the address, and the big button asks for the last tap; the offer comes a moment later and that tap installs
  await page.evaluate(()=>localStorage.removeItem('asker_store_customer'));
