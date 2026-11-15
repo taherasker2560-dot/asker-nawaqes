@@ -99,7 +99,8 @@ class AdamTtsService : TextToSpeechService() {
 
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
         stopped = false
-        val text = Titles.strip((request.charSequenceText ?: request.text ?: "").toString())   // no title or name (owner 2026-11-15)
+        // no title or name, and numbers / units in Egyptian words (owner 2026-11-15)
+        val text = Egyptian.speak(Titles.strip((request.charSequenceText ?: request.text ?: "").toString()))
         val parts = pieces(text)
         if (parts.isEmpty()) { callback.done(); return }
         if (!ok(request.language)) { callback.error(); return }
