@@ -6,6 +6,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   const KEY = 'a'.repeat(64), LAPTOP = 'b'.repeat(64), NOBODY = 'c'.repeat(64);
   const env = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'g' };
   const pcm = Buffer.from([1, 0, 2, 0, 3, 0, 4, 0]);   // 4 samples
+  const asked_models = [];
   function fake({ gemini = 'ok' } = {}) {
     const calls = [];
     const f = async (url, o = {}) => {
@@ -26,7 +27,12 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
         return new Response(new ReadableStream({ start(c) { c.enqueue(enc.encode(ev(pcm.subarray(0, 4)))); c.enqueue(enc.encode('data: {"usageMetadata":{}}\r\n\r\n' + ev(pcm.subarray(4)).slice(0, 20))); c.enqueue(enc.encode(ev(pcm.subarray(4)).slice(20))); c.close(); } }));
       }
       if (u.hostname === 'generativelanguage.googleapis.com' && u.pathname.endsWith(':generateContent')) {
+        const asked = /models\/([^:]+):/.exec(u.pathname)[1];
+        asked_models.push(asked);
         if (gemini === 'busy') return new Response('{"error":{"message":"quota per minute"}}', { status: 429 });
+        // the asked-for model and the first fallback are out of quota, the next one answers
+        if (gemini === 'two-out' && (asked === 'gemini-2.5-flash-preview-tts' || asked === 'gemini-3.8-flash-lite-tts')) return new Response('{"error":{"message":"daily"}}', { status: 429 });
+        if (gemini === 'server-error' && asked === 'gemini-2.5-flash-preview-tts') return new Response('oops', { status: 503 });
         if (gemini === 'empty') return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'no audio' }] } }] }));
         if (gemini === 'down') throw new Error('network');
         return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: pcm.toString('base64') } }] } }] }));
@@ -90,6 +96,19 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   for (const [mode, status] of [['busy', 429], ['empty', 502], ['down', 504]]) { r = await F.handle(req({ text: 'x' }), env, fake({ gemini: mode })); assert.equal(r.status, status, mode); }
   r = await F.handle(req({ text: 'x' }), env, fake({ gemini: 'busy' }));
   assert.match((await r.json()).detail, /quota per minute/, 'the 429 says why');
+
+  // a model out of quota (429) or down (5xx): the next one answers, the header says which; all out: the 429 with its message
+  asked_models.length = 0;
+  r = await F.handle(req({ text: 'x' }), env, fake({ gemini: 'two-out' }));
+  assert.equal(r.status, 200); assert.equal(r.headers.get('x-voice-model'), 'gemini-3.8-flash-tts');
+  assert.deepEqual(asked_models, ['gemini-2.5-flash-preview-tts', 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']);
+  asked_models.length = 0;
+  r = await F.handle(req({ text: 'x' }), env, fake({ gemini: 'server-error' }));
+  assert.equal(r.status, 200); assert.equal(r.headers.get('x-voice-model'), 'gemini-3.8-flash-lite-tts');
+  asked_models.length = 0;
+  r = await F.handle(req({ text: 'x', model: 'gemini-3.8-flash-lite-tts' }), env, fake({ gemini: 'busy' }));
+  assert.equal(r.status, 429);
+  assert.deepEqual(asked_models, ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview'], 'the asked-for model is not tried twice');
 
   // stream:true: the raw PCM as it is made (the audio events joined, the other lines ignored), the rate in a header
   f = fake();
