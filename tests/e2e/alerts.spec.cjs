@@ -66,7 +66,11 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('#bgPoBtn');
  await page.waitForFunction(()=>/اتضاف 1 صنف لأمر الشرا/.test(document.getElementById('bgList').textContent));
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_po_items.map(p=>[p.item_id,p.item_name,p.bag,p.qty,p.status,p.item.sold30])),[[11,'DAILY ONE','2428',16,'open',33]]);
- assert.match(await text(page,'#bgList'),/في أمر الشرا: 1 صنف .* افتح الطلبيات/);
+ assert.match(await text(page,'#bgList'),/في أمر الشرا: 1 صنف مش ظاهرين في الحقائب\. .* افتح الطلبيات اعرضهم/);
+ // it leaves the bag (owner 11-15: «طالما راحت أمر شراء يبقى ما تظهرش في الحقائب»); «اعرضهم» shows it again
+ assert.deepEqual(await order(),['DAILY THREE','DAILY TWO']);
+ assert.match(await text(page,'#bgList'),/نواقص يوميه 2/);
+ await page.click('#bgList [data-show-po]');
  assert.match(await text(page,'#bgList'),/DAILY ONE 🛒 في أمر الشرا/);
  await page.click('#bgList [data-pick="11"]');
  assert.equal(await page.$('#bgPoBtn'),null,'already in the order');
