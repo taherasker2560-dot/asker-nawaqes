@@ -142,6 +142,9 @@
   let moves = [], movesErr = '', sortKey = 'have', sortDir = 1, sheetTo = '', lastMoved = null, bagMsg = '';
   // «أمر الشرا» (owner 11-15): the open lines of ar_po_items; the order advisor («الطلبيات») builds from them only
   let po = [], poOk = '';
+  // what is in the purchase order leaves the bags (owner 11-15: «طالما راحت أمر شراء يبقى ما تظهرش في الحقائب عشان ما تعمليش
+  // دوشة»); «اعرضهم» shows them again, to take one out of the order
+  let showPo = false;
   const picked = new Set();
 
   async function load(force) {
@@ -255,6 +258,15 @@
       (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div></div></label>';
   }
   const bagView = () => applyMoves(data && data.bags, moves);
+  // the bags as drawn: without what is in the purchase order, unless «اعرضهم»
+  function visibleBags() {
+    const poIds = new Set(po.map((p) => String(p.item_id)));
+    return bagView().list.map((b) => {
+      if (showPo || !poIds.size) return b;
+      const items = b.items.filter((i) => !poIds.has(String(i.id)));
+      return { ...b, items, n: items.length };
+    });
+  }
   // the two orders (owner 11-15): the real stock (smallest first when chosen) and the item's monthly average, «اتباع في شهر»
   // (largest first when chosen, «عايزين نعمل واحد للمتوسط بتاع الصنف»); a tap on the chosen one turns it around
   const SORT_FIRST = { have: 1, sold30: -1 };
@@ -275,7 +287,7 @@
       box.innerHTML = a ? '<p class="hint">الحقائب لسه ما اتحسبتش: هتظهر مع تحديث اللاب الجاي.</p>' : '';
       return;
     }
-    const L = bagView().list;
+    const L = visibleBags();
     // every bag, even an empty one (owner 11-15: «ما عملتش حقيبة ابن سينا … حقيبة الكاش … عايزة تبقى موجودة هنا»); «النواقص
     // العامة» only while something is on its way there
     const count = (id) => (L.find((x) => x.id === id) || { n: 0 }).n;
@@ -300,7 +312,7 @@
       (lastMoved ? `<div class="bg-toast">✅ <span>${esc(`اتحوّل ${lastMoved.ids.length} صنف لـ`)}</span> <bdi class="notr">${esc(lastMoved.name)}</bdi> <button type="button" class="small secondary" data-undo>تراجع</button></div>` : '') +
       (bagMsg ? `<p class="status bad">${esc(bagMsg)}</p>` : '') +
       (poOk ? `<div class="bg-toast">${esc(poOk)}</div>` : '') +
-      (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button></div>` : '') +
+      (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>${showPo ? 'ظاهرين في الحقائب.' : 'مش ظاهرين في الحقائب.'}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button> <button type="button" class="small secondary" data-show-po>${showPo ? 'خبّيهم' : 'اعرضهم'}</button></div>` : '') +
       (tabs.length
         ? tabs.map((t) => `<div class="bg-bag${t.id === bagSel ? ' open' : ''}"><button type="button" class="bg-bag-h" data-bag="${esc(t.id)}" aria-expanded="${t.id === bagSel}">` +
             `<span class="bg-bag-name notr">${esc(t.name)}</span> <b class="bg-bag-n">${count(t.id)}</b></button>` +
@@ -468,13 +480,14 @@
       if (t.closest('#bgPoBtn')) { addPo(); return; }
       if (t.closest('#bgPoDrop')) { dropPo(); return; }
       if (t.closest('[data-open-drafts]')) { root.AskerApp?.showTab?.('drafts'); return; }
+      if (t.closest('[data-show-po]')) { showPo = !showPo; picked.clear(); drawBags(); return; }
       if (t.closest('[data-undo]')) { undoMove(); }
     });
     panel?.addEventListener('change', (e) => {
       const box = e.target.closest('[data-pick]');
       if (box) { if (box.checked) picked.add(box.dataset.pick); else picked.delete(box.dataset.pick); drawBags(); return; }
       if (e.target.id === 'bgAllBox') {
-        const b = bagView().list.find((x) => x.id === bagSel);
+        const b = visibleBags().find((x) => x.id === bagSel);
         picked.clear();
         if (e.target.checked && b) for (const i of b.items) picked.add(String(i.id));
         drawBags();
