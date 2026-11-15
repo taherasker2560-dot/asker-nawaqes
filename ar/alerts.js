@@ -199,6 +199,8 @@
     $('alAge').textContent = a ? ageText(a) : failed;
     $('alAge').className = 'status' + (failed && !a ? ' bad' : '');
     document.querySelectorAll('#alViews [data-al-view]').forEach((b) => b.classList.toggle('secondary', b.dataset.alView !== view));
+    // «اتقبلت قصيرة» (owner 2026-11-15, ar/short-dated.js): the purchase invoices' short-dated items; it reads the vendors' tables, not the alerts file
+    if (view === 'short') { alAge.textContent = ''; root.AskerShortDated?.show(box); return; }
     if (!a) { box.innerHTML = ''; return; }
     const tn = (l) => l.filter((x) => num(x.today) > 0).length;
     const setBadge = (id, n) => { const el = $(id); if (el) { el.textContent = n; el.classList.toggle('hidden', !n); } };
