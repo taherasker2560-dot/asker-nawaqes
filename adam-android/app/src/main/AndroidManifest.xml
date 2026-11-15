@@ -14,6 +14,8 @@
     <!-- simple official phone actions only: call a number, set an alarm or a timer -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- the voice engine «آدم» must know which app asked it to speak (Tasker = the natural voice, any other app = Google's) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <!-- what Adam may look for on the phone: the speech engine, the voice, the apps that can be opened -->
     <queries>
@@ -59,8 +61,8 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- Adam's natural voice as a text-to-speech ENGINE: a Tasker «Say» step set to Engine «آدم» (the bot's announcements) speaks with it.
-             It is not the phone's default engine and must not be made one (the rest of the phone keeps Google's voice). -->
+        <!-- Adam's natural voice as a text-to-speech ENGINE (the phone's preferred one since 2026-11-15): Tasker's «Say» steps (the bot's
+             announcements) speak with the natural voice; every other app is handed to the phone's own Google voice (AdamTtsService). -->
         <service
             android:name=".AdamTtsService"
             android:exported="true"
