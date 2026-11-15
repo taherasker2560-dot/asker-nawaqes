@@ -2079,3 +2079,9 @@ html.staff [data-al-view='short'] { display: none; }
 .sd-row.amber .sd-exp b { color: #9a5b00; }
 html.night .sd-row.red .sd-exp b { color: #ff8a7a; }
 html.night .sd-row.amber .sd-exp b { color: #ffc266; }
+/* ---------- quantity boxes: his own number is blue (owner 2026-11-15), the cursor is already in the first one (ar/qty-input.js) ---------- */
+.od-qty.mine input, label.qty.mine input { border-color: #0a6cff; background: #eaf3ff; color: #0a4aa6; font-weight: 800; box-shadow: 0 0 0 2px rgba(10, 108, 255, 0.18); }
+.od-qty.mine span::before, label.qty.mine span::before { content: '●'; color: #0a6cff; margin-inline-end: 4px; font-size: 11px; }
+html.night .od-qty.mine input, html.night label.qty.mine input { background: #12305e; color: #cfe3ff; border-color: #5a9bff; }
+html.night .od-qty.mine span::before, html.night label.qty.mine span::before { color: #7db4ff; }
+input[data-qty]:focus { outline: 2px solid #0a6cff; outline-offset: 1px; }

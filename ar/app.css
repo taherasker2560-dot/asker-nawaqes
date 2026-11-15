@@ -2,11 +2,11 @@
    One strong colour (crimson app bar + active states), everything else quiet: warm-white paper, soft rose tints,
    a thin gold line under the bar as the only ornament. Arabic UI type: IBM Plex Sans Arabic. */
 :root {
-  --crimson: #7d1028; /* royal crimson: app bar, primary buttons, active tab */
-  --crimson-deep: #560a1b;
-  --crimson-ink: #6a0d22; /* crimson text on light backgrounds */
-  --rose: #f7e9ec; /* soft tint for secondary buttons and selected states */
-  --rose-line: #ead2d8;
+  --crimson: #cf4014; /* the main color (since 2026-11-15 the vivid orange; ar/settings.js sets these before the page paints): app bar, primary buttons, active tab */
+  --crimson-deep: #922d0e;
+  --crimson-ink: #952e0e; /* the color as text on light backgrounds */
+  --rose: #f9efeb; /* soft tint for secondary buttons and selected states */
+  --rose-line: #ead4cd;
   --gold: #c39a3e; /* thin royal accent */
   --paper: #fbf8f8;
   --card: #ffffff;
