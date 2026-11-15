@@ -63,6 +63,11 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  await page.click('#odNewList [data-new-copy="REDA"]');
  await page.waitForFunction(()=>/Zetapro 5mg syrup/.test(window.__copied));
  assert.equal(await page.evaluate(()=>window.__copied),'السلام عليكم\nمحتاج الأصناف دي:\n• زيتابرو شراب (Zetapro 5mg syrup) × 3\nشكرًا','the warehouse\'s own name and the English one in brackets');
+ // «علّمهم اتطلبوا» on a warehouse group records WHERE it was ordered from (ar_orders, like every other order) so the invoice can say «لم يصل»
+ await page.click('#odNewList [data-new-mark="REDA"]');
+ await page.waitForFunction(()=>window.__tables.ar_new_items[0].status==='ordered');
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_orders.map(o=>[o.name_key,o.product_name,o.supplier])),[['ZETAPRO 5MG SYRUP','Zetapro 5mg syrup','رضا عطية']]);
+ await page.evaluate(()=>{window.__tables.ar_new_items[0].status='approved';window.__tables.ar_orders=[]});   // back to «موافق» for the plain-card part
  // not in any list (the block is gone): the plain card, a plain message, he picks the supplier
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[]});window.__copied=''});
  await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
@@ -74,6 +79,7 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  assert.equal(await page.evaluate(()=>window.__copied),'السلام عليكم\nمحتاج الأصناف دي:\n• Zetapro 5mg syrup × 3\nشكرًا');
  await page.click('#odNewList [data-new-mark=""]');
  await page.waitForFunction(()=>window.__tables.ar_new_items[0].status==='ordered');
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_orders),[],'no warehouse chosen: nothing to record');
  assert.ok(await page.evaluate(()=>document.getElementById('odNewBox').classList.contains('hidden')),'no longer waiting in the order');
  await page.click('[data-pgroup="short"]');await page.click('[data-tab="short"]');
  await page.waitForFunction(()=>/اتطلب/.test(document.getElementById('niList').textContent));
