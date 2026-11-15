@@ -94,11 +94,21 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('#bgPoDrop');
  await page.waitForFunction(()=>/اتشال 1 صنف من أمر الشرا/.test(document.getElementById('bgList').textContent));
  assert.equal(await page.evaluate(()=>window.__tables.ar_po_items[0].status),'cancelled');
+ // two lines an invoice closed (the laptop's PO_CLOSE sets them 'received'), one an old one: «✅ وصل من أمر الشرا» lists the recent two
+ await page.evaluate(()=>{const now=Date.now(),iso=(d)=>new Date(now-d*864e5).toISOString();window.__tables.ar_po_items.push(
+  {id:901,item_id:21,item_name:'RECEIVED ONE',bag:'2428',qty:3,status:'received',received_qty:3,inv_code:'11/26/100001',vendor:'AMG',received_at:iso(0.2)},
+  {id:902,item_id:22,item_name:'RECEIVED TWO',bag:'pv',qty:4,status:'received',received_qty:1,inv_code:'11/26/100002',vendor:'SKY',received_at:iso(1)},
+  {id:903,item_id:23,item_name:'OLD RECEIVED',bag:'pv',qty:2,status:'received',received_qty:2,inv_code:'11/26/100003',vendor:'AMG',received_at:iso(5)})});
  // «الطلبيات» with an empty purchase order says how to fill it
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[{id:'NEWCITY',label:'نيو سيتي',items:[]}],no_offer:[],summary:{items:0}})});
  await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
  await page.waitForFunction(()=>/أمر الشرا فاضي/.test(document.getElementById('draftsPanel').textContent));
  await page.click('[data-pgroup="short"]');await page.click('[data-tab="bags"]');await page.waitForTimeout(300);
+ assert.match(await text(page,'#bgList .bg-po-done summary'),/✅ وصل من أمر الشرا \(آخر 3 أيام\): 2 صنف/);
+ await page.click('#bgList .bg-po-done summary');
+ assert.match(await text(page,'#bgList .bg-po-done'),/RECEIVED ONE وصل 3 الفاتورة: 11\/26\/100001 AMG/);
+ assert.match(await text(page,'#bgList .bg-po-done'),/RECEIVED TWO وصل 1 من 4 الفاتورة: 11\/26\/100002 SKY/,'it came short: how many of how many');
+ assert.doesNotMatch(await text(page,'#bgList .bg-po-done'),/OLD RECEIVED/,'only the last 3 days');
  await openBag('2428');
  // tick two, «حوّل» shows every other bag (where they are now greyed), pick «نواقص كل الشركات», move
  await page.click('#bgList [data-pick="11"]');await page.click('#bgList [data-pick="12"]');

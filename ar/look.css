@@ -2097,3 +2097,10 @@ input[data-qty]:focus { outline: 2px solid #0a6cff; outline-offset: 1px; }
 .od-new-btns { display: flex; gap: 8px; margin-top: 8px; }
 .od-new-btns button { margin: 0; }
 html.night .od-new { background: #3a2c12; border-color: #b9873a; }
+/* «✅ وصل من أمر الشرا»: the lines an invoice closed (2026-11-16, Hub\orders\PO_CLOSE.ps1) */
+.bg-po-done { margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: #f2faf4; }
+.bg-po-done summary { cursor: pointer; font-weight: 700; color: #166534; }
+.bg-po-done ul { margin: 6px 0 2px; padding: 0; list-style: none; }
+.bg-po-done li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 5px 0; border-top: 1px dashed #cfe3d4; }
+html.night .bg-po-done { background: #14301f; border-color: #2f6b45; }
+html.night .bg-po-done summary { color: #7fd69b; }
