@@ -3,6 +3,22 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
+ "✏️ عدّل الزراير": "✏️ Edit buttons",
+ "في الرئيسية: دوس تشيله": "On Home: tap to remove",
+ "حطه في الرئيسية": "Put it on Home",
+ "الرئيسية مليانة (12 زرار). شيل واحد الأول من «✏️ عدّل الزراير».": "Home is full (12 buttons). Remove one first in «✏️ Edit buttons».",
+ "بقى في الرئيسية": "is on Home now",
+ "اتشال من الرئيسية": "was removed from Home",
+ "لفوق": "Up",
+ "لتحت": "Down",
+ "+ ضيف": "+ Add",
+ "زراير الرئيسية": "Home buttons",
+ "{0} من 12 زرار": "{0} of 12 buttons",
+ "اللي هنا ظاهر في الرئيسية بالترتيب ده: الأسهم بترتّبهم، و✕ بيشيل الزرار.": "These show on Home in this order: the arrows move them, ✕ removes a button.",
+ "مفيش زراير في الرئيسية. ضيف من تحت.": "No buttons on Home. Add some below.",
+ "ضيف من الأقسام": "Add from the sections",
+ "الرئيسية فيها 12 زرار. شيل واحد الأول عشان تضيف.": "Home has 12 buttons. Remove one first to add.",
+ "رجّع الأصلي": "Back to the default",
   "الحقائب": "Bags",
   "الكمية المطلوبة": "Need",
   "مفيش أصناف ناقصة في الحقيبة دي.": "No short items in this bag.",

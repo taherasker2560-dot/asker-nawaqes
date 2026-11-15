@@ -292,6 +292,8 @@
     // «العمليات» (ar/ops.js, owner 2026-11-15): what Adam recorded by voice
     $('opsPanel')?.classList.toggle('hidden', tab !== 'ops');
     if (tab === 'ops') window.AskerOps?.open();
+    // the 📌 «في الرئيسية» of this section (ar/shortcuts.js, owner 2026-11-15)
+    window.AskerShortcuts?.onTab?.(tab);
   }
   document.querySelectorAll('.subbar [data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-group]').forEach((b) => (b.onclick = () => showTab(lastTab[b.dataset.group])));
