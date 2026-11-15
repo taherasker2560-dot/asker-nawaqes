@@ -225,15 +225,29 @@
     if (!d || typeof d !== 'object') return '';
     const e = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
     const list = (a) => (Array.isArray(a) ? a.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5) : []);
+    // each part opens and closes (owner 2026-11-15); the first one with points is open
+    let first = true;
     const parts = DESC_SECTIONS.map(([k, title, cls]) => {
       const l = list(d[k]);
-      return l.length ? `<div class="ds-sec${cls}"><h4>${title}</h4><ul>${l.map((x) => `<li translate="no">${e(x)}</li>`).join('')}</ul></div>` : '';
+      if (!l.length) return '';
+      const open = first ? ' open' : ''; first = false;
+      return `<details class="ds-sec${cls}"${open}><summary>${title}</summary><ul>${l.map((x) => `<li translate="no">${e(x)}</li>`).join('')}</ul></details>`;
     }).join('');
     const h = String(d.h || '').trim();
     if (!h && !parts) return '';
     return `${h ? `<p class="ds-hook" translate="no">${e(h)}</p>` : ''}${parts}<p class="ds-note">المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.</p>`;
   }
-  const api = { descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  // آخر حاجات الزبون دوّر عليها (على موبايله بس): الأحدث الأول، من غير تكرار، 8 بالكتير
+  const MAX_RECENT = 8;
+  function rememberSearch(list, text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    const old = Array.isArray(list) ? list.filter((x) => typeof x === 'string') : [];
+    if (t.length < 2) return old.slice(0, MAX_RECENT);
+    return [t, ...old.filter((x) => x.toLowerCase() !== t.toLowerCase())].slice(0, MAX_RECENT);
+  }
+  // صورة كل قسم في الرئيسية: صنف معروف من القسم وعنده صورة (لو الصورة مش موجودة يرجع الرسم)
+  const SEC_PICS = { meds: 68432, vit: 4468, care: 27245, baby: 25723, supplies: 3614 };
+  const api = { rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -247,6 +261,9 @@
   // «الرسايل» (store/chat.js, owner 2026-11-13): our own messages page
   const chat = root.AskerStoreChat || null;
   const COLS = 'id,name,arabic_name,status,price,cat,needs_rx';
+  // no delivery yet (owner 2026-11-15: «ما عنديش توصيل حاليا»): the customer picks the order up from the pharmacy; the server still
+  // asks for an address, so the order says so in its place (the bot's «طلبات» shows it)
+  const PICKUP = 'استلام من الصيدلية';
   const DESC_SHARDS = 20, DESC_VER = '20261114a';
   const PAGE = 40;
   const $ = (id) => document.getElementById(id);
@@ -265,6 +282,9 @@
   if (!Array.isArray(seen)) seen = [];
   let cartShown = null; // the cart number already on screen (null = page just opened: no jump)
   let shown = [], popular = [], lastQuery = null, offset = 0, seq = 0, sending = false;
+  let recent = store.get('asker_store_recent', []); // آخر حاجات دوّر عليها (rememberSearch)
+  if (!Array.isArray(recent)) recent = [];
+  let similar = [], similarFor = null; // «ممكن يعجبك كمان» في صفحة الصنف
   // البدايل: {id الصنف اللي مش متوفر: [أصناف متوفرة بنفس المادة الفعالة والتركيز والشكل]} (ar_store_alternatives، 2026-11-11)
   let alts = {};
   let settings = { is_open: true };
@@ -336,9 +356,16 @@
       if (r.ok) pics = await r.json();
     } catch (e) { pics = {}; }
     drawList(!$('more').hidden);
+    drawSections();
     if (sheetItem) drawSheet(); // an item opened from a link before the photo list came
   }
 
+  // الأقسام بصورة منتج حقيقي من كل قسم (owner 2026-11-15)؛ لو الصورة لسه مش موجودة يرجع الرسم
+  function drawSections() {
+    const pic = (key) => { const id = SEC_PICS[key]; return id && pics[id] ? `<img src="store/img/${esc(pics[id])}" alt="" loading="lazy">` : `<svg viewBox="0 0 24 24" aria-hidden="true">${SEC_ICONS[key] || ''}</svg>`; };
+    $('sections').innerHTML = SECTIONS.map((s) => `<a href="#search" data-section="${s.key}" class="sec"><span class="sec-mark${SEC_PICS[s.key] && pics[SEC_PICS[s.key]] ? ' has-pic' : ''}">${pic(s.key)}</span><span>${s.name}</span></a>`).join('')
+      + '<a href="#search" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span><span>كل الأصناف</span></a>';
+  }
   function saveCart() {
     store.set('asker_store_cart', cart);
     const n = cartCount(cart);
@@ -359,6 +386,7 @@
     if (name === 'orders') drawOrders();
     if (name === 'account' && acct) acct.draw();
     if (chat) { if (name === 'chat') chat.open(); else chat.close(); }
+    drawCartBar();
     window.scrollTo(0, 0);
   }
   function route() {
@@ -385,7 +413,7 @@
     const inCart = cart.find((x) => x.id === it.id);
     let action = '';
     if (canAdd(it)) {
-      action = `<button type="button" class="add" data-add="${it.id}">${inCart ? 'في السلة (' + inCart.qty + ') +' : onOrder(it) ? 'اطلبه' : 'ضيف للسلة'}</button>`;
+      action = inCart ? stepper(it, inCart) : `<button type="button" class="add" data-add="${it.id}">${onOrder(it) ? 'اطلبه' : 'ضيف للسلة'}</button>`;
     } else if (it.needs_rx) {
       action = `<span class="hint-sm">بالروشتة: ابعت صورة الروشتة</span>`;
     }
@@ -408,31 +436,67 @@
       ${altBox}
     </article>`;
   }
+  // «+» على الصنف بيتحول لعدّاد بعد ما يتضاف (owner 2026-11-15)
+  function stepper(it, line) {
+    return `<div class="stepper" role="group" aria-label="الكمية في السلة">
+      <button type="button" data-step="${it.id}" data-d="1" aria-label="زوّد واحدة">+</button><span>${line.qty}</span><button type="button" data-step="${it.id}" data-d="-1" aria-label="${line.qty > 1 ? 'قلّل واحدة' : 'شيله من السلة'}">−</button></div>`;
+  }
+  // كارت صغير بالصورة (صف «الأكثر طلبًا» و«شفته قريب» و«ممكن يعجبك كمان»)
+  function pcard(it) {
+    const src = picSrc(it), line = cart.find((x) => x.id === it.id);
+    const ctl = !canAdd(it) ? '' : line ? stepper(it, line) : `<button type="button" class="plus" data-add="${it.id}" aria-label="ضيف ${esc(label(it))} للسلة">+</button>`;
+    const price = onOrder(it) ? 'بالطلب' : canAdd(it) ? money(it.price) + ' ج' : (STATUS[it.status] || STATUS.on_order).label;
+    return `<article class="pcard">
+      <div class="pc-pic" data-open="${it.id}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<div class="thumb card c-${cardInfo(it).sec}" aria-hidden="true">${cardHtml(it)}</div>`}</div>
+      ${ctl}
+      <div class="pc-nm" data-open="${it.id}" role="button" tabindex="0">${esc(it.arabic_name || it.name)}</div>
+      <div class="pc-pr${onOrder(it) ? ' later' : ''}">${price}</div>
+    </article>`;
+  }
   function drawList(more) {
     $('results').innerHTML = shown.length ? shown.map(row).join('') : '';
     $('more').hidden = !more;
     drawPopular();
+    drawRecent();
   }
   // الأكثر طلبًا (الرئيسية): الترتيب بييجي من مبيعات الصيدلية على اللاب
   function drawPopular() {
     $('popularBox').hidden = !popular.length;
-    $('popular').innerHTML = popular.map(row).join('');
+    $('popular').innerHTML = popular.map(pcard).join('');
     drawSeen();
+    if (sheetItem && similar.length) drawSimilar();
   }
   // «شفته قريب» (السعر والحالة من آخر مرة اتفتح فيها؛ السيرفر بيحسب السعر الصح وقت الطلب)
   function drawSeen() {
     const list = seen.filter((x) => !popular.some((p) => p.id === x.id)).slice(0, MAX_SEEN);
     $('seenBox').hidden = list.length < 2;
-    $('seen').innerHTML = list.length < 2 ? '' : list.map(row).join('');
+    $('seen').innerHTML = list.length < 2 ? '' : list.map(pcard).join('');
   }
-  // كروت الرئيسية: «كمّل طلبك» لما السلة فيها حاجة، و«اطلب طلبك اللي فات تاني»
+  // البحث فاضي: آخر حاجات دوّرت عليها + اللي الناس بتحتاجه
+  function drawRecent() {
+    const box = $('recentBox');
+    if (!box) return;
+    const empty = !lastQuery && !shown.length;
+    box.hidden = !empty;
+    if (!empty) return;
+    box.innerHTML = (recent.length ? `<h3>دوّرت عليه قبل كده</h3><div class="chips">${recent.map((t) => `<button type="button" class="chip" data-recent="${esc(t)}">🕘 <span dir="auto" translate="no">${esc(t)}</span></button>`).join('')}</div>` : '')
+      + `<h3>الناس بتدوّر على</h3><div class="chips">${NEEDS.map((s) => `<a href="#search" data-section="${s.key}" class="chip">${s.name}</a>`).join('')}</div>`;
+  }
+  // شريط السلة تحت (الرئيسية والبحث): عدد الأصناف والإجمالي و«كمّل الطلب»
+  function drawCartBar() {
+    const n = cartCount(cart), cur = (document.querySelector('[data-view]:not([hidden])') || {}).dataset;
+    const show = !!n && cur && (cur.view === 'home' || cur.view === 'search');
+    $('cartBar').hidden = !show;
+    document.body.classList.toggle('has-cartbar', show);
+    if (!n) return;
+    const t = cartTotal(cart), later = cart.filter((x) => x.on_order).length;
+    $('cartBarText').textContent = `${n} صنف` + (t > 0 ? ` · ${money(t)} ج` : '') + (later ? ' + بالطلب' : '');
+  }
+  // كروت الرئيسية: «اطلب طلبك اللي فات تاني» (السلة نفسها بقت في الشريط اللي تحت)
   function drawHomeCards() {
     const n = cartCount(cart);
-    $('cartCard').hidden = !n;
-    if (n) {
-      const t = cartTotal(cart), later = cart.filter((x) => x.on_order).length;
-      $('cartCardText').textContent = `${n} صنف في السلة` + (t > 0 ? ` · ${money(t)} ج` : '') + (later ? ' + أصناف بالطلب' : '');
-    }
+    $('cartCard').hidden = true;
+    drawCartBar();
     const last = myOrders.find((o) => (o.items || []).length);
     $('againCard').hidden = !last || !!n;
     if (last && !n) {
@@ -463,7 +527,7 @@
   async function loadPopular() {
     const cached = store.get('asker_store_pop', null);
     if (Array.isArray(cached) && cached.length) { popular = cached; drawPopular(); }
-    else { $('popularBox').hidden = false; $('popular').innerHTML = skel(3); }
+    else { $('popularBox').hidden = false; $('popular').innerHTML = Array.from({ length: 3 }, () => '<article class="pcard skel" aria-hidden="true"><div class="pc-pic"></div><i></i><i class="s"></i></article>').join(''); }
     const { data, error } = await client.from('ar_store_items').select(COLS).not('popular_rank', 'is', null).eq('status', 'available').order('popular_rank').limit(12);
     if (error || !data) { if (!popular.length) drawPopular(); return; }
     popular = data;
@@ -542,9 +606,12 @@
 
   // ---------- صفحة الصنف (sheet) ----------
   let sheetItem = null, sheetQty = 1, sheetFromLink = false;
-  const known = () => shown.concat(popular, seen, sheetItem ? [sheetItem] : [], ...Object.values(alts));
+  const known = () => shown.concat(popular, seen, similar, sheetItem ? [sheetItem] : [], ...Object.values(alts));
   function openItem(it, fromLink) {
     sheetItem = it; sheetQty = 1; sheetFromLink = !!fromLink;
+    // what he looked for and then opened = worth remembering (not every half-typed word)
+    if (lastQuery && lastQuery.text && !fromLink) { recent = rememberSearch(recent, lastQuery.text); store.set('asker_store_recent', recent); }
+    const card = document.querySelector('#sheet .sheet-card'); if (card) card.scrollTop = 0;
     seen = rememberSeen(seen, it); store.set('asker_store_seen', seen); drawSeen();
     $('shNote').textContent = '';
     if (!canAdd(it) || it.status !== 'available') loadAlts([it.id]);
@@ -567,6 +634,7 @@
     $('shPic').className = 'sh-pic' + (f ? '' : ' card c-' + cardInfo(it).sec);
     $('shPic').innerHTML = f ? `<img src="${esc(f)}" alt="صورة ${esc(label(it))}">` : cardHtml(it);
     drawDesc(it);
+    loadSimilar(it);
     if (root.AskerStoreEdit) root.AskerStoreEdit.onSheet(it);
     $('shName').textContent = it.name;
     $('shAr').textContent = it.arabic_name || '';
@@ -596,6 +664,35 @@
     if (sheetItem !== it) return;
     box.innerHTML = descHtml(d);
   }
+  // «ممكن يعجبك كمان»: متوفر من نفس القسم، الأكثر طلبًا الأول، واللي ليه صورة قبل اللي مالوش
+  const similarCache = {};
+  async function loadSimilar(it) {
+    if (similarFor === it.id) { drawSimilar(); return; }
+    similarFor = it.id; similar = []; drawSimilar();
+    if (!it.cat) return;
+    if (!similarCache[it.cat]) {
+      similarCache[it.cat] = client.from('ar_store_items').select(COLS).eq('cat', it.cat).eq('status', 'available')
+        .order('popular_rank', { ascending: true, nullsFirst: false }).limit(24)
+        .then(({ data, error }) => (error || !Array.isArray(data) ? [] : data), () => []);
+    }
+    const rows = await similarCache[it.cat];
+    if (sheetItem !== it) return;
+    similar = rows.filter((x) => x.id !== it.id && canAdd(x)).sort((a, b) => (picSrc(b) ? 1 : 0) - (picSrc(a) ? 1 : 0)).slice(0, 8);
+    drawSimilar();
+  }
+  function drawSimilar() {
+    const box = $('shSimilar');
+    if (!box) return;
+    box.innerHTML = similar.length ? `<h3>ممكن يعجبك كمان</h3><div class="rail">${similar.map(pcard).join('')}</div>` : '';
+  }
+  // الصورة كبيرة (دوسة على صورة الصنف)، ودوسة على الصورة نفسها بتكبّرها أكتر
+  function openZoom() {
+    const it = sheetItem, src = it && picSrc(it);
+    if (!src) return;
+    $('zoomImg').src = src; $('zoomImg').alt = 'صورة ' + label(it); $('zoomImg').classList.remove('big');
+    $('zoom').hidden = false;
+  }
+  function closeZoom() { $('zoom').hidden = true; $('zoomImg').removeAttribute('src'); }
   // for store/edit.js (the owner's «✏️ عدّل»)
   root.AskerStore = {
     client, SUPABASE_URL, SUPABASE_KEY, EDIT_IMG,
@@ -630,7 +727,7 @@
   }
   function search(text) {
     const terms = searchTerms(text);
-    if (!terms.length) { shown = []; drawList(false); $('resNote').textContent = 'اكتب حرفين على الأقل من اسم الدوا أو المنتج'; return; }
+    if (!terms.length) { shown = []; lastQuery = null; drawList(false); $('resNote').textContent = 'اكتب حرفين على الأقل من اسم الدوا أو المنتج'; return; }
     lastQuery = { terms, text: String(text).trim() };
     offset = 0;
     $('freeText').value = lastQuery.text.slice(0, 120); $('freeMsg').textContent = '';
@@ -725,12 +822,11 @@
     // from a customer's link: his name comes from the pharmacy's card, he picks on account or cash
     const link = acct && acct.active();
     const typed = $('cName').value.trim(), name = link ? link.name || typed : typed;
-    const phone = normPhone($('cPhone').value), address = $('cAddr').value.trim(), notes = $('cNotes').value.trim();
+    const phone = normPhone($('cPhone').value), address = PICKUP, notes = $('cNotes').value.trim();
     if (!cart.length && !rxFiles.length) return say(ERRORS.bad_items, true);
     if (!link && name.length < 2) return say(ERRORS.bad_name, true);
     if (!phone) return say(ERRORS.bad_phone, true);
-    if (address.length < 5) return say(ERRORS.bad_address, true);
-    store.set('asker_store_me', { name: typed, phone, address });
+    store.set('asker_store_me', { name: typed, phone });
     sending = true; $('sendBtn').disabled = true; say(rxFiles.length ? 'بيرفع صورة الروشتة…' : 'بيبعت الطلب…');
     try {
       let rx = [];
@@ -764,7 +860,7 @@
         : `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + (data.rx ? '، ومعاه الروشتة' : '') + '.'
           + (later ? ` و${later} صنف بالطلب، هنكلمك بسعرهم وميعادهم.` : '');
       $('donePay').hidden = !data.pay;
-      $('donePay').textContent = data.pay === 'account' ? 'الطلب هيتحط على حسابك في الصيدلية' : 'الدفع كاش عند الاستلام';
+      $('donePay').textContent = data.pay === 'account' ? 'الطلب هيتحط على حسابك في الصيدلية' : 'الدفع في الصيدلية لما تستلم';
       say('');
       location.hash = 'done';
     } catch (err) {
@@ -839,7 +935,7 @@
     }
     const add = e.target.closest('[data-add]');
     if (add) {
-      const it = shown.concat(popular, seen, ...Object.values(alts)).find((x) => String(x.id) === add.dataset.add);
+      const it = shown.concat(popular, seen, similar, ...Object.values(alts)).find((x) => String(x.id) === add.dataset.add);
       if (it && canAdd(it)) {
         if (cart.length >= MAX_LINES && !cart.find((x) => x.id === it.id)) { $('resNote').textContent = 'السلة فيها 30 صنف، ودي أقصى حاجة في الطلب الواحد'; return; }
         cart = cartAdd(cart, it); saveCart(); drawList(!$('more').hidden);
@@ -847,6 +943,21 @@
       }
       return;
     }
+    const step = e.target.closest('[data-step]');
+    if (step) {
+      const line = cart.find((x) => String(x.id) === step.dataset.step);
+      if (line) {
+        cart = cartSet(cart, line.id, line.qty + Number(step.dataset.d)); saveCart(); drawList(!$('more').hidden);
+        if (!$('cartItems').closest('[hidden]')) drawCart();
+        if (sheetItem) drawSheet();
+      }
+      return;
+    }
+    const rec = e.target.closest('[data-recent]');
+    if (rec) { $('q').value = rec.dataset.recent; search(rec.dataset.recent); return; }
+    if (e.target.closest('#zoomX') || (e.target.id === 'zoom')) { closeZoom(); return; }
+    if (e.target.id === 'zoomImg') { e.target.classList.toggle('big'); return; }
+    if (e.target.closest('#shPic') && sheetItem && picSrc(sheetItem)) { openZoom(); return; }
     if (e.target.closest('[data-close]')) { closeItem(); return; }
     const open = e.target.closest('[data-open]');
     if (open) {
@@ -886,8 +997,8 @@
   $('shShare').addEventListener('click', shareItem);
   $('shRxBtn').addEventListener('click', closeItem);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeItem();
-    else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.item-text[data-open]')) { e.preventDefault(); e.target.click(); }
+    if (e.key === 'Escape') { if (!$('zoom').hidden) closeZoom(); else closeItem(); }
+    else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.item-text[data-open], .pc-nm[data-open]')) { e.preventDefault(); e.target.click(); }
   });
   // «نزّل الصيدلية على موبايلك»: الزرار بيظهر بس لما المتصفح يقول إن التنزيل متاح (كروم على أندرويد)
   let installEvt = null;
@@ -902,10 +1013,9 @@
 
   $('needs').innerHTML = NEEDS.map((s) => `<a href="#search" data-section="${s.key}" class="need">${s.name}</a>`).join('');
   startSlides();
-  $('sections').innerHTML = SECTIONS.map((s) => `<a href="#search" data-section="${s.key}" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true">${SEC_ICONS[s.key] || ''}</svg></span><span>${s.name}</span></a>`).join('')
-    + '<a href="#search" class="sec"><span class="sec-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span><span>كل الأصناف</span></a>';
+  drawSections();
   const me = store.get('asker_store_me', null);
-  if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; $('cAddr').value = me.address || ''; }
+  if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; }
   if (acct) acct.attach(client);
   if (chat) chat.attach(client);
   saveCart();

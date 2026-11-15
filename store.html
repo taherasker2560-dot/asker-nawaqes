@@ -15,11 +15,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=logo2-20261112a" />
     <link rel="stylesheet" href="store/look.css?v=en-20261112d" />
-    <link rel="stylesheet" href="store/polish.css?v=edit-20261114a" />
+    <link rel="stylesheet" href="store/polish.css?v=v2-20261115a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=look-20261112a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=edit-20261114a"></script>
+    <script src="store/i18n-en-store.js?v=v2-20261115a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=acct-20261113b"></script>
   </head>
@@ -56,8 +56,8 @@
            last order, «محتاج إيه النهارده؟», best sellers, what you looked at, «مش لاقي دواك؟», and WhatsApp the pharmacist -->
       <div class="slides" id="slides" aria-roledescription="carousel">
         <section class="hero slide">
-          <h1 id="heroTitle">اطلب من صيدليتك وهي توصلك</h1>
-          <p id="heroText">اختار اللي محتاجه، وإحنا هنأكد معاك الطلب ومصاريف التوصيل على واتساب. الدفع كاش عند الاستلام.</p>
+          <h1 id="heroTitle">اطلب من صيدليتك واستلمه جاهز</h1>
+          <p id="heroText">اختار اللي محتاجه، وإحنا نجهّزه ونكلمك على واتساب لما يبقى جاهز. تستلمه وتدفع في الصيدلية.</p>
           <div class="hero-actions">
             <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
             <a href="#cart" class="hero-btn ghost" id="heroRx">صوّر الروشتة وابعتها</a>
@@ -84,8 +84,8 @@
       <ul class="trust" aria-label="ليه تطلب مننا">
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span>صيدلية من 1981</span></li>
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M15 15l2 2 3-3"/></svg><span>صيدلي بيراجع طلبك</span></li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg><span>الدفع عند الاستلام</span></li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.5"/><circle cx="17" cy="17.5" r="1.5"/></svg><span>توصيل لحد البيت</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg><span>الدفع في الصيدلية</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l2-6h14l2 6M4 10v10h16V10M3 10h18M9 20v-6h6v6"/></svg><span>استلمه جاهز من الصيدلية</span></li>
       </ul>
 
       <!-- a credit customer's own account (his personal link from the pharmacy, store/account.js) -->
@@ -119,11 +119,11 @@
       </section>
       <section id="popularBox" class="block popular-block" hidden>
         <h2>الأكثر طلبًا</h2>
-        <div id="popular" class="list flush"></div>
+        <div id="popular" class="rail"></div>
       </section>
       <section id="seenBox" class="block popular-block" hidden>
         <h2>شفته قريب</h2>
-        <div id="seen" class="list flush"></div>
+        <div id="seen" class="rail"></div>
       </section>
       <a href="#search" class="promo">
         <span><strong>مش لاقي اللي بتدوّر عليه؟</strong><span>اكتب اسمه وإحنا نجيبهولك ونكلمك بسعره</span></span>
@@ -148,6 +148,8 @@
         </form>
       </header>
       <p id="resNote" class="note">اكتب حرفين على الأقل من اسم الدوا أو المنتج</p>
+      <!-- an empty box: what this phone looked for before, and what people usually need -->
+      <div id="recentBox" class="recent-box"></div>
       <div id="results" class="list"></div>
       <button id="more" type="button" class="more" hidden>اعرض أكتر</button>
       <!-- صنف مش على الموقع: يتضاف للطلب سطر لوحده من غير سعر (قراره 2026-11-12)، مش في الملاحظات -->
@@ -182,13 +184,12 @@
       <form id="orderForm" novalidate>
         <div id="checkout" hidden>
           <section class="panel">
-            <h2>بيانات التوصيل</h2>
+            <h2>بياناتك</h2>
+            <p class="hint-sm pickup-note">🏪 الطلب بيتجهّز في الصيدلية، ونكلمك على واتساب لما يبقى جاهز تستلمه.</p>
             <label for="cName" id="cNameLbl">الاسم</label>
             <input id="cName" type="text" autocomplete="name" maxlength="80" required />
             <label for="cPhone">رقم الموبايل (واتساب)</label>
             <input id="cPhone" type="tel" dir="ltr" autocomplete="tel" inputmode="tel" maxlength="16" placeholder="01xxxxxxxxx" required />
-            <label for="cAddr">العنوان</label>
-            <input id="cAddr" type="text" autocomplete="street-address" maxlength="300" required />
             <label for="cNotes">ملاحظات (اختياري)</label>
             <textarea id="cNotes" rows="2" maxlength="500" placeholder="مثلًا: صنف مش لاقيه، أو ميعاد يناسبك"></textarea>
           </section>
@@ -196,16 +197,15 @@
           <section class="panel" id="payBox" hidden></section>
           <section class="panel sums" id="sumBox">
             <div><span>المنتجات</span><span id="sumItems"></span></div>
-            <div><span>التوصيل</span><span>هنقولك على واتساب</span></div>
-            <div class="total"><span>الإجمالي (من غير التوصيل)</span><span id="sumTotal"></span></div>
+            <div class="total"><span>الإجمالي</span><span id="sumTotal"></span></div>
             <span class="hint-sm later-note" id="sumLater" hidden></span>
-            <span class="hint-sm" id="cashNote">الدفع كاش عند الاستلام</span>
+            <span class="hint-sm" id="cashNote">الدفع في الصيدلية لما تستلم</span>
           </section>
           <div class="send">
             <p class="closed-note" hidden></p>
             <p id="formMsg" class="form-msg" role="status"></p>
             <button id="sendBtn" type="submit">إرسال الطلب</button>
-            <p class="hint-sm center">هنكلمك على واتساب نأكد الطلب قبل التوصيل</p>
+            <p class="hint-sm center">هنكلمك على واتساب لما طلبك يبقى جاهز تستلمه</p>
           </div>
         </div>
       </form>
@@ -268,7 +268,7 @@
         <h1>طلبك وصل</h1>
         <p id="doneText"></p>
         <p id="donePay" class="done-pay" hidden></p>
-        <p>هنكلمك على واتساب قريب نأكد الطلب ومصاريف التوصيل. وتقدر تتابعه من «طلباتي».</p>
+        <p>هنجهّز طلبك ونكلمك على واتساب لما يبقى جاهز تستلمه من الصيدلية. وتقدر تتابعه من «طلباتي».</p>
         <a href="#orders" class="hero-btn">تابع طلبك</a>
       </section>
     </div>
@@ -284,8 +284,19 @@
         <h2 id="shName" dir="ltr"></h2>
         <p id="shAr" class="sh-ar"></p>
         <div class="sh-row"><span id="shPrice" class="price"></span><span id="shBadge" class="badge"></span></div>
+        <!-- no delivery yet (owner 2026-11-15): picked up and paid at the pharmacy -->
+        <ul class="sh-perks"><li>🏪 استلمه من الصيدلية</li><li>💵 ادفع في الصيدلية</li><li>👨‍⚕️ صيدلي بيراجع طلبك</li></ul>
         <div id="shAlts"></div>
         <p id="shRx" class="sh-rx" hidden>الدوا ده بالروشتة: صوّر الروشتة وابعتها من السلة، وإحنا نكلمك.</p>
+        <a id="shRxBtn" href="#cart" class="hero-btn" hidden>ابعت الروشتة</a>
+        <div id="shDesc" class="sh-desc"></div>
+        <div id="shSimilar" class="sh-similar"></div>
+        <button type="button" id="shShare" class="share">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+          ابعت الصنف لحد
+        </button>
+        <p id="shNote" class="hint-sm center" role="status"></p>
+        <!-- the add button stays at the bottom while the page scrolls (owner 2026-11-15) -->
         <div id="shAct" class="sh-act">
           <div class="qty">
             <button type="button" id="shPlus" aria-label="زوّد واحدة">+</button>
@@ -294,15 +305,17 @@
           </div>
           <button type="button" id="shAdd" class="add"></button>
         </div>
-        <a id="shRxBtn" href="#cart" class="hero-btn" hidden>ابعت الروشتة</a>
-        <div id="shDesc" class="sh-desc"></div>
-        <button type="button" id="shShare" class="share">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
-          ابعت الصنف لحد
-        </button>
-        <p id="shNote" class="hint-sm center" role="status"></p>
       </div>
     </div>
+
+    <!-- the item's photo big (a tap on the item page's photo); a tap on the photo makes it bigger still -->
+    <div id="zoom" class="zoom" hidden>
+      <button type="button" class="sheet-x" id="zoomX" aria-label="اقفل">×</button>
+      <img id="zoomImg" alt="" />
+    </div>
+
+    <!-- the cart, always at hand on the home and the search (owner 2026-11-15) -->
+    <a href="#cart" id="cartBar" class="cart-bar" hidden><span id="cartBarText"></span><b>كمّل الطلب ‹</b></a>
 
     <!-- الألوان والوضع الليلي (store/theme.js): نفس اختيارات البوت -->
     <div id="themeSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="themeTitle" hidden>
@@ -335,7 +348,7 @@
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
     <script src="store/account.js?v=notme-20261114a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=edit-20261114a"></script>
+    <script src="store/store.js?v=v2-20261115a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>
