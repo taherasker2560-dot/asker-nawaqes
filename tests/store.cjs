@@ -124,4 +124,9 @@ assert.equal(ci('SENOLAN FACIAL CLEANSING GEL','cosmetic').sec,'care');
 assert.equal(ci('قلم تحديد حواجب','cosmetic').short,'قلم تحديد');
 assert.equal(ci('X','no_such_cat').sec,'other');
 assert.ok(ci('A VERY VERY LONG PRODUCTNAMEHERE TAB','cosmetic').short.length<=18);
+// the home must not be shown zoomed out with blank bands (2026-11-16, a phone screenshot at ~87%): the viewport has minimum-scale=1 and the page never overflows sideways
+const fs=require('node:fs'),pathM=require('node:path');
+const storeHtml=fs.readFileSync(pathM.join(__dirname,'..','store.html'),'utf8');
+assert.match(storeHtml,/<meta name="viewport"[^>]*minimum-scale=1[^>]*>/,'the store cannot be zoomed out below 100%');
+assert.match(fs.readFileSync(pathM.join(__dirname,'..','store','polish.css'),'utf8'),/html,\s*body\s*\{[^}]*overflow-x:\s*clip/,'the page never scrolls sideways');
 console.log('store ok');

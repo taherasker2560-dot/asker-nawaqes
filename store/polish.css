@@ -361,3 +361,5 @@ details.ds-sec ul { margin: 0 0 8px; }
 .open-now::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.25); }
 .open-now.off::before { background: #fca5a5; box-shadow: 0 0 0 3px rgba(252, 165, 165, 0.25); }
 .top .brand > div { display: flex; flex-direction: column; }
+/* the page never scrolls or shrinks sideways (2026-11-16: a phone showed the home at ~87% with blank bands left and the bottom bar shifted); the rails scroll inside themselves */
+html, body { overflow-x: clip; max-width: 100%; }
