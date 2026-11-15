@@ -268,12 +268,17 @@
       return;
     }
     const L = bagView().list;
-    if (!L.some((b) => b.id === bagSel)) { bagSel = L.length ? L[0].id : ''; picked.clear(); }
-    chips.innerHTML = L.map((b) => `<button type="button" data-bag="${esc(b.id)}"${bagSel === b.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(b.name)}</bdi> <b>${b.n}</b></button>`).join('');
+    // every bag, even an empty one (owner 11-15: «ما عملتش حقيبة ابن سينا … حقيبة الكاش … عايزة تبقى موجودة هنا»); «النواقص
+    // العامة» only while something is on its way there
+    const count = (id) => (L.find((x) => x.id === id) || { n: 0 }).n;
+    const tabs = a.bags.all.filter((x) => x.id !== 'gs' || count('gs') > 0);
+    for (const x of L) if (!tabs.some((t) => t.id === x.id)) tabs.push({ id: x.id, name: x.name });
+    if (!tabs.some((t) => t.id === bagSel)) { bagSel = tabs.length ? tabs[0].id : ''; picked.clear(); }
+    chips.innerHTML = tabs.map((t) => `<button type="button" data-bag="${esc(t.id)}"${bagSel === t.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(t.name)}</bdi> <b>${count(t.id)}</b></button>`).join('');
     $('bgSort').innerHTML = L.length
       ? `<span>رتّب:</span><button type="button" data-sort="have">${sortDir === 1 ? '<span>الرصيد: الأقل فوق</span> ▲' : '<span>الرصيد: الأكتر فوق</span> ▼'}</button>`
       : '';
-    const b = L.find((x) => x.id === bagSel);
+    const b = L.find((x) => x.id === bagSel) || (bagSel ? { id: bagSel, name: (tabs.find((t) => t.id === bagSel) || { name: bagSel }).name, items: [], n: 0 } : null);
     const items = b ? sortItems(b.items, sortKey, sortDir) : [];
     for (const k of [...picked]) if (!items.some((i) => String(i.id) === k)) picked.delete(k);
     box.innerHTML =
@@ -282,11 +287,13 @@
       (lastMoved ? `<div class="bg-toast">✅ <span>${esc(`اتحوّل ${lastMoved.ids.length} صنف لـ`)}</span> <bdi class="notr">${esc(lastMoved.name)}</bdi> <button type="button" class="small secondary" data-undo>تراجع</button></div>` : '') +
       (bagMsg ? `<p class="status bad">${esc(bagMsg)}</p>` : '') +
       (poOk ? `<div class="bg-toast">${esc(poOk)}</div>` : '') +
-      (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن مع التحديث الجاي.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button></div>` : '') +
+      (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button></div>` : '') +
       (b
         ? `<h3 class="al-h"><bdi class="notr">${esc(b.name)}</bdi> <b class="al-n">${b.n}</b></h3>` +
-          `<label class="bg-all"><input type="checkbox" id="bgAllBox"${items.length && picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
-          items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
+          (items.length
+            ? `<label class="bg-all"><input type="checkbox" id="bgAllBox"${picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
+              items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
+            : '<p class="hint">مفيش أصناف ناقصة في الحقيبة دي.</p>')
         : '<p class="hint">مفيش أصناف ناقصة في الحقائب.</p>');
     bar.classList.toggle('hidden', !picked.size);
     // «حوّل» (any bag), and his two quick ones (owner 11-15): «للنواقص العامة» (not found in the market) and «أجّل» («نواقص كل الشركات»)
@@ -307,6 +314,9 @@
   function drawSheet() {
     const sh = $('bgSheet');
     if (!sh) return;
+    // on the page itself, not inside the bags card: the card's opening animation made the sheet open at the very bottom of the
+    // list, off the screen (owner 11-15: «بيعمل ضباب على الشاشة … وما بيخيرنيش»)
+    if (sh.parentElement !== document.body) document.body.appendChild(sh);
     if (!sheetTo && !sh.dataset.open) { sh.classList.add('hidden'); sh.innerHTML = ''; return; }
     const L = bagView().list, count = (id) => (L.find((x) => x.id === id) || { n: 0 }).n;
     const pick = (data.bags.all.find((x) => x.id === sheetTo) || {}).name;
@@ -422,19 +432,26 @@
     const panel = $('bagsPanel');
     panel?.addEventListener('click', (e) => {
       const t = e.target;
-      const chip = t.closest('[data-bag]'), sort = t.closest('[data-sort]'), dest = t.closest('[data-to]');
+      const chip = t.closest('[data-bag]'), sort = t.closest('[data-sort]');
       if (chip) { bagSel = chip.dataset.bag; picked.clear(); lastMoved = null; poOk = ''; drawBags(); return; }
       if (sort) { sortKey = 'have'; sortDir = -sortDir; drawBags(); return; }
       if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
       if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
+    });
+    // the sheet lives on the page (see drawSheet): its own clicks; a tap on the dark part closes it
+    $('bgSheet')?.addEventListener('click', (e) => {
+      const t = e.target, dest = t.closest('[data-to]');
+      if (dest) { sheetTo = dest.dataset.to; drawSheet(); return; }
+      if (t.closest('#bgGo')) { doMove(sheetTo); return; }
+      if (t.closest('#bgBack') || t === $('bgSheet')) { sheetTo = ''; delete $('bgSheet').dataset.open; drawSheet(); }
+    });
+    panel?.addEventListener('click', (e) => {
+      const t = e.target;
       const quick = t.closest('[data-quick]');
       if (quick) { doMove(quick.dataset.quick); return; }
       if (t.closest('#bgPoBtn')) { addPo(); return; }
       if (t.closest('#bgPoDrop')) { dropPo(); return; }
       if (t.closest('[data-open-drafts]')) { root.AskerApp?.showTab?.('drafts'); return; }
-      if (dest) { sheetTo = dest.dataset.to; drawSheet(); return; }
-      if (t.closest('#bgBack')) { sheetTo = ''; delete $('bgSheet').dataset.open; drawSheet(); return; }
-      if (t.closest('#bgGo')) { doMove(sheetTo); return; }
       if (t.closest('[data-undo]')) { undoMove(); }
     });
     panel?.addEventListener('change', (e) => {

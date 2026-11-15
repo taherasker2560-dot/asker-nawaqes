@@ -35,7 +35,7 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.waitForFunction(()=>!document.getElementById('bagsPanel').classList.contains('hidden')&&/ECLATREM/.test(document.getElementById('bgList').textContent));
  assert.equal(await page.$eval('[data-tab="bags"]',b=>b.classList.contains('on')),true);
  const chips=()=>page.$$eval('#bgChips [data-bag]',b=>b.map(x=>[x.textContent.replace(/\s+/g,' ').trim(),x.classList.contains('secondary')]));
- assert.deepEqual(await chips(),[['نواقص يوميه 3',true],['نواقص كل الشركات 1',true],['فارما مول 1',true],['zad pharma 2',false]],'every bag, «كل الشركات» as one');
+ assert.deepEqual(await chips(),[['نواقص يوميه 3',true],['نواقص كل الشركات 1',true],['IBN SINA 1 0',true],['فارما مول 1',true],['zad pharma 2',false],['نقدى 0',true]],'every bag even an empty one, «كل الشركات» as one, not the general shortages');
  const bagText=await text(page,'#bgList');
  assert.match(bagText,/ECLATREM FIRMING CREAM عندك 1 · الحد الأدنى 1 · اتباع في شهر 0 · المطلوب 1 آخر شرا 02\/11\/2025 · ناقص من النهارده/);
  assert.match(bagText,/NEVER BOUGHT عندك 0 · اتباع في شهر 2 · المطلوب 1 ما اتشراش قبل كده · ناقص بقاله 2 يوم/);
@@ -77,20 +77,24 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('#bgMoveBtn');
  assert.deepEqual(await page.$$eval('#bgSheet [data-to]',b=>b.map(x=>x.dataset.to)),['pv','gs','2495','2274','2576','7'],'every bag, the general shortages and the empty Ibn Sina bag too');
  assert.match(await text(page,'#bgSheet .bg-dest.cur'),/نواقص يوميه هنا دلوقتي/);
+ assert.ok(await page.$eval('#bgSheet',s=>s.parentElement===document.body&&!s.classList.contains('hidden')),'the sheet is on the page itself, over everything');
+ // a tap on the dark part closes it; open it again
+ await page.mouse.click(200,40);assert.ok(await page.$eval('#bgSheet',s=>s.classList.contains('hidden')),'closed by the dark part');
+ await page.click('#bgMoveBtn');
  await page.click('#bgSheet [data-to="pv"]');
  assert.equal(await text(page,'#bgGo'),'حوّل لـ نواقص كل الشركات');
  await page.click('#bgGo');
  await page.waitForFunction(()=>/اتحوّل 2 صنف لـ/.test(document.getElementById('bgList').textContent));
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.map(m=>[m.item_id,m.item_name,m.from_bag,m.to_bag,m.status,m.item.need])),[[11,'DAILY ONE','2428','pv','pending',16],[12,'DAILY TWO','2428','pv','pending',6]]);
  assert.ok(await page.$eval('#bgSheet',s=>s.classList.contains('hidden')),'the sheet closes');
- assert.deepEqual(await chips(),[['نواقص يوميه 1',false],['نواقص كل الشركات 3',true],['فارما مول 1',true],['zad pharma 2',true]],'they show in their new bag at once');
+ assert.deepEqual(await chips(),[['نواقص يوميه 1',false],['نواقص كل الشركات 3',true],['IBN SINA 1 0',true],['فارما مول 1',true],['zad pharma 2',true],['نقدى 0',true]],'they show in their new bag at once');
  // undo: both moves cancelled, back in the daily bag
  await page.click('#bgList [data-undo]');
  await page.waitForFunction(()=>/نواقص يوميه\s*3/.test(document.getElementById('bgChips').textContent));
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.map(m=>m.status)),['cancelled','cancelled']);
  // a move to an empty bag makes it show, the item marked «لسه في فارمافلاي» with where it came from
  await page.click('#bgList [data-pick="13"]');await page.click('#bgMoveBtn');await page.click('#bgSheet [data-to="7"]');await page.click('#bgGo');
- await page.waitForFunction(()=>/نقدى/.test(document.getElementById('bgChips').textContent));
+ await page.waitForFunction(()=>/نقدى\s*1/.test(document.getElementById('bgChips').textContent));
  await page.click('#bgChips [data-bag="7"]');
  assert.match(await text(page,'#bgList'),/DAILY THREE ⏳ لسه في فارمافلاي .* جاي من نواقص يوميه/);
  // the two quick buttons: «أجّل» → «نواقص كل الشركات», «للنواقص العامة» → 'gs' (none shown for the bag they are already in)

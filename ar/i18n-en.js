@@ -5,6 +5,8 @@ window.AskerEN = {
  "exact": {
   "الحقائب": "Bags",
   "الكمية المطلوبة": "Need",
+  "مفيش أصناف ناقصة في الحقيبة دي.": "No short items in this bag.",
+  "مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.": "The order advisor splits them among the suppliers within a minute or two.",
   "🛒 في أمر الشرا": "🛒 In the purchase order",
   "🛒 في أمر الشرا: {0} صنف": "🛒 In the purchase order: {0} items",
   "مستشار الطلبيات بيقسّمهم على المخازن مع التحديث الجاي.": "The order advisor splits them among the suppliers with the next update.",
@@ -15,7 +17,7 @@ window.AskerEN = {
   "✅ اتشال {0} صنف من أمر الشرا": "✅ {0} items removed from the purchase order",
   "أمر الشرا ما اتسجلش: {0}": "The purchase order was not saved: {0}",
   "ما اتشالوش من أمر الشرا: {0}": "Not removed from the purchase order: {0}",
-  "أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في التحديث الجاي.": "The purchase order is empty: tick the items you want to buy in «Bags» and press «🛒 Purchase order»; the orders are prepared with the next update.",
+  "أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في خلال دقيقة أو اتنين.": "The purchase order is empty: tick the items you want to buy in «Bags» and press «🛒 Purchase order»; the orders are ready within a minute or two.",
   "الرصيد: الأقل فوق": "Stock: lowest first",
   "الرصيد: الأكتر فوق": "Stock: highest first",
   "للنواقص العامة": "To general shortages",
