@@ -1976,3 +1976,30 @@ html.staff .qa-pin, html.staff .qa-pinrow { display: none !important; }
 .qa-row .qa-b:disabled { opacity: 0.3; }
 .qa-row .qa-x { color: #b42318; }
 .qa-row .qa-add { margin: 0; min-height: 34px; }
+/* ---------- «الحسابات ← الخزن» (ar/cash.js, owner 2026-11-15) ---------- */
+.cs-total, .cs-now { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; padding: 10px 12px; border-radius: 14px; background: var(--tint); font-weight: 700; }
+.cs-total b, .cs-now b { font-size: 18px; }
+.cs-box { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin: 0 0 8px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: var(--sh-1); text-align: start; }
+.cs-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-main strong { font-size: 15px; overflow-wrap: anywhere; }
+.cs-main small { color: var(--muted); font-size: 12px; }
+.cs-main .cs-today { color: var(--ink); opacity: 0.8; }
+.cs-amt { flex: none; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.cs-amt.neg, .cs-now b.neg, .cs-total b.neg, .cs-sum b.neg, .cs-move b.neg, .cs-day small.neg { color: #b42318; }
+.cs-amt.pos, .cs-now b.pos, .cs-total b.pos, .cs-sum b.pos, .cs-move b.pos, .cs-day small.pos { color: #166534; }
+html.night .cs-amt.neg, html.night .cs-now b.neg, html.night .cs-total b.neg, html.night .cs-sum b.neg, html.night .cs-move b.neg, html.night .cs-day small.neg { color: #ff8a7a; }
+html.night .cs-amt.pos, html.night .cs-now b.pos, html.night .cs-total b.pos, html.night .cs-sum b.pos, html.night .cs-move b.pos, html.night .cs-day small.pos { color: #7fe3a0; }
+.cs-head { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+.cs-head strong { font-size: 17px; overflow-wrap: anywhere; }
+.cs-head button { margin: 0; }
+.cs-sum { display: flex; justify-content: space-around; gap: 8px; margin: 0 0 8px; font-size: 13.5px; color: var(--muted); font-weight: 600; }
+.cs-filters { margin: 0 0 6px; }
+.cs-day h4 { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 2px 4px; font-size: 14px; }
+.cs-day h4 small { font-size: 13px; font-weight: 800; }
+.cs-move { display: flex; align-items: flex-start; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.cs-t { flex: none; width: 42px; color: var(--muted); font-size: 12px; padding-top: 2px; }
+.cs-w { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cs-w b { font-weight: 700; overflow-wrap: anywhere; }
+.cs-w small, .cs-a small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.cs-a { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.cs-a b { font-size: 15px; white-space: nowrap; }
