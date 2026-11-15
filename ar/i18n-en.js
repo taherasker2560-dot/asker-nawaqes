@@ -19,6 +19,8 @@ window.AskerEN = {
   "ما اتشالوش من أمر الشرا: {0}": "Not removed from the purchase order: {0}",
   "أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في خلال دقيقة أو اتنين.": "The purchase order is empty: tick the items you want to buy in «Bags» and press «🛒 Purchase order»; the orders are ready within a minute or two.",
   "وفي القوايم": "and in the lists",
+  "ممكن نفس الصنف:": "Maybe the same item:",
+  "عندك منه {0}": "you have {0} of it",
   "ظاهرين في الحقائب.": "Shown in the bags.",
   "مش ظاهرين في الحقائب.": "Hidden from the bags.",
   "اعرضهم": "Show them",
