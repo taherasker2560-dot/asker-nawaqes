@@ -1,6 +1,7 @@
 /* «الحسابات ← العمليات» (owner 2026-11-15: «عايز آدم ينفذ كل العمليات … بالصوت … وبعد كده تتنفذ أوتوماتيك على اللاب»).
    What Adam recorded by voice after the owner's spoken yes, and where each one stands:
-   - a customer's payment / a supplier's payment (ar_ops), a sale / a return (ar_temp_sales, the «البيع المؤقت» list), newest first;
+   - a customer's payment / a supplier's payment / a purchase order (ar_ops), a sale / a return (ar_temp_sales, the «البيع المؤقت»
+     list), newest first (Adam's bag changes are in «الحقائب», table ar_bag_moves);
    - status: waiting (مستنية: the laptop enters it in PharmaFly later, on PharmaFly's own screens), done, failed, cancelled;
    - a waiting one can be cancelled here (the owner's own sign-in; the database refuses everything else).
    Migration 202611150400. Nothing here writes to PharmaFly. */
@@ -20,11 +21,11 @@
   function merge(ops, sales) {
     const out = [];
     for (const o of ops || []) {
-      const cust = o.kind === 'customer_payment';
-      out.push({
-        key: 'op' + o.id, table: 'ar_ops', id: o.id, at: o.created_at, status: o.status,
-        text: `${cust ? 'دفعة من عميل' : 'دفعة لمورد'}: ${o.party_name || '#' + o.party_id} · ${money(o.amount)} ج`,
-      });
+      const who = o.party_name || '#' + o.party_id, n = Array.isArray(o.items) ? o.items.length : 0;
+      // a purchase order chosen item by item (owner 2026-11-15); bag changes live in ar_bag_moves («الحقائب»)
+      const text = o.kind === 'purchase_order' ? `أمر شرا لـ ${who}: ${n} صنف`
+        : `${o.kind === 'customer_payment' ? 'دفعة من عميل' : 'دفعة لمورد'}: ${who} · ${money(o.amount)} ج`;
+      out.push({ key: 'op' + o.id, table: 'ar_ops', id: o.id, at: o.created_at, status: o.status, text });
     }
     for (const s of sales || []) {
       const n = Array.isArray(s.items) ? s.items.length : 0;
@@ -67,7 +68,7 @@
     loading = true;
     try {
       const [o, s] = await Promise.all([
-        db().from('ar_ops').select('id,kind,party_id,party_name,amount,status,created_at').order('created_at', { ascending: false }).limit(40),
+        db().from('ar_ops').select('id,kind,party_id,party_name,amount,items,status,created_at').order('created_at', { ascending: false }).limit(40),
         db().from('ar_temp_sales').select('no,kind,customer_name,items,total,status,created_at').not('adam_request', 'is', null).order('created_at', { ascending: false }).limit(40),
       ]);
       if (o.error) throw o.error;

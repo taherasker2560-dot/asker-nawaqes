@@ -20,4 +20,7 @@ assert.deepEqual(m.map((x) => x.table), ['ar_ops', 'ar_temp_sales', 'ar_ops', 'a
 assert.deepEqual(['pending', 'running', 'done', 'failed', 'cancelled', 'entered', 'x'].map(statusText), ['مستنية', 'بتتنفذ', 'اتنفذت', 'فشلت', 'اتلغت', 'اتنفذت', 'x']);
 assert.equal(money(0.001), '0'); assert.equal(money(1234.5), '1,234.50');
 assert.deepEqual(merge(null, undefined), []);
+// a purchase order chosen item by item
+const b = merge([{ id: 10, kind: 'purchase_order', party_id: 2540, party_name: 'مخزن الفتح للادوية', items: [{ i: 1, q: 3 }, { i: 2, q: 1 }], status: 'pending', created_at: '2026-11-15T14:00:00Z' }], []);
+assert.equal(b[0].text, 'أمر شرا لـ مخزن الفتح للادوية: 2 صنف');
 console.log('PASS: ops list: both tables in one list, newest first, statuses in words');
