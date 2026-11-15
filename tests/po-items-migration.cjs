@@ -32,5 +32,18 @@ const OWNER = 'ff6c33dc-9dc5-4e2f-95bb-5d449e231f1c', STAFF = '00000000-0000-400
   assert.ok(await fails('authenticated', STAFF, `INSERT INTO public.ar_po_items(item_id,qty) VALUES (14,1)`));
   assert.equal((await as('authenticated', STAFF, 'SELECT id FROM public.ar_po_items')).length, 0);
   assert.equal((await as('authenticated', OWNER, `SELECT count(*)::int n FROM public.ar_po_items WHERE status='open'`))[0].n, 2);
+  // 202611160000: the invoice closes the line («received») with what closed it; a new line for the same item is allowed after that
+  const sql2 = fs.readFileSync('supabase/migrations/202611160000_ar_po_received.sql', 'utf8');
+  await db.exec(sql2); await db.exec(sql2); // applied twice: safe
+  await db.exec('GRANT SELECT, INSERT, UPDATE ON public.ar_po_items TO authenticated;');
+  const [b] = await as('authenticated', OWNER, `SELECT id FROM public.ar_po_items WHERE item_id=12 AND status='open'`);
+  await as('authenticated', OWNER, `UPDATE public.ar_po_items SET status='received', received_qty=2.5, received_at=now(), done_at=now(), updated_at=now(), inv_code='11/26/107075', vendor='AMG' WHERE id=${b.id}`);
+  assert.deepEqual((await as('authenticated', OWNER, `SELECT status, received_qty::float q, inv_code, vendor FROM public.ar_po_items WHERE id=${b.id}`))[0], { status: 'received', q: 2.5, inv_code: '11/26/107075', vendor: 'AMG' });
+  await as('authenticated', OWNER, `INSERT INTO public.ar_po_items(item_id,qty) VALUES (12,4)`); // the item can be ordered again once received
+  for (const bad of [`received_qty=0`, `received_qty=100001`, `status='sent'`, `inv_code='${'x'.repeat(41)}'`, `vendor='${'x'.repeat(81)}'`]) {
+    assert.ok(await fails('authenticated', OWNER, `UPDATE public.ar_po_items SET ${bad} WHERE id=${b.id}`), bad);
+  }
+  assert.equal((await as('authenticated', STAFF, `SELECT id FROM public.ar_po_items WHERE status='received'`)).length, 0, 'staff sees nothing');
+  assert.doesNotMatch(sql2.replace(/--.*$/gm, ''), /drop table|truncate/i);
   console.log('po-items-migration ok');
 })().catch((e) => { console.error(e); process.exit(1); });

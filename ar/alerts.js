@@ -142,6 +142,8 @@
   let moves = [], movesErr = '', sortKey = 'have', sortDir = 1, sheetTo = '', lastMoved = null, bagMsg = '';
   // «أمر الشرا» (owner 11-15): the open lines of ar_po_items; the order advisor («الطلبيات») builds from them only
   let po = [], poOk = '';
+  // the lines an invoice closed in the last 3 days (migration 202611160000, laptop Hub\orders\PO_CLOSE.ps1): «وصل من أمر الشرا»
+  let poDone = [];
   // what is in the purchase order leaves the bags (owner 11-15: «طالما راحت أمر شراء يبقى ما تظهرش في الحقائب عشان ما تعمليش
   // دوشة»); «اعرضهم» shows them again, to take one out of the order
   let showPo = false;
@@ -330,6 +332,7 @@
       (dupOk ? `<div class="bg-toast">✅ <bdi class="notr" dir="auto">${esc(dupOk.name)}</bdi> <span>${dupOk.decision === 'same' ? 'اتعلّم مكرر: اتشال من الحقائب وأمر الشرا' : 'صنف تاني: التحذير اتشال، وبيدخل أمر الشرا لو رصيده صفر'}</span> <button type="button" class="small secondary" data-dup-undo="${esc(dupOk.id)}">تراجع</button></div>` : '') +
       dupsList() +
       (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>${showPo ? 'ظاهرين في الحقائب.' : 'مش ظاهرين في الحقائب.'}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button> <button type="button" class="small secondary" data-show-po>${showPo ? 'خبّيهم' : 'اعرضهم'}</button></div>` : '') +
+      poDoneBox() +
       (tabs.length
         ? tabs.map((t) => `<div class="bg-bag${t.id === bagSel ? ' open' : ''}"><button type="button" class="bg-bag-h" data-bag="${esc(t.id)}" aria-expanded="${t.id === bagSel}">` +
             `<span class="bg-bag-name notr">${esc(t.name)}</span> <b class="bg-bag-n">${count(t.id)}</b></button>` +
@@ -436,6 +439,23 @@
       const { data: rows, error } = await db().from('ar_po_items').select('id,item_id,item_name,qty,status').eq('status', 'open').order('created_at');
       po = error ? [] : rows || [];
     } catch (e) { po = []; }
+    // what the invoices closed (no migration yet / any error = nothing to show)
+    try {
+      const since = new Date(Date.now() - 3 * 864e5).toISOString();
+      const r = await db().from('ar_po_items').select('id,item_id,item_name,qty,received_qty,inv_code,vendor,received_at').eq('status', 'received').gte('received_at', since).order('received_at', { ascending: false }).limit(100);
+      poDone = r.error ? [] : r.data || [];
+    } catch (e) { poDone = []; }
+  }
+  // «✅ وصل من أمر الشرا»: one line per item an invoice closed: what came (and of how many he ordered, when less), the invoice, the supplier
+  function poDoneBox() {
+    if (!poDone.length) return '';
+    const n = (v) => String(Math.round((Number(v) || 0) * 100) / 100);
+    const rows = poDone.map((p) => {
+      const q = Number(p.qty) || 0, r = Number(p.received_qty) || 0;
+      const less = q > 0 && r < q - 0.001;
+      return `<li><bdi class="notr" dir="auto">${esc(p.item_name || p.item_id)}</bdi> <b>${esc(less ? `وصل ${n(r)} من ${n(q)}` : `وصل ${n(r)}`)}</b> <span>الفاتورة:</span> <bdi class="notr">${esc(p.inv_code || '')}</bdi> <bdi class="notr">${esc(p.vendor || '')}</bdi></li>`;
+    }).join('');
+    return `<details class="bg-po-done"><summary>${esc(`✅ وصل من أمر الشرا (آخر 3 أيام): ${poDone.length} صنف`)}</summary><ul>${rows}</ul></details>`;
   }
   async function openBags() { await load(false); await loadMoves(); await loadPo(); await loadDups(); drawBags(); }
   // «🛒 أمر شراء»: the ticked items not in the order yet go in, each with what PharmaFly says is needed (at least 1)
