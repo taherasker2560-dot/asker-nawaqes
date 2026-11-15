@@ -183,13 +183,21 @@
   const waLink = (t, phone) => 'https://wa.me/' + waPhone(phone) + (t ? '?text=' + encodeURIComponent(t) : '');
   // which saved companies (the ones under «الوارد» ← «الشركات», several people per supplier) belong to which supplier
   const fold = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[\s()\-_.]+/g, '');
-  const KEYS = { NEWCITY: ['نيوسيتي'], AMG: ['ايهامجروب', 'amgroup', 'amg'], REDA: ['رضاعطيه'], ELFATH: ['الفتح'], PHARMA: ['فارما'], IBNSINA: ['ابنسينا'] };
+  const KEYS = { NEWCITY: ['نيوسيتي'], AMG: ['ايهامجروب', 'amgroup', 'amg'], REDA: ['رضاعطيه'], ELFATH: ['الفتح'], PHARMA: ['فارما'], IBNSINA: ['ابنسينا'],
+    COS_FATHY: ['احمدفتحي', 'مكتبفتحي'], COS_DOCTOR: ['الدكتور'], COS_SARHAN: ['سرحان'], COS_SINA: ['سيناللمستلزمات', 'عامر'] };
   // the six suppliers an order can be sent to; the file's own label wins when that supplier has an order today
   const LABELS = { NEWCITY: 'نيو سيتي', AMG: 'AMG', REDA: 'رضا عطية', ELFATH: 'الفتح', PHARMA: 'فارما', IBNSINA: 'ابن سينا' };
-  function sendOptions(d) {
+  // the cosmetics and supplies companies (owner 2026-11-15): their orders are their own door, «طلبيات المستحضرات»
+  const COS_LABELS = { COS_FATHY: 'مكتب أحمد فتحي', COS_DOCTOR: 'الدكتور', COS_SARHAN: 'محمد سرحان', COS_SINA: 'سينا للمستلزمات' };
+  const isCos = (id) => /^COS_/.test(String(id || ''));
+  // where an order can go: the six medicine suppliers, or (for a cosmetics order) the four cosmetics companies
+  function sendOptions(d, forId) {
     const own = new Map(((d && d.suppliers) || []).map((s) => [s.id, s.label]));
-    return Object.keys(LABELS).map((id) => ({ id, label: own.get(id) || LABELS[id] }));
+    const L = isCos(forId) ? COS_LABELS : LABELS;
+    return Object.keys(L).map((id) => ({ id, label: own.get(id) || L[id] }));
   }
+  // the two doors of «الطلبيات»: medicines and cosmetics, each with its own suppliers and items without an offer
+  const ofDoor = (door, id) => (door === 'cos') === isCos(id);
   // the message of an order sent to another supplier: that warehouse's own name from its list when known (+ PharmaFly name),
   // else the PharmaFly name only (the first warehouse's names do not fit the other one)
   function buildMessageTo(sup, st, toId) {
@@ -207,6 +215,7 @@
     return (saved || []).filter((c) => {
       const n = fold(c && c.name);
       if (supId === 'PHARMA' && n.includes('نيوسيتي')) return false; // «مخزن نيو سيتى فارما» is a New City contact
+      if (supId === 'COS_SINA' && n.includes('ابنسينا')) return false; // Ibn Sina is a medicine distributor
       return keys.some((k) => n.includes(k));
     });
   }
@@ -226,7 +235,7 @@
     if (/\b(TAB|TABS|TABLET|TABLETS|T|CAP|CAPS|CAPSULE|CAPSULES|EFF|SACH|SACHETS)\b|\d+\s*(T|TAB|CAP)\b|قرص|كبسول|اكياس/.test(n)) return 'pills';
     return 'box';
   }
-  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, orderItems, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, offerAt, knowsOffers, unitCostAt, totalAt, unknownAt, diffWords, atNote, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, sendOptions, buildMessageTo };
+  const api = { PATH, OLD_HOURS, DAY_STARTS_AT, MAX_URL_TEXT, MAX_QTY, key, nk, dm, pct, money, parseDrafts, businessDayStart, hideOrdered, orderItems, age, sourceNote, mismatchNote, fallbackNote, avgNote, qtyOf, nameFor, defaultSel, picked, buildMessage, unitCost, totalOf, offerAt, knowsOffers, unitCostAt, totalAt, unknownAt, diffWords, atNote, urlText, waPhone, waLink, fold, contactsFor, chooseContact, shapeOf, LABELS, COS_LABELS, isCos, ofDoor, sendOptions, buildMessageTo };
   root.AskerOrderDraftsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -252,6 +261,9 @@
   // carry: sent to another supplier, 'new' = only the items not ordered yet today, 'both' = also the ones already ordered.
   // base = the file as the laptop wrote it; hiddenBy = per supplier, the items already ordered today (hidden from it)
   let sendTo = {}, carry = {}, base = null, hiddenBy = {};
+  // the door shown: 'drug' (الأدوية) or 'cos' (المستحضرات), owner 2026-11-15 «ده في باب وده في باب»
+  let door = 'drug';
+  const doorSuppliers = () => (drafts ? drafts.suppliers.filter((s) => ofDoor(door, s.id)) : []);
   try {
     const c = JSON.parse(localStorage.getItem(CHOICE) || '{}');
     if (c && typeof c === 'object') choice = c;
@@ -287,7 +299,7 @@
   }
   // marked «اتطلب» today (from any supplier) for this PharmaFly name
   const orderedFrom = (i) => ordered.filter((o) => o.name_key === nk(i.name_pf)).map((o) => o.supplier || '');
-  const labelOf = (id) => (sendOptions(drafts).find((x) => x.id === id) || { label: id }).label;
+  const labelOf = (id) => (sendOptions(drafts, current).find((x) => x.id === id) || { label: id }).label;
   const target = () => chooseContact(contactsFor(toId(), saved), choice[toId()]);
 
   function thumb(i) {
@@ -315,7 +327,7 @@
       `<label class="od-qty"><span>الكمية</span><input type="number" inputmode="numeric" min="0" max="${MAX_QTY}" step="1" data-qty value="${esc(st.qty)}"></label></div>`;
   }
   function drawChips() {
-    $('odChips').innerHTML = drafts.suppliers
+    $('odChips').innerHTML = doorSuppliers()
       .map((s) => `<button type="button" class="chip${s.id === current ? ' on' : ''}" data-sup="${esc(s.id)}">${esc(s.label)} · ${esc(s.items.length || 'اتطلبت')}</button>`)
       .join('');
   }
@@ -341,7 +353,7 @@
   function drawSendLabels() {
     const s = supplier(current), box = $('odSendTo');
     if (!s || !box) return;
-    const c = compare(current), opts = sendOptions(drafts);
+    const c = compare(current), opts = sendOptions(drafts, current);
     for (const opt of box.options) {
       const o = opts.find((x) => x.id === opt.value);
       if (o) opt.textContent = optionText(o, s, c);
@@ -364,7 +376,7 @@
   function drawSendTo() {
     const s = supplier(current), box = $('odSendTo');
     if (!s || !box) return;
-    box.innerHTML = sendOptions(drafts).map((o) => `<option value="${esc(o.id)}"${o.id === toId() ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
+    box.innerHTML = sendOptions(drafts, current).map((o) => `<option value="${esc(o.id)}"${o.id === toId() ? ' selected' : ''}>${esc(o.label)}</option>`).join('');
     const other = toId() !== s.id;
     drawSendLabels();
     // sent to another supplier after some of it was already ordered today: the owner chooses (2026-11-10: «تخيرني ابعت
@@ -420,16 +432,28 @@
     drawOrder();
     drawRows();
   }
+  // «💊 طلبيات الأدوية» / «🧴 طلبيات المستحضرات», each with how many items it has
+  const noOfDoor = (d) => ((drafts && drafts.noOffer) || []).filter((i) => (d === 'cos') === (i.kind === 'cos'));
+  function drawDoors() {
+    const n = (d) => drafts.suppliers.filter((s) => ofDoor(d, s.id)).reduce((x, s) => x + s.items.length, 0) + noOfDoor(d).length;
+    $('odDoors').innerHTML = [['drug', '💊 طلبيات الأدوية'], ['cos', '🧴 طلبيات المستحضرات']]
+      .map(([d, t]) => `<button type="button" data-door="${d}"${door === d ? '' : ' class="secondary"'}><span>${t}</span> <b>${n(d)}</b></button>`).join('');
+  }
   function draw() {
-    const none = !drafts || !drafts.suppliers.length;
+    const none = !drafts || (!drafts.suppliers.length && !drafts.noOffer.length);
     $('odBody').classList.toggle('hidden', none);
     if (none) return;
-    if (!supplier(current)) current = drafts.suppliers[0].id;
+    drawDoors();
+    const list = doorSuppliers();
+    if (!list.some((s) => s.id === current)) current = list.length ? list[0].id : '';
     const a = age(drafts.generatedAt);
     $('odInfo').textContent = `اتجهزت ${a.text}${a.old ? ' — قديمة، اللاب لسه ما حدّثهاش' : ''}`;
     $('odInfo').className = 'status' + (a.old ? ' bad' : '');
-    drawSupplier();
-    const no = drafts.noOffer || [];
+    $('odSupBox').classList.toggle('hidden', !list.length);
+    $('odDoorEmpty').classList.toggle('hidden', !!list.length);
+    $('odDoorEmpty').textContent = door === 'cos' ? 'مفيش أصناف مستحضرات في أمر الشرا دلوقتي.' : 'مفيش أصناف أدوية في أمر الشرا دلوقتي.';
+    if (list.length) drawSupplier(); else $('odChips').innerHTML = '';
+    const no = noOfDoor(door);
     $('odNoBox').classList.toggle('hidden', !no.length);
     $('odNoTitle').textContent = `مفيش عليهم عرض (${no.length})`;
     $('odNo').innerHTML = no.map((i) => `<div class="od-row"><strong dir="ltr">${esc(i.name_pf)}</strong> <span>× ${esc(i.qty)}</span></div>`).join('');
@@ -542,6 +566,14 @@
   $('odChips')?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-sup]');
     if (b) pick(b.dataset.sup);
+  });
+  $('odDoors')?.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-door]');
+    if (!b || b.dataset.door === door) return;
+    door = b.dataset.door === 'cos' ? 'cos' : 'drug';
+    current = '';
+    say('');
+    draw();
   });
   $('odPick')?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-contact]');

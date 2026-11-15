@@ -902,6 +902,16 @@ html.night .todo-note {
 .bg-bar button {
   padding: 8px 10px;
 }
+/* the search card: a warehouse list priced differently from ours (owner 11-15) */
+.hs-listprice {
+  margin-top: 2px;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 700;
+}
+html.night .hs-listprice {
+  color: #fbbf24;
+}
 /* the bags one under the other, a tap opens one (owner 11-15) */
 .bg-bag {
   margin: 8px 0;

@@ -132,3 +132,28 @@ run('orders tab: a supplier with no saved number, no file yet, an old file, a br
  await page.click('[data-tab="drafts"]');await waitStatus(page,/ملف الطلبيات شكله مش مظبوط/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')));
 });
+
+run('orders tab: two doors, medicines and cosmetics (owner 2026-11-15 «ده في باب وده في باب»)',async({page})=>{
+ const d=drafts();
+ d.suppliers.push({id:'COS_DOCTOR',label:'الدكتور',count:1,items:[item(63625,'BABY DIAPERS L',16,{source:'buy',source_date:'2026-05-12',discount:19.4,name_supplier:null,list:null,buy:{discount:19.4,date:'2026-05-12',bonus:0},fallback:null})]});
+ d.no_offer.push({item_id:63718,name_pf:'TISSUES 700',qty:17,kind:'cos'});
+ await put(page,d);
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForSelector('#odDoors [data-door]');
+ // medicines first: 2 + 1 + 150 items and one without an offer; cosmetics: one item and one without an offer
+ assert.deepEqual(await page.$$eval('#odDoors [data-door]',b=>b.map(x=>[x.textContent.replace(/\s+/g,' ').trim(),x.classList.contains('secondary')])),[['💊 طلبيات الأدوية 154',false],['🧴 طلبيات المستحضرات 2',true]]);
+ assert.deepEqual(await page.$$eval('#odChips [data-sup]',b=>b.map(x=>x.dataset.sup)),['NEWCITY','AMG','REDA']);
+ assert.match(await page.textContent('#odNo'),/LONELY ITEM/);assert.doesNotMatch(await page.textContent('#odNo'),/TISSUES/);
+ await page.click('#odDoors [data-door="cos"]');
+ assert.deepEqual(await page.$$eval('#odChips [data-sup]',b=>b.map(x=>x.dataset.sup)),['COS_DOCTOR']);
+ assert.deepEqual(await page.$$eval('#odSendTo option',o=>o.map(x=>x.value)),['COS_FATHY','COS_DOCTOR','COS_SARHAN','COS_SINA'],'a cosmetics order goes only to the cosmetics companies');
+ assert.match(await msgOf(page),/BABY DIAPERS L × 16/);
+ assert.match(await page.textContent('#odNo'),/TISSUES 700/);assert.doesNotMatch(await page.textContent('#odNo'),/LONELY/);
+ // an empty door says so
+ const only=drafts();await put(page,only);
+ await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForSelector('#odDoors [data-door]');
+ await page.click('#odDoors [data-door="cos"]');
+ assert.ok(await page.isVisible('#odDoorEmpty'));assert.match(await text(page,'#odDoorEmpty'),/مفيش أصناف مستحضرات في أمر الشرا دلوقتي/);
+ assert.ok(!(await page.isVisible('#odSupBox')));
+});
