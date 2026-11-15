@@ -52,6 +52,25 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('#bgSort [data-sort]');assert.deepEqual(await order(),['DAILY TWO','DAILY THREE','DAILY ONE']);
  assert.equal(await text(page,'#bgSort'),'رتّب: الرصيد: الأكتر فوق ▼');
  await page.click('#bgSort [data-sort]');assert.deepEqual(await order(),['DAILY ONE','DAILY THREE','DAILY TWO']);
+ // «🛒 أمر شراء»: the ticked item goes in his purchase order with what is needed; ticked again it can come out
+ await page.click('#bgList [data-pick="11"]');
+ assert.equal((await page.textContent('#bgPoBtn')).trim(),'🛒 أمر شراء (1)');
+ await page.click('#bgPoBtn');
+ await page.waitForFunction(()=>/اتضاف 1 صنف لأمر الشرا/.test(document.getElementById('bgList').textContent));
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_po_items.map(p=>[p.item_id,p.item_name,p.bag,p.qty,p.status,p.item.sold30])),[[11,'DAILY ONE','2428',16,'open',33]]);
+ assert.match(await text(page,'#bgList'),/في أمر الشرا: 1 صنف .* افتح الطلبيات/);
+ assert.match(await text(page,'#bgList'),/DAILY ONE 🛒 في أمر الشرا/);
+ await page.click('#bgList [data-pick="11"]');
+ assert.equal(await page.$('#bgPoBtn'),null,'already in the order');
+ await page.click('#bgPoDrop');
+ await page.waitForFunction(()=>/اتشال 1 صنف من أمر الشرا/.test(document.getElementById('bgList').textContent));
+ assert.equal(await page.evaluate(()=>window.__tables.ar_po_items[0].status),'cancelled');
+ // «الطلبيات» with an empty purchase order says how to fill it
+ await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[{id:'NEWCITY',label:'نيو سيتي',items:[]}],no_offer:[],summary:{items:0}})});
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForFunction(()=>/أمر الشرا فاضي/.test(document.getElementById('draftsPanel').textContent));
+ await page.click('[data-pgroup="short"]');await page.click('[data-tab="bags"]');await page.waitForTimeout(300);
+ await page.click('#bgChips [data-bag="2428"]');
  // tick two, «حوّل» shows every other bag (where they are now greyed), pick «نواقص كل الشركات», move
  await page.click('#bgList [data-pick="11"]');await page.click('#bgList [data-pick="12"]');
  assert.equal((await page.textContent('#bgMoveBtn')).trim(),'⇄ حوّل (2)');
@@ -76,14 +95,14 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.match(await text(page,'#bgList'),/DAILY THREE ⏳ لسه في فارمافلاي .* جاي من نواقص يوميه/);
  // the two quick buttons: «أجّل» → «نواقص كل الشركات», «للنواقص العامة» → 'gs' (none shown for the bag they are already in)
  await page.click('#bgChips [data-bag="2428"]');await page.click('#bgList [data-pick="12"]');
- assert.deepEqual(await page.$$eval('#bgBar button',b=>b.map(x=>x.textContent.trim())),['⇄ حوّل (1)','للنواقص العامة','أجّل','إلغاء']);
+ assert.deepEqual(await page.$$eval('#bgBar button',b=>b.map(x=>x.textContent.trim())),['🛒 أمر شراء (1)','⇄ حوّل (1)','للنواقص العامة','أجّل','إلغاء']);
  await page.click('#bgBar [data-quick="pv"]');
  await page.waitForFunction(()=>/اتحوّل 1 صنف لـ\s*نواقص كل الشركات/.test(document.getElementById('bgList').textContent));
  await page.click('#bgList [data-pick="11"]');await page.click('#bgBar [data-quick="gs"]');
  await page.waitForFunction(()=>/النواقص العامة\s*1/.test(document.getElementById('bgChips').textContent));
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.filter(m=>m.status==='pending').map(m=>[m.item_id,m.to_bag]).sort()),[[11,'gs'],[12,'pv'],[13,'7']]);
  await page.click('#bgChips [data-bag="pv"]');await page.click('#bgList [data-pick="21"]');
- assert.deepEqual(await page.$$eval('#bgBar button',b=>b.map(x=>x.textContent.trim())),['⇄ حوّل (1)','للنواقص العامة','إلغاء'],'no «أجّل» inside «كل الشركات»');
+ assert.deepEqual(await page.$$eval('#bgBar button',b=>b.map(x=>x.textContent.trim())),['🛒 أمر شراء (1)','⇄ حوّل (1)','للنواقص العامة','إلغاء'],'no «أجّل» inside «كل الشركات»');
  await page.click('[data-group="home"]');
  // a home row opens «الصلاحيات» on its view
  await page.click('#todoList .todo-row[data-view="expired"]');
@@ -113,7 +132,7 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.equal(await page.$eval('[data-group="sales"]',b=>b.dataset.badge),'2');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-notify-seen')).store),2);
  // nothing else was written to the server (only his moves between bags)
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves/.test(JSON.stringify(w)))),[]);
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items/.test(JSON.stringify(w)))),[]);
 },{home:true});
 run('alerts: no file yet',async({page})=>{
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');

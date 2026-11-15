@@ -140,6 +140,8 @@
   // the order: by the real stock only (owner 11-15: «من رصيد الاصناف، الرصيد الموجود الفعلي … الكميات اللي مفيش منها فوق»),
   // smallest first when a bag opens, a tap turns it to largest first and back
   let moves = [], movesErr = '', sortKey = 'have', sortDir = 1, sheetTo = '', lastMoved = null, bagMsg = '';
+  // «أمر الشرا» (owner 11-15): the open lines of ar_po_items; the order advisor («الطلبيات») builds from them only
+  let po = [], poOk = '';
   const picked = new Set();
 
   async function load(force) {
@@ -243,10 +245,11 @@
       ? `عندك ${num(x.have)} · الحد الأدنى ${num(x.min)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`
       : `عندك ${num(x.have)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`;
     const since = num(x.days) > 1 ? `ناقص بقاله ${num(x.days)} يوم` : 'ناقص من النهارده';
-    const k = String(x.id);
+    const k = String(x.id), inPo = po.some((p) => String(p.item_id) === k);
     return `<label class="al-item bg-it${late ? ' late' : ''}${picked.has(k) ? ' on' : ''}"><input type="checkbox" data-pick="${esc(k)}"${picked.has(k) ? ' checked' : ''} />` +
       `<div><strong dir="auto" class="notr">${esc(x.name)}</strong>` +
       (x.pending ? ` <span class="bg-pend">⏳ لسه في فارمافلاي</span>` : '') +
+      (inPo ? ` <span class="bg-po-tag">🛒 في أمر الشرا</span>` : '') +
       `<div class="bg-line">${esc(line)}</div>` +
       `<div class="hint">${x.last_buy ? `<span>${esc('آخر شرا ' + dayText(x.last_buy, ref))}</span>` : '<span>ما اتشراش قبل كده</span>'} · <span class="${late ? 'al-late' : ''}">${esc(since)}</span>` +
       (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div></div></label>';
@@ -278,6 +281,8 @@
       (movesErr ? `<p class="status bad">${esc(movesErr)}</p>` : '') +
       (lastMoved ? `<div class="bg-toast">✅ <span>${esc(`اتحوّل ${lastMoved.ids.length} صنف لـ`)}</span> <bdi class="notr">${esc(lastMoved.name)}</bdi> <button type="button" class="small secondary" data-undo>تراجع</button></div>` : '') +
       (bagMsg ? `<p class="status bad">${esc(bagMsg)}</p>` : '') +
+      (poOk ? `<div class="bg-toast">${esc(poOk)}</div>` : '') +
+      (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن مع التحديث الجاي.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button></div>` : '') +
       (b
         ? `<h3 class="al-h"><bdi class="notr">${esc(b.name)}</bdi> <b class="al-n">${b.n}</b></h3>` +
           `<label class="bg-all"><input type="checkbox" id="bgAllBox"${items.length && picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
@@ -285,8 +290,13 @@
         : '<p class="hint">مفيش أصناف ناقصة في الحقائب.</p>');
     bar.classList.toggle('hidden', !picked.size);
     // «حوّل» (any bag), and his two quick ones (owner 11-15): «للنواقص العامة» (not found in the market) and «أجّل» («نواقص كل الشركات»)
+    // «🛒 أمر شراء» for the ticked items not in the order yet; «✖ شيل من أمر الشرا» for the ticked ones already in it
+    const inPo = (k) => po.some((p) => String(p.item_id) === k);
+    const toAdd = [...picked].filter((k) => !inPo(k)).length, toDrop = picked.size - toAdd;
     bar.innerHTML = picked.size
-      ? `<button type="button" id="bgMoveBtn">${esc(`⇄ حوّل (${picked.size})`)}</button>` +
+      ? (toAdd ? `<button type="button" class="bg-buy" id="bgPoBtn">${esc(`🛒 أمر شراء (${toAdd})`)}</button>` : '') +
+        (toDrop ? `<button type="button" class="secondary" id="bgPoDrop">${esc(`✖ شيل من أمر الشرا (${toDrop})`)}</button>` : '') +
+        `<button type="button" id="bgMoveBtn">${esc(`⇄ حوّل (${picked.size})`)}</button>` +
         (bagSel !== 'gs' ? '<button type="button" class="secondary" data-quick="gs">للنواقص العامة</button>' : '') +
         (bagSel !== 'pv' ? '<button type="button" class="secondary" data-quick="pv">أجّل</button>' : '') +
         '<button type="button" class="secondary" id="bgClear">إلغاء</button>'
@@ -321,7 +331,45 @@
       }
     } catch (e) { movesErr = 'التحويلات مش متاحة دلوقتي: ' + ((e && e.message) || e); }
   }
-  async function openBags() { await load(false); await loadMoves(); drawBags(); }
+  // his purchase order: the open lines
+  async function loadPo() {
+    if (!db()) return;
+    try {
+      const { data: rows, error } = await db().from('ar_po_items').select('id,item_id,item_name,qty,status').eq('status', 'open').order('created_at');
+      po = error ? [] : rows || [];
+    } catch (e) { po = []; }
+  }
+  async function openBags() { await load(false); await loadMoves(); await loadPo(); drawBags(); }
+  // «🛒 أمر شراء»: the ticked items not in the order yet go in, each with what PharmaFly says is needed (at least 1)
+  async function addPo() {
+    const L = bagView().list, b = L.find((x) => x.id === bagSel);
+    if (!b) return;
+    const real = new Map();
+    for (const bb of data.bags.list) for (const i of bb.items) real.set(String(i.id), bb.id);
+    const rows = b.items.filter((i) => picked.has(String(i.id)) && !po.some((p) => String(p.item_id) === String(i.id))).map((i) => ({
+      item_id: Number(i.id), item_name: String(i.name || '').slice(0, 200), bag: real.get(String(i.id)) || bagSel, qty: Math.max(1, Math.ceil(num(i.need) - 1e-9)), status: 'open',
+      item: { have: num(i.have), sold30: num(i.sold30), min: num(i.min), need: num(i.need), last_buy: i.last_buy || null },
+    }));
+    bagMsg = ''; poOk = ''; lastMoved = null;
+    if (rows.length) {
+      const r = await db().from('ar_po_items').insert(rows).select('id');
+      if (r.error) bagMsg = 'أمر الشرا ما اتسجلش: ' + (r.error.message || r.error);
+      else poOk = `✅ اتضاف ${rows.length} صنف لأمر الشرا`;
+    }
+    picked.clear();
+    await loadPo(); drawBags();
+  }
+  async function dropPo() {
+    const ids = po.filter((p) => picked.has(String(p.item_id))).map((p) => p.id);
+    bagMsg = ''; poOk = ''; lastMoved = null;
+    if (ids.length) {
+      const r = await db().from('ar_po_items').update({ status: 'cancelled', updated_at: new Date().toISOString() }).in('id', ids);
+      if (r.error) bagMsg = 'ما اتشالوش من أمر الشرا: ' + (r.error.message || r.error);
+      else poOk = `✅ اتشال ${ids.length} صنف من أمر الشرا`;
+    }
+    picked.clear();
+    await loadPo(); drawBags();
+  }
   // move the ticked items: an item already moved has that move closed first; back to where PharmaFly has it = nothing to record
   async function doMove(to) {
     const L = bagView().list, b = L.find((x) => x.id === bagSel);
@@ -375,12 +423,15 @@
     panel?.addEventListener('click', (e) => {
       const t = e.target;
       const chip = t.closest('[data-bag]'), sort = t.closest('[data-sort]'), dest = t.closest('[data-to]');
-      if (chip) { bagSel = chip.dataset.bag; picked.clear(); lastMoved = null; drawBags(); return; }
+      if (chip) { bagSel = chip.dataset.bag; picked.clear(); lastMoved = null; poOk = ''; drawBags(); return; }
       if (sort) { sortKey = 'have'; sortDir = -sortDir; drawBags(); return; }
       if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
       if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
       const quick = t.closest('[data-quick]');
       if (quick) { doMove(quick.dataset.quick); return; }
+      if (t.closest('#bgPoBtn')) { addPo(); return; }
+      if (t.closest('#bgPoDrop')) { dropPo(); return; }
+      if (t.closest('[data-open-drafts]')) { root.AskerApp?.showTab?.('drafts'); return; }
       if (dest) { sheetTo = dest.dataset.to; drawSheet(); return; }
       if (t.closest('#bgBack')) { sheetTo = ''; delete $('bgSheet').dataset.open; drawSheet(); return; }
       if (t.closest('#bgGo')) { doMove(sheetTo); return; }
