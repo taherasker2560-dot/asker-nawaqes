@@ -82,3 +82,31 @@ run('quantity boxes in «الوارد»: ready, typed number replaces the sugges
  await waitStatus(page,/رجعت للكمية المقترحة/,'msgStatus');
  assert.ok(!(await page.$eval('[data-qty="s2"]',e=>e.closest('label').classList.contains('mine'))));
 });
+
+run('quantity boxes learn: the number he chose last time starts blue, the new one is remembered',async({page,table})=>{
+ await page.evaluate((o)=>{window.__storage['orders/drafts.json']=JSON.stringify(o);window.__tables.ar_orders=[];window.__tables.ar_suppliers=[];window.__tables.ar_order_qty=[{item_id:11,item_name:'ITEM ONE',qty:6,suggested:23,supplier:'NEWCITY'}]},drafts());
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForSelector('#odChips [data-sup]');
+ // an item he chose a number for starts at it (blue), the others at the laptop's number; the order follows
+ await page.click('#odEdit');
+ assert.equal(await page.inputValue('#odItems [data-k="11"] [data-qty]'),'6');
+ assert.ok(await page.$eval('#odItems [data-k="11"] .od-qty',e=>e.classList.contains('mine')));
+ assert.equal(await page.inputValue('#odItems [data-k="12"] [data-qty]'),'3');
+ assert.ok(!(await page.$eval('#odItems [data-k="12"] .od-qty',e=>e.classList.contains('mine'))));
+ assert.match(await page.inputValue('#odMsg'),/ITEM ONE.* × 6\n.*ITEM TWO.* × 3/);
+ // a new number is remembered when the cursor leaves the box (Enter); the old one is replaced, not doubled
+ await page.keyboard.type('9');await page.keyboard.press('Enter');
+ await page.keyboard.type('4');await page.keyboard.press('Enter');
+ const rows=async()=>(await table('ar_order_qty')).map(x=>[x.item_id,x.qty,x.suggested,x.supplier]).sort((a,b)=>a[0]-b[0]);
+ await page.waitForFunction(()=>window.__tables.ar_order_qty.length===2);
+ assert.deepEqual(await rows(),[[11,9,23,'NEWCITY'],[12,4,3,'NEWCITY']]);
+ // 0 or empty is not learned (it only means «not now»)
+ await page.fill('#odItems [data-k="13"] [data-qty]','0');await page.press('#odItems [data-k="13"] [data-qty]','Tab');
+ await page.fill('#odItems [data-k="14"] [data-qty]','');await page.press('#odItems [data-k="14"] [data-qty]','Tab');
+ await page.waitForTimeout(300);
+ assert.equal((await rows()).length,2);
+ // a server without the table yet: the page still opens at the laptop's numbers
+ await page.evaluate(()=>{delete window.__tables.ar_order_qty;window.__fakeWrites=[]});
+ await page.evaluate(()=>window.AskerOrderDrafts.open());
+ await page.waitForSelector('#odChips [data-sup]');
+});

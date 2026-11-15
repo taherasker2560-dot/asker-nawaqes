@@ -284,10 +284,13 @@
     const items = orderItems(s, hiddenBy[id], sendTo[id] || id, carry[id]);
     return items === s.items ? s : { ...s, items };
   };
-  // ticks and quantities: every item of the order starts ticked at the laptop's quantity (also the carried ones)
+  // ticks and quantities: every item of the order starts ticked at the laptop's quantity (also the carried ones), or at the number he
+  // chose last time, blue (owner 2026-11-15: «تتعلم منها … تحط الارقام اللي انا بطلبها على طول»)
+  let learned = {};
+  const start = (i) => (learned[String(i.item_id)] ? { on: true, qty: String(learned[String(i.item_id)]), mine: true } : { on: true, qty: String(i.qty) });
   const state = (id) => {
     const st = sel[id] || (sel[id] = {}), s = effective(id);
-    for (const i of (s && s.items) || []) if (!st[String(i.item_id)]) st[String(i.item_id)] = { on: true, qty: String(i.qty) };
+    for (const i of (s && s.items) || []) if (!st[String(i.item_id)]) st[String(i.item_id)] = start(i);
     return st;
   };
   // hide what is already ordered today, from the file as the laptop wrote it
@@ -470,6 +473,14 @@
     if (error) throw error;
     return data || [];
   }
+  // the last number he chose for each item (ar_order_qty, migration 202611152300); no table yet = nothing learned
+  async function loadLearned() {
+    const { data, error } = await db().from('ar_order_qty').select('item_id,qty').range(0, 4999);
+    if (error) throw error;
+    const m = {};
+    for (const r of data || []) if (Number(r.qty) > 0) m[String(r.item_id)] = Number(r.qty);
+    return m;
+  }
   async function loadSaved() {
     const { data, error } = await db().from('ar_suppliers').select('name,phone').order('name');
     if (error) throw error;
@@ -499,7 +510,7 @@
         draw();
         return say('أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في خلال دقيقة أو اتنين.');
       }
-      [ordered, saved, pics] = await Promise.all([soft(loadOrdered(), []), soft(loadSaved(), []), soft(loadPics(), {})]);
+      [ordered, saved, pics, learned] = await Promise.all([soft(loadOrdered(), []), soft(loadSaved(), []), soft(loadPics(), {}), soft(loadLearned(), {})]);
       const hidden = reapply();
       say(hidden ? `${hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
       draw();
@@ -605,8 +616,16 @@
     if (editing) root.AskerQty?.ready($('odItems')); // the first quantity is ready: type a number, or Enter for the next one
   });
   // ticks and quantities (delegated: one listener for all the rows)
+  async function learn(k, raw) {
+    const q = qtyOf(raw), s = effective(current), it = s && s.items.find((x) => String(x.item_id) === k);
+    if (!q || !it || !db()) return;
+    if (learned[k] === q) return;
+    const { error } = await db().from('ar_order_qty').upsert({ item_id: Number(k), item_name: String(it.name_pf || '').slice(0, 250), qty: q, suggested: Math.max(0, Math.round(Number(it.qty) || 0)), supplier: String(current || '').slice(0, 40), updated_at: new Date().toISOString() }, { onConflict: 'item_id' });
+    if (!error) learned[k] = q;
+  }
   $('odItems')?.addEventListener('change', (e) => {
     const r = e.target.closest('[data-k]');
+    if (r && e.target.matches('[data-qty]')) { learn(r.dataset.k, e.target.value); return; }
     if (!r || !e.target.matches('[data-on]')) return;
     state(current)[r.dataset.k].on = e.target.checked;
     r.classList.toggle('off', !e.target.checked);
