@@ -137,7 +137,9 @@
   const qtyText = () => (root.AskerStockLib && root.AskerStockLib.qtyText) || null;
   let data = null, loading = null, loadedAt = 0, view = 'today', failed = '', bagSel = '';
   // «الحقائب»: his open moves (ar_bag_moves), the order he chose, the ticked items, the bag picked in «حوّل», the last moves (undo)
-  let moves = [], movesErr = '', sortKey = 'need', sortDir = -1, sheetTo = '', lastMoved = null, bagMsg = '';
+  // the order: by the real stock only (owner 11-15: «من رصيد الاصناف، الرصيد الموجود الفعلي … الكميات اللي مفيش منها فوق»),
+  // smallest first when a bag opens, a tap turns it to largest first and back
+  let moves = [], movesErr = '', sortKey = 'have', sortDir = 1, sheetTo = '', lastMoved = null, bagMsg = '';
   const picked = new Set();
 
   async function load(force) {
@@ -265,10 +267,8 @@
     const L = bagView().list;
     if (!L.some((b) => b.id === bagSel)) { bagSel = L.length ? L[0].id : ''; picked.clear(); }
     chips.innerHTML = L.map((b) => `<button type="button" data-bag="${esc(b.id)}"${bagSel === b.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(b.name)}</bdi> <b>${b.n}</b></button>`).join('');
-    const arrow = (k) => (sortKey === k ? (sortDir === -1 ? ' ▼' : ' ▲') : '');
     $('bgSort').innerHTML = L.length
-      ? '<span>رتّب:</span>' + [['need', 'الكمية المطلوبة'], ['have', 'عندك'], ['sold30', 'اتباع في شهر']]
-        .map(([k, t]) => `<button type="button" data-sort="${k}"${sortKey === k ? '' : ' class="secondary"'}><span>${t}</span>${arrow(k)}</button>`).join('')
+      ? `<span>رتّب:</span><button type="button" data-sort="have">${sortDir === 1 ? '<span>الرصيد: الأقل فوق</span> ▲' : '<span>الرصيد: الأكتر فوق</span> ▼'}</button>`
       : '';
     const b = L.find((x) => x.id === bagSel);
     const items = b ? sortItems(b.items, sortKey, sortDir) : [];
@@ -376,7 +376,7 @@
       const t = e.target;
       const chip = t.closest('[data-bag]'), sort = t.closest('[data-sort]'), dest = t.closest('[data-to]');
       if (chip) { bagSel = chip.dataset.bag; picked.clear(); lastMoved = null; drawBags(); return; }
-      if (sort) { const k = sort.dataset.sort; sortDir = sortKey === k ? -sortDir : -1; sortKey = k; drawBags(); return; }
+      if (sort) { sortKey = 'have'; sortDir = -sortDir; drawBags(); return; }
       if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
       if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
       const quick = t.closest('[data-quick]');

@@ -44,13 +44,14 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.match(await text(page,'#bgList'),/فارما مول 1 علّم الكل ZURCAL 40MG 14 TAB عندك 1 · اتباع في شهر 33 · المطلوب 16 آخر شرا 25\/10 · ناقص بقاله 8 يوم/);
  assert.equal(await page.$$eval('#bgList .al-item.late',r=>r.length),1,'the late item is red');
  assert.equal(await page.$eval('[data-tab="bags"]',b=>b.dataset.badge),'1','the small tab counts the late items');
- // the daily bag; the arrows: largest «المطلوب» first, again = smallest first, «عندك» = largest first
+ // the daily bag, ordered by the real stock: smallest first (none on top), a tap = largest first, again = smallest first
  await page.click('#bgChips [data-bag="2428"]');
  const order=()=>page.$$eval('#bgList .bg-it strong',s=>s.map(x=>x.textContent.trim()));
- assert.deepEqual(await order(),['DAILY ONE','DAILY TWO','DAILY THREE']);
- await page.click('#bgSort [data-sort="need"]');assert.deepEqual(await order(),['DAILY THREE','DAILY TWO','DAILY ONE']);
- await page.click('#bgSort [data-sort="have"]');assert.deepEqual(await order(),['DAILY TWO','DAILY THREE','DAILY ONE']);
- await page.click('#bgSort [data-sort="need"]');
+ assert.deepEqual(await order(),['DAILY ONE','DAILY THREE','DAILY TWO']);
+ assert.equal(await text(page,'#bgSort'),'رتّب: الرصيد: الأقل فوق ▲');
+ await page.click('#bgSort [data-sort]');assert.deepEqual(await order(),['DAILY TWO','DAILY THREE','DAILY ONE']);
+ assert.equal(await text(page,'#bgSort'),'رتّب: الرصيد: الأكتر فوق ▼');
+ await page.click('#bgSort [data-sort]');assert.deepEqual(await order(),['DAILY ONE','DAILY THREE','DAILY TWO']);
  // tick two, «حوّل» shows every other bag (where they are now greyed), pick «نواقص كل الشركات», move
  await page.click('#bgList [data-pick="11"]');await page.click('#bgList [data-pick="12"]');
  assert.equal((await page.textContent('#bgMoveBtn')).trim(),'⇄ حوّل (2)');
