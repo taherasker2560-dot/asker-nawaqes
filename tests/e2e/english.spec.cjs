@@ -24,7 +24,9 @@ run('English: the switch, every section in English, names and messages untouched
   tasks:{expiry_mix:[{id:1,name:'LAMIFEN CREAM 15GM',parts:1,today:2,n7:5,last:'2026-11-11T22:34:52',batches:[{store:1,exp:'2028-07-28',packs:2,units:0},{store:5,store_name:'مخزن انتظار ابن سينا',exp:'2028-09-28',packs:3,units:1}]},{id:2,name:'OLDER',parts:1,today:0,n7:1,last:'2026-11-08T10:00:00',batches:[]}],
    negative:[{id:3,name:'EZAPRIL-CO 72 TAB',parts:3,today:1,n7:1,last:'2026-11-11T18:52:00',batches:[{store:1,exp:'2029-07-28',packs:5,units:0}]}],expired_sold:[]},
   expiry:{expired:[{id:68195,name:'SOLONAL FACIAL WASH',parts:1,exp:'2026-06-28',packs:1,value:150,batches:[{store:1,exp:'2026-06-28',packs:1,units:0}]}],soon:[{id:9,name:'SOON ITEM',parts:1,exp:'2027-01-28',packs:2,value:200,batches:[{store:6,store_name:'مخزن انتظار فارما',exp:'2027-01-28',packs:2,units:0}]}]},
-  customers:{owing:781,owed:388218,prepaid:102,over:[{id:5,name:'CUSTOMER',balance:5400.25,limit:1000,over:4400.25,pct:540,last_at:'2026-11-11T11:17:08',last_kind:'sale'}],near:[{id:6,name:'NEAR',balance:9500,limit:10000,over:-500,pct:95,last_at:'2026-11-10T10:00:00',last_kind:'payment'}]}});
+  customers:{owing:781,owed:388218,prepaid:102,over:[{id:5,name:'CUSTOMER',balance:5400.25,limit:1000,over:4400.25,pct:540,last_at:'2026-11-11T11:17:08',last_kind:'sale'}],near:[{id:6,name:'NEAR',balance:9500,limit:10000,over:-500,pct:95,last_at:'2026-11-10T10:00:00',last_kind:'payment'}]},
+  // the other bags (2026-11-15): the bag's name stays as PharmaFly writes it
+  bags:{since:'2026-11-03',late_days:7,list:[{id:2274,name:'فارما مول',items:[{id:1,name:'ZURCAL 40MG',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:8},{id:2,name:'NEW ONE',have:0,sold30:0,min:2,need:1,last_buy:null,days:1}]}]}});
   window.__tables.ar_store_orders=[{id:1,status:'new'}];window.__tables.ar_documents=[{id:'d1',status:'new'}];});
  await page.evaluate(()=>window.AskerNotify.tick());
  const seen=new Map();
@@ -35,6 +37,7 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-group="purchases"]');await scan('shortages');
  await go('[data-tab="read"]');for(const s of ['manual','companies','today'])await go(`[data-sub="${s}"]`);await scan('read');
  await go('[data-tab="translate"]');await scan('translate');
+ await go('[data-tab="bags"]');await page.waitForTimeout(400);await scan('bags');
  await go('[data-pgroup="orders"]');for(const t of ['drafts','docs','suppliers']){await go(`[data-tab="${t}"]`);await page.waitForTimeout(400);await scan(t)}
  await go('[data-pgroup="stock"]');await go('[data-tab="stock"]');await page.fill('#stQ','BR');await page.waitForTimeout(300);await go('[data-tab="count"]');await scan('stock');
  await go('[data-tab="expiry"]');await page.waitForTimeout(400);for(const v of ['today','expired','soon']){await go(`[data-al-view="${v}"]`);await scan('expiry/'+v)}

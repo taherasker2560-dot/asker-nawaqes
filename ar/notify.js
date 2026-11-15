@@ -28,6 +28,8 @@
     { key: 'store', group: 'sales', tab: 'storeorders', sound: 'bell', title: 'طلب جديد من الموقع', body: (n) => `${n} طلب جديد من الموقع` },
     // «الرسايل» (ar/chat.js, owner 2026-11-13): customers waiting for an answer on our messages page
     { key: 'care', group: 'care', tab: 'care', sound: 'pop', title: 'رسالة جديدة من عميل', body: (n) => `${n} عميل مستني رد في الرسايل` },
+    // «الحقائب» (ar/alerts.js, owner 2026-11-15): rings when an item of the other bags passes 7 days short in a row
+    { key: 'bags', group: 'purchases', tab: 'bags', sound: 'ding', title: 'صنف ناقص من أكتر من 7 أيام', body: (n) => `${n} صنف في الحقائب التانية ناقصين من أكتر من 7 أيام` },
   ];
   // which numbers went up since the last time they were seen (the first time only remembers, it does not ring)
   function rises(prev, now) {
@@ -57,7 +59,7 @@
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const SEEN = 'asker-notify-seen', PICK = 'asker-notify-sounds', ON = 'asker-notify-on';
-  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء' };
+  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب' };
   let counts = {}, timer = null, ctx = null, busy = false;
 
   const picks = () => { try { return JSON.parse(read(PICK, '{}')) || {}; } catch (e) { return {}; } };
@@ -112,6 +114,8 @@
     if (store != null) out.store = store;
     if (care != null) out.care = care;
     if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
+    // the other bags: only the late items count here (the home card shows every bag's shortages anyway)
+    if (a && a.bags) out.bags = root.AskerAlertsLib ? root.AskerAlertsLib.lateBags(a) : 0;
     return out;
   }
   // the red numbers: bottom bar sections and their small tabs
@@ -138,7 +142,9 @@
     if (counts.store) rows.push({ tab: 'storeorders', n: counts.store, text: 'طلب جديد من الموقع' });
     for (const t of (root.AskerAlerts && root.AskerAlerts.todo()) || []) rows.push(t);
     $('todoCard')?.classList.toggle('hidden', !rows.length);
-    box.innerHTML = rows.map((r) => `<button type="button" class="todo-row" data-go="${esc(r.tab)}"${r.view ? ` data-view="${esc(r.view)}"` : ''}><b>${esc(r.n)}</b><span>${esc(r.text)}</span></button>`).join('');
+    // a bag's line: its name as written in PharmaFly (never translated), and its late note under it
+    box.innerHTML = rows.map((r) => `<button type="button" class="todo-row${r.late ? ' late' : ''}" data-go="${esc(r.tab)}"${r.view ? ` data-view="${esc(r.view)}"` : ''}><b>${esc(r.n)}</b>` +
+      `<span>${r.name ? `<span>${esc(r.text)}</span> <bdi class="notr">${esc(r.name)}</bdi>${r.note ? ` <small class="todo-note">${esc(r.note)}</small>` : ''}` : esc(r.text)}</span></button>`).join('');
   }
   async function notify(key) {
     const k = KINDS.find((x) => x.key === key);
