@@ -28,7 +28,7 @@ object Config {
      * phone's own voice above is the fallback when the server or the net is not there.
      */
     /** How sure the word model must be that it heard «آدم» (0..1); set over adb (SET_VOICE wakeconf=) while it is tuned to his voice. */
-    fun wakeConf(c: Context): Double = p(c).getFloat("wakeconf", 0.65f).toDouble()
+    fun wakeConf(c: Context): Double = p(c).getFloat("wakeconf", 0.55f).toDouble()
     fun saveWakeConf(c: Context, v: Float?) { if (v != null && v in 0.3f..0.99f) p(c).edit().putFloat("wakeconf", v).apply() }
 
     fun natural(c: Context): Boolean = p(c).getBoolean("natural", true)

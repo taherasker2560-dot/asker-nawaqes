@@ -65,9 +65,9 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
             rec.setWords(true)   // each word with its confidence
             val s = SpeechService(rec, 16000.0f)
             s.startListening(object : RecognitionListener {
-                // the half-heard guesses are NOT used any more (owner 2026-11-15: «بقى بيتكلم اصلا من غير ما اقول ادم»): they fire on
-                // any sound near «آدم» in a conversation
-                override fun onPartialResult(hypothesis: String?) {}
+                // a half-heard guess wakes only when it is «آدم» and NOTHING before it (the start of what he says: fast); «آدم» in the
+                // middle of a conversation never does (owner 2026-11-15: «بقى بيتكلم اصلا من غير ما اقول ادم»)
+                override fun onPartialResult(hypothesis: String?) = checkPartial(hypothesis)
                 override fun onResult(hypothesis: String?) = check(hypothesis)
                 override fun onFinalResult(hypothesis: String?) = check(hypothesis)
                 override fun onError(exception: Exception?) { log("wake word error: " + exception?.message) }
@@ -81,31 +81,39 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
         }
     }
 
+    /** The start of what he says is «آدم» (nothing before it): wake at once, without waiting for him to stop talking. */
+    private fun checkPartial(hypothesis: String?) {
+        if (fired || hypothesis == null) return
+        try {
+            val p = JSONObject(hypothesis).optString("partial", "").trim()
+            if (p == "adam" || p == "a dam") { log("wake (start of speech)"); fired = true; onWake() }
+        } catch (e: Exception) { }
+    }
+
     /**
-     * Wakes only on «آدم» said ON ITS OWN (a short pause before and after, the way he calls it), heard with good confidence.
-     * «آدم» inside a sentence (him talking to someone, or about Adam) or a doubtful sound is ignored and written to the log.
+     * After he stops talking: wakes on a short call where «آدم» is the first or the last word («آدم»، «يا آدم»، «آدم بقولك»: at most
+     * 3 words), heard with good confidence. «آدم» in the middle of a longer sentence (him talking to someone, or about Adam) or a
+     * doubtful sound is ignored and written to the log (seen 11-15: «يا آدم» was ignored by the first, too strict, version).
      */
     private fun check(hypothesis: String?) {
         if (fired || hypothesis == null) return
         try {
             val o = JSONObject(hypothesis)
-            val text = o.optString("text", "").trim()
-            if (text.isEmpty()) return
-            if (text != "adam" && text != "a dam") {
-                if (text.contains("adam")) log("wake ignored, inside a sentence: $text")
-                return
-            }
-            val words = o.optJSONArray("result")
+            val text = o.optString("text", "").trim().replace("a dam", "adam")
+            if (text.isEmpty() || !text.contains("adam")) return
+            val tokens = text.split(Regex("\\s+"))
+            val firstOrLast = tokens.first() == "adam" || tokens.last() == "adam"
+            if (tokens.size > 3 || !firstOrLast) { log("wake ignored, inside a sentence: $text"); return }
             var conf = 1.0
-            var dur = 0.0
-            if (words != null && words.length() > 0) {
-                var sum = 0.0
-                for (i in 0 until words.length()) sum += words.getJSONObject(i).optDouble("conf", 0.0)
-                conf = sum / words.length()
-                dur = words.getJSONObject(words.length() - 1).optDouble("end", 0.0) - words.getJSONObject(0).optDouble("start", 0.0)
+            val words = o.optJSONArray("result")
+            if (words != null) {
+                for (i in 0 until words.length()) {
+                    val w = words.getJSONObject(i)
+                    if (w.optString("word") == "adam" || w.optString("word") == "a") { conf = w.optDouble("conf", 0.0); break }
+                }
             }
-            if (conf < Config.wakeConf(ctx) || dur > 1.4) { log("wake ignored, conf %.2f, %.1f s".format(conf, dur)); return }
-            log("wake conf %.2f".format(conf))
+            if (conf < Config.wakeConf(ctx)) { log("wake ignored, conf %.2f: %s".format(conf, text)); return }
+            log("wake conf %.2f: %s".format(conf, text))
             fired = true
             onWake()
         } catch (e: Exception) { }
