@@ -129,12 +129,12 @@
       `<div class="cs-now"><span>الرصيد دلوقتي</span><b class="${cls(a.balance)}">${esc(money(a.balance))} ج</b></div>` +
       `<div class="cs-sum"><span>النهارده داخل <b class="pos">${esc(money(tin))}</b></span><span>خارج <b class="neg">${esc(money(tout))}</b></span></div>` +
       `<div class="chips cs-filters" role="group" aria-label="نوع الحركة">${FILTERS.map(([k, t]) => `<button type="button" class="chip${filter === k ? ' on' : ''}" data-cs-filter="${k}">${esc(t)}</button>`).join('')}</div>` +
-      (shown.length ? byDay(shown).map((g) => `<div class="cs-day"><h4>${esc(dayTitle(g.day))} <small class="${cls(g.net)}">${esc(signed(g.net))}</small></h4>` +
+      (shown.length ? byDay(shown).map((g) => `<div class="cs-day"><h4>${esc(dayTitle(g.day))} <small class="${cls(g.net)}"><bdi dir="ltr">${esc(signed(g.net))}</bdi></small></h4>` +
         g.moves.map((m) => {
           const l = label(m);
           return `<div class="cs-move"><span class="cs-t">${esc(clock(m.at))}</span><span class="cs-w"><b>${esc(l.word)}${l.who ? ' <bdi class="notr">' + esc(l.who) + '</bdi>' : ''}</b>` +
             (l.small ? `<small>${m.memo ? '<bdi class="notr">' + esc(l.small) + '</bdi>' : esc(l.small)}</small>` : '') + '</span>' +
-            `<span class="cs-a"><b class="${cls(m.amount)}">${esc(signed(m.amount))}</b><small>${esc(money(m.after))}</small></span></div>`;
+            `<span class="cs-a"><b class="${cls(m.amount)}"><bdi dir="ltr">${esc(signed(m.amount))}</bdi></b><small>${esc(money(m.after))}</small></span></div>`;
         }).join('') + '</div>').join('') : '<p class="hint">مفيش حركات بالنوع ده في آخر حركات الخزنة.</p>') +
       (moves.length >= 400 ? '<p class="hint">ده آخر 400 حركة بس.</p>' : '');
   }

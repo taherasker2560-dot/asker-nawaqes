@@ -2003,3 +2003,7 @@ html.night .cs-amt.pos, html.night .cs-now b.pos, html.night .cs-total b.pos, ht
 .cs-w small, .cs-a small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .cs-a { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .cs-a b { font-size: 15px; white-space: nowrap; }
+/* the 📌 never covers a tab: the small tabs are a little tighter so the row and the pin fit a phone (2026-11-15) */
+.subbar .chips, .subbar.chips { gap: 6px; }
+.subbar .chips .chip:not(.qa-pin), .subbar.chips .chip:not(.qa-pin) { padding-inline: 9px; font-size: 13.5px; }
+.subbar .chips .chip.qa-pin, .subbar.chips .chip.qa-pin { min-width: 36px; padding: 6px 8px; }
