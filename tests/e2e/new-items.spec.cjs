@@ -48,14 +48,31 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  assert.ok(await page.evaluate(()=>!!window.__tables.ar_new_items[0].approved_at));
  // the orders page lists it with its quantity, the form and a message to copy; «علّمهم اتطلبوا» marks it
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[]});window.__tables.ar_orders=[];window.__tables.ar_suppliers=[];window.__copied='';Object.defineProperty(navigator,'clipboard',{value:{writeText:async(t)=>{window.__copied=t}},configurable:true})});
+ // 2026-11-16: the laptop found it in two warehouses' lists (the «new_items» block of drafts.json): grouped under the best discount, its own message
+ await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[],new_items:[{key:'ZETAPRO 5MG SYRUP',name_en:'Zetapro 5mg syrup',qty:3,price:90,form:'شراب',best:'REDA',offers:[
+  {supplier:'REDA',label:'رضا عطية',name:'زيتابرو شراب',price:90,discount:27,date:'2026-11-07',fresh:true,strength:'strong'},
+  {supplier:'NEWCITY',label:'نيو سيتي',name:'زيتابرو ٥ مجم شراب',price:90,discount:24.5,date:'2026-11-08',fresh:true,strength:'strong'}]}]})});
  await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
  await page.waitForSelector('#odNewBox:not(.hidden)');
+ await page.waitForFunction(()=>!!document.querySelector('#odNewList [data-new-group="REDA"]'));
  assert.match(await page.textContent('#odNewTitle'),/أصناف جديدة في أمر الشراء \(1\)/);
- assert.match(await page.textContent('#odNewList'),/Zetapro 5mg syrup.*زيتابرو.*شراب.*× 3.*≈ 90 ج/);
- await page.click('#odNewCopy');
+ assert.equal(await page.$$eval('#odNewList [data-new-group]',g=>g.length),1,'one group: the best warehouse');
+ assert.match(await page.textContent('#odNewList [data-new-group="REDA"] h4'),/رضا عطية/);
+ assert.match(await page.textContent('#odNewList'),/Zetapro 5mg syrup.*زيتابرو.*شراب.*× 3.*≈ 90 ج.*في قايمتهم: زيتابرو شراب 90 ج خصم 27% وكمان عند: نيو سيتي 24\.5%/);
+ assert.equal((await page.textContent('#odNewList [data-new-copy="REDA"]')).trim(),'انسخ رسالة رضا عطية');
+ await page.click('#odNewList [data-new-copy="REDA"]');
+ await page.waitForFunction(()=>/Zetapro 5mg syrup/.test(window.__copied));
+ assert.equal(await page.evaluate(()=>window.__copied),'السلام عليكم\nمحتاج الأصناف دي:\n• زيتابرو شراب (Zetapro 5mg syrup) × 3\nشكرًا','the warehouse\'s own name and the English one in brackets');
+ // not in any list (the block is gone): the plain card, a plain message, he picks the supplier
+ await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[]});window.__copied=''});
+ await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForFunction(()=>!!document.querySelector('#odNewList [data-new-group=""]'));
+ assert.match(await page.textContent('#odNewList'),/Zetapro 5mg syrup.*زيتابرو.*شراب.*× 3.*≈ 90 ج.*مش لاقيه في قوايم المخازن/);
+ assert.equal(await page.$('#odNewList h4'),null,'no warehouse heading');
+ await page.click('#odNewList [data-new-copy=""]');
  await page.waitForFunction(()=>/Zetapro 5mg syrup × 3/.test(window.__copied));
  assert.equal(await page.evaluate(()=>window.__copied),'السلام عليكم\nمحتاج الأصناف دي:\n• Zetapro 5mg syrup × 3\nشكرًا');
- await page.click('#odNewMark');
+ await page.click('#odNewList [data-new-mark=""]');
  await page.waitForFunction(()=>window.__tables.ar_new_items[0].status==='ordered');
  assert.ok(await page.evaluate(()=>document.getElementById('odNewBox').classList.contains('hidden')),'no longer waiting in the order');
  await page.click('[data-pgroup="short"]');await page.click('[data-tab="short"]');
