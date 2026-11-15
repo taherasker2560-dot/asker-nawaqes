@@ -255,7 +255,10 @@
       (inPo ? ` <span class="bg-po-tag">🛒 في أمر الشرا</span>` : '') +
       `<div class="bg-line">${esc(line)}</div>` +
       `<div class="hint">${x.last_buy ? `<span>${esc('آخر شرا ' + dayText(x.last_buy, ref))}</span>` : '<span>ما اتشراش قبل كده</span>'} · <span class="${late ? 'al-late' : ''}">${esc(since)}</span>` +
-      (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div></div></label>';
+      (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div>' +
+      // a card with nearly the same name that HAS stock (the laptop finds it, owner 11-15: «لازم تشاورني فيها الأول»)
+      (x.dup && x.dup.name ? `<div class="bg-dup">⚠️ <span>ممكن نفس الصنف:</span> <bdi class="notr" dir="auto">${esc(x.dup.name)}</bdi> <span>${esc(`عندك منه ${num(x.dup.have)}`)}</span></div>` : '') +
+      '</div></label>';
   }
   const bagView = () => applyMoves(data && data.bags, moves);
   // the bags as drawn: without what is in the purchase order, unless «اعرضهم»

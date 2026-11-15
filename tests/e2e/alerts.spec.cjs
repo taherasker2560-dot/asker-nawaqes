@@ -17,7 +17,7 @@ const file=()=>({generated_at:new Date().toISOString(),data_at:'2026-11-11T23:59
   {id:'2428',name:'نواقص يوميه',home:false,items:[{id:11,name:'DAILY ONE',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:3},{id:12,name:'DAILY TWO',have:9,sold30:30,min:0,need:6,last_buy:'2026-10-25',days:1},{id:13,name:'DAILY THREE',have:5,sold30:10,min:0,need:2,last_buy:null,days:1}]},
   {id:'pv',name:'نواقص كل الشركات',home:false,items:[{id:21,name:'POSTPONED ONE',have:4,sold30:32,min:0,need:12,last_buy:'2026-10-30',days:1}]},
   {id:'2274',name:'فارما مول',home:true,items:[{id:62386,name:'ZURCAL 40MG 14 TAB',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:8,since:'2026-11-04'}]},
-  {id:'2576',name:'zad pharma',home:true,items:[{id:66288,name:'ECLATREM FIRMING CREAM',have:1,sold30:0,min:1,need:1,last_buy:'2025-11-02',days:1,since:'2026-11-11'},{id:3,name:'NEVER BOUGHT',have:0,sold30:2,min:0,need:1,last_buy:null,days:2,since:'2026-11-10'}]}]},
+  {id:'2576',name:'zad pharma',home:true,items:[{id:66288,name:'ECLATREM FIRMING CREAM',have:1,sold30:0,min:1,need:1,last_buy:'2025-11-02',days:1,since:'2026-11-11'},{id:3,name:'NEVER BOUGHT',have:0,sold30:2,min:0,need:1,last_buy:null,days:2,since:'2026-11-10',dup:{id:4,name:'NEVER BOUGHT BIG',have:5}}]}]},
  counts:{}});
 run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',async({page})=>{
  await page.evaluate((o)=>{window.__storage['alerts/alerts.json']=JSON.stringify(o);window.__tables.ar_store_orders=[{id:1,status:'new'},{id:2,status:'done'}];window.__tables.ar_documents=[{id:'d1',status:'new'}];},file());
@@ -41,7 +41,7 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.deepEqual(await chips(),[['نواقص يوميه 3',true],['نواقص كل الشركات 1',true],['IBN SINA 1 0',true],['فارما مول 1',true],['zad pharma 2',false],['نقدى 0',true]],'every bag even an empty one, «كل الشركات» as one, not the general shortages');
  const bagText=await text(page,'#bgList');
  assert.match(bagText,/ECLATREM FIRMING CREAM عندك 1 · الحد الأدنى 1 · اتباع في شهر 0 · المطلوب 1 آخر شرا 02\/11\/2025 · ناقص من النهارده/);
- assert.match(bagText,/NEVER BOUGHT عندك 0 · اتباع في شهر 2 · المطلوب 1 ما اتشراش قبل كده · ناقص بقاله 2 يوم/);
+ assert.match(bagText,/NEVER BOUGHT عندك 0 · اتباع في شهر 2 · المطلوب 1 ما اتشراش قبل كده · ناقص بقاله 2 يوم ⚠️ ممكن نفس الصنف: NEVER BOUGHT BIG عندك منه 5/,'a card with the same name and stock is pointed out');
  assert.doesNotMatch(bagText,/ZURCAL/,'only the chosen bag');
  await openBag('2274');
  assert.equal(await page.$$eval('#bgList .bg-bag.open',b=>b.length),1,'one bag open at a time');
