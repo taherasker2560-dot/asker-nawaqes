@@ -225,7 +225,7 @@
   const GROUP_OF = {
     home: 'home',
     short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
-    customers: 'accounts', vendors: 'accounts', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
+    customers: 'accounts', vendors: 'accounts', ops: 'accounts', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
   };
   const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
@@ -285,6 +285,9 @@
     $('salesPanel')?.classList.toggle('hidden', tab !== 'sales');
     // «حركة البيع» (ar/sales.js, owner 2026-11-14): one year of sales
     if (tab === 'sales') window.AskerSales?.open();
+    // «العمليات» (ar/ops.js, owner 2026-11-15): what Adam recorded by voice
+    $('opsPanel')?.classList.toggle('hidden', tab !== 'ops');
+    if (tab === 'ops') window.AskerOps?.open();
   }
   document.querySelectorAll('.subbar [data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
   document.querySelectorAll('[data-group]').forEach((b) => (b.onclick = () => showTab(lastTab[b.dataset.group])));
