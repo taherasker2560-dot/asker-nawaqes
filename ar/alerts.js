@@ -145,6 +145,10 @@
   // what is in the purchase order leaves the bags (owner 11-15: «طالما راحت أمر شراء يبقى ما تظهرش في الحقائب عشان ما تعمليش
   // دوشة»); «اعرضهم» shows them again, to take one out of the order
   let showPo = false;
+  // his answers to «⚠️ ممكن نفس الصنف» (ar_item_dups, owner 11-15 «الحل فين؟»): 'same' = a duplicate card, it leaves the bags and
+  // waits in «مكررات تتشال من نواقص فارمافلاي»; 'different' = the warning goes away for that card. dupOk = the last answer (undo)
+  let dups = [], dupOk = null;
+  const dupOf = (id) => dups.find((d) => String(d.item_id) === String(id));
   const picked = new Set();
 
   async function load(force) {
@@ -256,17 +260,23 @@
       `<div class="bg-line">${esc(line)}</div>` +
       `<div class="hint">${x.last_buy ? `<span>${esc('آخر شرا ' + dayText(x.last_buy, ref))}</span>` : '<span>ما اتشراش قبل كده</span>'} · <span class="${late ? 'al-late' : ''}">${esc(since)}</span>` +
       (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div>' +
-      // a card with nearly the same name that HAS stock (the laptop finds it, owner 11-15: «لازم تشاورني فيها الأول»)
-      (x.dup && x.dup.name ? `<div class="bg-dup">⚠️ <span>ممكن نفس الصنف:</span> <bdi class="notr" dir="auto">${esc(x.dup.name)}</bdi> <span>${esc(`عندك منه ${num(x.dup.have)}`)}</span></div>` : '') +
+      // a card with nearly the same name that HAS stock (the laptop finds it, owner 11-15: «لازم تشاورني فيها الأول»), with his two
+      // answers; answered «صنف تاني» = no warning any more
+      (x.dup && x.dup.name && !dupOf(x.id)
+        ? `<div class="bg-dup">⚠️ <span>ممكن نفس الصنف:</span> <bdi class="notr" dir="auto">${esc(x.dup.name)}</bdi> <span>${esc(`عندك منه ${num(x.dup.have)}`)}</span>` +
+          `<span class="bg-dup-btns"><button type="button" class="small bg-dup-same" data-dup-same="${esc(k)}">✔ نفس الصنف</button><button type="button" class="small secondary" data-dup-diff="${esc(k)}">✖ صنف تاني</button></span></div>`
+        : '') +
       '</div></label>';
   }
   const bagView = () => applyMoves(data && data.bags, moves);
   // the bags as drawn: without what is in the purchase order, unless «اعرضهم»
   function visibleBags() {
     const poIds = new Set(po.map((p) => String(p.item_id)));
+    // a card answered «نفس الصنف» is a duplicate: never shown in the bags
+    const same = new Set(dups.filter((d) => d.decision === 'same').map((d) => String(d.item_id)));
     return bagView().list.map((b) => {
-      if (showPo || !poIds.size) return b;
-      const items = b.items.filter((i) => !poIds.has(String(i.id)));
+      if ((showPo || !poIds.size) && !same.size) return b;
+      const items = b.items.filter((i) => !same.has(String(i.id)) && (showPo || !poIds.has(String(i.id))));
       return { ...b, items, n: items.length };
     });
   }
@@ -315,6 +325,8 @@
       (lastMoved ? `<div class="bg-toast">✅ <span>${esc(`اتحوّل ${lastMoved.ids.length} صنف لـ`)}</span> <bdi class="notr">${esc(lastMoved.name)}</bdi> <button type="button" class="small secondary" data-undo>تراجع</button></div>` : '') +
       (bagMsg ? `<p class="status bad">${esc(bagMsg)}</p>` : '') +
       (poOk ? `<div class="bg-toast">${esc(poOk)}</div>` : '') +
+      (dupOk ? `<div class="bg-toast">✅ <bdi class="notr" dir="auto">${esc(dupOk.name)}</bdi> <span>${dupOk.decision === 'same' ? 'اتعلّم مكرر: اتشال من الحقائب وأمر الشرا' : 'صنف تاني: التحذير اتشال، وبيدخل أمر الشرا لو رصيده صفر'}</span> <button type="button" class="small secondary" data-dup-undo="${esc(dupOk.id)}">تراجع</button></div>` : '') +
+      dupsList() +
       (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>${showPo ? 'ظاهرين في الحقائب.' : 'مش ظاهرين في الحقائب.'}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button> <button type="button" class="small secondary" data-show-po>${showPo ? 'خبّيهم' : 'اعرضهم'}</button></div>` : '') +
       (tabs.length
         ? tabs.map((t) => `<div class="bg-bag${t.id === bagSel ? ' open' : ''}"><button type="button" class="bg-bag-h" data-bag="${esc(t.id)}" aria-expanded="${t.id === bagSel}">` +
@@ -367,6 +379,54 @@
       }
     } catch (e) { movesErr = 'التحويلات مش متاحة دلوقتي: ' + ((e && e.message) || e); }
   }
+  // «🗂 مكررات تتشال من نواقص فارمافلاي»: the cards he answered «نفس الصنف», until the copy shows them out of the shortages
+  function dupsList() {
+    const same = dups.filter((d) => d.decision === 'same');
+    if (!same.length) return '';
+    const bagName = (id) => ((data && data.bags && data.bags.all) || []).find((b) => b.id === String(id || '')) || null;
+    return `<details class="bg-dups" open><summary>${esc(`🗂 مكررات تتشال من نواقص فارمافلاي (${same.length})`)}</summary>` +
+      same.map((d) => `<div class="bg-dups-row"><strong class="notr" dir="auto">${esc(d.item_name || '#' + d.item_id)}</strong>` +
+        (bagName(d.bag) ? ` <small>(<bdi class="notr">${esc(bagName(d.bag).name)}</bdi>)</small>` : '') +
+        `<div><span>نفس:</span> <bdi class="notr" dir="auto">${esc(d.other_name || '#' + d.other_id)}</bdi> · <span class="bg-pend">⏳ لسه في فارمافلاي</span> ` +
+        `<button type="button" class="small secondary" data-dup-undo="${esc(d.id)}">تراجع</button></div></div>`).join('') + '</details>';
+  }
+  // his answers; a «نفس الصنف» card the laptop's copy no longer shows short anywhere is done (he took it out in PharmaFly)
+  async function loadDups() {
+    if (!db()) return;
+    try {
+      const { data: rows, error } = await db().from('ar_item_dups').select('id,item_id,item_name,other_id,other_name,bag,decision,status').eq('status', 'open').order('created_at');
+      dups = error ? [] : rows || [];
+      const shortNow = new Set();
+      for (const b of (data && data.bags && data.bags.list) || []) for (const i of b.items) shortNow.add(String(i.id));
+      const gone = data && data.bags ? dups.filter((d) => d.decision === 'same' && !shortNow.has(String(d.item_id))).map((d) => d.id) : [];
+      if (gone.length) {
+        await db().from('ar_item_dups').update({ status: 'done', done_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in('id', gone);
+        dups = dups.filter((d) => !gone.includes(d.id));
+      }
+    } catch (e) { dups = []; }
+  }
+  // «✔ نفس الصنف» / «✖ صنف تاني» on a card's warning; «نفس الصنف» also takes it out of the purchase order
+  async function answerDup(itemId, decision) {
+    let item = null, bag = '';
+    for (const b of bagView().list) { const i = b.items.find((x) => String(x.id) === String(itemId)); if (i) { item = i; bag = b.id; break; } }
+    if (!item || !item.dup) return;
+    bagMsg = ''; poOk = ''; lastMoved = null;
+    const row = { item_id: Number(item.id), item_name: String(item.name || '').slice(0, 200), other_id: Number(item.dup.id), other_name: String(item.dup.name || '').slice(0, 200), bag: /^(pv|gs|\d{1,12})$/.test(bag) ? bag : null, decision, status: 'open' };
+    const r = await db().from('ar_item_dups').insert(row).select('id');
+    if (r.error) { bagMsg = 'القرار ما اتسجلش: ' + (r.error.message || r.error); drawBags(); return; }
+    dupOk = { id: ((r.data || [])[0] || {}).id, name: row.item_name, decision };
+    if (decision === 'same') {
+      const inPo = po.filter((p) => String(p.item_id) === String(itemId)).map((p) => p.id);
+      if (inPo.length) await db().from('ar_po_items').update({ status: 'cancelled', updated_at: new Date().toISOString() }).in('id', inPo);
+    }
+    picked.delete(String(itemId));
+    await loadDups(); await loadPo(); drawBags();
+  }
+  async function undoDup(id) {
+    if (id) await db().from('ar_item_dups').update({ status: 'cancelled', updated_at: new Date().toISOString() }).in('id', [Number(id) || id]);
+    dupOk = null;
+    await loadDups(); drawBags();
+  }
   // his purchase order: the open lines
   async function loadPo() {
     if (!db()) return;
@@ -375,7 +435,7 @@
       po = error ? [] : rows || [];
     } catch (e) { po = []; }
   }
-  async function openBags() { await load(false); await loadMoves(); await loadPo(); drawBags(); }
+  async function openBags() { await load(false); await loadMoves(); await loadPo(); await loadDups(); drawBags(); }
   // «🛒 أمر شراء»: the ticked items not in the order yet go in, each with what PharmaFly says is needed (at least 1)
   async function addPo() {
     const L = bagView().list, b = L.find((x) => x.id === bagSel);
@@ -484,6 +544,11 @@
       if (t.closest('#bgPoDrop')) { dropPo(); return; }
       if (t.closest('[data-open-drafts]')) { root.AskerApp?.showTab?.('drafts'); return; }
       if (t.closest('[data-show-po]')) { showPo = !showPo; picked.clear(); drawBags(); return; }
+      const same = t.closest('[data-dup-same]'), diff = t.closest('[data-dup-diff]'), undo = t.closest('[data-dup-undo]');
+      if (same || diff || undo) e.preventDefault(); // the buttons sit inside the item's label: never tick it
+      if (same) { answerDup(same.dataset.dupSame, 'same'); return; }
+      if (diff) { answerDup(diff.dataset.dupDiff, 'different'); return; }
+      if (undo) { undoDup(undo.dataset.dupUndo); return; }
       if (t.closest('[data-undo]')) { undoMove(); }
     });
     panel?.addEventListener('change', (e) => {

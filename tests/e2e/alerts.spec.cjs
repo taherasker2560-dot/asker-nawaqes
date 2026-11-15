@@ -43,6 +43,23 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.match(bagText,/ECLATREM FIRMING CREAM عندك 1 · الحد الأدنى 1 · اتباع في شهر 0 · المطلوب 1 آخر شرا 02\/11\/2025 · ناقص من النهارده/);
  assert.match(bagText,/NEVER BOUGHT عندك 0 · اتباع في شهر 2 · المطلوب 1 ما اتشراش قبل كده · ناقص بقاله 2 يوم ⚠️ ممكن نفس الصنف: NEVER BOUGHT BIG عندك منه 5/,'a card with the same name and stock is pointed out');
  assert.doesNotMatch(bagText,/ZURCAL/,'only the chosen bag');
+ // his two answers to the warning (owner 11-15 «الحل فين؟»): «✖ صنف تاني» = the warning goes away; undo brings it back
+ await page.click('#bgList [data-dup-diff="3"]');
+ await page.waitForFunction(()=>/صنف تاني: التحذير اتشال/.test(document.getElementById('bgList').textContent));
+ assert.doesNotMatch(await text(page,'#bgList .bg-bag.open'),/ممكن نفس الصنف/);
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_item_dups.map(d=>[d.item_id,d.other_id,d.bag,d.decision,d.status])),[[3,4,'2576','different','open']]);
+ assert.equal(await page.$eval('#bgList [data-pick="3"]',b=>b.checked),false,'the button did not tick the item');
+ await page.click('#bgList [data-dup-undo]');
+ await page.waitForFunction(()=>/ممكن نفس الصنف/.test(document.getElementById('bgList').textContent));
+ // «✔ نفس الصنف» = a duplicate card: it leaves the bag and waits in the list of duplicates to take out of PharmaFly
+ await page.click('#bgList [data-dup-same="3"]');
+ await page.waitForFunction(()=>/مكررات تتشال من نواقص فارمافلاي \(1\)/.test(document.getElementById('bgList').textContent));
+ assert.match(await text(page,'#bgList .bg-dups'),/NEVER BOUGHT \(zad pharma\) نفس: NEVER BOUGHT BIG · ⏳ لسه في فارمافلاي/);
+ assert.match(await text(page,'#bgList'),/zad pharma 1/,'out of its bag');
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_item_dups.map(d=>[d.decision,d.status])),[['different','cancelled'],['same','open']]);
+ await page.click('#bgList .bg-dups [data-dup-undo]');
+ await page.waitForFunction(()=>/zad pharma\s*2/.test(document.getElementById('bgList').textContent));
+ assert.equal(await page.$('#bgList .bg-dups'),null);
  await openBag('2274');
  assert.equal(await page.$$eval('#bgList .bg-bag.open',b=>b.length),1,'one bag open at a time');
  assert.match(await text(page,'#bgList'),/فارما مول 1 رتّب: الرصيد: الأقل فوق ▲ المتوسط: الأكتر فوق علّم الكل ZURCAL 40MG 14 TAB عندك 1 · اتباع في شهر 33 · المطلوب 16 آخر شرا 25\/10 · ناقص بقاله 8 يوم/);
@@ -150,7 +167,7 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.equal(await page.$eval('[data-group="sales"]',b=>b.dataset.badge),'2');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-notify-seen')).store),2);
  // nothing else was written to the server (only his moves between bags)
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items/.test(JSON.stringify(w)))),[]);
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items|ar_item_dups/.test(JSON.stringify(w)))),[]);
 },{home:true});
 run('alerts: no file yet',async({page})=>{
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');
