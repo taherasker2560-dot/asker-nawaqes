@@ -54,6 +54,39 @@ class ControlReceiver : BroadcastReceiver() {
                     resultData = "saying"
                 } else resultData = "adam is not running"
             }
+            // TTS_TEST text | b64: speaks the sentence THROUGH THE ENGINE «آدم» (the way a Tasker Say step with that engine does) and
+            // answers done / error / timeout; proves the engine works without touching Tasker
+            "com.askerpharmacy.adam.TTS_TEST" -> {
+                var t = intent.getStringExtra("text")?.trim() ?: ""
+                val b = intent.getStringExtra("b64")
+                if (!b.isNullOrEmpty()) {
+                    try { t = String(Base64.decode(b, Base64.DEFAULT), Charsets.UTF_8).trim() } catch (e: Exception) { }
+                }
+                if (t.isEmpty()) { resultData = "no text"; return }
+                val pending = goAsync()
+                val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+                var engine: android.speech.tts.TextToSpeech? = null
+                val finish = { msg: String ->
+                    if (finished.compareAndSet(false, true)) {
+                        pending.resultData = msg
+                        try { engine?.shutdown() } catch (e: Throwable) { }
+                        pending.finish()
+                    }
+                }
+                engine = android.speech.tts.TextToSpeech(context.applicationContext, { status ->
+                    val e = engine
+                    if (status != android.speech.tts.TextToSpeech.SUCCESS || e == null) { finish("init failed $status") } else {
+                        e.setLanguage(java.util.Locale("ar", "EG"))
+                        e.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                            override fun onStart(utteranceId: String?) {}
+                            override fun onDone(utteranceId: String?) { finish("done (engine " + e.defaultEngine + ")") }
+                            override fun onError(utteranceId: String?) { finish("error") }
+                        })
+                        e.speak(t, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "t")
+                    }
+                }, "com.askerpharmacy.adam")
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ finish("timeout") }, 9000)
+            }
             "com.askerpharmacy.adam.STOP" -> {
                 if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_STOP))
                 resultData = "stopping"

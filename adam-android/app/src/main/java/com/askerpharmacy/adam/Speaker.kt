@@ -19,7 +19,9 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
     private val waiting = HashMap<String, () -> Unit>()
 
     init {
-        tts = TextToSpeech(app) { status ->
+        // the phone's own voice is Google's engine, whatever the default engine is (Adam's own engine «آدم» must never be its own fallback)
+        val engine = try { app.packageManager.getPackageInfo("com.google.android.tts", 0); "com.google.android.tts" } catch (e: Throwable) { null }
+        tts = TextToSpeech(app, { status ->
             val t = tts
             if (status == TextToSpeech.SUCCESS && t != null) {
                 var r = t.setLanguage(Locale("ar", "EG"))
@@ -41,7 +43,7 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
             } else {
                 log("voice failed to start")
             }
-        }
+        }, engine)
     }
 
     /** Puts the chosen voice, pitch and speed (Config) on the engine. A voice that is not on the phone is ignored. */

@@ -59,6 +59,21 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Adam's natural voice as a text-to-speech ENGINE: a Tasker «Say» step set to Engine «آدم» (the bot's announcements) speaks with it.
+             It is not the phone's default engine and must not be made one (the rest of the phone keeps Google's voice). -->
+        <service
+            android:name=".AdamTtsService"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.TTS_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech.tts"
+                android:resource="@xml/tts_engine" />
+        </service>
+
         <!-- from the laptop over adb only (it holds the DUMP permission; no other app does): the settings, a typed question, the status -->
         <receiver
             android:name=".ControlReceiver"
@@ -71,6 +86,7 @@
                 <action android:name="com.askerpharmacy.adam.SET_VOICE" />
                 <action android:name="com.askerpharmacy.adam.VOICES" />
                 <action android:name="com.askerpharmacy.adam.SAY" />
+                <action android:name="com.askerpharmacy.adam.TTS_TEST" />
             </intent-filter>
         </receiver>
 
