@@ -2104,6 +2104,52 @@ html.night .od-new { background: #3a2c12; border-color: #b9873a; }
 .bg-po-done li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 5px 0; border-top: 1px dashed #cfe3d4; }
 html.night .bg-po-done { background: #14301f; border-color: #2f6b45; }
 html.night .bg-po-done summary { color: #7fd69b; }
+
+/* ---------- «طلب الجهاز × طلب البوت» (owner 2026-11-16): ar/order-compare.js, the file orders/compare.json ---------- */
+.cmp { margin: 10px 0; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: var(--sh-1); }
+.cmp.hidden, .cmp .hidden { display: none; }
+.cmp h3 { margin: 0 0 4px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cmp h3 small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.cmp-three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
+.cmp-n { border-radius: 12px; padding: 9px 4px; text-align: center; font-size: 12px; font-weight: 700; line-height: 1.5; }
+.cmp-n b { display: block; font-size: 24px; }
+.cmp-n.g { background: #e8f6ec; color: #166534; }
+.cmp-n.o { background: #fff4e5; color: #9a3412; }
+.cmp-n.b { background: #e8f0fb; color: #0a4aa6; }
+.cmp-big { margin: 12px 2px 2px; font-size: 18px; font-weight: 800; color: #166534; }
+.cmp-bars { display: flex; gap: 6px; align-items: flex-end; height: 100px; margin: 10px 2px 2px; }
+.cmp-bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 11px; font-weight: 400; box-shadow: none; margin: 0; cursor: pointer; }
+.cmp-bar.e { cursor: default; }
+.cmp-bar i { display: block; width: 100%; border-radius: 6px 6px 0 0; background: #c9d6ea; max-height: 62px; }
+.cmp-bar.on i { background: var(--crimson, #0a4aa6); }
+.cmp-bar.e i { background: #e5e7eb; }
+.cmp-bar.on span { color: var(--ink); font-weight: 700; }
+.cmp-week { background: #f1f5fb; border-radius: 12px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+.cmp-grp { margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; background: var(--card); }
+.cmp-grp summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 0; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+.cmp-grp summary b { font-size: 15px; }
+.cmp-grp.om[open] { background: #fff9f0; border-color: #f0c48a; }
+.cmp-list { padding-bottom: 6px; }
+.cmp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 12.5px; }
+.cmp-row strong { font-size: 12.5px; }
+.cmp-qty { color: var(--muted); }
+.cmp-why { font-size: 11.5px; border-radius: 10px; padding: 2px 8px; background: #fff4e5; color: #9a3412; }
+.cmp-why.red { background: #fde8e8; color: #b42318; font-weight: 700; }
+.cmp-why.own { background: #e8f0fb; color: #0a4aa6; }
+.cmp-why.gray { background: #eef0f4; color: #4b5563; }
+html.night .cmp-n.g { background: #14301f; color: #7fd69b; }
+html.night .cmp-n.o { background: #3a2c12; color: #f0c48a; }
+html.night .cmp-n.b { background: #12305e; color: #cfe3ff; }
+html.night .cmp-big { color: #7fd69b; }
+html.night .cmp-bar i { background: #3b4863; }
+html.night .cmp-bar.on i { background: #5a9bff; }
+html.night .cmp-bar.e i { background: #2a3142; }
+html.night .cmp-week { background: #1c2536; }
+html.night .cmp-grp.om[open] { background: #3a2c12; border-color: #b9873a; }
+html.night .cmp-why { background: #3a2c12; color: #f0c48a; }
+html.night .cmp-why.red { background: #4a1d22; color: #ff9aa6; }
+html.night .cmp-why.own { background: #12305e; color: #cfe3ff; }
+html.night .cmp-why.gray { background: #2a3142; color: #c3cad8; }
 /* the new products grouped by the warehouse that lists them (2026-11-16, Hub\orders\NEW_ITEM_OFFERS.ps1) */
 .od-new-group { margin: 8px 0 12px; padding-top: 6px; border-top: 1px solid var(--line); }
 .od-new-group:first-of-type { border-top: 0; padding-top: 0; }
