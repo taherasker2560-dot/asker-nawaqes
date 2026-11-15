@@ -202,6 +202,7 @@ class AdamService : Service() {
         notHeardOnce = false
         collecting = false
         dictation.setLength(0)
+        walk = null
         setState("idle")
         if (!wake.start()) {
             log("wake word did not start, again in 5 s")
@@ -365,6 +366,8 @@ class AdamService : Service() {
         if (current == id) current = 0
         if (!interactive && state != "idle") return
         setState("speaking")
+        val walkObj = if (interactive) reply.optJSONObject("walk") else null
+        if (walkObj != null) { startWalk(id, walkObj); return }
         if (confirm != null) {
             pendingConfirm = id
             askedConfirmAgain = false
@@ -372,6 +375,107 @@ class AdamService : Service() {
         } else {
             speaker.say(speak) { if (interactive && reply.optBoolean("listen_again")) beginRequestListening() else goIdle() }
         }
+    }
+
+    // ---------- a list read item by item (owner 2026-11-15: «افتح حقيبة النواقص اليومية … يقرا لي الاصناف وانا اقول له ايوه او لا») ----------
+    // The laptop sends the whole list once (reply.walk); the phone reads it here without going back to the laptop between items:
+    //   read: the items in groups of 6, «أكمّل؟» between groups;
+    //   pick: one item, then «أيوه / لا / خلاص / كرر»; at the end «هحوّل 7 صنف … أكمّل؟» and only his «أيوه» sends the chosen items
+    //         (as «pick:12,45,…», the answer to the proposal) - the laptop records only those, and only ones it proposed.
+    private var walk: JSONObject? = null
+    private var walkReq = 0L
+    private var walkIdx = 0
+    private var walkRetry = false
+    private val walkPicked = ArrayList<Long>()
+
+    private fun startWalk(id: Long, w: JSONObject) {
+        walk = w; walkReq = id; walkIdx = 0; walkRetry = false; walkPicked.clear()
+        log("walk " + w.optString("mode") + ": " + (w.optJSONArray("items")?.length() ?: 0) + " items")
+        speaker.say(w.optString("intro")) { if (alive) walkNext() }
+    }
+
+    private fun walkItems(): org.json.JSONArray? = walk?.optJSONArray("items")
+
+    private fun walkNext() {
+        val w = walk ?: return goIdle()
+        val items = walkItems() ?: return walkEnd()
+        if (walkIdx >= items.length()) return walkEnd()
+        setState("speaking", "بيقرا " + (walkIdx + 1) + " من " + items.length())
+        if (w.optString("mode") == "read") {
+            val sb = StringBuilder()
+            var n = 0
+            while (walkIdx < items.length() && n < 6) { sb.append(items.getJSONObject(walkIdx).optString("say")).append(". "); walkIdx++; n++ }
+            speaker.say(sb.toString()) { if (!alive) return@say; if (walkIdx < items.length()) walkAskMore() else walkEnd() }
+        } else {
+            val it = items.getJSONObject(walkIdx)
+            speaker.say(it.optString("say") + ". " + w.optString("ask", "أيوه ولا لا؟")) { if (alive) walkListen() }
+        }
+    }
+
+    private fun walkAskMore() {
+        speaker.say("أكمّل؟") {
+            setState("confirm", "أكمّل؟")
+            listener.listen({ said -> if (classify(said) == 1) walkNext() else walkEnd() }, { _ -> walkEnd() })
+        }
+    }
+
+    // 1 yes, -1 no, 2 stop («خلاص / كفاية / بس»), 3 repeat («كرر / تاني / اعيد»), 0 unclear
+    private fun walkAnswer(said: String): Int {
+        val t = said.trim()
+        if (Regex("(خلاص|كفايه|كفاية|بس كده|انهي|اقف|ستوب|stop)").containsMatchIn(t)) return 2
+        if (Regex("(كرر|كررها|تاني|اعيد|اعد|قول تاني)").containsMatchIn(t)) return 3
+        return classify(t)
+    }
+
+    private fun walkListen() {
+        setState("confirm", "أيوه / لا / خلاص")
+        listener.listen(
+            { said ->
+                lastHeard = said
+                when (walkAnswer(said)) {
+                    1 -> { walkItems()?.optJSONObject(walkIdx)?.optLong("id")?.let { walkPicked.add(it) }; walkIdx++; walkRetry = false; walkNext() }
+                    -1 -> { walkIdx++; walkRetry = false; walkNext() }
+                    2 -> walkEnd()
+                    3 -> walkNext()
+                    else -> walkUnclear()
+                }
+            },
+            { _ -> walkUnclear() }
+        )
+    }
+
+    private fun walkUnclear() {
+        if (!walkRetry) { walkRetry = true; speaker.say("أيوه ولا لا؟") { if (alive) walkListen() } }
+        else { walkRetry = false; walkIdx++; walkNext() }   // no clear answer twice: this item is left out
+    }
+
+    private fun walkEnd() {
+        val w = walk ?: return goIdle()
+        if (w.optString("mode") == "read") { walk = null; speaker.say(w.optString("end_say", "خلصت")) { goIdle() }; return }
+        if (walkPicked.isEmpty()) { walk = null; speaker.say(w.optString("none_say", "ماختارتش حاجة")) { goIdle() }; return }
+        val say = w.optString("final_tpl", "أكمّل؟").replace("{n}", walkPicked.size.toString())
+        askedConfirmAgain = false
+        speaker.say(say) { if (alive) walkConfirm() }
+    }
+
+    private fun walkConfirm() {
+        setState("confirm", "قول أيوه أو لا")
+        listener.listen(
+            { said ->
+                lastHeard = said
+                when (classify(said)) {
+                    1 -> { pendingConfirm = walkReq; val ids = walkPicked.joinToString(","); walk = null; sendConfirm("yes", "pick:$ids") }
+                    -1 -> { walk = null; saySimple("تمام، ماعملتش حاجة") }
+                    else -> walkConfirmAgain()
+                }
+            },
+            { _ -> walkConfirmAgain() }
+        )
+    }
+
+    private fun walkConfirmAgain() {
+        if (!askedConfirmAgain) { askedConfirmAgain = true; speaker.say("قول أيوه أو لا") { if (alive) walkConfirm() } }
+        else { walk = null; saySimple("تمام، ماعملتش حاجة") }
     }
 
     // ---------- «أيوه» / «لا» ----------

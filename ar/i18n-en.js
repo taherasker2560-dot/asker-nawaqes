@@ -51,6 +51,7 @@ window.AskerEN = {
   "اتلغت": "Cancelled",
   "دفعة من عميل: {0} · {1} ج": "Customer payment: {0} · {1} EGP",
   "دفعة لمورد: {0} · {1} ج": "Supplier payment: {0} · {1} EGP",
+  "أمر شرا لـ {0}: {1} صنف": "Purchase order to {0}: {1} items",
   "بيعة رقم {0}: {1} · {2} صنف · {3} ج": "Sale no. {0}: {1} · {2} items · {3} EGP",
   "مرتجع رقم {0}: {1} · {2} صنف · {3} ج": "Return no. {0}: {1} · {2} items · {3} EGP",
   "مفيش عمليات لسه. قول لآدم «سجّل دفعة …» أو «سجّل بيعة …».": "No operations yet. Tell Adam «record a payment …» or «record a sale …».",
