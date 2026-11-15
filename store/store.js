@@ -237,6 +237,25 @@
     if (!h && !parts) return '';
     return `${h ? `<p class="ds-hook" translate="no">${e(h)}</p>` : ''}${parts}<p class="ds-note">المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.</p>`;
   }
+  // مواعيد الصيدلية (صاحب الصيدلية 2026-11-15): كل يوم من 9 الصبح لحد 12 بالليل في الشتا ولحد 2 بالليل في الصيف،
+  // والجمعة من 3 العصر لحد 11 بالليل. الصيف = التوقيت الصيفي في مصر (ساعة القاهرة +3)، فالموقع بيعرفه لوحده.
+  const HOURS_LABEL = { 540: '9 الصبح', 900: '3 العصر', 1380: '11 بالليل', 1440: '12 بالليل', 1560: '2 بالليل' };
+  function cairoNow(date) {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'shortOffset' }).formatToParts(date)) p[x.type] = x.value;
+    return { day: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday), min: Number(p.hour) * 60 + Number(p.minute), summer: /\+3/.test(p.timeZoneName || '') };
+  }
+  // a day's hours in minutes from that day's midnight (a close after 1440 = after midnight)
+  const dayHours = (day, summer) => (day === 5 ? [900, 1380] : [540, summer ? 1560 : 1440]);
+  function shopHours(date, closedByOwner) {
+    const c = cairoNow(date || new Date());
+    if (closedByOwner) return { open: false, text: 'مقفول دلوقتي' };
+    const [o, cl] = dayHours(c.day, c.summer), [, pcl] = dayHours((c.day + 6) % 7, c.summer);
+    if (c.min < pcl - 1440) return { open: true, text: 'مفتوح دلوقتي · بنقفل ' + HOURS_LABEL[pcl] }; // yesterday's night
+    if (c.min >= o && c.min < cl) return { open: true, text: 'مفتوح دلوقتي · بنقفل ' + HOURS_LABEL[cl] };
+    if (c.min < o) return { open: false, text: 'مقفول دلوقتي · بنفتح ' + HOURS_LABEL[o] };
+    return { open: false, text: 'مقفول دلوقتي · بنفتح بكرة ' + HOURS_LABEL[dayHours((c.day + 1) % 7, c.summer)[0]] };
+  }
   // آخر حاجات الزبون دوّر عليها (على موبايله بس): الأحدث الأول، من غير تكرار، 8 بالكتير
   const MAX_RECENT = 8;
   function rememberSearch(list, text) {
@@ -247,7 +266,7 @@
   }
   // صورة كل قسم في الرئيسية: صنف معروف من القسم وعنده صورة (لو الصورة مش موجودة يرجع الرسم)
   const SEC_PICS = { meds: 68432, vit: 4468, care: 27245, baby: 25723, supplies: 3614 };
-  const api = { rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -549,6 +568,16 @@
     store.set('asker_store_settings', data[0]);
     applySettings(data[0]);
   }
+  // «مفتوح دلوقتي · بنقفل 12 بالليل» تحت اسم الصيدلية (بيتحدث كل دقيقة؛ لو صاحب الصيدلية قافل الموقع: «مقفول دلوقتي»)
+  function drawOpenNow() {
+    const el = $('openNow');
+    if (!el) return;
+    try {
+      const h = shopHours(new Date(), settings.is_open === false);
+      el.textContent = h.text; el.className = 'open-now ' + (h.open ? 'on' : 'off'); el.hidden = false;
+    } catch (e) { el.hidden = true; }
+  }
+  setInterval(drawOpenNow, 60000);
   function applySettings(s) {
     settings = s;
     if (root.AskerStoreTheme && 'theme_color' in settings) root.AskerStoreTheme.setDefault(settings.theme_color, settings.theme_night);
@@ -560,6 +589,7 @@
     };
     if (own(settings.hero_title)) $('heroTitle').textContent = settings.hero_title;
     if (own(settings.hero_text)) $('heroText').textContent = settings.hero_text;
+    drawOpenNow();
     const closed = settings.is_open === false;
     document.querySelectorAll('.closed-note').forEach((el) => {
       el.hidden = !closed;
@@ -1020,6 +1050,7 @@
   if (chat) chat.attach(client);
   saveCart();
   route();
+  drawOpenNow();
   loadSettings();
   // English: the translator never touches message boxes, so their hint (placeholder) is translated here
   if (root.AskerI18n && root.AskerI18n.lang() === 'en') {
