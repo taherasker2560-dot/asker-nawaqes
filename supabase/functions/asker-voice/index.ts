@@ -19,6 +19,9 @@ export const FALLBACK_MODELS = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-t
 // instruction. The voice reads the Arabic text as it is; a style is sent only when a caller asks for one.
 export const DEFAULT_STYLE = '';
 export const MAX_TEXT = 500;
+// Low "freedom" so every sentence comes out the same way, like the sample he picked (owner 2026-11-15: «انا عايز الصوت دايما ثابت زي
+// الصوت اللي انا سمعته وانا بختار، مش عايزه يتغير بالشكل ده»). The model's default (1.0) changes the tone from one sentence to the next.
+export const TEMPERATURE = 0.4;
 const TIMEOUT_MS = 12000, GEMINI_TIMEOUT_MS = 40000, PER_MINUTE = 40;
 const KEY_RE = /^[0-9a-f]{64}$/, VOICE_RE = /^[A-Za-z]{3,24}$/, MODEL_RE = /^gemini-[a-z0-9.\-]{0,60}tts[a-z0-9.\-]{0,30}$/;
 
@@ -99,7 +102,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
       body: JSON.stringify({
         contents: [{ parts: [{ text: style + text }] }],
-        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+        generationConfig: { responseModalities: ['AUDIO'], temperature: TEMPERATURE, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
       }),
     }).catch(() => null);
     if (g && g.status !== 429 && g.status < 500) break;

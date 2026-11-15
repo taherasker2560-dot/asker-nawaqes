@@ -57,6 +57,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.deepEqual([...w.subarray(44)], [...pcm]);
   const gb = JSON.parse(gem(f)[0].o.body);
   assert.equal(gb.generationConfig.responseModalities[0], 'AUDIO');
+  assert.equal(gb.generationConfig.temperature, 0.4, 'low freedom: the same voice every sentence');
   assert.equal(gb.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Charon');
   // no English instruction in front of the words (the owner heard it spoken): the text goes to the voice as it is
   assert.equal(F.DEFAULT_STYLE, '');

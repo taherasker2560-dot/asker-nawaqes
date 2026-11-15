@@ -14,15 +14,54 @@ import java.util.concurrent.Future
 /**
  * «Adam's voice» as a text-to-speech ENGINE of the phone (the owner 2026-11-15: «عايز صوت طبيعي … سواء اللي بينطق من البوت او سواء ادم»).
  * The bot speaks through Tasker's «Say» steps (the announcements of «نواقص اتحدثت» and «وارد»). Choosing this engine in a Say step
- * (Engine: Voice → آدم) makes it speak with the same natural voice as Adam, with no other change in Tasker. Nothing else on the phone
- * changes: it is NOT made the phone's default engine (maps, TalkBack and the rest keep Google's voice).
+ * (Engine: Voice → آدم) makes it speak with the same natural voice as Adam, with no other change in Tasker. Since 2026-11-15 the owner
+ * chose it as the phone's PREFERRED engine, so every Tasker announcement uses it.
  * The sentences come from the bot's server (Natural.kt, the same cache and the same voice); a long text is cut at sentence ends
- * and the pieces are fetched together, then played in order. No net / no server: the step says nothing (error), as any engine would.
+ * and the pieces are fetched together, then played in order. No net / no server / no credit: the phone's Google voice says it, so
+ * an announcement is never lost.
  */
 class AdamTtsService : TextToSpeechService() {
     companion object { const val VOICE = "adam-natural" }
     @Volatile private var stopped = false
     private val pool = Executors.newFixedThreadPool(3)
+
+    // The phone's Google voice, used ONLY when the natural voice cannot be had (no net, server down, Gemini credit empty), so a
+    // bot announcement is never lost (2026-11-15: this engine is now the phone's preferred one; before, such a step said nothing).
+    private var google: TextToSpeech? = null
+    @Volatile private var googleReady = false
+
+    override fun onCreate() {
+        super.onCreate()
+        try {
+            google = TextToSpeech(applicationContext, { st ->
+                val g = google
+                if (st == TextToSpeech.SUCCESS && g != null) {
+                    var r = g.setLanguage(Locale("ar", "EG"))
+                    if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) r = g.setLanguage(Locale("ar"))
+                    try { val want = Config.voice(applicationContext); if (want.isNotEmpty()) g.voices?.firstOrNull { it.name == want }?.let { g.voice = it } } catch (e: Throwable) { }
+                    googleReady = r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED
+                }
+            }, "com.google.android.tts")
+        } catch (e: Throwable) { google = null }
+    }
+
+    /** [text] in the phone's Google voice, as a WAV file (null when that voice is not there either). Waits at most 20 s. */
+    private fun googleWav(text: String): File? {
+        val g = google ?: return null
+        if (!googleReady) return null
+        val f = File(cacheDir, "fallback_" + System.nanoTime() + ".wav")
+        val id = java.util.UUID.randomUUID().toString()
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var ok = false
+        g.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) { if (utteranceId == id) { ok = true; latch.countDown() } }
+            override fun onError(utteranceId: String?) { if (utteranceId == id) latch.countDown() }
+        })
+        if (g.synthesizeToFile(text, android.os.Bundle(), f, id) != TextToSpeech.SUCCESS) return null
+        latch.await(20, java.util.concurrent.TimeUnit.SECONDS)
+        return if (ok && f.length() > 44) f else { f.delete(); null }
+    }
 
     private fun ok(lang: String?) = lang != null && (lang.equals("ara", true) || lang.equals("ar", true))
 
@@ -67,19 +106,25 @@ class AdamTtsService : TextToSpeechService() {
         // all pieces are asked for at once; the first one is played as soon as it is there
         val jobs: List<Future<File?>> = parts.map { p -> pool.submit(java.util.concurrent.Callable<File?> { Natural.file(applicationContext, p) }) }
         var started = false
-        for (j in jobs) {
+        var startedRate = 0
+        var useGoogle = false   // once a piece is in Google's voice, the rest is too (one voice and one rate per announcement)
+        for ((i, j) in jobs.withIndex()) {
             if (stopped) { jobs.forEach { it.cancel(true) }; callback.done(); return }
-            val f = try { j.get() } catch (e: Throwable) { null }
+            var f = if (useGoogle) { j.cancel(true); null } else try { j.get() } catch (e: Throwable) { null }
+            var fallback = false
+            if (f == null || f.length() <= 44) { f = googleWav(parts[i]); fallback = f != null; if (fallback && !started) useGoogle = true }   // the announcement is still said
             val wav = if (f != null) try { f.readBytes() } catch (e: Throwable) { null } else null
+            if (fallback) f?.delete()
             if (wav == null || wav.size <= 44) {
                 if (!started) { callback.error(); return }
                 continue
             }
             val rate = (wav[24].toInt() and 0xff) or ((wav[25].toInt() and 0xff) shl 8) or ((wav[26].toInt() and 0xff) shl 16)
             if (!started) {
-                callback.start(if (rate in 8000..48000) rate else 24000, AudioFormat.ENCODING_PCM_16BIT, 1)
+                startedRate = if (rate in 8000..48000) rate else 24000
+                callback.start(startedRate, AudioFormat.ENCODING_PCM_16BIT, 1)
                 started = true
-            }
+            } else if (rate != startedRate) continue   // one audio stream has one rate: a piece made at another rate is skipped
             val max = callback.maxBufferSize.coerceAtLeast(1024)
             var off = 44
             while (off < wav.size) {
@@ -94,6 +139,7 @@ class AdamTtsService : TextToSpeechService() {
 
     override fun onDestroy() {
         pool.shutdownNow()
+        try { google?.shutdown() } catch (e: Throwable) { }
         super.onDestroy()
     }
 }
