@@ -185,7 +185,8 @@
         </div>
         <div class="subbar chips" data-for="accounts" role="group" aria-label="الحسابات" hidden>
           <button type="button" class="chip on" data-tab="customers">العملاء</button
-          ><button type="button" class="chip" data-tab="vendors">الموردين</button>
+          ><button type="button" class="chip" data-tab="vendors">الموردين</button
+          ><button type="button" class="chip" data-tab="ops">العمليات</button>
         </div>
         <div class="subbar chips" data-for="sales" role="group" aria-label="المبيعات" hidden>
           <button type="button" class="chip on" data-tab="storeorders">الموقع</button
@@ -600,6 +601,13 @@
             <button id="veItemMore" type="button" class="secondary hidden">أقدم (لحد 2018)</button>
           </div>
         </section>
+        <!-- «العمليات» (owner 2026-11-15, ar/ops.js): what Adam recorded by voice (payments, sales, returns) and where each one stands -->
+        <section id="opsPanel" class="card hidden">
+          <div class="sa-head"><h2>العمليات</h2><button id="opRefresh" type="button" class="secondary small">تحديث</button></div>
+          <p id="opStatus" class="status"></p>
+          <div id="opRows"></div>
+          <p class="hint">دي العمليات اللي آدم سجّلها بالصوت بعد ما قلتله «أيوه». اللاب بيدخلها في فارمافلاي بعدين من شاشاتها. اللي لسه «مستنية» تقدر تلغيها من هنا.</p>
+        </section>
         <!-- «حركة البيع» (owner 2026-11-14, ar/sales.js): one year of sales, cash and credit apart, an item inside the invoices,
              a credit customer's purchases -->
         <section id="salesPanel" class="card hidden">
@@ -838,6 +846,7 @@
     <script src="ar/customers.js?v=link-20261113a"></script>
 <script src="ar/sales.js?v=sales-20261114b"></script>
 <script src="ar/vendors.js?v=vendors-20261114b"></script>
+<script src="ar/ops.js?v=ops-20261115a"></script>
     <script src="ar/tempsale.js?v=link-20261113a"></script>
     <script src="ar/chat.js?v=acct-20261114a"></script>
     <script src="ar/count.js?v=acct-20261113a"></script>

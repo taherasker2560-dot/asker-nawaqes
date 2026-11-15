@@ -52,7 +52,7 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-cu-phone-edit]');await page.fill('#cuPhoneIn','0101');await go('[data-cu-phone-save]');await scan('phone/edit');await go('[data-cu-phone-cancel]');
  for(const f of ['payments','sales'])await go(`[data-cu-filter="${f}"]`);await scan('statement/filters');await go('[data-cu-back]');await page.waitForTimeout(300);
  await go('#cuRows [data-cu="7"]');await page.waitForTimeout(400);await scan('statement/empty');await go('[data-cu-back]');await page.waitForTimeout(300);
- await go('[data-tab="vendors"]');await scan('accounts');
+ await go('[data-tab="vendors"]');await scan('accounts');await go('[data-tab="ops"]');await page.waitForTimeout(300);await scan('ops');
  await go('[data-group="sales"]');await page.waitForTimeout(400);await go('[data-tab="sales"]');await go('[data-tab="tempsale"]');await scan('sales');
  await go('[data-group="care"]');await scan('care');
  await go('#settingsBtn');await scan('settings');await go('#settingsClose');

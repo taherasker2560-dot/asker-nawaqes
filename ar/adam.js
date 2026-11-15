@@ -10,7 +10,7 @@
    owner's own sign-in on the phone. It writes nothing to the server: sending and account changes never come through here. */
 (function (root) {
   'use strict';
-  const TABS = ['home', 'short', 'read', 'translate', 'drafts', 'docs', 'suppliers', 'stock', 'count', 'expiry', 'customers', 'vendors', 'storeorders', 'sales', 'tempsale', 'care'];
+  const TABS = ['home', 'short', 'read', 'translate', 'drafts', 'docs', 'suppliers', 'stock', 'count', 'expiry', 'customers', 'vendors', 'ops', 'storeorders', 'sales', 'tempsale', 'care'];
   const KEY = 'asker-accent', NIGHT = 'asker-night', UNDO = 'asker-adam-undo';
 
   // the one command in the address: {verb, arg} or null (anything unknown or oddly shaped is ignored)

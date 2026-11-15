@@ -1633,3 +1633,14 @@ html.night .ve-lines td.exp { color: #fdba74; }
 .im-l textarea { display: block; width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 13.5px; background: var(--card); color: inherit; resize: vertical; }
 .im-note { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: #16a34a; text-align: center; }
 .im-note.bad { color: #b91c1c; }
+
+/* «العمليات» (owner 2026-11-15, ar/ops.js): what Adam recorded by voice */
+.op-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; padding: 10px 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-1); }
+.op-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.op-t b { font-weight: 700; overflow-wrap: anywhere; }
+.op-t small { opacity: .7; }
+.op-s { font-size: .85em; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--line); white-space: nowrap; }
+.op-pending { background: #fff1c2; color: #7a5200; }
+.op-done, .op-entered { background: #d6f2df; color: #0f5a2c; }
+.op-failed { background: #fcd9d4; color: #8a1c10; }
+.op-cancelled { opacity: .65; }
