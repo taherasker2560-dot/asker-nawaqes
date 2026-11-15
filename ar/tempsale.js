@@ -251,6 +251,13 @@
     $('tsHits').innerHTML = hits.map(hitCard).join('');
     say('tsFind', hits.length ? '' : 'مفيش صنف عليه رصيد بالاسم ده');
   }
+  // a picked item closes the list at once, in sale and return, by name as by code (owner 2026-11-15: the list stayed open
+  // under the search after picking Augmentin); the box empties for the next item and keeps its focus
+  function closeHits() {
+    $('tsQ').value = '';
+    $('tsHits').innerHTML = '';
+    $('tsClear').classList.add('hidden');
+  }
   function setWay(w) {
     way = w;
     document.querySelectorAll('[data-ts-way]').forEach((b) => b.classList.toggle('on', b.dataset.tsWay === w));
@@ -640,9 +647,9 @@
       if (t.dataset.tsType) return setKind(t.dataset.tsType);
       if (t.id === 'tsCam') return nextCam();
       if (t.dataset.tsAdd) {
+        closeHits();
         const it = await itemByCode(Number(t.dataset.tsAdd));
         if (it) { add(it); say('tsFind', 'اتضاف: ' + nameOf(it), 'ok'); }
-        if (way === 'code') { $('tsQ').value = ''; $('tsHits').innerHTML = ''; }
         return;
       }
       const line = t.closest('.ts-line'), l = line ? cart[Number(line.dataset.i)] : null;
