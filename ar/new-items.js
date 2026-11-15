@@ -22,15 +22,30 @@
     const n = Math.round(parseFloat(t) * 100) / 100;
     return n < 1000000 ? n : NaN;
   }
-  const STATUS = { new: 'جديد', ordered: 'اتطلب', arrived: 'وصل', cancelled: 'اتلغى' };
-  const isOpen = (x) => x.status === 'new' || x.status === 'ordered';
+  const STATUS = { new: 'جديد', approved: 'في أمر الشراء', ordered: 'اتطلب', arrived: 'وصل', cancelled: 'اتلغى' };
+  const isOpen = (x) => x.status === 'new' || x.status === 'approved' || x.status === 'ordered';
+  // what the item IS, from its name (owner 2026-11-15: «تعرف تقسمه بقى إذا كان حبوب إذا كان كريم»): the first form word wins; '' = not known.
+  // The order matters: «EYE DROPS» is drops, a shampoo is a shampoo even when it says «50 ML».
+  const FORMS = [
+    ['شامبو', /\b(SHAMPOO|SHMP)\b|شامبو/], ['لوشن', /\b(LOTION|LOT)\b|لوشن/], ['كريم', /\b(CREAM|CRM|CRE)\b|كريم/], ['جيل', /\b(GEL)\b|جل|جيل/],
+    ['مرهم', /\b(OINT|OINTMENT)\b|مرهم/], ['نقط', /\b(DROPS?|EYE|EAR|NASAL)\b|نقط|قطرة|قطره/], ['حقن', /\b(INJ|INJECTION|AMP|AMPOULES?|VIAL|PEN)\b|حقن|امبول|أمبول/],
+    ['لبوس', /\b(SUPP|SUPPOSITORY|SUPPOSITORIES)\b|لبوس/], ['سبراي', /\b(SPRAY|SPR)\b|سبراي|اسبراي/], ['شراب', /\b(SYRUP|SYP|SUSP|SUSPENSION|ELIXIR)\b|شراب|معلق/],
+    ['فوار/أكياس', /\b(SACHETS?|SACH|EFF|EFFERVESCENT|POWDER|GRANULES?)\b|اكياس|أكياس|فوار|بودرة/], ['كبسول', /\b(CAP|CAPS|CAPSULES?)\b|كبسول|كبسولة/],
+    ['حبوب', /\b(TAB|TABS|TABLETS?|CHEW|FILM)\b|حبوب|قرص|اقراص|أقراص/], ['لصقة', /\b(PATCH|PATCHES)\b|لصقة|لزق/], ['محلول', /\b(SOLUTION|SOL|LIQUID|MOUTHWASH)\b|محلول/],
+    ['استنشاق', /\b(INHALER|NEB|NEBULES?|INHALATION)\b|استنشاق|بخاخ/],
+  ];
+  function formOf(name) {
+    const s = ` ${String(name || '').toUpperCase().replace(/[^A-Z0-9؀-ۿ%./]+/g, ' ')} `;
+    for (const [word, re] of FORMS) if (re.test(s)) return word;
+    return '';
+  }
   // the open ones, newest first; then the closed ones
   function split(items) {
     const list = Array.isArray(items) ? items : [];
     const byNew = (a, b) => String(b.created_at).localeCompare(String(a.created_at)) || Number(b.id) - Number(a.id);
     return { open: list.filter(isOpen).sort(byNew), closed: list.filter((x) => !isOpen(x)).sort(byNew) };
   }
-  const api = { key, parsePrice, split, isOpen, STATUS };
+  const api = { key, parsePrice, split, isOpen, formOf, STATUS };
   root.AskerNewItemsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -51,11 +66,16 @@
       : a ? `<span class="ni-ar notr" dir="auto">${esc(a)}</span>${ar.status === 'approved' ? '' : ' <small class="pill warn">ترجمة تلقائية</small>'}`
         : '<small class="hint">لسه ماتترجمش</small>';
     const price = x.price != null ? `<span class="ni-price">≈ ${esc(money(x.price))} ج</span>` : '';
+    // new -> «موافق» (in the purchase order) -> «اتطلب» -> «وصل»; «رجّعه» goes one step back
+    const set = (st, label, cls) => `<button type="button" class="small${cls ? ' ' + cls : ''}" data-ni-set="${st}:${esc(x.id)}">${label}</button>`;
     const acts = isOpen(x)
-      ? `${x.status === 'new' ? `<button type="button" class="small secondary" data-ni-set="ordered:${esc(x.id)}">اتطلب</button>` : ''}<button type="button" class="small" data-ni-set="arrived:${esc(x.id)}">وصل</button><button type="button" class="small secondary" data-ni-edit="${esc(x.id)}" aria-label="عدّل الاسم العربي">✏️</button><button type="button" class="small secondary" data-ni-set="cancelled:${esc(x.id)}" aria-label="شيل">✕</button>`
+      ? `${x.status === 'new' ? set('approved', 'موافق', '') : ''}${x.status === 'approved' ? set('ordered', 'اتطلب', '') + set('new', 'رجّعه', 'secondary') : ''}${x.status === 'ordered' ? set('arrived', 'وصل', '') : ''}<button type="button" class="small secondary" data-ni-edit="${esc(x.id)}" aria-label="عدّل الاسم العربي">✏️</button>${set('cancelled', '✕', 'secondary').replace('>✕<', ' aria-label="شيل">✕<')}`
       : `<button type="button" class="small secondary" data-ni-set="new:${esc(x.id)}">رجّعه</button>`;
+    const qty = Number(x.qty) > 1 ? `<span class="ni-qty">× ${esc(x.qty)}</span>` : '';
+    const form = x.form ? `<span class="pill">${esc(x.form)}</span>` : '';
+    const state = x.status === 'approved' ? ' <span class="pill good">في أمر الشراء</span>' : x.status === 'ordered' ? ' <span class="pill good">اتطلب</span>' : '';
     return `<div class="ni-row" data-ni="${esc(x.id)}"><div class="ni-main"><b class="ni-en notr" dir="ltr">${esc(x.name_en)}</b>${arHtml}` +
-      `<small class="ni-meta">${price}${x.status === 'ordered' ? ' <span class="pill good">اتطلب</span>' : ''}${x.note ? ` <span class="notr" dir="auto">${esc(x.note)}</span>` : ''}</small></div><div class="ni-acts">${acts}</div></div>`;
+      `<small class="ni-meta">${form} ${qty} ${price}${state}${x.note ? ` <span class="notr" dir="auto">${esc(x.note)}</span>` : ''}</small></div><div class="ni-acts">${acts}</div></div>`;
   }
   function draw() {
     const box = $('niBox');
@@ -83,7 +103,7 @@
     if (loading || !db()) return;
     loading = true;
     try {
-      const { data, error } = await db().from('ar_new_items').select('id,name_key,name_en,price,note,status,created_at').order('created_at', { ascending: false }).limit(300);
+      const { data, error } = await db().from('ar_new_items').select('id,name_key,name_en,price,note,status,created_at,qty,form').order('created_at', { ascending: false }).limit(300);
       if (error) throw error;
       items = data || []; hidden = false;
       await loadArabic();
@@ -104,8 +124,10 @@
   async function add() {
     const name = String($('niName').value || '').replace(/\s+/g, ' ').trim();
     const price = parsePrice($('niPrice').value), note = String($('niNote').value || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    const qtyRaw = parsePrice($('niQty') ? $('niQty').value : ''), qty = qtyRaw == null ? null : Math.floor(qtyRaw);
     if (name.length < 2) { say('اكتب اسم الصنف بالإنجليزي.', true); return; }
     if (Number.isNaN(price)) { say('السعر لازم يبقى رقم (أو سيبه فاضي).', true); return; }
+    if (Number.isNaN(qtyRaw) || (qty !== null && (qty < 1 || qty > 100000))) { say('الكمية لازم تبقى رقم من 1 فوق (أو سيبها فاضية).', true); return; }
     const k = key(name), have = items.find((x) => x.name_key === k);
     const btn = $('niAdd'); btn.disabled = true;
     try {
@@ -114,14 +136,16 @@
         const patch = { updated_at: new Date().toISOString() };
         if (price != null) patch.price = price;
         if (note) patch.note = note;
+        if (qty !== null) patch.qty = qty;
+        if (!have.form && formOf(name)) patch.form = formOf(name);
         if (!isOpen(have)) { patch.status = 'new'; patch.arrived_at = null; }
         res = await db().from('ar_new_items').update(patch).eq('id', have.id);
       } else {
-        res = await db().from('ar_new_items').insert({ name_key: k, name_en: name.slice(0, 250), price, note: note || null, status: 'new' });
+        res = await db().from('ar_new_items').insert({ name_key: k, name_en: name.slice(0, 250), price, note: note || null, qty: qty === null ? 1 : qty, form: formOf(name) || null, status: 'new' });
       }
       if (res.error) throw res.error;
       say(have ? 'الصنف ده كان مسجل: حدّثت بياناته.' : 'اتحفظ. بيترجم…');
-      ['niName', 'niPrice', 'niNote'].forEach((id) => ($(id).value = ''));
+      ['niName', 'niPrice', 'niQty', 'niNote'].forEach((id) => { if ($(id)) $(id).value = ''; });
       await load();
       if (!arabic.get(k)) { await translate(); if (arabic.get(k)) say('اتحفظ واتترجم.'); }
       else say(have ? 'الصنف ده كان مسجل: حدّثت بياناته.' : 'اتحفظ.');
@@ -131,7 +155,8 @@
   async function setStatus(id, status) {
     const patch = { status, updated_at: new Date().toISOString() };
     if (status === 'arrived') patch.arrived_at = new Date().toISOString();
-    if (status === 'new') patch.arrived_at = null;
+    if (status === 'new') { patch.arrived_at = null; patch.approved_at = null; }
+    if (status === 'approved') patch.approved_at = new Date().toISOString();
     const { error } = await db().from('ar_new_items').update(patch).eq('id', isNaN(Number(id)) ? id : Number(id));
     if (error) { say('ماتعدّلش: ' + error.message, true); return; }
     await load();
@@ -156,7 +181,7 @@
       const ed = t.closest('[data-ni-edit]'); if (ed) { editing = Number(ed.dataset.niEdit) || ed.dataset.niEdit; draw(); const i = document.querySelector('[data-ni-ar]'); i && i.focus(); return; }
       const sv = t.closest('[data-ni-save]'); if (sv) return saveArabic(sv.dataset.niSave);
     });
-    ['niName', 'niPrice', 'niNote'].forEach((id) => $(id) && $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }));
+    ['niName', 'niPrice', 'niQty', 'niNote'].forEach((id) => $(id) && $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }));
     // the count on the box is ready soon after the sign in
     setTimeout(() => { if (db() && !$('app')?.classList.contains('hidden')) load(); }, 3000);
   }
