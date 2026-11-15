@@ -74,6 +74,8 @@ run('search on top: الكل / المخزون / القوايم / النواقص'
  const rows=await page.$$eval('#hsItems .hs-offers-t tr',t=>t.map(r=>({best:r.classList.contains('best'),text:r.textContent.replace(/\s+/g,' ').trim()})));
  assert.deepEqual(rows,[{best:true,text:'AMG ✓ الأعلى22%'},{best:false,text:'رضا عطية (أقل 4%)18%'}]);
  assert.equal(await page.$$eval('#hsItems .tag.good, #hsItems .tag.none, #hsItems .hs-offers',x=>x.length),0,'no stock on «القوايم»');
+ // the public price shows on «القوايم» too (owner 2026-11-15: «انا ببحث اعرف سعره»)
+ assert.match(await page.textContent('#hsItems'),/سعر الجمهور 30 ج/);
  assert.doesNotMatch(await page.textContent('#hsStatus'),/آخر مخزون/);
  await find('CONCOR',/مفيش صنف بالاسم ده في القوايم/);
  await page.fill('#hsQ','فلاجيل');await page.waitForFunction(()=>!document.getElementById('hsLinesBox').classList.contains('hidden'));

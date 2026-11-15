@@ -245,6 +245,13 @@
     return index;
   }
   const PEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function publicPrice(it) {
+    const s = it.stock;
+    if (s && Number(s.price) > 0) return Number(s.price);
+    if (Number(it.price) > 0) return Number(it.price);
+    const o = [...(it.offers || [])].filter((x) => Number(x.price) > 0).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
+    return o ? Number(o.price) : null;
+  }
   // the card follows the button under the box (owner 2026-11-13): «المخزون» = the pharmacy only (no warehouse, no «آخر شرا»);
   // «القوايم» = the warehouses only (one row each with the discount difference, «آخر شرا» against today; no stock)
   function card(it) {
@@ -252,8 +259,10 @@
     const lists = scope === 'lists', pharmacy = scope === 'stock';
     const tags = marks(it, lib.qtyText).filter((m) => !lists || m.kind === 'bad' || m.kind === 'warn').map((m) => `<span class="tag ${m.kind}">${esc(m.text)}</span>`).join('');
     const s = lists ? null : it.stock;
-    const price = lists ? null : s && Number(s.price) > 0 ? Number(s.price) : it.price;
-    const more = [s && lib.expText ? lib.expText(s.exp_near) : '', price > 0 ? Math.round(price * 100) / 100 + ' ج' : ''].filter(Boolean).join(' · ');
+    // the public price in every view, «القوايم» too (owner 2026-11-15: «السعر الجمهور ما بيظهرش في كارت الصنف … انا ببحث اعرف
+    // سعره»): the pharmacy's price, else the store's, else the newest warehouse list's
+    const price = publicPrice(it);
+    const more = [s && lib.expText ? lib.expText(s.exp_near) : '', price > 0 ? 'سعر الجمهور ' + Math.round(price * 100) / 100 + ' ج' : ''].filter(Boolean).join(' · ');
     const others = s && lib.otherText ? lib.otherText(s.other, s.parts).map((t) => `<div class="st-other">${esc(t)}</div>`).join('') : '';
     const offers = pharmacy || lists ? '' : offersText(it), bought = pharmacy ? '' : lists ? buysVsLists(it) : buysText(it);
     const table = lists ? offerRows(it).map((r) => `<tr class="${r.best ? 'best' : ''}"><td>${esc(r.name)}${r.best ? ' ✓ الأعلى' : ''}${r.less != null ? ` <span class="less">(أقل ${r.less}%)</span>` : ''}</td><td class="d">${r.disc != null ? r.disc + '%' : '—'}</td></tr>`).join('') : '';
