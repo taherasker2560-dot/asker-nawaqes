@@ -34,6 +34,12 @@ run('English: the switch, every section in English, names and messages untouched
  const scan=async(where)=>{for(const v of await leftArabic(page))if(!ALLOWED.some(r=>r.test(v))&&!seen.has(v))seen.set(v,where)};
  const go=async(sel)=>{const el=await page.$(sel);if(el){await el.click();await page.waitForTimeout(300)}};
  await scan('home');
+ // his own home buttons: the edit sheet, a full home's note and the 📌 note (2026-11-15)
+ await go('#qaEdit');await scan('home/buttons');await go('#qaSheet [data-qa-flip="vendors"]');await scan('home/buttons-added');await go('#qaDone');
+ await go('[data-group="sales"]');await go('.subbar[data-for="sales"] .qa-pin');await scan('home/pin');
+ await go('[data-group="home"]');await go('#qaEdit');for(let i=0;i<4;i++)await go('#qaSheet .qa-add:not([disabled])');await go('#qaDone');
+ await go('[data-group="sales"]');await go('[data-tab="sales"]');await go('.subbar[data-for="sales"] .qa-pin');await scan('home/full');
+ await go('[data-group="home"]');await go('#qaEdit');await scan('home/buttons-full');await go('#qaReset');await go('#qaDone');
  await page.fill('#hsQ','FLAGYL');await page.waitForTimeout(900);await scan('search');await go('#hsClear');
  await go('[data-group="purchases"]');await scan('shortages');
  await go('[data-tab="read"]');for(const s of ['manual','companies','today'])await go(`[data-sub="${s}"]`);await scan('read');

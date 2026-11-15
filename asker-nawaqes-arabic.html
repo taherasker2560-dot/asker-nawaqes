@@ -15,7 +15,7 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=scopes-20261113a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=dupans-20261115a" />
+    <link rel="stylesheet" href="ar/look.css?v=qa-20261115a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
     <script src="ar/i18n-en.js?v=media-20261114a"></script>
@@ -216,6 +216,8 @@
             <button type="button" class="kpi" data-go="drafts"><strong id="kOrdered">—</strong><span>اتطلب النهارده</span></button>
             <div class="kpi"><strong id="kAge">—</strong><small id="kAgo">آخر داتا</small></div>
           </div>
+          <!-- his own buttons (ar/shortcuts.js, owner 2026-11-15): up to 12 sections he picks and orders; these six are the first time -->
+          <div class="qa-top"><span>ادخل على طول</span><button type="button" id="qaEdit" class="qa-edit">✏️ عدّل الزراير</button></div>
           <div class="qa">
             <button type="button" data-go="short"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>النواقص</button>
             <button type="button" data-go="read"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 13h5l1 2h4l1-2h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>الوارد</button>
@@ -843,7 +845,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
     <script src="ar/cache.js?v=wait-20261113a"></script>
-    <script src="ar/app.js?v=bags-20261115b"></script>
+    <script src="ar/app.js?v=qa-20261115a"></script>
     <script src="ar/staff.js?v=chat-20261113a"></script>
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -857,6 +859,7 @@
     <script src="ar/stock.js?v=media-20261114a"></script>
     <script src="ar/home.js?v=price-20261115b"></script>
     <script src="ar/look.js?v=times-20261113a"></script>
+    <script src="ar/shortcuts.js?v=qa-20261115a"></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=dupans-20261115a"></script>
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
