@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=orange-20261115a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=orange-20261115a" />
+    <link rel="stylesheet" href="ar/look.css?v=newpo-20261115a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=qty-20261115a"></script>
+    <script src="ar/i18n-en.js?v=newpo-20261115a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -266,6 +266,7 @@
               <input id="niName" type="text" dir="ltr" maxlength="250" autocomplete="off" autocapitalize="characters" placeholder="Product name in English" aria-label="اسم الصنف بالإنجليزي" />
               <div class="ni-line">
                 <input id="niPrice" type="text" inputmode="decimal" autocomplete="off" placeholder="السعر تقريبًا" aria-label="السعر التقريبي" />
+                <input id="niQty" type="text" inputmode="numeric" autocomplete="off" placeholder="الكمية" aria-label="الكمية" />
                 <input id="niNote" type="text" maxlength="300" autocomplete="off" placeholder="الشركة / ملاحظة" aria-label="ملاحظة" />
               </div>
               <button id="niAdd" type="button">احفظ وترجم</button>
@@ -520,6 +521,13 @@
             وتبعت لمحادثة المورد بإيدك: مفيش حاجة بتتبعت لوحدها. الخصم من آخر شرا فعلي أو آخر قايمة نزلتها (الأحدث).
           </p>
           <p id="odInfo" class="status"></p>
+          <!-- the new products he approved («النواقص ← أصناف جديدة ← موافق»): in the purchase order, no supplier offer to compare -->
+          <div id="odNewBox" class="od-new hidden">
+            <h3 id="odNewTitle">أصناف جديدة في أمر الشراء</h3>
+            <p class="hint">مش في فارمافلاي لسه ومفيش عليها عرض. دي الأسماء والكميات والأسعار التقريبية اللي كتبتها: انسخ الرسالة وابعتها للمورد اللي تختاره.</p>
+            <div id="odNewList"></div>
+            <div class="od-new-btns"><button type="button" id="odNewCopy">انسخ الرسالة</button><button type="button" class="secondary" id="odNewMark">علّمهم اتطلبوا</button></div>
+          </div>
           <div id="odBody" class="hidden">
             <!-- two doors (owner 2026-11-15: «طلبات المستحضرات … طلبات الدواء … ده في باب وده في باب») -->
             <div id="odDoors" class="tabs seg sub" role="group" aria-label="نوع الطلبيات"></div>
@@ -890,7 +898,7 @@
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/qty-input.js?v=qty-20261115a"></script>
-    <script src="ar/order-drafts.js?v=qtylearn-20261115a"></script>
+    <script src="ar/order-drafts.js?v=newpo-20261115a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=link-20261113a"></script>
     <script src="ar/store-settings.js?v=orange-20261115a"></script>
@@ -910,7 +918,7 @@
 <script src="ar/ops.js?v=ops-20261115a"></script>
 <script src="ar/cash.js?v=cash-20261115b"></script>
 <script src="ar/notes.js?v=notes-20261115a"></script>
-<script src="ar/new-items.js?v=newitems-20261115b"></script>
+<script src="ar/new-items.js?v=newitems-20261115c"></script>
 <script src="ar/short-dated.js?v=shortdated-20261115b"></script>
     <script src="ar/tempsale.js?v=link-20261113a"></script>
     <script src="ar/chat.js?v=acct-20261114a"></script>

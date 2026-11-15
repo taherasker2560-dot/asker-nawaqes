@@ -2085,3 +2085,15 @@ html.night .sd-row.amber .sd-exp b { color: #ffc266; }
 html.night .od-qty.mine input, html.night label.qty.mine input { background: #12305e; color: #cfe3ff; border-color: #5a9bff; }
 html.night .od-qty.mine span::before, html.night label.qty.mine span::before { color: #7db4ff; }
 input[data-qty]:focus { outline: 2px solid #0a6cff; outline-offset: 1px; }
+/* ---------- «أصناف جديدة»: «موافق», the quantity and the form (owner 2026-11-15) ---------- */
+.ni-line { grid-template-columns: 1fr 0.75fr 1.4fr; }
+.ni-qty { font-weight: 800; color: var(--ink); margin-inline: 4px; }
+.ni-meta .pill { margin-inline-end: 4px; }
+/* ---------- «الطلبيات»: the new products he approved (owner 2026-11-15) ---------- */
+.od-new { margin: 10px 0; padding: 10px 12px; border: 1px solid #f0c48a; border-radius: 14px; background: #fff8ec; }
+.od-new.hidden { display: none; }
+.od-new h3 { margin: 0 0 4px; font-size: 15px; }
+.od-new .od-row { padding: 6px 0; border-bottom: 1px dashed var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.od-new-btns { display: flex; gap: 8px; margin-top: 8px; }
+.od-new-btns button { margin: 0; }
+html.night .od-new { background: #3a2c12; border-color: #b9873a; }

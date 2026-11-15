@@ -1135,7 +1135,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       const [shortages0, names, fresh] = await Promise.all([
         restAll<Shortage>(env, auth, fetchImpl, 'ar_shortages?select=id,product_name&is_active=eq.true&order=id'),
         restAll<ArName>(env, auth, fetchImpl, 'ar_names?select=name_key,arabic_name,status&order=name_key'),
-        restAll<{ id: number; name_en: string }>(env, auth, fetchImpl, 'ar_new_items?select=id,name_en&status=in.(new,ordered)&order=id').catch(() => [] as { id: number; name_en: string }[]),
+        restAll<{ id: number; name_en: string }>(env, auth, fetchImpl, 'ar_new_items?select=id,name_en&status=in.(new,approved,ordered)&order=id').catch(() => [] as { id: number; name_en: string }[]),
       ]);
       const shortages: Shortage[] = [...shortages0, ...fresh.map((x) => ({ id: 'n' + x.id, product_name: x.name_en }))];
       const have = new Set(names.map((n) => n.name_key)), seen = new Set<string>();

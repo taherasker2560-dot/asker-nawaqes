@@ -1,5 +1,6 @@
 // «النواقص ← أصناف جديدة» (owner 2026-11-15): the English name + an approximate price, saved and translated with the shortages,
-// «اتطلب» / «وصل», a hand-typed Arabic name, a repeated name, bad input. The new items are NOT written into the shortage list.
+// «موافق» (in the purchase order) / «اتطلب» / «وصل», a quantity, the form worked out from the name (حبوب / كريم …), a hand-typed Arabic name,
+// a repeated name, bad input. The new items are NOT written into the shortage list. The approved ones show in «الطلبيات» with a message to copy.
 const {run,assert}=require('./harness.cjs');
 const names=(page,sel)=>page.$$eval(sel,b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim()));
 run('New items: save with an approximate price, translated, ordered, arrived, a typed Arabic name',async({page})=>{
@@ -14,13 +15,15 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  assert.match(await page.textContent('#niStatus'),/السعر لازم يبقى رقم/);
  assert.equal((await page.evaluate(()=>window.__tables.ar_new_items||[])).length,0,'nothing saved on a bad price');
  // the real one: Arabic digits in the price, a note
- await page.fill('#niPrice','٨٥٫٥');await page.fill('#niNote','Eva Pharma');await page.click('#niAdd');
+ await page.fill('#niPrice','٨٥٫٥');await page.fill('#niQty','abc');await page.click('#niAdd');
+ assert.match(await page.textContent('#niStatus'),/الكمية لازم تبقى رقم/);
+ await page.fill('#niQty','٣');await page.fill('#niNote','Eva Pharma');await page.click('#niAdd');
  await page.waitForSelector('#niList .ni-row');
  await page.waitForFunction(()=>/ترجمة/.test(document.querySelector('#niList .ni-ar')?.textContent||''));
- const saved=await page.evaluate(()=>window.__tables.ar_new_items.map(x=>({k:x.name_key,en:x.name_en,p:x.price,n:x.note,s:x.status})));
- assert.deepEqual(saved,[{k:'ZETAPRO 5MG SYRUP',en:'Zetapro 5mg syrup',p:85.5,n:'Eva Pharma',s:'new'}]);
+ const saved=await page.evaluate(()=>window.__tables.ar_new_items.map(x=>({k:x.name_key,en:x.name_en,p:x.price,n:x.note,s:x.status,q:x.qty,f:x.form})));
+ assert.deepEqual(saved,[{k:'ZETAPRO 5MG SYRUP',en:'Zetapro 5mg syrup',p:85.5,n:'Eva Pharma',s:'new',q:3,f:'شراب'}],'quantity 3 (Arabic digit) and the form worked out from «SYRUP»');
  const row=(await names(page,'#niList .ni-row'))[0];
- assert.match(row,/Zetapro 5mg syrup/);assert.match(row,/ترجمة Zetapro 5mg syrup/);assert.match(row,/≈ 85\.5 ج/);assert.match(row,/Eva Pharma/);assert.match(row,/ترجمة تلقائية/);
+ assert.match(row,/Zetapro 5mg syrup/);assert.match(row,/ترجمة Zetapro 5mg syrup/);assert.match(row,/≈ 85\.5 ج/);assert.match(row,/Eva Pharma/);assert.match(row,/ترجمة تلقائية/);assert.match(row,/شراب/);assert.match(row,/× 3/);
  assert.match(await page.textContent('#niCount'),/1/);
  assert.equal(await page.inputValue('#niName'),'','the form is empty again');
  // it is in the shortages' own table of names (so «الترجمة» shows it too) and NOT in the shortage list
@@ -37,8 +40,25 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  await page.waitForFunction(()=>(document.querySelector('#niList .ni-ar')?.textContent||'').includes('مجم'));
  assert.ok(!/ترجمة تلقائية/.test(await page.textContent('#niList')));
  assert.equal(await page.evaluate(()=>window.__tables.ar_names.find(n=>n.name_key==='ZETAPRO 5MG SYRUP').status),'approved');
- // ordered, then arrived: it moves under «اللي وصل واللي اتلغى»
- await page.click('#niList [data-ni-set^="ordered:"]');
+ // «موافق»: in the purchase order. A new item cannot be «ordered» before it is approved
+ assert.ok(!(await page.$('#niList [data-ni-set^="ordered:"]')),'«اتطلب» comes after «موافق»');
+ await page.click('#niList [data-ni-set^="approved:"]');
+ await page.waitForFunction(()=>/في أمر الشراء/.test(document.getElementById('niList').textContent));
+ assert.equal(await page.evaluate(()=>window.__tables.ar_new_items[0].status),'approved');
+ assert.ok(await page.evaluate(()=>!!window.__tables.ar_new_items[0].approved_at));
+ // the orders page lists it with its quantity, the form and a message to copy; «علّمهم اتطلبوا» marks it
+ await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[]});window.__tables.ar_orders=[];window.__tables.ar_suppliers=[];window.__copied='';Object.defineProperty(navigator,'clipboard',{value:{writeText:async(t)=>{window.__copied=t}},configurable:true})});
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForSelector('#odNewBox:not(.hidden)');
+ assert.match(await page.textContent('#odNewTitle'),/أصناف جديدة في أمر الشراء \(1\)/);
+ assert.match(await page.textContent('#odNewList'),/Zetapro 5mg syrup.*زيتابرو.*شراب.*× 3.*≈ 90 ج/);
+ await page.click('#odNewCopy');
+ await page.waitForFunction(()=>/Zetapro 5mg syrup × 3/.test(window.__copied));
+ assert.equal(await page.evaluate(()=>window.__copied),'السلام عليكم\nمحتاج الأصناف دي:\n• Zetapro 5mg syrup × 3\nشكرًا');
+ await page.click('#odNewMark');
+ await page.waitForFunction(()=>window.__tables.ar_new_items[0].status==='ordered');
+ assert.ok(await page.evaluate(()=>document.getElementById('odNewBox').classList.contains('hidden')),'no longer waiting in the order');
+ await page.click('[data-pgroup="short"]');await page.click('[data-tab="short"]');
  await page.waitForFunction(()=>/اتطلب/.test(document.getElementById('niList').textContent));
  assert.ok(!(await page.$('#niList [data-ni-set^="ordered:"]')),'no «اتطلب» button once ordered');
  await page.click('#niList [data-ni-set^="arrived:"]');

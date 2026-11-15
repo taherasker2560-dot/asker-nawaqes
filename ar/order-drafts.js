@@ -491,7 +491,51 @@
     const r = await fetch('store/img/index.json', { cache: 'no-cache' });
     return r.ok ? await r.json() : {};
   }
+  // «أصناف جديدة في أمر الشراء» (owner 2026-11-15: «لما أدوس موافق ينضاف لأمر الشراء»): the new products (not in PharmaFly yet) he approved in
+  // «النواقص ← أصناف جديدة»: no supplier offer to compare, so they are listed here with their quantity and approximate price, with a
+  // message to copy (he sends it to whoever he chooses) and «علّمهم اتطلبوا»
+  let newItems = [], newAr = new Map();
+  async function refreshNew() {
+    if (!$('odNewBox') || !db()) return;
+    try {
+      const { data, error } = await db().from('ar_new_items').select('id,name_key,name_en,price,qty,form,status').eq('status', 'approved').order('created_at', { ascending: true }).limit(200);
+      if (error) throw error;
+      newItems = data || [];
+      newAr = new Map();
+      if (newItems.length) {
+        const r = await db().from('ar_names').select('name_key,arabic_name').in('name_key', newItems.map((x) => x.name_key));
+        for (const n of r.data || []) newAr.set(n.name_key, n.arabic_name);
+      }
+    } catch (e) { newItems = []; }
+    drawNew();
+  }
+  const newMessage = () => ['السلام عليكم', 'محتاج الأصناف دي:', ...newItems.map((x) => `• ${x.name_en} × ${x.qty || 1}`), 'شكرًا'].join('\n');
+  function drawNew() {
+    const box = $('odNewBox');
+    if (!box) return;
+    box.classList.toggle('hidden', !newItems.length);
+    if (!newItems.length) return;
+    $('odNewTitle').textContent = `أصناف جديدة في أمر الشراء (${newItems.length})`;
+    $('odNewList').innerHTML = newItems.map((x) => `<div class="od-row"><strong dir="ltr" class="notr">${esc(x.name_en)}</strong>${newAr.get(x.name_key) ? ` <span class="notr" dir="auto">${esc(newAr.get(x.name_key))}</span>` : ''}${x.form ? ` <span class="pill">${esc(x.form)}</span>` : ''} <span>× ${esc(x.qty || 1)}</span>${x.price != null ? ` <small>≈ ${esc(money(x.price))} ج</small>` : ''}</div>`).join('');
+  }
+  async function newCopy() {
+    if (!newItems.length) return;
+    try { await navigator.clipboard.writeText(newMessage()); say('رسالة الأصناف الجديدة اتنسخت: الزقها في محادثة المورد اللي تختاره.', 'good'); }
+    catch (e) { say('مقدرتش أنسخ لوحدي: ' + newMessage().replace(/\n/g, ' | '), 'bad'); }
+  }
+  async function newMark() {
+    if (!newItems.length) return;
+    const { error } = await db().from('ar_new_items').update({ status: 'ordered', updated_at: new Date().toISOString() }).in('id', newItems.map((x) => x.id));
+    if (error) return say('ماتعلّمتش: ' + error.message, 'bad');
+    say('الأصناف الجديدة اتعلّمت اتطلبت.', 'good');
+    await refreshNew();
+  }
+  $('odNewCopy')?.addEventListener('click', newCopy);
+  $('odNewMark')?.addEventListener('click', newMark);
   async function open() {
+    await Promise.all([refreshNew(), openDrafts()]);
+  }
+  async function openDrafts() {
     if (!db()) return;
     try {
       const { data: blob, error } = await db().storage.from('asker-private').download(PATH);
