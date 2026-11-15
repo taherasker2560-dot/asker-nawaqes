@@ -2136,6 +2136,7 @@ html.night .bg-po-done summary { color: #7fd69b; }
 .cmp-why { font-size: 11.5px; border-radius: 10px; padding: 2px 8px; background: #fff4e5; color: #9a3412; }
 .cmp-why.red { background: #fde8e8; color: #b42318; font-weight: 700; }
 .cmp-why.own { background: #e8f0fb; color: #0a4aa6; }
+.cmp-why.ok { background: #e8f6ec; color: #166534; font-weight: 700; }
 .cmp-why.gray { background: #eef0f4; color: #4b5563; }
 html.night .cmp-n.g { background: #14301f; color: #7fd69b; }
 html.night .cmp-n.o { background: #3a2c12; color: #f0c48a; }
@@ -2149,6 +2150,7 @@ html.night .cmp-grp.om[open] { background: #3a2c12; border-color: #b9873a; }
 html.night .cmp-why { background: #3a2c12; color: #f0c48a; }
 html.night .cmp-why.red { background: #4a1d22; color: #ff9aa6; }
 html.night .cmp-why.own { background: #12305e; color: #cfe3ff; }
+html.night .cmp-why.ok { background: #14301f; color: #7fd69b; }
 html.night .cmp-why.gray { background: #2a3142; color: #c3cad8; }
 /* the new products grouped by the warehouse that lists them (2026-11-16, Hub\orders\NEW_ITEM_OFFERS.ps1) */
 .od-new-group { margin: 8px 0 12px; padding-top: 6px; border-top: 1px solid var(--line); }
