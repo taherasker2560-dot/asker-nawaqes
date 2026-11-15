@@ -101,6 +101,11 @@ assert.equal(D.orderItems(supN,[],'AMG','both'),supN.items);assert.deepEqual(D.o
 // «ابعت الطلبية دي لـ»: the six suppliers, the file's own label when that supplier has an order
 assert.deepEqual(D.sendOptions({suppliers:[{id:'NEWCITY',label:'نيوسيتى'}]}).map(x=>x.id),['NEWCITY','AMG','REDA','ELFATH','PHARMA','IBNSINA']);
 assert.equal(D.sendOptions({suppliers:[{id:'NEWCITY',label:'نيوسيتى'}]})[0].label,'نيوسيتى');assert.equal(D.sendOptions(null)[1].label,'AMG');
+// the cosmetics door (2026-11-15): a cosmetics order goes only to the four cosmetics companies
+assert.deepEqual(D.sendOptions(null,'COS_DOCTOR').map(x=>x.id),['COS_FATHY','COS_DOCTOR','COS_SARHAN','COS_SINA']);
+assert.deepEqual(D.sendOptions(null,'AMG').map(x=>x.id),['NEWCITY','AMG','REDA','ELFATH','PHARMA','IBNSINA']);
+assert.equal(D.isCos('COS_SINA'),true);assert.equal(D.isCos('IBNSINA'),false);assert.equal(D.ofDoor('cos','COS_FATHY'),true);assert.equal(D.ofDoor('drug','COS_FATHY'),false);
+assert.deepEqual(D.contactsFor('COS_SINA',[{name:'ابن سينا الليل'},{name:'شركة عامر سينا للمستلزمات'}]).map(c=>c.name),['شركة عامر سينا للمستلزمات'],'Ibn Sina is not the cosmetics Sina');
 // sent to its own supplier: the same message as before; to another one: PharmaFly names only
 const supX={id:'REDA',items:[{item_id:7,name_pf:'BRUFEN 400MG 30TAB',name_supplier:'بروفين ٤٠٠',qty:3}]},stX=D.defaultSel(supX);
 assert.equal(D.buildMessageTo(supX,stX,'REDA'),D.buildMessage(supX,stX));

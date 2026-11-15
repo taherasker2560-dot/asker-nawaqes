@@ -488,7 +488,11 @@
           </p>
           <p id="odInfo" class="status"></p>
           <div id="odBody" class="hidden">
+            <!-- two doors (owner 2026-11-15: «طلبات المستحضرات … طلبات الدواء … ده في باب وده في باب») -->
+            <div id="odDoors" class="tabs seg sub" role="group" aria-label="نوع الطلبيات"></div>
+            <p id="odDoorEmpty" class="hint hidden"></p>
             <div id="odChips" class="chips" role="group" aria-label="المورد"></div>
+            <div id="odSupBox">
             <!-- the owner may send the whole order to another supplier (2026-11-10: «تغيير المورد للطلبيه نفسها… ساعات بكون مضطر اطلب من حد معين») -->
             <div class="od-sendto">
               <label for="odSendTo">ابعت الطلبية دي لـ</label>
@@ -518,6 +522,7 @@
                 <button id="odNone" type="button" class="secondary small">شيل الكل</button>
               </div>
               <div id="odItems"></div>
+            </div>
             </div>
             <details class="od-box hidden" id="odNoBox">
               <summary id="odNoTitle">مفيش عليهم عرض</summary>
@@ -842,7 +847,7 @@
     <script src="ar/staff.js?v=chat-20261113a"></script>
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
-    <script src="ar/order-drafts.js?v=po-20261115b"></script>
+    <script src="ar/order-drafts.js?v=doors-20261115a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=link-20261113a"></script>
     <script src="ar/store-settings.js?v=theme-20261112a"></script>
