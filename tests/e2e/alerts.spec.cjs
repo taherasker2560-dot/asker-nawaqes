@@ -34,24 +34,28 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('#todoList .todo-row[data-view="bag:2576"]');
  await page.waitForFunction(()=>!document.getElementById('bagsPanel').classList.contains('hidden')&&/ECLATREM/.test(document.getElementById('bgList').textContent));
  assert.equal(await page.$eval('[data-tab="bags"]',b=>b.classList.contains('on')),true);
- const chips=()=>page.$$eval('#bgChips [data-bag]',b=>b.map(x=>[x.textContent.replace(/\s+/g,' ').trim(),x.classList.contains('secondary')]));
+ // the bags one under the other, each on its line with its whole name; the open one shows its items
+ const chips=()=>page.$$eval('#bgList .bg-bag',b=>b.map(x=>[x.querySelector('.bg-bag-h').textContent.replace(/\s+/g,' ').trim(),!x.classList.contains('open')]));
+ const openBag=async(id)=>{if(!(await page.$eval(`#bgList [data-bag="${id}"]`,b=>b.closest('.bg-bag').classList.contains('open'))))await page.click(`#bgList [data-bag="${id}"]`)};
+ assert.equal(await page.$eval('#bgChips',c=>c.classList.contains('hidden')),true,'no strip of bags on top any more');
  assert.deepEqual(await chips(),[['نواقص يوميه 3',true],['نواقص كل الشركات 1',true],['IBN SINA 1 0',true],['فارما مول 1',true],['zad pharma 2',false],['نقدى 0',true]],'every bag even an empty one, «كل الشركات» as one, not the general shortages');
  const bagText=await text(page,'#bgList');
  assert.match(bagText,/ECLATREM FIRMING CREAM عندك 1 · الحد الأدنى 1 · اتباع في شهر 0 · المطلوب 1 آخر شرا 02\/11\/2025 · ناقص من النهارده/);
  assert.match(bagText,/NEVER BOUGHT عندك 0 · اتباع في شهر 2 · المطلوب 1 ما اتشراش قبل كده · ناقص بقاله 2 يوم/);
  assert.doesNotMatch(bagText,/ZURCAL/,'only the chosen bag');
- await page.click('#bgChips [data-bag="2274"]');
- assert.match(await text(page,'#bgList'),/فارما مول 1 علّم الكل ZURCAL 40MG 14 TAB عندك 1 · اتباع في شهر 33 · المطلوب 16 آخر شرا 25\/10 · ناقص بقاله 8 يوم/);
+ await openBag('2274');
+ assert.equal(await page.$$eval('#bgList .bg-bag.open',b=>b.length),1,'one bag open at a time');
+ assert.match(await text(page,'#bgList'),/فارما مول 1 رتّب: الرصيد: الأقل فوق ▲ علّم الكل ZURCAL 40MG 14 TAB عندك 1 · اتباع في شهر 33 · المطلوب 16 آخر شرا 25\/10 · ناقص بقاله 8 يوم/);
  assert.equal(await page.$$eval('#bgList .al-item.late',r=>r.length),1,'the late item is red');
  assert.equal(await page.$eval('[data-tab="bags"]',b=>b.dataset.badge),'1','the small tab counts the late items');
  // the daily bag, ordered by the real stock: smallest first (none on top), a tap = largest first, again = smallest first
- await page.click('#bgChips [data-bag="2428"]');
+ await openBag('2428');
  const order=()=>page.$$eval('#bgList .bg-it strong',s=>s.map(x=>x.textContent.trim()));
  assert.deepEqual(await order(),['DAILY ONE','DAILY THREE','DAILY TWO']);
- assert.equal(await text(page,'#bgSort'),'رتّب: الرصيد: الأقل فوق ▲');
- await page.click('#bgSort [data-sort]');assert.deepEqual(await order(),['DAILY TWO','DAILY THREE','DAILY ONE']);
- assert.equal(await text(page,'#bgSort'),'رتّب: الرصيد: الأكتر فوق ▼');
- await page.click('#bgSort [data-sort]');assert.deepEqual(await order(),['DAILY ONE','DAILY THREE','DAILY TWO']);
+ assert.equal(await text(page,'#bgList .bg-sort'),'رتّب: الرصيد: الأقل فوق ▲');
+ await page.click('#bgList [data-sort]');assert.deepEqual(await order(),['DAILY TWO','DAILY THREE','DAILY ONE']);
+ assert.equal(await text(page,'#bgList .bg-sort'),'رتّب: الرصيد: الأكتر فوق ▼');
+ await page.click('#bgList [data-sort]');assert.deepEqual(await order(),['DAILY ONE','DAILY THREE','DAILY TWO']);
  // «🛒 أمر شراء»: the ticked item goes in his purchase order with what is needed; ticked again it can come out
  await page.click('#bgList [data-pick="11"]');
  assert.equal((await page.textContent('#bgPoBtn')).trim(),'🛒 أمر شراء (1)');
@@ -70,7 +74,7 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
  await page.waitForFunction(()=>/أمر الشرا فاضي/.test(document.getElementById('draftsPanel').textContent));
  await page.click('[data-pgroup="short"]');await page.click('[data-tab="bags"]');await page.waitForTimeout(300);
- await page.click('#bgChips [data-bag="2428"]');
+ await openBag('2428');
  // tick two, «حوّل» shows every other bag (where they are now greyed), pick «نواقص كل الشركات», move
  await page.click('#bgList [data-pick="11"]');await page.click('#bgList [data-pick="12"]');
  assert.equal((await page.textContent('#bgMoveBtn')).trim(),'⇄ حوّل (2)');
@@ -90,22 +94,24 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  assert.deepEqual(await chips(),[['نواقص يوميه 1',false],['نواقص كل الشركات 3',true],['IBN SINA 1 0',true],['فارما مول 1',true],['zad pharma 2',true],['نقدى 0',true]],'they show in their new bag at once');
  // undo: both moves cancelled, back in the daily bag
  await page.click('#bgList [data-undo]');
- await page.waitForFunction(()=>/نواقص يوميه\s*3/.test(document.getElementById('bgChips').textContent));
+ await page.waitForFunction(()=>/نواقص يوميه\s*3/.test(document.getElementById('bgList').textContent));
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.map(m=>m.status)),['cancelled','cancelled']);
  // a move to an empty bag makes it show, the item marked «لسه في فارمافلاي» with where it came from
  await page.click('#bgList [data-pick="13"]');await page.click('#bgMoveBtn');await page.click('#bgSheet [data-to="7"]');await page.click('#bgGo');
- await page.waitForFunction(()=>/نقدى\s*1/.test(document.getElementById('bgChips').textContent));
- await page.click('#bgChips [data-bag="7"]');
+ await page.waitForFunction(()=>/نقدى\s*1/.test(document.getElementById('bgList').textContent));
+ await openBag('7');
  assert.match(await text(page,'#bgList'),/DAILY THREE ⏳ لسه في فارمافلاي .* جاي من نواقص يوميه/);
  // the two quick buttons: «أجّل» → «نواقص كل الشركات», «للنواقص العامة» → 'gs' (none shown for the bag they are already in)
- await page.click('#bgChips [data-bag="2428"]');await page.click('#bgList [data-pick="12"]');
+ await openBag('2428');await page.click('#bgList [data-pick="12"]');
  assert.deepEqual(await page.$$eval('#bgBar button',b=>b.map(x=>x.textContent.trim())),['🛒 أمر شراء (1)','⇄ حوّل (1)','للنواقص العامة','أجّل','إلغاء']);
  await page.click('#bgBar [data-quick="pv"]');
  await page.waitForFunction(()=>/اتحوّل 1 صنف لـ\s*نواقص كل الشركات/.test(document.getElementById('bgList').textContent));
  await page.click('#bgList [data-pick="11"]');await page.click('#bgBar [data-quick="gs"]');
- await page.waitForFunction(()=>/النواقص العامة\s*1/.test(document.getElementById('bgChips').textContent));
+ await page.waitForFunction(()=>/النواقص العامة\s*1/.test(document.getElementById('bgList').textContent));
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_bag_moves.filter(m=>m.status==='pending').map(m=>[m.item_id,m.to_bag]).sort()),[[11,'gs'],[12,'pv'],[13,'7']]);
- await page.click('#bgChips [data-bag="pv"]');await page.click('#bgList [data-pick="21"]');
+ await openBag('pv');await page.click('#bgList [data-pick="21"]');
+ // a second tap on the open bag closes it
+ await page.click('#bgList [data-bag="pv"]');assert.equal(await page.$$eval('#bgList .bg-bag.open',b=>b.length),0);await openBag('pv');await page.click('#bgList [data-pick="21"]');
  assert.deepEqual(await page.$$eval('#bgBar button',b=>b.map(x=>x.textContent.trim())),['🛒 أمر شراء (1)','⇄ حوّل (1)','للنواقص العامة','إلغاء'],'no «أجّل» inside «كل الشركات»');
  await page.click('[data-group="home"]');
  // a home row opens «الصلاحيات» on its view
