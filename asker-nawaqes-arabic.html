@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=scopes-20261113a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=cash-20261115b" />
+    <link rel="stylesheet" href="ar/look.css?v=notes-20261115a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=cash-20261115a"></script>
+    <script src="ar/i18n-en.js?v=notes-20261115a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -231,6 +231,20 @@
           <div id="todoCard" class="todo hidden">
             <h3 class="qa-h">محتاج شغل</h3>
             <div id="todoList"></div>
+          </div>
+          <!-- «ملاحظاتي» (owner 2026-11-15, ar/notes.js): notes by hand or by voice; the ones «في الصيدلية» remind him when the laptop is on the pharmacy network -->
+          <div id="notesCard" class="notes hidden">
+            <h3 class="qa-h">ملاحظاتي</h3>
+            <p id="ntPresence" class="nt-presence nt-unknown"></p>
+            <div class="nt-add">
+              <input id="ntText" type="text" maxlength="500" autocomplete="off" enterkeyhint="done" placeholder="اكتب أو قول حاجة تفتكرها" aria-label="ملاحظة جديدة" />
+              <button id="ntMic" type="button" class="secondary" aria-label="قول بصوتك">🎤</button>
+              <button id="ntAdd" type="button">ضيف</button>
+            </div>
+            <label class="nt-where"><input id="ntPlace" type="checkbox" checked /> افتكرني لما أبقى في الصيدلية</label>
+            <p id="ntStatus" class="status" role="status"></p>
+            <div id="ntList"></div>
+            <details id="ntDoneBox" class="nt-donebox hidden"><summary><span>اتعملت</span> (<span id="ntDoneCount">0</span>)</summary><div id="ntDone"></div></details>
           </div>
           <details class="home-help">
             <summary>البحث اللي فوق بيدوّر في إيه؟</summary>
@@ -877,6 +891,7 @@
 <script src="ar/vendors.js?v=vendors-20261114b"></script>
 <script src="ar/ops.js?v=ops-20261115a"></script>
 <script src="ar/cash.js?v=cash-20261115b"></script>
+<script src="ar/notes.js?v=notes-20261115a"></script>
     <script src="ar/tempsale.js?v=link-20261113a"></script>
     <script src="ar/chat.js?v=acct-20261114a"></script>
     <script src="ar/count.js?v=acct-20261113a"></script>
