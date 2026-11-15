@@ -30,6 +30,32 @@ assert.deepEqual(rowsB.slice(-2).map(t=>[t.key,t.tab,t.view,t.n,t.text,t.name,t.
 assert.deepEqual(rowsB.slice(0,4).map(t=>t.key),['mix','negative','expired','over'],'the bags come after the rest');
 assert.equal(A.lateBags(withBags),1);assert.equal(A.lateBags(a),0);
 assert.equal(A.dayText('2026-10-25','2026-11-14T23:38:50'),'25/10');assert.equal(A.dayText('2025-11-02','2026-11-14T23:38:50'),'02/11/2025');assert.equal(A.dayText(null,'2026'),'');
+// the file with every bag (2026-11-15 afternoon): the daily bag and «كل الشركات» get no home line; a home line counts only what
+// sells or has a minimum; `all` lists the bags to move to
+const full=A.parse({...file,bags:{since:'2026-11-14',late_days:7,all:[{id:'2428',name:'نواقص يوميه'},{id:'pv',name:'نواقص كل الشركات'},{id:'2434',name:'سرحان'},{id:'2274',name:'فارما مول'}],list:[
+ {id:'2428',name:'نواقص يوميه',home:false,items:[{id:1001,name:'A',have:1,sold30:33,min:0,need:16,days:9},{id:1002,name:'B',have:9,sold30:30,min:0,need:6,days:1}]},
+ {id:'pv',name:'نواقص كل الشركات',home:false,items:[{id:2001,name:'C',have:4,sold30:32,min:0,need:12,days:1}]},
+ {id:'2434',name:'سرحان',home:true,items:[{id:3001,name:'D',have:0,sold30:5,min:0,need:3,days:8},{id:3002,name:'E',have:0,sold30:0,min:0,need:1,days:8}]}]}});
+assert.deepEqual(full.bags.list.map(b=>[b.id,b.n,b.home,b.homeN,b.late]),[['2428',2,false,0,0],['pv',1,false,0,0],['2434',2,true,1,1]]);
+assert.deepEqual(A.todo(full).filter(t=>t.key==='bag').map(t=>[t.view,t.n,t.note]),[['bag:2434',1,'منهم 1 بقالهم أكتر من 7 أيام']],'only the other bags, only what sells');
+assert.deepEqual(full.bags.all.map(x=>x.id),['2428','pv','2434','2274']);
+// his moves: an item goes to its new bag at once (pending, from where PharmaFly has it); to an empty bag too; a move PharmaFly
+// already shows is done; an item no longer short keeps the numbers it had
+const mv=A.applyMoves(full.bags,[
+ {id:'m1',item_id:1001,from_bag:'2428',to_bag:'pv',status:'pending'},
+ {id:'m2',item_id:1002,from_bag:'2428',to_bag:'2274',status:'pending'},
+ {id:'m3',item_id:2001,from_bag:'2428',to_bag:'pv',status:'pending'},
+ {id:'m4',item_id:9999,item_name:'GONE',from_bag:'2434',to_bag:'2428',item:{have:3,sold30:2,need:1},status:'pending'},
+ {id:'m5',item_id:3001,from_bag:'2434',to_bag:'pv',status:'cancelled'}]);
+assert.deepEqual(mv.done,['m3'],'PharmaFly already has it in «كل الشركات»');
+assert.deepEqual(mv.list.map(b=>[b.id,b.items.map(i=>i.id+(i.pending?'*':'')).join(',')]),[['2428','9999*'],['pv','2001,1001*'],['2434','3001,3002'],['2274','1002*']]);
+const z=mv.list.find(b=>b.id==='pv').items.find(i=>i.id===1001);assert.equal(z.fromName,'نواقص يوميه');assert.equal(z.move,'m1');
+assert.equal(mv.list[0].items[0].name,'GONE');assert.equal(mv.list[0].items[0].have,3);
+assert.equal(full.bags.list[0].items.length,2,'the file itself is not changed');
+// the arrows: largest first, then smallest first
+assert.deepEqual(A.sortItems(full.bags.list[0].items,'need',-1).map(i=>i.id),[1001,1002]);
+assert.deepEqual(A.sortItems(full.bags.list[0].items,'need',1).map(i=>i.id),[1002,1001]);
+assert.deepEqual(A.sortItems(full.bags.list[0].items,'have',-1).map(i=>i.id),[1002,1001]);
 // notifications: a number that goes up rings; the first time only remembers; going down is quiet
 assert.deepEqual(N.rises({incoming:2,docs:1},{incoming:3,docs:1,store:4}),['incoming']);
 assert.deepEqual(N.rises({},{incoming:3}),[],'first time: nothing rings');

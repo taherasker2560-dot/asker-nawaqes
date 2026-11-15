@@ -815,6 +815,138 @@ html.night .todo-note {
 .bg-chips {
   flex-wrap: wrap;
 }
+/* ticking items and moving them (owner 2026-11-15) */
+.bg-sort {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 2px;
+  font-size: 13px;
+}
+.bg-sort button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+.bg-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-weight: 600;
+}
+.bg-it {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.bg-it input,
+.bg-all input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex: none;
+  accent-color: var(--brand, #0a4aa6);
+}
+.bg-it.on {
+  outline: 2px solid var(--brand, #0a4aa6);
+}
+.bg-it > div {
+  min-width: 0;
+  flex: 1;
+}
+.bg-it strong {
+  display: inline;
+}
+.bg-pend {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: #fff4e5;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+}
+.bg-toast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #e8f6ec;
+  color: #166534;
+  font-weight: 600;
+}
+.bg-bar {
+  position: sticky;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 72px);
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+  z-index: 5;
+}
+.bg-bar #bgMoveBtn {
+  flex: 1;
+}
+.bg-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 27, 51, 0.45);
+}
+.bg-sheet-in {
+  width: 100%;
+  max-height: 80vh;
+  overflow: auto;
+  padding: 14px 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border-radius: 22px 22px 0 0;
+  background: var(--card);
+  color: var(--ink);
+}
+.bg-sheet-in h3 {
+  margin: 0 0 6px;
+}
+.bg-dest {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  text-align: start;
+  font-weight: 600;
+}
+.bg-dest.cur {
+  opacity: 0.45;
+}
+.bg-dest.pick {
+  border: 2px solid var(--brand, #0a4aa6);
+}
+.bg-dest small {
+  color: var(--muted);
+}
+.bg-sheet-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.bg-sheet-btns #bgGo {
+  flex: 1;
+}
 .al-item strong {
   display: block;
   font-size: 14.5px;
