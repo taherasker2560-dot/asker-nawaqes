@@ -16,7 +16,21 @@ object Config {
     fun deviceKey(c: Context): String = p(c).getString("key", "") ?: ""
     fun botUrl(c: Context): String = p(c).getString("bot", DEFAULT_BOT) ?: DEFAULT_BOT
 
-    fun ready(c: Context): Boolean = url(c).startsWith("https://") && apiKey(c).isNotEmpty() && deviceKey(c).length == 64
+    /** The voice he chose (the engine's voice name, empty = the phone's default), its pitch (1.0 = normal, lower = deeper) and speed. */
+    // the owner's pick (2026-11-15, after hearing the four offline Arabic voices of Google's engine): number 4, a man's voice
+    fun voice(c: Context): String = p(c).getString("voice", "ar-xa-x-are-local") ?: "ar-xa-x-are-local"
+    fun pitch(c: Context): Float = p(c).getFloat("pitch", 1.0f)
+    fun rate(c: Context): Float = p(c).getFloat("rate", 1.0f)
+
+    fun saveVoice(c: Context, voice: String?, pitch: Float?, rate: Float?) {
+        val e = p(c).edit()
+        if (voice != null) e.putString("voice", voice.trim())
+        if (pitch != null && pitch in 0.4f..2.0f) e.putFloat("pitch", pitch)
+        if (rate != null && rate in 0.5f..2.0f) e.putFloat("rate", rate)
+        e.apply()
+    }
+
+    fun ready(c: Context): Boolean =url(c).startsWith("https://") && apiKey(c).isNotEmpty() && deviceKey(c).length == 64
 
     fun save(c: Context, url: String?, api: String?, key: String?, bot: String?) {
         val e = p(c).edit()

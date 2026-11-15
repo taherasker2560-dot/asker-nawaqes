@@ -34,6 +34,9 @@ class AdamService : Service() {
         const val ACTION_ASK_AGAIN = "com.askerpharmacy.adam.ASK_AGAIN"
         const val ACTION_TEXT = "com.askerpharmacy.adam.TEXT"
         const val ACTION_STOP = "com.askerpharmacy.adam.STOP_SERVICE"
+        const val ACTION_VOICE = "com.askerpharmacy.adam.VOICE"      // the chosen voice / pitch / speed changed
+        const val ACTION_VOICES = "com.askerpharmacy.adam.VOICES"    // write the Arabic voices of the phone to files/voices.txt
+        const val ACTION_SAY = "com.askerpharmacy.adam.SAY"          // say a sentence in the current voice (to try a voice)
         const val CH_LISTEN = "adam_listen"
         const val CH_RESULT = "adam_result"
         const val ID_LISTEN = 1
@@ -139,6 +142,16 @@ class AdamService : Service() {
         if (!::wake.isInitialized) return START_NOT_STICKY
         when (intent?.action) {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
+            ACTION_VOICE -> speaker.apply()
+            ACTION_VOICES -> try { File(filesDir, "voices.txt").writeText(speaker.describeVoices()) } catch (e: Throwable) { log("voices: " + e.message) }
+            ACTION_SAY -> {
+                val t = intent.getStringExtra("text")?.trim() ?: ""
+                if (t.isNotEmpty() && wake.ready) {
+                    wake.stop(); speaker.stop(); listener.cancel()
+                    setState("speaking")
+                    speaker.say(t) { goIdle() }
+                }
+            }
             ACTION_ASK_AGAIN -> if (wake.ready) { wake.stop(); beginRequestListening() }
             ACTION_TEXT -> {
                 val t = intent.getStringExtra("text")?.trim() ?: ""
@@ -246,12 +259,12 @@ class AdamService : Service() {
         speaker.say(text) { goIdle() }
     }
 
-    /** Waits for the laptop's answer: every second at first, then every 10 seconds (up to 3 hours: the laptop may be switched on later). */
+    /** Waits for the laptop's answer: every half second at first (the answer is spoken as soon as it is there), then every 10 seconds (up to 3 hours: the laptop may be switched on later). */
     private fun poll(id: Long, interactive: Boolean) {
         Thread {
             val start = System.currentTimeMillis()
             while (alive && System.currentTimeMillis() - start < POLL_MAX_MS) {
-                try { Thread.sleep(if (System.currentTimeMillis() - start < 120_000) 1200 else 10_000) } catch (e: InterruptedException) { return@Thread }
+                try { Thread.sleep(if (System.currentTimeMillis() - start < 120_000) 500 else 10_000) } catch (e: InterruptedException) { return@Thread }
                 val g = Api.get(this, id) ?: continue
                 if (!g.optBoolean("ok")) { if (g.optString("error") == "none") return@Thread else continue }
                 val status = g.optString("status")
@@ -363,7 +376,7 @@ class AdamService : Service() {
                 .setStyle(Notification.BigTextStyle().bigText(text))
                 .setAutoCancel(true)
             if (openUrl != null) {
-                val pi = PendingIntent.getActivity(this, 1, Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                val pi = PendingIntent.getActivity(this, 1, Actions.viewIntent(this, openUrl), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
                 b.setContentIntent(pi)
                 b.addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_menu_view), "افتح", pi).build())
             }

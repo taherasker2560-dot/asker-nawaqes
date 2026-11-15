@@ -2,6 +2,7 @@ package com.askerpharmacy.adam
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.AlarmClock
 import org.json.JSONArray
@@ -18,6 +19,7 @@ object Actions {
     fun botCommand(a: JSONObject): String? = when (a.optString("type")) {
         "open_tab" -> "go:" + a.optString("tab")
         "open_customer" -> "cust:" + a.optLong("id")
+        "open_vendor" -> "vend:" + a.optLong("id")
         "search" -> "find:" + a.optString("q")
         "theme" -> {
             val c = a.optString("color").lowercase(Locale.ROOT)
@@ -41,6 +43,7 @@ object Actions {
         return when {
             open.has("tab") -> "go:" + open.optString("tab")
             open.has("customer") -> "cust:" + open.optLong("customer")
+            open.has("vendor") -> "vend:" + open.optLong("vendor")
             open.has("q") -> "find:" + open.optString("q")
             else -> null
         }
@@ -49,6 +52,26 @@ object Actions {
     private fun launch(ctx: Context, i: Intent): Boolean {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return try { ctx.startActivity(i); true } catch (e: Throwable) { false }
+    }
+
+    /**
+     * An address opened the way he wants: in his installed bot app (the home-screen web app «نواقص عربي», a Chrome WebAPK whose
+     * scope covers the address), not in whatever browser the phone has (owner 2026-11-15: «بقول لها افتح لي النواقص بتفتح لي
+     * ابلكيشن تاني»: it opened Firefox). If that app is not installed: Chrome, else the phone's choice.
+     */
+    fun viewIntent(ctx: Context, url: String): Intent {
+        val i = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+        try {
+            val pm = ctx.packageManager
+            val handlers = pm.queryIntentActivities(i, PackageManager.MATCH_ALL)
+            val app = handlers.firstOrNull { it.activityInfo.packageName.startsWith("org.chromium.webapk") }?.activityInfo?.packageName
+            if (app != null) {
+                i.setPackage(app)
+            } else if (handlers.any { it.activityInfo.packageName == "com.android.chrome" }) {
+                i.setPackage("com.android.chrome")
+            }
+        } catch (e: Throwable) { }
+        return i
     }
 
     private val aliases = mapOf(
@@ -124,9 +147,9 @@ object Actions {
         }
         if (botCmds.isEmpty()) return null
         val url = botUrl(ctx, botCmds)
-        launch(ctx, Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        launch(ctx, viewIntent(ctx, url))
         return url
     }
 
-    fun openUrl(ctx: Context, url: String): Boolean = launch(ctx, Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    fun openUrl(ctx: Context, url: String): Boolean = launch(ctx, viewIntent(ctx, url))
 }

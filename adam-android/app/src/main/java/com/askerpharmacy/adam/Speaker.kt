@@ -8,15 +8,16 @@ import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 import java.util.UUID
 
-/** Adam's voice: the phone's own text-to-speech in Arabic. */
+/** Adam's voice: the phone's own text-to-speech in Arabic. The voice, its pitch and its speed are the owner's choice (Config). */
 class Speaker(ctx: Context, private val handler: Handler, private val log: (String) -> Unit) {
+    private val app = ctx.applicationContext
     private var tts: TextToSpeech? = null
     private var ready = false
     val isReady: Boolean get() = ready
     private val waiting = HashMap<String, () -> Unit>()
 
     init {
-        tts = TextToSpeech(ctx.applicationContext) { status ->
+        tts = TextToSpeech(app) { status ->
             val t = tts
             if (status == TextToSpeech.SUCCESS && t != null) {
                 var r = t.setLanguage(Locale("ar", "EG"))
@@ -34,10 +35,46 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
                     override fun onDone(utteranceId: String?) = finished(utteranceId)
                     override fun onError(utteranceId: String?) = finished(utteranceId)
                 })
+                apply()
             } else {
                 log("voice failed to start")
             }
         }
+    }
+
+    /** Puts the chosen voice, pitch and speed (Config) on the engine. A voice that is not on the phone is ignored. */
+    fun apply() {
+        val t = tts ?: return
+        if (!ready) return
+        try {
+            val want = Config.voice(app)
+            if (want.isNotEmpty()) {
+                val v = t.voices?.firstOrNull { it.name == want }
+                if (v != null) t.voice = v else log("voice not found: $want")
+            }
+            t.setPitch(Config.pitch(app))
+            t.setSpeechRate(Config.rate(app))
+        } catch (e: Throwable) {
+            log("voice apply failed: " + e.message)
+        }
+    }
+
+    /** One line per Arabic voice the engine has: name, language, quality, speed, needs the net. */
+    fun describeVoices(): String {
+        val t = tts ?: return "no engine"
+        val sb = StringBuilder()
+        try {
+            sb.append("engine=").append(t.defaultEngine).append(" current=").append(t.voice?.name).append("\n")
+            for (v in (t.voices ?: emptySet())) {
+                if (!v.locale.language.equals("ar", ignoreCase = true)) continue
+                sb.append(v.name).append(" | ").append(v.locale).append(" | quality ").append(v.quality)
+                    .append(" | latency ").append(v.latency).append(" | net ").append(v.isNetworkConnectionRequired)
+                    .append(" | ").append(v.features.joinToString(",")).append("\n")
+            }
+        } catch (e: Throwable) {
+            sb.append("error: ").append(e.message)
+        }
+        return sb.toString()
     }
 
     private fun finished(id: String?) {
