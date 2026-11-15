@@ -159,7 +159,7 @@
     const abs = (p) => new URL(p, page).href;
     return {
       id: 'store.html', name: 'صيدلية عسكر', short_name: 'صيدلية عسكر', description: 'حسابك في صيدلية عسكر', lang: 'ar', dir: 'rtl',
-      start_url: page.href + '#me=' + token, scope: abs('./'), display: 'standalone', background_color: '#f3f6fc', theme_color: '#0a4aa6',
+      start_url: page.href + '#me=' + token, scope: abs('./'), display: 'standalone', background_color: '#f3f6fc', theme_color: '#cf4014',
       icons: [
         { src: abs('icons/arabic-192.png?v=logo2'), sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: abs('icons/arabic-512.png?v=logo2'), sizes: '512x512', type: 'image/png', purpose: 'any' },

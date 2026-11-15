@@ -38,7 +38,7 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   let found = [];
   // the site's default look: the bot's 25 colors (ar/settings.js) + any color; the customer can still change it on his phone
-  let themeReady = false, themeColor = 'asker';
+  let themeReady = false, themeColor = 'flame';
   function drawTheme(color, night) {
     const S = root.AskerSettings, box = $('ssThemePick');
     if (!S || !box) return;
@@ -64,7 +64,7 @@
     const s = data || { is_open: true };
     themeReady = 'theme_color' in s;
     if ($('ssThemeBox')) $('ssThemeBox').hidden = !themeReady;
-    if (themeReady) drawTheme(s.theme_color || 'asker', !!s.theme_night);
+    if (themeReady) drawTheme(s.theme_color || 'flame', !!s.theme_night);
     $('ssOpen').checked = s.is_open !== false;
     $('ssClosedMsg').value = s.closed_message || '';
     $('ssHeroTitle').value = s.hero_title || '';
