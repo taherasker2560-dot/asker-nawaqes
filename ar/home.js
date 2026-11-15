@@ -138,7 +138,21 @@
     return true;
   }
   const SCOPE_WORDS = { stock: 'في المخزون', lists: 'في القوايم', short: 'في النواقص' };
-  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists };
+  // a warehouse list priced differently from ours (owner 2026-11-15: «لو … سعره عندي جنيه، وفي حد في القوائم سعره جنيه وربع، تكتب
+  // لي جنبه وفي القوائم مخزن كذا جنيه وربع»): the newest line of each warehouse whose price is not ours
+  function listPriceText(it, ours) {
+    const p = num(ours);
+    if (!(p > 0)) return '';
+    const seen = new Set(), diff = [];
+    for (const x of [...(it.offers || [])].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))) {
+      const s = String(x.supplier || '').toUpperCase(), lp = num(x.price);
+      if (seen.has(s) || !(lp > 0)) continue;
+      seen.add(s);
+      if (Math.abs(lp - p) >= 0.01) diff.push(supName(x.supplier) + ' ' + r2(lp) + ' ج');
+    }
+    return diff.length ? 'وفي القوايم ' + diff.join(' · ') : '';
+  }
+  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists, listPriceText };
   root.AskerHomeLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -263,6 +277,9 @@
     // سعره»): the pharmacy's price, else the store's, else the newest warehouse list's
     const price = publicPrice(it);
     const more = [s && lib.expText ? lib.expText(s.exp_near) : '', price > 0 ? 'سعر الجمهور ' + Math.round(price * 100) / 100 + ' ج' : ''].filter(Boolean).join(' · ');
+    // our price against the warehouses' lists: only when a list says another price
+    const ourPrice = it.stock && Number(it.stock.price) > 0 ? Number(it.stock.price) : Number(it.price) > 0 ? Number(it.price) : null;
+    const listPrice = listPriceText(it, ourPrice);
     const others = s && lib.otherText ? lib.otherText(s.other, s.parts).map((t) => `<div class="st-other">${esc(t)}</div>`).join('') : '';
     const offers = pharmacy || lists ? '' : offersText(it), bought = pharmacy ? '' : lists ? buysVsLists(it) : buysText(it);
     const table = lists ? offerRows(it).map((r) => `<tr class="${r.best ? 'best' : ''}"><td>${esc(r.name)}${r.best ? ' ✓ الأعلى' : ''}${r.less != null ? ` <span class="less">(أقل ${r.less}%)</span>` : ''}</td><td class="d">${r.disc != null ? r.disc + '%' : '—'}</td></tr>`).join('') : '';
@@ -275,6 +292,7 @@
       ${tags ? `<div class="hs-tags">${tags}</div>` : ''}
       ${others}
       ${more ? `<div class="hint">${esc(more)}</div>` : ''}
+      ${listPrice ? `<div class="hs-listprice">${esc(listPrice)}</div>` : ''}
       ${table ? `<table class="hs-offers-t">${table}</table>` : ''}
       ${bought ? `<div class="hs-buys">${esc(bought)}</div>` : ''}
       ${offers ? `<div class="hs-offers">${esc(offers)}</div>` : ''}

@@ -18,6 +18,7 @@ window.AskerEN = {
   "أمر الشرا ما اتسجلش: {0}": "The purchase order was not saved: {0}",
   "ما اتشالوش من أمر الشرا: {0}": "Not removed from the purchase order: {0}",
   "أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في خلال دقيقة أو اتنين.": "The purchase order is empty: tick the items you want to buy in «Bags» and press «🛒 Purchase order»; the orders are ready within a minute or two.",
+  "وفي القوايم": "and in the lists",
   "💊 طلبيات الأدوية": "💊 Medicine orders",
   "🧴 طلبيات المستحضرات": "🧴 Cosmetics orders",
   "نوع الطلبيات": "Order type",
