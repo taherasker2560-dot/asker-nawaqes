@@ -324,7 +324,7 @@
     return `<div class="od-item${st.on ? '' : ' off'}" data-k="${esc(String(i.item_id))}">` +
       `<label class="od-check"><input type="checkbox" data-on${st.on ? ' checked' : ''} aria-label="هطلب ${esc(i.name_pf)}"></label>` +
       thumb(i) + `<div class="od-info">${lines}</div>` +
-      `<label class="od-qty"><span>الكمية</span><input type="number" inputmode="numeric" min="0" max="${MAX_QTY}" step="1" data-qty value="${esc(st.qty)}"></label></div>`;
+      `<label class="od-qty${st.mine ? ' mine' : ''}"${st.mine ? ' title="الرقم اللي اخترته"' : ''}><span>الكمية</span><input type="number" inputmode="numeric" enterkeyhint="next" autocomplete="off" min="0" max="${MAX_QTY}" step="1" data-qty value="${esc(st.qty)}" title="المقترح: ${esc(String(i.qty))}"></label></div>`;
   }
   function drawChips() {
     $('odChips').innerHTML = doorSuppliers()
@@ -565,7 +565,7 @@
   }
   $('odChips')?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-sup]');
-    if (b) pick(b.dataset.sup);
+    if (b) { pick(b.dataset.sup); if (editing) root.AskerQty?.ready($('odItems')); }
   });
   $('odDoors')?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-door]');
@@ -602,6 +602,7 @@
   $('odEdit')?.addEventListener('click', () => {
     editing = !editing;
     drawRows();
+    if (editing) root.AskerQty?.ready($('odItems')); // the first quantity is ready: type a number, or Enter for the next one
   });
   // ticks and quantities (delegated: one listener for all the rows)
   $('odItems')?.addEventListener('change', (e) => {
@@ -614,7 +615,10 @@
   $('odItems')?.addEventListener('input', (e) => {
     const r = e.target.closest('[data-k]');
     if (!r || !e.target.matches('[data-qty]')) return;
-    state(current)[r.dataset.k].qty = e.target.value;
+    const sq = state(current)[r.dataset.k];
+    sq.qty = e.target.value;
+    sq.mine = true; // a number he typed: the box turns blue (owner 2026-11-15)
+    e.target.closest('.od-qty')?.classList.add('mine');
     drawOrder();
   });
   const setAll = (on) => {

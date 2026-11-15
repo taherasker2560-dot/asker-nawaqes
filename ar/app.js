@@ -1967,6 +1967,7 @@
     ].join('\n');
   }
   // a quantity box for each item in the message: the suggestion is filled in, the owner changes it before sending
+  let lastQtyKey = '';
   function drawQty() {
     const items = msgItems().filter((x) => !x.from.length);
     $('msgQty').innerHTML = items.length
@@ -1974,10 +1975,20 @@
         items
           .map((x) => {
             const sug = fmtQty(qtyNum(sRow(x.id)?.suggested_qty));
-            return `<label class="qty"><span dir="auto">${esc(x.line)}</span><input type="number" min="0" step="1" inputmode="decimal" data-qty="${esc(x.id)}" value="${esc(fmtQty(qtyOf(x.id)))}" placeholder="${esc(sug)}"></label>${sug ? `<p class="hint qty-hint">مقترح: ${esc(sug)}</p>` : ''}`;
+            const mine = sRow(x.id)?.order_qty != null; // a number he typed: the box is blue
+            return `<label class="qty${mine ? ' mine' : ''}"><span dir="auto">${esc(x.line)}</span><input type="number" min="0" step="1" inputmode="decimal" enterkeyhint="next" autocomplete="off" data-qty="${esc(x.id)}" value="${esc(fmtQty(qtyOf(x.id)))}" placeholder="${esc(sug)}"></label>${sug ? `<p class="hint qty-hint">مقترح: ${esc(sug)}</p>` : ''}`;
           })
           .join('')
       : '';
+    // the first quantity is ready (cursor in it, number selected) once for each message he opens (owner 2026-11-15)
+    const qk = items.map((x) => x.id).join(',');
+    // (the panel may show a moment after it is drawn: a few quick tries)
+    const tryReady = (n) => {
+      if (qk === lastQtyKey) return;
+      if (window.AskerQty?.ready($('msgQty'))) { lastQtyKey = qk; return; }
+      if (n > 0) setTimeout(() => tryReady(n - 1), 120);
+    };
+    if (qk && qk !== lastQtyKey) tryReady(6);
   }
   $('msgQty').addEventListener('change', async (e) => {
     const id = e.target?.dataset?.qty,
@@ -1992,6 +2003,7 @@
     }
     const before = s.order_qty;
     s.order_qty = v;
+    e.target.closest('label.qty')?.classList.toggle('mine', v !== null);
     if (!msgEdited) $('msgText').value = buildMessage();
     const { error } = await client.from('ar_shortages').update({ order_qty: v }).eq('id', id);
     if (error) {

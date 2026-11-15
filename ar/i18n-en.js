@@ -3,6 +3,8 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
+ "الرقم اللي اخترته": "The number you chose",
+ "المقترح: {0}": "Suggested: {0}",
  "فواتير": "Invoices",
  "الأصناف اللي دخلت فواتير الشرا (يعني وافقت عليها) ومارجعتهاش للمورد، وصلاحيتها أقل من سنة وست شهور، الأقصر صلاحية الأول. اللي اترجع للمورد بيتشال من هنا، والمرتجع الجزئي بيظهر اللي فاضل.": "Items on the purchase invoices (so you accepted them) that you did not return to the supplier and that expire in less than 18 months, shortest expiry first. What was returned to the supplier is taken off here, and a partial return shows what is left.",
  "آخر 3 أيام": "Last 3 days",
