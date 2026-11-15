@@ -2150,3 +2150,8 @@ html.night .cmp-why { background: #3a2c12; color: #f0c48a; }
 html.night .cmp-why.red { background: #4a1d22; color: #ff9aa6; }
 html.night .cmp-why.own { background: #12305e; color: #cfe3ff; }
 html.night .cmp-why.gray { background: #2a3142; color: #c3cad8; }
+/* the new products grouped by the warehouse that lists them (2026-11-16, Hub\orders\NEW_ITEM_OFFERS.ps1) */
+.od-new-group { margin: 8px 0 12px; padding-top: 6px; border-top: 1px solid var(--line); }
+.od-new-group:first-of-type { border-top: 0; padding-top: 0; }
+.od-new-group h4 { margin: 0 0 4px; font-size: 14px; }
+.od-new-offer { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--muted); }

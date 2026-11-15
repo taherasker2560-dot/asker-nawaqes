@@ -492,9 +492,12 @@
     return r.ok ? await r.json() : {};
   }
   // «أصناف جديدة في أمر الشراء» (owner 2026-11-15: «لما أدوس موافق ينضاف لأمر الشراء»): the new products (not in PharmaFly yet) he approved in
-  // «النواقص ← أصناف جديدة»: no supplier offer to compare, so they are listed here with their quantity and approximate price, with a
-  // message to copy (he sends it to whoever he chooses) and «علّمهم اتطلبوا»
-  let newItems = [], newAr = new Map();
+  // «النواقص ← أصناف جديدة». 2026-11-16 («انت بنسبة كبيرة هتلاقيه في القوائم بتاعت الموردين»): the laptop looks each one up in the warehouses'
+  // newest lists (Hub\orders\NEW_ITEM_OFFERS.ps1, the «new_items» block of drafts.json) and the proposed warehouse is the best discount among the
+  // sure lines, the way the advisor ranks every other item. They are grouped by that warehouse, each group with its own message to copy (the
+  // warehouse's own name for the item + the English name in brackets) and its own «علّمهم اتطلبوا». Not found in any list = the plain group:
+  // a plain message, he sends it to whoever he chooses.
+  let newItems = [], newAr = new Map(), newOffers = [];
   async function refreshNew() {
     if (!$('odNewBox') || !db()) return;
     try {
@@ -509,29 +512,56 @@
     } catch (e) { newItems = []; }
     drawNew();
   }
-  const newMessage = () => ['السلام عليكم', 'محتاج الأصناف دي:', ...newItems.map((x) => `• ${x.name_en} × ${x.qty || 1}`), 'شكرًا'].join('\n');
+  // the offers part of drafts.json: where each approved product is listed (anything odd = none, the plain group)
+  const parseNewOffers = (o) => (o && Array.isArray(o.new_items) ? o.new_items.filter((x) => x && x.key && Array.isArray(x.offers)) : []);
+  function newGroups() {
+    const g = new Map();
+    for (const x of newItems) {
+      const o = newOffers.find((f) => f.key === x.name_key) || null;
+      const sup = o && o.best ? o.offers.find((f) => f.supplier === o.best) || null : null;
+      const k = sup ? sup.supplier : '';
+      if (!g.has(k)) g.set(k, { id: k, label: sup ? sup.label : '', rows: [] });
+      g.get(k).rows.push({ x, o, sup });
+    }
+    return [...g.values()].sort((a, b) => (a.id === '') - (b.id === '') || String(a.label).localeCompare(String(b.label), 'ar'));
+  }
+  const newMessage = (rows) => ['السلام عليكم', 'محتاج الأصناف دي:', ...rows.map(({ x, sup }) => `• ${sup ? `${sup.name} (${x.name_en})` : x.name_en} × ${x.qty || 1}`), 'شكرًا'].join('\n');
+  function newRow({ x, o, sup }) {
+    const others = o ? o.offers.filter((f) => !sup || f.supplier !== sup.supplier) : [];
+    return `<div class="od-row"><strong dir="ltr" class="notr">${esc(x.name_en)}</strong>${newAr.get(x.name_key) ? ` <span class="notr" dir="auto">${esc(newAr.get(x.name_key))}</span>` : ''}${x.form ? ` <span class="pill">${esc(x.form)}</span>` : ''} <span>× ${esc(x.qty || 1)}</span>${x.price != null ? ` <small>≈ ${esc(money(x.price))} ج</small>` : ''}` +
+      (sup ? `<div class="od-new-offer"><small>في قايمتهم:</small> <bdi class="notr" dir="auto">${esc(sup.name)}</bdi> <small>${esc(pct(sup.price))} ج</small> <small>${esc(`خصم ${pct(sup.discount)}%`)}</small>${others.length ? ` <small>وكمان عند:</small> ${others.map((f) => `<small class="notr">${esc(f.label)} ${esc(pct(f.discount))}%</small>`).join(' ')}` : ''}</div>`
+        : `<div class="od-new-offer"><small>مش لاقيه في قوايم المخازن: ابعته للمورد اللي تختاره.</small></div>`) + '</div>';
+  }
   function drawNew() {
     const box = $('odNewBox');
     if (!box) return;
     box.classList.toggle('hidden', !newItems.length);
     if (!newItems.length) return;
     $('odNewTitle').textContent = `أصناف جديدة في أمر الشراء (${newItems.length})`;
-    $('odNewList').innerHTML = newItems.map((x) => `<div class="od-row"><strong dir="ltr" class="notr">${esc(x.name_en)}</strong>${newAr.get(x.name_key) ? ` <span class="notr" dir="auto">${esc(newAr.get(x.name_key))}</span>` : ''}${x.form ? ` <span class="pill">${esc(x.form)}</span>` : ''} <span>× ${esc(x.qty || 1)}</span>${x.price != null ? ` <small>≈ ${esc(money(x.price))} ج</small>` : ''}</div>`).join('');
+    $('odNewList').innerHTML = newGroups().map((g) => `<div class="od-new-group" data-new-group="${esc(g.id)}">${g.id ? `<h4 class="notr">${esc(g.label)}</h4>` : ''}${g.rows.map(newRow).join('')}` +
+      `<div class="od-new-btns"><button type="button" data-new-copy="${esc(g.id)}">${g.id ? `<span>انسخ رسالة</span> <bdi class="notr">${esc(g.label)}</bdi>` : '<span>انسخ الرسالة</span>'}</button><button type="button" class="secondary" data-new-mark="${esc(g.id)}">علّمهم اتطلبوا</button></div></div>`).join('');
   }
-  async function newCopy() {
-    if (!newItems.length) return;
-    try { await navigator.clipboard.writeText(newMessage()); say('رسالة الأصناف الجديدة اتنسخت: الزقها في محادثة المورد اللي تختاره.', 'good'); }
-    catch (e) { say('مقدرتش أنسخ لوحدي: ' + newMessage().replace(/\n/g, ' | '), 'bad'); }
+  const newGroup = (id) => newGroups().find((g) => g.id === id);
+  async function newCopy(id) {
+    const g = newGroup(id);
+    if (!g) return;
+    const msg = newMessage(g.rows);
+    try { await navigator.clipboard.writeText(msg); say(g.label ? `رسالة الأصناف الجديدة اتنسخت: الزقها في محادثة ${g.label}.` : 'رسالة الأصناف الجديدة اتنسخت: الزقها في محادثة المورد اللي تختاره.', 'good'); }
+    catch (e) { say('مقدرتش أنسخ لوحدي: ' + msg.replace(/\n/g, ' | '), 'bad'); }
   }
-  async function newMark() {
-    if (!newItems.length) return;
-    const { error } = await db().from('ar_new_items').update({ status: 'ordered', updated_at: new Date().toISOString() }).in('id', newItems.map((x) => x.id));
+  async function newMark(id) {
+    const g = newGroup(id);
+    if (!g) return;
+    const { error } = await db().from('ar_new_items').update({ status: 'ordered', updated_at: new Date().toISOString() }).in('id', g.rows.map((r) => r.x.id));
     if (error) return say('ماتعلّمتش: ' + error.message, 'bad');
     say('الأصناف الجديدة اتعلّمت اتطلبت.', 'good');
     await refreshNew();
   }
-  $('odNewCopy')?.addEventListener('click', newCopy);
-  $('odNewMark')?.addEventListener('click', newMark);
+  $('odNewList')?.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-new-copy]'), m = e.target.closest('[data-new-mark]');
+    if (c) newCopy(c.dataset.newCopy);
+    else if (m) newMark(m.dataset.newMark);
+  });
   async function open() {
     await Promise.all([refreshNew(), openDrafts()]);
   }
@@ -540,11 +570,13 @@
     try {
       const { data: blob, error } = await db().storage.from('asker-private').download(PATH);
       if (error || !blob) {
-        drafts = null;
+        drafts = null; newOffers = []; drawNew();
         draw();
         return say('لسه مفيش طلبيات مقترحة: اللاب بيجهزها مع كل تحديث، كل ساعة.');
       }
-      base = drafts = parseDrafts(JSON.parse(await blob.text()));
+      const fileJson = JSON.parse(await blob.text());
+      newOffers = parseNewOffers(fileJson); drawNew();
+      base = drafts = parseDrafts(fileJson);
       if (!drafts) {
         draw();
         return say('ملف الطلبيات شكله مش مظبوط، استنى التحديث الجاي.', 'bad');
