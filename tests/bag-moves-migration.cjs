@@ -21,6 +21,8 @@ const OWNER = 'ff6c33dc-9dc5-4e2f-95bb-5d449e231f1c', STAFF = '00000000-0000-400
   assert.ok(await fails('authenticated', OWNER, `INSERT INTO public.ar_bag_moves(item_id,from_bag,to_bag) VALUES (11,'2428','2434')`));
   await as('authenticated', OWNER, `UPDATE public.ar_bag_moves SET status='cancelled', updated_at=now() WHERE id=${m.id}`);
   await as('authenticated', OWNER, `INSERT INTO public.ar_bag_moves(item_id,from_bag,to_bag) VALUES (11,'2428','2434')`);
+  // «النواقص العامة» ('gs') is a place too
+  await as('authenticated', OWNER, `INSERT INTO public.ar_bag_moves(item_id,from_bag,to_bag) VALUES (14,'2428','gs')`);
   // only real bags: a Cards id or 'pv'; never to the same bag; only the known statuses; small item numbers
   assert.ok(await fails('authenticated', OWNER, `INSERT INTO public.ar_bag_moves(item_id,from_bag,to_bag) VALUES (12,'2428','2428')`));
   assert.ok(await fails('authenticated', OWNER, `INSERT INTO public.ar_bag_moves(item_id,from_bag,to_bag) VALUES (12,'2428','x; drop')`));
