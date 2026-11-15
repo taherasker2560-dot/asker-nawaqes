@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.speech.SpeechRecognizer
 import org.json.JSONObject
 import java.io.File
 import java.text.Normalizer
@@ -53,6 +54,26 @@ class AdamService : Service() {
 
         private val YES = setOf("ايوه", "ايوة", "ايوا", "اه", "ااه", "نعم", "تمام", "ماشي", "اوكي", "اوكيه", "يلا", "اعمل", "اكيد", "طبعا", "موافق", "ابعت", "كمل", "اتفضل", "ok", "okay", "yes")
         private val NO = setOf("لا", "لأ", "لاء", "بلاش", "الغي", "الغيه", "لغي", "وقف", "ماتعملش", "متعملش", "مش", "no")
+
+        private fun fold(s: String): String = Normalizer.normalize(s.lowercase(Locale.ROOT), Normalizer.Form.NFKC)
+            .replace(Regex("[\\u064B-\\u0652\\u0640]"), "")
+            .replace(Regex("[أإآٱ]"), "ا").replace('ى', 'ي').replace('ة', 'ه')
+
+        private val DICTATION = Regex("^(سجل|سجللي|بيع|بيعه|فاتوره|اكتب|اكتبلي|مرتجع|طلبيه|اطلب|ضيف|جرد|دخل|اعمل فاتوره|اعمل بيعه)(\\s|$)")
+        /** A request that lists things (a sale, an invoice, an order, a count): he gets time to say all of them. */
+        fun isDictation(said: String): Boolean = DICTATION.containsMatchIn(fold(said).trim())
+
+        private val DONE = Regex("\\s*(خلاص|بس كده|بس كدا|كده تمام|كدا تمام|خلصت|انتهيت)\\s*$")
+        /** The words without a «خلاص» at their end, and whether it was there. */
+        fun stripDone(said: String): Pair<String, Boolean> {
+            val t = said.trim()
+            val f = fold(t)
+            val m = DONE.find(f) ?: return Pair(t, false)
+            // the same number of characters is cut from the original (fold only removes marks, so cut by the folded tail's words)
+            val tailWords = m.value.trim().split(Regex("\\s+")).size
+            val words = t.split(Regex("\\s+"))
+            return Pair(words.dropLast(tailWords).joinToString(" "), true)
+        }
 
         /** «أيوه» = 1, «لا» = -1, anything else = 0 (Arabic spelling variants folded). */
         fun classify(said: String): Int {
@@ -178,6 +199,9 @@ class AdamService : Service() {
     // ---------- the conversation ----------
     private fun goIdle() {
         askedConfirmAgain = false
+        notHeardOnce = false
+        collecting = false
+        dictation.setLength(0)
         setState("idle")
         if (!wake.start()) {
             log("wake word did not start, again in 5 s")
@@ -202,17 +226,67 @@ class AdamService : Service() {
         } catch (e: Throwable) { }
     }
 
+    private fun beepShort() {
+        try {
+            val t = ToneGenerator(AudioManager.STREAM_MUSIC, 50)
+            t.startTone(ToneGenerator.TONE_PROP_ACK, 70)
+            main.postDelayed({ try { t.release() } catch (e: Throwable) { } }, 300)
+        } catch (e: Throwable) { }
+    }
+
+    // ---------- what he says after «آدم» ----------
+    // Owner 2026-11-15: «ساعات بكلمه ومش بيرد اصلا» and «لو عايز اقول له على 7 8 اصناف … بيقوم جاي قافل عليا وياخد اول صنفين».
+    // - Not heard right after the word: he is told («مسمعتكش، قول تاني») and listened to once more; then back to waiting quietly.
+    // - Dictation: a request that starts with «سجّل / بيعة / فاتورة / اكتب / مرتجع / طلبية / ضيف / جرد» keeps listening piece after
+    //   piece (a short beep between them) until he says «خلاص» or stops talking; all of it goes as ONE request.
+    private var notHeardOnce = false
+    private var collecting = false
+    private val dictation = StringBuilder()
+    private var pieces = 0
+
     private fun beginRequestListening() {
         if (!Config.ready(this)) { speaker.say("لسه ماتظبطتش الإعدادات") { goIdle() }; return }
-        setState("listening", "سامعك…")
+        setState("listening", if (collecting) "كمّل… وقول «خلاص» لما تخلص" else "سامعك…")
         listener.listen(
-            { text -> handleText(text) },
+            { text -> onHeard(text) },
             { code ->
                 log("request not heard ($code)")
-                // nothing heard: back to waiting for the word, quietly
-                goIdle()
+                if (collecting) { finishDictation(); return@listen }
+                val nothingSaid = code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                if (nothingSaid && !notHeardOnce) {
+                    notHeardOnce = true
+                    setState("speaking")
+                    speaker.say("مسمعتكش، قول تاني") { if (alive) beginRequestListening() }
+                } else goIdle()
             }
         )
+    }
+
+    private fun onHeard(text: String) {
+        notHeardOnce = false
+        val (piece, done) = stripDone(text)
+        if (collecting) {
+            if (piece.isNotBlank()) { dictation.append(' ').append(piece); pieces++ }
+            log("dictation piece $pieces: " + piece.take(60))
+            if (done || pieces >= 10 || dictation.length > 1200) finishDictation() else { beepShort(); beginRequestListening() }
+            return
+        }
+        if (isDictation(piece) && !done) {
+            collecting = true
+            dictation.setLength(0); dictation.append(piece); pieces = 1
+            log("dictation started: " + piece.take(60))
+            beepShort()
+            beginRequestListening()
+            return
+        }
+        handleText(if (piece.isNotBlank()) piece else text)
+    }
+
+    private fun finishDictation() {
+        collecting = false
+        val t = dictation.toString().trim()
+        dictation.setLength(0)
+        if (t.isEmpty()) goIdle() else handleText(t)
     }
 
     private fun handleText(text: String) {

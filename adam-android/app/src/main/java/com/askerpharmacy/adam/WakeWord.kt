@@ -62,11 +62,14 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
         fired = false
         return try {
             val rec = Recognizer(m, 16000.0f, "[\"adam\", \"a dam\", \"[unk]\"]")
+            rec.setWords(true)   // each word with its confidence
             val s = SpeechService(rec, 16000.0f)
             s.startListening(object : RecognitionListener {
-                override fun onPartialResult(hypothesis: String?) = check(hypothesis, "partial")
-                override fun onResult(hypothesis: String?) = check(hypothesis, "text")
-                override fun onFinalResult(hypothesis: String?) = check(hypothesis, "text")
+                // the half-heard guesses are NOT used any more (owner 2026-11-15: «بقى بيتكلم اصلا من غير ما اقول ادم»): they fire on
+                // any sound near «آدم» in a conversation
+                override fun onPartialResult(hypothesis: String?) {}
+                override fun onResult(hypothesis: String?) = check(hypothesis)
+                override fun onFinalResult(hypothesis: String?) = check(hypothesis)
                 override fun onError(exception: Exception?) { log("wake word error: " + exception?.message) }
                 override fun onTimeout() {}
             })
@@ -78,13 +81,34 @@ class WakeWord(private val ctx: Context, private val onWake: () -> Unit, private
         }
     }
 
-    private fun check(hypothesis: String?, key: String) {
+    /**
+     * Wakes only on «آدم» said ON ITS OWN (a short pause before and after, the way he calls it), heard with good confidence.
+     * «آدم» inside a sentence (him talking to someone, or about Adam) or a doubtful sound is ignored and written to the log.
+     */
+    private fun check(hypothesis: String?) {
         if (fired || hypothesis == null) return
-        val t = try { JSONObject(hypothesis).optString(key, "") } catch (e: Exception) { "" }
-        if (t.contains("adam")) {
+        try {
+            val o = JSONObject(hypothesis)
+            val text = o.optString("text", "").trim()
+            if (text.isEmpty()) return
+            if (text != "adam" && text != "a dam") {
+                if (text.contains("adam")) log("wake ignored, inside a sentence: $text")
+                return
+            }
+            val words = o.optJSONArray("result")
+            var conf = 1.0
+            var dur = 0.0
+            if (words != null && words.length() > 0) {
+                var sum = 0.0
+                for (i in 0 until words.length()) sum += words.getJSONObject(i).optDouble("conf", 0.0)
+                conf = sum / words.length()
+                dur = words.getJSONObject(words.length() - 1).optDouble("end", 0.0) - words.getJSONObject(0).optDouble("start", 0.0)
+            }
+            if (conf < Config.wakeConf(ctx) || dur > 1.4) { log("wake ignored, conf %.2f, %.1f s".format(conf, dur)); return }
+            log("wake conf %.2f".format(conf))
             fired = true
             onWake()
-        }
+        } catch (e: Exception) { }
     }
 
     /** Lets go of the microphone. */
