@@ -2007,3 +2007,34 @@ html.night .cs-amt.pos, html.night .cs-now b.pos, html.night .cs-total b.pos, ht
 .subbar .chips, .subbar.chips { gap: 6px; }
 .subbar .chips .chip:not(.qa-pin), .subbar.chips .chip:not(.qa-pin) { padding-inline: 9px; font-size: 13.5px; }
 .subbar .chips .chip.qa-pin, .subbar.chips .chip.qa-pin { min-width: 36px; padding: 6px 8px; }
+/* ---------- «الرئيسية ← ملاحظاتي» (ar/notes.js, owner 2026-11-15) ---------- */
+.notes { margin: 14px 0 4px; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+.notes.hidden { display: none; }
+.notes .qa-h { margin: 2px 2px 6px; }
+.notes.nt-hot { border-color: #f0c48a; background: #fff8ec; box-shadow: 0 0 0 3px rgba(240, 196, 138, 0.35); }
+html.night .notes.nt-hot { background: #3a2c12; border-color: #b9873a; }
+.nt-presence { margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; background: var(--tint); color: var(--muted); font-size: 13px; font-weight: 600; }
+.nt-presence.nt-in { background: #e8f6ec; color: #166534; }
+.nt-presence.hot { background: #ffe9c2; color: #8a4b00; font-weight: 800; }
+html.night .nt-presence.nt-in { background: #163a25; color: #7fe3a0; }
+html.night .nt-presence.hot { background: #5a3e0c; color: #ffd48a; }
+.nt-add { display: flex; gap: 6px; align-items: center; }
+.nt-add input[type='text'] { flex: 1; min-width: 0; margin: 0; }
+.nt-add button { flex: none; margin: 0; min-height: 42px; }
+.nt-add #ntMic { min-width: 46px; font-size: 18px; padding: 0 10px; }
+.nt-add #ntMic.rec { background: #c62828; color: #fff; animation: nt-pulse 1s infinite; }
+@keyframes nt-pulse { 50% { opacity: 0.55; } }
+.nt-where { display: flex; align-items: center; gap: 6px; margin: 6px 2px 2px; color: var(--muted); font-size: 13px; }
+.nt-where input { width: 18px; height: 18px; margin: 0; }
+#ntStatus:empty { display: none; }
+.nt-row { display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.nt-row.due { background: rgba(255, 196, 94, 0.18); border-radius: 10px; padding-inline: 6px; }
+.nt-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nt-text { font-weight: 600; overflow-wrap: anywhere; }
+.nt-t small { color: var(--muted); font-size: 12px; }
+.nt-tick { flex: none; width: 40px; height: 40px; min-height: 0; margin: 0; padding: 0; border-radius: 50%; border: 2px solid var(--line); background: var(--card); color: var(--muted); box-shadow: none; font-size: 18px; }
+.nt-row.due .nt-tick { border-color: #d98a1a; color: #8a4b00; }
+.nt-x { flex: none; width: 34px; height: 34px; min-height: 0; margin: 0; padding: 0; border: 0; background: transparent; color: var(--muted); box-shadow: none; font-size: 15px; }
+.nt-row.done .nt-text { text-decoration: line-through; opacity: 0.6; }
+.nt-donebox { margin: 8px 2px 0; color: var(--muted); font-size: 13.5px; }
+.nt-donebox.hidden { display: none; }

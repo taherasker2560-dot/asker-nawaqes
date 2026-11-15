@@ -30,10 +30,12 @@ run('English: the switch, every section in English, names and messages untouched
    {id:'2274',name:'فارما مول',home:true,items:[{id:1,name:'ZURCAL 40MG',have:1,sold30:33,min:0,need:16,last_buy:'2026-10-25',days:8},{id:2,name:'NEW ONE',have:0,sold30:0,min:2,need:1,last_buy:null,days:1}]}]}});
   window.__tables.ar_store_orders=[{id:1,status:'new'}];window.__tables.ar_documents=[{id:'d1',status:'new'}];});
  await page.evaluate(()=>window.AskerNotify.tick());
+ await page.evaluate(()=>{const iso=m=>new Date(Date.now()-m*6e4).toISOString();window.__tables.ar_notes=[{id:1,text:'اسأل على فاتورة الفتح',place:'pharmacy',status:'open',created_at:iso(3000)},{id:2,text:'كلم المحاسب',place:'any',status:'open',created_at:iso(100)},{id:3,text:'خلصت دي',place:'pharmacy',status:'done',created_at:iso(500),done_at:iso(20)}];window.__tables.ar_presence=[{id:1,at_pharmacy:true,since:iso(5),checked_at:iso(1)}];return window.AskerNotes.refresh()});await page.waitForSelector('#ntList .nt-row');
+
  const seen=new Map();
  const scan=async(where)=>{for(const v of await leftArabic(page))if(!ALLOWED.some(r=>r.test(v))&&!seen.has(v))seen.set(v,where)};
  const go=async(sel)=>{const el=await page.$(sel);if(el){await el.click();await page.waitForTimeout(300)}};
- await scan('home');
+ await scan('home');await go('#ntMic');await scan('home/notes-mic');await go('#ntDoneBox summary');await scan('home/notes-done');
  // his own home buttons: the edit sheet, a full home's note and the 📌 note (2026-11-15)
  await go('#qaEdit');await scan('home/buttons');await go('#qaSheet [data-qa-flip="vendors"]');await scan('home/buttons-added');await go('#qaDone');
  await go('[data-group="sales"]');await go('.subbar[data-for="sales"] .qa-pin');await scan('home/pin');
