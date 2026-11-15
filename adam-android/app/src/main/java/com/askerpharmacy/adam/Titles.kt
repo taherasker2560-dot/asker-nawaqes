@@ -2,7 +2,8 @@ package com.askerpharmacy.adam
 
 /**
  * No title and no name in anything Adam's voice says (owner 2026-11-15: «مش عايزه لا يناديني لا باسمي ولا باي لقب، انا عايزه يتكلم بس
- * وخلاص»). Used by the voice engine «آدم» (the bot's Tasker announcements) and by Adam's own voice, whatever text reaches them.
+ * وخلاص»; then «يا فندم» and «حضرتك» are fine). Used by the voice engine «آدم» (the bot's Tasker announcements) and by Adam's own
+ * voice, whatever text reaches them.
  */
 object Titles {
     private val CALLS = listOf(
@@ -11,8 +12,7 @@ object Titles {
         Regex("يا\\s*دكتور[هة]?"),
         Regex("(يا\\s*)?(أستاذ|استاذ|اُستاذ)\\s*طاهر"),
         Regex("يا\\s*طاهر"),
-        Regex("يا\\s*فندم"),
-        Regex("حضرتك\\s*"),
+        // «يا فندم» and «حضرتك» stay: he allowed them («ممكن ماشي يا فندم … أو حضرتك», 2026-11-15)
     )
 
     fun strip(text: String): String {
