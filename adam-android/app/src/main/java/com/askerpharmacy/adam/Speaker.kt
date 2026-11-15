@@ -2,6 +2,8 @@ package com.askerpharmacy.adam
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.os.Handler
 import android.speech.tts.TextToSpeech
@@ -19,7 +21,9 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
     private val waiting = HashMap<String, () -> Unit>()
 
     init {
-        tts = TextToSpeech(app) { status ->
+        // the phone's own voice is Google's engine, whatever the default engine is (Adam's own engine «آدم» must never be its own fallback)
+        val engine = try { app.packageManager.getPackageInfo("com.google.android.tts", 0); "com.google.android.tts" } catch (e: Throwable) { null }
+        tts = TextToSpeech(app, { status ->
             val t = tts
             if (status == TextToSpeech.SUCCESS && t != null) {
                 var r = t.setLanguage(Locale("ar", "EG"))
@@ -41,7 +45,7 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
             } else {
                 log("voice failed to start")
             }
-        }
+        }, engine)
     }
 
     /** Puts the chosen voice, pitch and speed (Config) on the engine. A voice that is not on the phone is ignored. */
@@ -83,7 +87,7 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
         handler.post { if (id != null) waiting.remove(id)?.invoke() }
     }
 
-    private var seq = 0
+    @Volatile private var seq = 0
     private var player: MediaPlayer? = null
 
     /**
@@ -98,12 +102,87 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
         val my = ++seq
         if (!Config.natural(app) || !Config.ready(app) || clean.length > Natural.MAX) { sayLocal(clean, then); return }
         Thread {
-            val f = Natural.file(app, clean, log)
-            handler.post {
-                if (my != seq) return@post   // a newer sentence (or stop) replaced this one while it was being made
-                if (f == null || !play(f, my, then)) sayLocal(clean, then)
+            val cached = Natural.cached(app, clean)
+            if (cached != null) {
+                // a line heard before: it plays at once
+                handler.post {
+                    if (my != seq) return@post   // a newer sentence (or stop) replaced this one
+                    if (!play(cached, my, then)) sayLocal(clean, then)
+                }
+            } else {
+                streamSay(clean, my, then)
             }
         }.start()
+    }
+
+    @Volatile private var activeTrack: AudioTrack? = null
+
+    /**
+     * A new sentence is played while the server is still making it (Natural.stream): it starts after the first 0.35 s of sound is
+     * there (so it does not run dry), not after the whole sentence. When it is over it is kept on the phone for next time.
+     * No sound at all (server / net / quota): the phone's own voice says it. Runs on a background thread.
+     */
+    private fun streamSay(clean: String, my: Int, then: () -> Unit) {
+        var track: AudioTrack? = null
+        val all = java.io.ByteArrayOutputStream()
+        val head = java.io.ByteArrayOutputStream()
+        var carry = -1
+        var rateNow = 24000
+        var frames = 0L
+        fun newTrack(rate: Int): AudioTrack {
+            val min = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            val t = AudioTrack.Builder()
+                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                .setAudioFormat(AudioFormat.Builder().setSampleRate(rate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+                .setBufferSizeInBytes(maxOf(min * 2, rate * 2))
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+            activeTrack = t
+            t.play()
+            return t
+        }
+        val sink = { rate: Int, buf: ByteArray, n: Int ->
+            if (my != seq) false else try {
+                rateNow = rate
+                var data = buf
+                var len = n
+                if (carry >= 0) { data = ByteArray(n + 1); data[0] = carry.toByte(); System.arraycopy(buf, 0, data, 1, n); len = n + 1; carry = -1 }
+                if (len % 2 == 1) { carry = data[len - 1].toInt() and 0xff; len -= 1 }
+                if (len > 0) {
+                    all.write(data, 0, len)
+                    val t = track
+                    if (t == null) {
+                        head.write(data, 0, len)
+                        if (head.size() >= rate * 2 * 35 / 100) {
+                            val nt = newTrack(rate); track = nt
+                            val h = head.toByteArray(); nt.write(h, 0, h.size); frames += h.size / 2
+                        }
+                    } else { t.write(data, 0, len); frames += len / 2 }
+                }
+                true
+            } catch (e: Throwable) { false }
+        }
+        val got = Natural.stream(app, clean, log, sink)
+        try {
+            if (my != seq) return
+            if (!got) { handler.post { if (my == seq) sayLocal(clean, then) }; return }
+            if (track == null) {   // a short sentence: all of it is still in the head
+                val nt = newTrack(rateNow); track = nt
+                val h = head.toByteArray(); nt.write(h, 0, h.size); frames += h.size / 2
+            }
+            val t = track ?: return
+            t.stop()   // a streaming track plays what is written, then stops
+            val limit = System.currentTimeMillis() + frames * 1000 / rateNow + 3000
+            while (my == seq && t.playbackHeadPosition < frames && System.currentTimeMillis() < limit) Thread.sleep(40)
+            if (my == seq) Natural.saveWav(app, clean, rateNow, all.toByteArray())
+            handler.post { if (my == seq) then() }
+        } catch (e: Throwable) {
+            log("stream play failed: " + e.message)
+            handler.post { if (my == seq) then() }
+        } finally {
+            try { track?.release() } catch (e: Throwable) { }
+            if (activeTrack === track) activeTrack = null
+        }
     }
 
     private fun play(f: File, my: Int, then: () -> Unit): Boolean {
@@ -130,6 +209,12 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
     }
 
     private fun stopPlayer() {
+        val at = activeTrack
+        if (at != null) {
+            activeTrack = null
+            try { at.pause(); at.flush() } catch (e: Throwable) { }
+            try { at.release() } catch (e: Throwable) { }
+        }
         val mp = player ?: return
         player = null
         try { mp.stop() } catch (e: Throwable) { }

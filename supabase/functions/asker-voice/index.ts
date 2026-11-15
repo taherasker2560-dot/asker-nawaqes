@@ -1,8 +1,9 @@
 // asker-voice: a natural Egyptian-Arabic voice for «آدم» and the bot (owner 2026-11-15: «عايز صوت يكون طبيعي زي ما انا بكلمك،
 // سواء اللي بينطق من البوت او سواء ادم»). The phone's own voice is a small offline engine; this one is Gemini's speech model.
-//   POST {text, voice?, style?, model?}   header x-adam-key: <Adam's 64-hex device key (phone or laptop)>
+//   POST {text, voice?, style?, model?, stream?}   header x-adam-key: <Adam's 64-hex device key (phone or laptop)>
 //        -> audio/wav (24 kHz, mono, 16 bit): the words spoken. `voice` is one of Gemini's voice names (default Charon, a man),
-//           `style` the way of speaking (default: relaxed everyday Egyptian), `model` a speech model name (default below).
+//           `style` a way of speaking (default none: an instruction in the text can be read aloud), `model` a speech model name.
+//           With stream:true the answer is the raw 16-bit mono PCM (rate in the X-Voice-Rate header), sent as it is made.
 //   POST {action:'models'}                same key -> the speech models this Gemini key can use (to choose one).
 // Nothing is stored: the text goes to Gemini, the audio comes back. Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (set by
 // Supabase), GEMINI_API_KEY, GEMINI_TTS_MODEL (optional).
@@ -12,7 +13,9 @@
 type Env = Record<string, string | undefined>;
 const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
 const DEFAULT_VOICE = 'Charon';
-export const DEFAULT_STYLE = 'Say this in natural, relaxed, everyday Egyptian Arabic, like a friendly man talking to a colleague: calm, brisk, no drama. ';
+// NO style line by default (2026-11-15): the owner heard an English sentence before Adam's words, the model had spoken the
+// instruction. The voice reads the Arabic text as it is; a style is sent only when a caller asks for one.
+export const DEFAULT_STYLE = '';
 export const MAX_TEXT = 500;
 const TIMEOUT_MS = 12000, GEMINI_TIMEOUT_MS = 40000, PER_MINUTE = 40;
 const KEY_RE = /^[0-9a-f]{64}$/, VOICE_RE = /^[A-Za-z]{3,24}$/, MODEL_RE = /^gemini-[a-z0-9.\-]{0,60}tts[a-z0-9.\-]{0,30}$/;
@@ -58,7 +61,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   const role = rr && rr.ok ? await rr.json().catch(() => null) : null;
   if (role !== 'phone' && role !== 'laptop') return reply(401, { error: 'key' });
   if (tooMany(key, now)) return reply(429, { error: 'rate' });
-  let body: { action?: unknown; text?: unknown; voice?: unknown; style?: unknown; model?: unknown };
+  let body: { action?: unknown; text?: unknown; voice?: unknown; style?: unknown; model?: unknown; stream?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body' }); }
 
   if (body.action === 'models') {
@@ -81,7 +84,10 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   const style = body.style === undefined ? DEFAULT_STYLE : String(body.style).replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, 300);
 
   const t0 = Date.now();
-  const g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  // stream:true = the raw PCM (16 bit, mono, rate in X-Voice-Rate) comes as Gemini makes it, so the phone starts speaking after
+  // about a second instead of after the whole sentence (owner 2026-11-15: «عايزه أسرع من كده»)
+  const streaming = body.stream === true;
+  const g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
     body: JSON.stringify({
       contents: [{ parts: [{ text: style + text }] }],
@@ -89,7 +95,36 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
     }),
   }).catch(() => null);
   if (!g) return reply(504, { error: 'gemini-timeout' });
-  if (g.status === 429) return reply(429, { error: 'gemini-busy' });
+  if (g.status === 429) return reply(429, { error: 'gemini-busy', detail: (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300) });
+  if (streaming) {
+    if (!g.ok || !g.body) return reply(502, { error: 'gemini', status: g.status });
+    const reader = g.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    const stream = new ReadableStream<Uint8Array>({
+      async pull(ctrl) {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) { ctrl.close(); return; }
+          buf += dec.decode(value, { stream: true });
+          const chunks: Uint8Array[] = [];
+          for (let i = buf.indexOf('\n'); i >= 0; i = buf.indexOf('\n')) {
+            const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+            if (!line.startsWith('data:')) continue;
+            try {
+              const d = JSON.parse(line.slice(5))?.candidates?.[0]?.content?.parts?.find((p: { inlineData?: { data?: string } }) => p.inlineData?.data)?.inlineData?.data;
+              if (d) chunks.push(unb64(d));
+            } catch { /* a line that is not an audio event */ }
+          }
+          if (chunks.length) { for (const c of chunks) ctrl.enqueue(c); return; }
+        }
+      },
+      cancel() { reader.cancel().catch(() => {}); },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Voice-Rate': '24000', 'X-Voice-Model': model, 'X-Voice-Voice': voice },
+    });
+  }
   const out = g.ok ? await g.json().catch(() => null) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] } | null : null;
   const part = out?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
   if (!part?.inlineData?.data) return reply(502, { error: 'gemini', status: g.status });
