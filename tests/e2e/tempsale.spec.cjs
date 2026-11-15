@@ -26,13 +26,24 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.click('.subbar [data-tab="storeorders"]');
  assert.equal(await page.evaluate(()=>document.body.classList.contains('ts-page')),false,'the data-age line is back elsewhere');
  await page.click('.subbar [data-tab="tempsale"]');
- // by name: a tap adds one box, another tap one more
+ // by name: a pick adds one box and closes the list at once (owner 2026-11-15: the list stayed open under the search);
+ // the box empties for the next item; the same item picked again (Enter = the first one) adds one more
+ const closed=async(why)=>{
+  assert.equal((await page.$$('#tsHits [data-ts-add]')).length,0,'the list closes after a pick: '+why);
+  assert.equal(await page.inputValue('#tsQ'),'','the search box empties: '+why);
+  assert.ok(await page.$eval('#tsClear',e=>e.classList.contains('hidden')),'no ✕ on the empty box: '+why)};
  await page.fill('#tsQ','كريم');
  await page.waitForSelector('#tsHits [data-ts-add="4875"]');
  assert.match(await text(page,'#tsHits [data-ts-add="4875"] small'),/كود 4875 · 20 ج · رصيد 3 علب/);
  await page.click('#tsHits [data-ts-add="4875"]');
- await page.click('#tsHits [data-ts-add="4875"]');
- assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'2');
+ await closed('sale, tap');
+ assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'1');
+ await page.fill('#tsQ','كريم');
+ await page.waitForSelector('#tsHits [data-ts-add="4875"]');
+ await page.press('#tsQ','Enter');
+ await closed('sale, Enter');
+ assert.equal(await page.evaluate(()=>document.activeElement.id),'tsQ','Enter keeps the cursor in the search box');
+ await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] .ts-qty b')?.textContent==='2');
  // the line shows the stock and the nearest expiry, as in PharmaFly; more than the stock = red
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/رصيد 3 علب · صلاحية 07\/2028/);
  assert.equal(await page.$('#tsCart .ts-line[data-i="0"] .ts-warn'),null);
@@ -45,7 +56,7 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.fill('#tsQ','101060');
  await page.waitForSelector('#tsHits [data-ts-add="1060"]');
  await page.click('#tsHits [data-ts-add="1060"]');
- assert.equal(await page.inputValue('#tsQ'),'','the code box empties for the next one');
+ await closed('sale, by code');
  // the camera's reading (the sticker barcode) counts only when the same number comes twice in a row
  await page.evaluate(()=>window.AskerTempSale.scanned('169423'));
  await page.evaluate(()=>window.AskerTempSale.scanned('101060'));
@@ -147,6 +158,7 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.fill('#tsQ','كريم');
  await page.waitForSelector('#tsHits [data-ts-add="4875"]');
  await page.click('#tsHits [data-ts-add="4875"]');
+ await closed('return, tap');
  await page.fill('#tsPaid','20');
  await page.click('#tsSave');
  await page.waitForFunction(()=>/اتحفظت ✓/.test(document.getElementById('tsStatus').textContent));
