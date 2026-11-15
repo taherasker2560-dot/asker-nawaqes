@@ -74,6 +74,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- «say this in Adam's voice» (Tasker's Send Intent for the bot's announcements): it can only speak a sentence, so any app may send it -->
+        <receiver
+            android:name=".SpeakReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.askerpharmacy.adam.SPEAK" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="false">

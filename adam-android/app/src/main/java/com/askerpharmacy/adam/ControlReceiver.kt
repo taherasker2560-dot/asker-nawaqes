@@ -33,8 +33,11 @@ class ControlReceiver : BroadcastReceiver() {
             // VOICES writes files/voices.txt (readable with run-as); SAY says a sentence (text | b64) in the current voice
             "com.askerpharmacy.adam.SET_VOICE" -> {
                 Config.saveVoice(context, intent.getStringExtra("voice"), intent.getStringExtra("pitch")?.toFloatOrNull(), intent.getStringExtra("rate")?.toFloatOrNull())
+                // the natural voice: natural = on|off, nvoice = a Gemini voice name (Charon), nmodel = a Gemini speech model
+                Config.saveNatural(context, intent.getStringExtra("natural")?.let { it == "on" || it == "true" || it == "1" }, intent.getStringExtra("nvoice"), intent.getStringExtra("nmodel"))
                 if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_VOICE))
-                resultData = "voice=" + Config.voice(context) + " pitch=" + Config.pitch(context) + " rate=" + Config.rate(context)
+                resultData = "voice=" + Config.voice(context) + " pitch=" + Config.pitch(context) + " rate=" + Config.rate(context) +
+                    " natural=" + Config.natural(context) + " " + Config.naturalVoice(context) + " " + Config.naturalModel(context)
             }
             "com.askerpharmacy.adam.VOICES" -> {
                 if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_VOICES))
