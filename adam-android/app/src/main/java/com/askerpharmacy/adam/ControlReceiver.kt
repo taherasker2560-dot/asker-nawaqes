@@ -77,13 +77,17 @@ class ControlReceiver : BroadcastReceiver() {
                 engine = android.speech.tts.TextToSpeech(context.applicationContext, { status ->
                     val e = engine
                     if (status != android.speech.tts.TextToSpeech.SUCCESS || e == null) { finish("init failed $status") } else {
-                        e.setLanguage(java.util.Locale("ar", "EG"))
+                        // lang = a language tag («en-US») to test another language; force=google = the phone's own voice even for
+                        // Adam's own app (tests only); the engine's own log (files/engine.log) says what it did
+                        val langTag = intent.getStringExtra("lang")?.trim().orEmpty()
+                        val lr = e.setLanguage(if (langTag.isNotEmpty()) java.util.Locale.forLanguageTag(langTag) else java.util.Locale("ar", "EG"))
                         e.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                             override fun onStart(utteranceId: String?) {}
-                            override fun onDone(utteranceId: String?) { finish("done (engine " + e.defaultEngine + ")") }
-                            override fun onError(utteranceId: String?) { finish("error") }
+                            override fun onDone(utteranceId: String?) { finish("done (engine " + e.defaultEngine + ", setLanguage=" + lr + ")") }
+                            override fun onError(utteranceId: String?) { finish("error (setLanguage=" + lr + ")") }
                         })
-                        e.speak(t, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "t")
+                        val params = if (intent.getStringExtra("force") == "google") android.os.Bundle().apply { putString("adam_force", "google") } else null
+                        e.speak(t, android.speech.tts.TextToSpeech.QUEUE_FLUSH, params, "t")
                     }
                 }, "com.askerpharmacy.adam")
                 val h = android.os.Handler(android.os.Looper.getMainLooper())
