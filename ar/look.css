@@ -902,6 +902,32 @@ html.night .todo-note {
 .bg-bar button {
   padding: 8px 10px;
 }
+/* «أمر الشرا» (owner 11-15) */
+.bg-bar .bg-buy {
+  background: #166534;
+  color: #fff;
+}
+.bg-po-tag {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 8px;
+  background: #e8f6ec;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+.bg-po {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--tint);
+  font-size: 13px;
+  font-weight: 600;
+}
 .bg-sheet {
   position: fixed;
   inset: 0;

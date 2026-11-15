@@ -470,6 +470,11 @@
         draw();
         return say('ملف الطلبيات شكله مش مظبوط، استنى التحديث الجاي.', 'bad');
       }
+      // since 2026-11-15 the advisor builds only from his purchase order («أمر شراء» in «الحقائب»): empty order = nothing here
+      if (!drafts.suppliers.length && !drafts.noOffer.length) {
+        draw();
+        return say('أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في التحديث الجاي.');
+      }
       [ordered, saved, pics] = await Promise.all([soft(loadOrdered(), []), soft(loadSaved(), []), soft(loadPics(), {})]);
       const hidden = reapply();
       say(hidden ? `${hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
