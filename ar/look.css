@@ -902,6 +902,61 @@ html.night .todo-note {
 .bg-bar button {
   padding: 8px 10px;
 }
+/* the bags one under the other, a tap opens one (owner 11-15) */
+.bg-bag {
+  margin: 8px 0;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+}
+.bg-bag-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--tint);
+  color: var(--ink);
+  text-align: start;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: none;
+}
+.bg-bag-name {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.bg-bag-n {
+  min-width: 34px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--brand, #0a4aa6);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.bg-bag-h::after {
+  content: '▸';
+  color: var(--muted);
+}
+.bg-bag.open > .bg-bag-h::after {
+  content: '▾';
+  color: #fff;
+}
+.bg-bag.open > .bg-bag-h {
+  background: var(--brand, #0a4aa6);
+  color: #fff;
+}
+.bg-bag-body {
+  padding: 4px 10px 10px;
+}
 /* «أمر الشرا» (owner 11-15) */
 .bg-bar .bg-buy {
   background: #166534;

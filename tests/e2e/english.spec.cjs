@@ -40,8 +40,8 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-tab="translate"]');await scan('translate');
  await go('[data-tab="bags"]');await page.waitForTimeout(400);await scan('bags');
  // tick an item, the «move» sheet, a move and its note (2026-11-15)
- await go('#bgList [data-pick="5"]');await go('#bgMoveBtn');await go('#bgSheet [data-to="pv"]');await scan('bags/move');await go('#bgGo');await page.waitForTimeout(400);await scan('bags/moved');
- await go('#bgChips [data-bag="pv"]');await scan('bags/pending');
+ await go('#bgList [data-bag="2428"]');await go('#bgList [data-pick="5"]');await go('#bgMoveBtn');await go('#bgSheet [data-to="pv"]');await scan('bags/move');await go('#bgGo');await page.waitForTimeout(400);await scan('bags/moved');
+ await go('#bgList [data-bag="pv"]');await scan('bags/pending');
  await go('[data-pgroup="orders"]');for(const t of ['drafts','docs','suppliers']){await go(`[data-tab="${t}"]`);await page.waitForTimeout(400);await scan(t)}
  await go('[data-pgroup="stock"]');await go('[data-tab="stock"]');await page.fill('#stQ','BR');await page.waitForTimeout(300);await go('[data-tab="count"]');await scan('stock');
  await go('[data-tab="expiry"]');await page.waitForTimeout(400);for(const v of ['today','expired','soon']){await go(`[data-al-view="${v}"]`);await scan('expiry/'+v)}

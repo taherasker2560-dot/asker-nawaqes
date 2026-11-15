@@ -273,14 +273,19 @@
     const count = (id) => (L.find((x) => x.id === id) || { n: 0 }).n;
     const tabs = a.bags.all.filter((x) => x.id !== 'gs' || count('gs') > 0);
     for (const x of L) if (!tabs.some((t) => t.id === x.id)) tabs.push({ id: x.id, name: x.name });
-    if (!tabs.some((t) => t.id === bagSel)) { bagSel = tabs.length ? tabs[0].id : ''; picked.clear(); }
-    chips.innerHTML = tabs.map((t) => `<button type="button" data-bag="${esc(t.id)}"${bagSel === t.id ? '' : ' class="secondary"'}><bdi class="notr">${esc(t.name)}</bdi> <b>${count(t.id)}</b></button>`).join('');
-    $('bgSort').innerHTML = L.length
-      ? `<span>رتّب:</span><button type="button" data-sort="have">${sortDir === 1 ? '<span>الرصيد: الأقل فوق</span> ▲' : '<span>الرصيد: الأكتر فوق</span> ▼'}</button>`
-      : '';
-    const b = L.find((x) => x.id === bagSel) || (bagSel ? { id: bagSel, name: (tabs.find((t) => t.id === bagSel) || { name: bagSel }).name, items: [], n: 0 } : null);
+    // the bags one under the other, each on its own line with its whole name; a tap opens it (and closes the one open), a
+    // second tap closes it (owner 11-15: «الحقائب كلها تحت بعضها، كل واحد ادوس عليه يفتح لي اللي جواه … اسم الحقيبة … ظاهر كامل»)
+    if (bagSel && !tabs.some((t) => t.id === bagSel)) { bagSel = ''; picked.clear(); }
+    chips.innerHTML = ''; chips.classList.add('hidden'); $('bgSort').innerHTML = '';
+    const b = bagSel ? L.find((x) => x.id === bagSel) || { id: bagSel, name: (tabs.find((t) => t.id === bagSel) || { name: bagSel }).name, items: [], n: 0 } : null;
     const items = b ? sortItems(b.items, sortKey, sortDir) : [];
     for (const k of [...picked]) if (!items.some((i) => String(i.id) === k)) picked.delete(k);
+    const body = () =>
+      items.length
+        ? `<div class="bg-sort"><span>رتّب:</span><button type="button" data-sort="have">${sortDir === 1 ? '<span>الرصيد: الأقل فوق</span> ▲' : '<span>الرصيد: الأكتر فوق</span> ▼'}</button></div>` +
+          `<label class="bg-all"><input type="checkbox" id="bgAllBox"${picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
+          items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
+        : '<p class="hint">مفيش أصناف ناقصة في الحقيبة دي.</p>';
     box.innerHTML =
       '<p class="hint">الأصناف اللي ظاهرة ناقصة النهارده في فارمافلاي، بنفس قاعدته. علّم الأصناف ودوس «حوّل» عشان تنقلها لحقيبة تانية: التحويل بيتسجل هنا، وفارمافلاي ما بيتلمسش.</p>' +
       (movesErr ? `<p class="status bad">${esc(movesErr)}</p>` : '') +
@@ -288,12 +293,10 @@
       (bagMsg ? `<p class="status bad">${esc(bagMsg)}</p>` : '') +
       (poOk ? `<div class="bg-toast">${esc(poOk)}</div>` : '') +
       (po.length ? `<div class="bg-po"><span>${esc(`🛒 في أمر الشرا: ${po.length} صنف`)}</span> <span>مستشار الطلبيات بيقسّمهم على المخازن في خلال دقيقة أو اتنين.</span> <button type="button" class="small secondary" data-open-drafts>افتح الطلبيات</button></div>` : '') +
-      (b
-        ? `<h3 class="al-h"><bdi class="notr">${esc(b.name)}</bdi> <b class="al-n">${b.n}</b></h3>` +
-          (items.length
-            ? `<label class="bg-all"><input type="checkbox" id="bgAllBox"${picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
-              items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
-            : '<p class="hint">مفيش أصناف ناقصة في الحقيبة دي.</p>')
+      (tabs.length
+        ? tabs.map((t) => `<div class="bg-bag${t.id === bagSel ? ' open' : ''}"><button type="button" class="bg-bag-h" data-bag="${esc(t.id)}" aria-expanded="${t.id === bagSel}">` +
+            `<span class="bg-bag-name notr">${esc(t.name)}</span> <b class="bg-bag-n">${count(t.id)}</b></button>` +
+            (t.id === bagSel ? `<div class="bg-bag-body">${body()}</div>` : '') + '</div>').join('')
         : '<p class="hint">مفيش أصناف ناقصة في الحقائب.</p>');
     bar.classList.toggle('hidden', !picked.size);
     // «حوّل» (any bag), and his two quick ones (owner 11-15): «للنواقص العامة» (not found in the market) and «أجّل» («نواقص كل الشركات»)
@@ -433,7 +436,12 @@
     panel?.addEventListener('click', (e) => {
       const t = e.target;
       const chip = t.closest('[data-bag]'), sort = t.closest('[data-sort]');
-      if (chip) { bagSel = chip.dataset.bag; picked.clear(); lastMoved = null; poOk = ''; drawBags(); return; }
+      if (chip) {
+        const id = chip.dataset.bag;
+        bagSel = bagSel === id ? '' : id; picked.clear(); lastMoved = null; poOk = ''; drawBags();
+        if (bagSel) $('bgList')?.querySelector(`.bg-bag.open`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        return;
+      }
       if (sort) { sortKey = 'have'; sortDir = -sortDir; drawBags(); return; }
       if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
       if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
