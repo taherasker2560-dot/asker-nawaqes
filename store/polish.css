@@ -291,3 +291,66 @@ html.night .ch-ok { background: #183524; border-color: #2f6b45; color: #bdf0cd; 
 .ed-note.bad { color: #b91c1c; }
 /* a long item page (with its description) scrolls; nothing in it is squeezed, the photo included */
 .sheet-card > * { flex-shrink: 0; }
+
+/* ---------- store v2 (owner 2026-11-15: «تبقى عالمية … زي الصفحات المحترمة») ---------- */
+/* rows of photo cards that slide sideways: best sellers, seen lately, «ممكن يعجبك كمان» */
+.rail { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; padding: 2px 16px 10px; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.sh-similar .rail { padding: 2px 0 8px; }
+.pcard { position: relative; flex: 0 0 142px; scroll-snap-align: start; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 6px 16px -14px rgba(var(--glow, 10, 74, 166), 0.6); }
+.pc-pic { height: 108px; border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
+.pc-pic img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.pc-pic .thumb.card { width: 100%; height: 100%; border-radius: 12px; }
+.pc-nm { font-size: 12.5px; font-weight: 600; line-height: 1.35; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; cursor: pointer; }
+.pc-pr { font-weight: 800; color: var(--accent-text, var(--accent)); font-size: 14px; }
+.pc-pr.later { font-weight: 600; color: var(--muted); font-size: 12px; }
+.pcard .plus { position: absolute; top: 92px; inset-inline-start: 8px; width: 32px; height: 32px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 21px; line-height: 1; display: grid; place-items: center; cursor: pointer; box-shadow: 0 6px 12px -4px rgba(var(--glow, 10, 74, 166), 0.7); transition: transform 0.15s; }
+.pcard .plus:active { transform: scale(0.9); }
+.pcard .stepper { position: absolute; top: 92px; inset-inline-start: 8px; }
+.pcard.skel .pc-pic, .pcard.skel i { display: block; border-radius: 10px; background: linear-gradient(90deg, var(--line) 25%, var(--card) 50%, var(--line) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
+.pcard.skel i { height: 12px; margin-top: 6px; } .pcard.skel i.s { width: 50%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+/* «+» turns into a counter once the item is in the cart */
+.stepper { display: inline-flex; align-items: center; background: var(--accent); color: #fff; border-radius: 999px; font-weight: 800; box-shadow: 0 6px 12px -6px rgba(var(--glow, 10, 74, 166), 0.7); }
+.stepper button { width: 32px; height: 32px; border: 0; background: none; color: inherit; font-size: 19px; line-height: 1; cursor: pointer; }
+.stepper span { min-width: 18px; text-align: center; font-size: 14px; }
+/* section tiles with a real product photo */
+.sec-mark.has-pic { background: #fff !important; border: 1px solid var(--line); overflow: hidden; padding: 3px; }
+.sec-mark.has-pic img { width: 100%; height: 100%; object-fit: contain; }
+/* the cart bar above the bottom menu (home and search) */
+.cart-bar { position: fixed; z-index: 35; inset-inline: 12px; bottom: calc(96px + var(--safe-b, 0px)); max-width: 536px; margin-inline: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 10px 14px; border-radius: 18px; background: #13213a; color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.55); animation: bar-up 0.25s ease-out; }
+.cart-bar b { background: var(--accent); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; white-space: nowrap; }
+.cart-bar[hidden] { display: none; }
+@keyframes bar-up { from { transform: translateY(20px); opacity: 0; } }
+body.has-cartbar [data-view="home"], body.has-cartbar [data-view="search"] { padding-bottom: 150px; }
+body.has-cartbar .wa-fab { bottom: calc(164px + env(safe-area-inset-bottom, 0px)); }
+/* the search when the box is empty: recent searches and common needs */
+.recent-box { padding: 0 16px; }
+.recent-box[hidden] { display: none; }
+.recent-box h3 { margin: 14px 0 8px; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--card); color: inherit; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; text-decoration: none; cursor: pointer; }
+/* item page: pickup + pay at the pharmacy, folding description, sticky add button */
+.sh-perks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sh-perks li { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: var(--accent-soft); color: var(--accent-text, var(--accent)); }
+.sh-pic { cursor: zoom-in; }
+.sh-pic.card { cursor: default; }
+details.ds-sec { border-top: 1px solid var(--line); padding: 2px 2px; }
+details.ds-sec summary { list-style: none; cursor: pointer; padding: 9px 0; font-size: 14px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+details.ds-sec summary::-webkit-details-marker { display: none; }
+details.ds-sec summary::after { content: '⌄'; font-size: 16px; color: var(--muted); transition: transform 0.2s; }
+details.ds-sec[open] summary::after { transform: rotate(180deg); }
+details.ds-sec.warn summary { color: #b45309; }
+details.ds-sec ul { margin: 0 0 8px; }
+.sh-similar:empty { display: none; }
+.sh-similar h3 { margin: 6px 0 8px; font-size: 15px; }
+.sheet-card .sh-act { position: sticky; bottom: calc(-18px - var(--safe-b, 0px)); z-index: 2; margin: 6px -16px calc(-18px - var(--safe-b, 0px)); padding: 10px 16px calc(12px + var(--safe-b, 0px)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -10px 20px -16px rgba(0, 0, 0, 0.4); }
+.sheet-card .sh-act[hidden] { display: none; }
+.sheet-card .sh-act .add { flex: 1; }
+/* the photo big */
+.zoom { position: fixed; inset: 0; z-index: 80; background: rgba(5, 10, 20, 0.92); display: flex; align-items: center; justify-content: center; overflow: auto; }
+.zoom[hidden] { display: none; }
+.zoom img { max-width: 94vw; max-height: 86vh; object-fit: contain; background: #fff; border-radius: 16px; cursor: zoom-in; transition: transform 0.2s; }
+.zoom img.big { max-width: none; max-height: none; width: 180vw; cursor: zoom-out; border-radius: 0; }
+.zoom .sheet-x { position: fixed; top: 14px; inset-inline-end: 14px; z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .cart-bar, .pcard.skel .pc-pic, .pcard.skel i { animation: none; } }body.sheet-open .cart-bar { display: none; }

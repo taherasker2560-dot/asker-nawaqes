@@ -115,11 +115,12 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.ok(await page.isHidden('#cName'));
  assert.equal(await page.inputValue('#cPhone'),'01012345678');
  assert.ok(await page.isChecked('#payBox input[value="account"]'));
- await page.fill('#cAddr','شارع التجربة 12');
+ // no delivery (owner 2026-11-15): no address box; the order says «استلام من الصيدلية»
+ assert.equal(await page.$('#cAddr'),null);
  await page.click('#sendBtn');
  await page.waitForSelector('[data-view="done"]:not([hidden])');
  const w=await page.evaluate(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_customer_place_order').map(x=>x.args));
- assert.equal(w.length,1);assert.equal(w[0].p_token,tok);assert.equal(w[0].p_pay,'account');assert.equal(w[0].p_name,undefined);
+ assert.equal(w.length,1);assert.equal(w[0].p_token,tok);assert.equal(w[0].p_pay,'account');assert.equal(w[0].p_name,undefined);assert.equal(w[0].p_address,'استلام من الصيدلية');
  assert.equal(await text(page,'#donePay'),'الطلب هيتحط على حسابك في الصيدلية');
  // the owner stopped him: the page says so, and the order is cash only
  await seed([{customer_id:101}]);
@@ -132,12 +133,11 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  await page.waitForSelector('#payBox:not([hidden]) input[value="cash"]');
  assert.ok(await page.isDisabled('#payBox input[value="account"]'));
  assert.ok(await page.isChecked('#payBox input[value="cash"]'));
- await page.fill('#cAddr','شارع التجربة 12');
  await page.click('#sendBtn');
  await page.waitForSelector('[data-view="done"]:not([hidden])');
  const w2=await page.evaluate(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_customer_place_order').map(x=>x.args.p_pay));
  assert.deepEqual(w2,['cash']);
- assert.equal(await text(page,'#donePay'),'الدفع كاش عند الاستلام');
+ assert.equal(await text(page,'#donePay'),'الدفع في الصيدلية لما تستلم');
  // sent over from another browser to Chrome by the install button (?me=…&install=1): the same account, the secret leaves
  // the address, and the big button asks for the last tap; the offer comes a moment later and that tap installs
  await page.evaluate(()=>localStorage.removeItem('asker_store_customer'));
