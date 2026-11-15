@@ -255,6 +255,14 @@
       (x.pending ? ` · <span>جاي من</span> <bdi class="notr">${esc(x.fromName)}</bdi>` : '') + '</div></div></label>';
   }
   const bagView = () => applyMoves(data && data.bags, moves);
+  // the two orders (owner 11-15): the real stock (smallest first when chosen) and the item's monthly average, «اتباع في شهر»
+  // (largest first when chosen, «عايزين نعمل واحد للمتوسط بتاع الصنف»); a tap on the chosen one turns it around
+  const SORT_FIRST = { have: 1, sold30: -1 };
+  function sortBtn(k) {
+    const on = sortKey === k, dir = on ? sortDir : SORT_FIRST[k];
+    const t = k === 'have' ? (dir === 1 ? 'الرصيد: الأقل فوق' : 'الرصيد: الأكتر فوق') : (dir === -1 ? 'المتوسط: الأكتر فوق' : 'المتوسط: الأقل فوق');
+    return `<button type="button" data-sort="${k}"${on ? '' : ' class="secondary"'}><span>${t}</span>${on ? (dir === 1 ? ' ▲' : ' ▼') : ''}</button>`;
+  }
   function drawBags() {
     const box = $('bgList');
     if (!box) return;
@@ -282,7 +290,7 @@
     for (const k of [...picked]) if (!items.some((i) => String(i.id) === k)) picked.delete(k);
     const body = () =>
       items.length
-        ? `<div class="bg-sort"><span>رتّب:</span><button type="button" data-sort="have">${sortDir === 1 ? '<span>الرصيد: الأقل فوق</span> ▲' : '<span>الرصيد: الأكتر فوق</span> ▼'}</button></div>` +
+        ? `<div class="bg-sort"><span>رتّب:</span>${sortBtn('have')}${sortBtn('sold30')}</div>` +
           `<label class="bg-all"><input type="checkbox" id="bgAllBox"${picked.size === items.length ? ' checked' : ''} /> <span>علّم الكل</span></label>` +
           items.map((x) => bagItem(x, a.bags.lateDays, a.dataAt)).join('')
         : '<p class="hint">مفيش أصناف ناقصة في الحقيبة دي.</p>';
@@ -442,7 +450,7 @@
         if (bagSel) $('bgList')?.querySelector(`.bg-bag.open`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
         return;
       }
-      if (sort) { sortKey = 'have'; sortDir = -sortDir; drawBags(); return; }
+      if (sort) { const k = sort.dataset.sort === 'sold30' ? 'sold30' : 'have'; if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = SORT_FIRST[k]; } drawBags(); return; }
       if (t.closest('#bgMoveBtn')) { sheetTo = ''; $('bgSheet').dataset.open = '1'; drawSheet(); return; }
       if (t.closest('#bgClear')) { picked.clear(); drawBags(); return; }
     });
