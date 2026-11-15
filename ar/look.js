@@ -10,7 +10,7 @@
     homePanel: '', shortPanel: 'النواقص', readPanel: 'الوارد', translatePanel: 'الترجمة', draftsPanel: 'الطلبيات',
     docsPanel: 'الفواتير', suppliersPanel: 'قوايم المخازن', stockPanel: 'المخزون', countPanel: 'جرد المخزون', expiryPanel: 'الصلاحيات',
     customersPanel: 'العملاء', vendorsPanel: 'الموردين', storeOrdersPanel: 'طلبات الموقع', salesPanel: 'حركة البيع',
-    tempSalePanel: 'البيع المؤقت', carePanel: '',
+    tempSalePanel: 'البيع المؤقت', cashPanel: 'الخزن', carePanel: '',
   };
 
   // 1) where you are
