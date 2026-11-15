@@ -13,6 +13,8 @@
 type Env = Record<string, string | undefined>;
 const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
 const DEFAULT_VOICE = 'Charon';
+// tried in this order after the asked-for model (the same voice sounds almost the same on all of them)
+export const FALLBACK_MODELS = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview'];
 // NO style line by default (2026-11-15): the owner heard an English sentence before Adam's words, the model had spoken the
 // instruction. The voice reads the Arabic text as it is; a style is sent only when a caller asks for one.
 export const DEFAULT_STYLE = '';
@@ -87,15 +89,25 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   // stream:true = the raw PCM (16 bit, mono, rate in X-Voice-Rate) comes as Gemini makes it, so the phone starts speaking after
   // about a second instead of after the whole sentence (owner 2026-11-15: «عايزه أسرع من كده»)
   const streaming = body.stream === true;
-  const g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: style + text }] }],
-      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
-    }),
-  }).catch(() => null);
+  // Every speech model has its OWN daily quota on the free plan (2026-11-15: the fast model ran out after about a hundred calls
+  // while the others still answered), so when the asked-for model is out of quota (429) or down (5xx) the next one is tried.
+  const chain = [model, ...FALLBACK_MODELS.filter((m) => m !== model)];
+  let g: Response | null = null, used = model, why = '';
+  for (const m of chain) {
+    used = m;
+    g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:${streaming ? 'streamGenerateContent?alt=sse' : 'generateContent'}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: style + text }] }],
+        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+      }),
+    }).catch(() => null);
+    if (g && g.status !== 429 && g.status < 500) break;
+    if (g) why = (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 900);
+  }
   if (!g) return reply(504, { error: 'gemini-timeout' });
-  if (g.status === 429) return reply(429, { error: 'gemini-busy', detail: (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300) });
+  if (g.status === 429) return reply(429, { error: 'gemini-busy', detail: why });
+  if (g.status >= 500) return reply(502, { error: 'gemini', status: g.status, detail: why.slice(0, 300) });
   if (streaming) {
     if (!g.ok || !g.body) return reply(502, { error: 'gemini', status: g.status });
     const reader = g.body.getReader(), dec = new TextDecoder();
@@ -122,7 +134,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
     });
     return new Response(stream, {
       status: 200,
-      headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Voice-Rate': '24000', 'X-Voice-Model': model, 'X-Voice-Voice': voice },
+      headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Voice-Rate': '24000', 'X-Voice-Model': used, 'X-Voice-Voice': voice },
     });
   }
   const out = g.ok ? await g.json().catch(() => null) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] } | null : null;
@@ -134,7 +146,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   if (!pcm.length) return reply(502, { error: 'empty' });
   return new Response(wav(pcm, rate), {
     status: 200,
-    headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store', 'X-Voice-Model': model, 'X-Voice-Voice': voice, 'X-Voice-Ms': String(Date.now() - t0) },
+    headers: { 'Content-Type': 'audio/wav', 'Cache-Control': 'no-store', 'X-Voice-Model': used, 'X-Voice-Voice': voice, 'X-Voice-Ms': String(Date.now() - t0) },
   });
 }
 
