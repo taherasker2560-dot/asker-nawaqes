@@ -259,12 +259,12 @@ class AdamService : Service() {
         speaker.say(text) { goIdle() }
     }
 
-    /** Waits for the laptop's answer: every second at first, then every 10 seconds (up to 3 hours: the laptop may be switched on later). */
+    /** Waits for the laptop's answer: every half second at first (the answer is spoken as soon as it is there), then every 10 seconds (up to 3 hours: the laptop may be switched on later). */
     private fun poll(id: Long, interactive: Boolean) {
         Thread {
             val start = System.currentTimeMillis()
             while (alive && System.currentTimeMillis() - start < POLL_MAX_MS) {
-                try { Thread.sleep(if (System.currentTimeMillis() - start < 120_000) 1200 else 10_000) } catch (e: InterruptedException) { return@Thread }
+                try { Thread.sleep(if (System.currentTimeMillis() - start < 120_000) 500 else 10_000) } catch (e: InterruptedException) { return@Thread }
                 val g = Api.get(this, id) ?: continue
                 if (!g.optBoolean("ok")) { if (g.optString("error") == "none") return@Thread else continue }
                 val status = g.optString("status")

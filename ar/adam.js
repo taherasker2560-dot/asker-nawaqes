@@ -2,6 +2,7 @@
    The Android app (adam-android/) opens this page with its commands in the address (one ?adam=… each), after Adam has answered by voice:
      ?adam=go:sales              a section (the same keys as ?tab=: short, read, drafts, stock, customers, vendors, sales, tempsale ...)
      ?adam=cust:123              a customer's statement
+     ?adam=vend:45               a supplier's statement («افتح حساب مخزن الفتح»; the number is the supplier's card id)
      ?adam=find:بانادول          the search on top with that word
      ?adam=theme:green[:n|:d]    the color (a ready color's id, or hex-1d6f48 for any color); :n night look, :d day look
      ?adam=undo                  back to the color / look before Adam's last change («رجّعه»)
@@ -21,7 +22,7 @@
     if (i < 1) return null;
     const verb = s.slice(0, i), arg = s.slice(i + 1);
     if (verb === 'go') return TABS.includes(arg) ? { verb, arg } : null;
-    if (verb === 'cust') return /^\d{1,12}$/.test(arg) ? { verb, arg } : null;
+    if (verb === 'cust' || verb === 'vend') return /^\d{1,12}$/.test(arg) ? { verb, arg } : null;
     if (verb === 'find') { const q = arg.trim(); return q && q.length <= 80 ? { verb, arg: q } : null; }
     if (verb === 'theme') {
       const m = /^([a-z]{3,12}|hex-[0-9a-f]{6})(?::([nd]))?$/i.exec(arg);
@@ -100,6 +101,15 @@
     }
     root.AskerCustomers?.statement?.(Number(id));
   }
+  // a supplier's statement: the suppliers' list loads first (the statement needs the supplier from it), then it opens
+  async function vendor(id) {
+    root.AskerApp?.showTab?.('vendors');
+    for (let i = 0; i < 40; i++) {
+      if ((root.AskerVendors?.list?.() || []).some((v) => String(v.id) === String(id))) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    root.AskerVendors?.statement?.(Number(id));
+  }
   function find(q) {
     root.AskerApp?.showTab?.('home');
     const box = $('hsQ');
@@ -112,6 +122,7 @@
     if (!cmd) return;
     if (cmd.verb === 'go') root.AskerApp?.showTab?.(cmd.arg);
     else if (cmd.verb === 'cust') customer(cmd.arg);
+    else if (cmd.verb === 'vend') vendor(cmd.arg);
     else if (cmd.verb === 'find') find(cmd.arg);
     else if (cmd.verb === 'theme') theme(cmd);
     else if (cmd.verb === 'undo') undo();

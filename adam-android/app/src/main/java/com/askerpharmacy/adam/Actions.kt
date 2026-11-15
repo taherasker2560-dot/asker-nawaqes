@@ -19,6 +19,7 @@ object Actions {
     fun botCommand(a: JSONObject): String? = when (a.optString("type")) {
         "open_tab" -> "go:" + a.optString("tab")
         "open_customer" -> "cust:" + a.optLong("id")
+        "open_vendor" -> "vend:" + a.optLong("id")
         "search" -> "find:" + a.optString("q")
         "theme" -> {
             val c = a.optString("color").lowercase(Locale.ROOT)
@@ -42,6 +43,7 @@ object Actions {
         return when {
             open.has("tab") -> "go:" + open.optString("tab")
             open.has("customer") -> "cust:" + open.optLong("customer")
+            open.has("vendor") -> "vend:" + open.optLong("vendor")
             open.has("q") -> "find:" + open.optString("q")
             else -> null
         }
