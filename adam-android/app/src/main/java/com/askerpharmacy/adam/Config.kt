@@ -22,6 +22,22 @@ object Config {
     fun pitch(c: Context): Float = p(c).getFloat("pitch", 1.0f)
     fun rate(c: Context): Float = p(c).getFloat("rate", 1.0f)
 
+    /**
+     * The natural voice (the owner 2026-11-15: «عايز صوت طبيعي زي ما انا بكلمك»; he picked sample 5 = Charon on the fast model): the
+     * words are spoken by Gemini's speech model through the bot's server (function asker-voice, with this phone's device key); the
+     * phone's own voice above is the fallback when the server or the net is not there.
+     */
+    fun natural(c: Context): Boolean = p(c).getBoolean("natural", true)
+    fun naturalVoice(c: Context): String = p(c).getString("nvoice", "Charon") ?: "Charon"
+    fun naturalModel(c: Context): String = p(c).getString("nmodel", "gemini-3.8-flash-lite-tts") ?: "gemini-3.8-flash-lite-tts"
+    fun saveNatural(c: Context, on: Boolean?, voice: String?, model: String?) {
+        val e = p(c).edit()
+        if (on != null) e.putBoolean("natural", on)
+        if (!voice.isNullOrBlank() && Regex("^[A-Za-z]{3,24}$").matches(voice.trim())) e.putString("nvoice", voice.trim())
+        if (!model.isNullOrBlank() && Regex("^gemini-[a-z0-9.\\-]{0,60}tts[a-z0-9.\\-]{0,30}$").matches(model.trim())) e.putString("nmodel", model.trim())
+        e.apply()
+    }
+
     fun saveVoice(c: Context, voice: String?, pitch: Float?, rate: Float?) {
         val e = p(c).edit()
         if (voice != null) e.putString("voice", voice.trim())

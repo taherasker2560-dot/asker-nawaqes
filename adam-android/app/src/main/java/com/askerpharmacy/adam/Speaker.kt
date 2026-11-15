@@ -2,13 +2,15 @@ package com.askerpharmacy.adam
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.os.Handler
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import java.io.File
 import java.util.Locale
 import java.util.UUID
 
-/** Adam's voice: the phone's own text-to-speech in Arabic. The voice, its pitch and its speed are the owner's choice (Config). */
+/** Adam's voice: the natural voice of the bot's server (Natural.kt), with the phone's own Arabic text-to-speech as the fallback (its voice, pitch and speed are Config's). */
 class Speaker(ctx: Context, private val handler: Handler, private val log: (String) -> Unit) {
     private val app = ctx.applicationContext
     private var tts: TextToSpeech? = null
@@ -81,11 +83,62 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
         handler.post { if (id != null) waiting.remove(id)?.invoke() }
     }
 
-    /** Says [text]; [then] runs when it is finished (also when the voice is not available, so the conversation goes on). */
+    private var seq = 0
+    private var player: MediaPlayer? = null
+
+    /**
+     * Says [text]; [then] runs when it is finished (also when no voice is available, so the conversation goes on).
+     * The natural voice first (the bot's server, Gemini's speech: Natural.kt, kept on the phone for repeated lines); the phone's own
+     * voice when the server or the net is not there, or the sentence is too long for it.
+     */
     fun say(text: String, then: () -> Unit) {
-        val t = tts
         val clean = text.trim().take(3500)
-        if (!ready || t == null || clean.isEmpty()) {
+        if (clean.isEmpty()) { handler.post(then); return }
+        stopPlayer()
+        val my = ++seq
+        if (!Config.natural(app) || !Config.ready(app) || clean.length > Natural.MAX) { sayLocal(clean, then); return }
+        Thread {
+            val f = Natural.file(app, clean, log)
+            handler.post {
+                if (my != seq) return@post   // a newer sentence (or stop) replaced this one while it was being made
+                if (f == null || !play(f, my, then)) sayLocal(clean, then)
+            }
+        }.start()
+    }
+
+    private fun play(f: File, my: Int, then: () -> Unit): Boolean {
+        val mp = MediaPlayer()
+        return try {
+            player = mp
+            mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            mp.setDataSource(f.absolutePath)
+            mp.setOnCompletionListener { releasePlayer(mp); if (my == seq) handler.post(then) }
+            mp.setOnErrorListener { _, _, _ -> releasePlayer(mp); if (my == seq) handler.post(then); true }
+            mp.prepare()
+            mp.start()
+            true
+        } catch (e: Throwable) {
+            log("play failed: " + e.message)
+            releasePlayer(mp)
+            false
+        }
+    }
+
+    private fun releasePlayer(mp: MediaPlayer) {
+        try { mp.release() } catch (e: Throwable) { }
+        if (player === mp) player = null
+    }
+
+    private fun stopPlayer() {
+        val mp = player ?: return
+        player = null
+        try { mp.stop() } catch (e: Throwable) { }
+        try { mp.release() } catch (e: Throwable) { }
+    }
+
+    private fun sayLocal(clean: String, then: () -> Unit) {
+        val t = tts
+        if (!ready || t == null) {
             handler.post(then)
             return
         }
@@ -99,10 +152,14 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
     }
 
     fun stop() {
+        seq++
+        stopPlayer()
         try { tts?.stop() } catch (e: Throwable) { }
     }
 
     fun shutdown() {
+        seq++
+        stopPlayer()
         try { tts?.stop(); tts?.shutdown() } catch (e: Throwable) { }
         tts = null
     }
