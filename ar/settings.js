@@ -16,6 +16,28 @@
     ['brown', 'بني', '#5d4037'], ['gray', 'رمادي', '#3f4650'], ['slate', 'رصاصي', '#455a64'], ['charcoal', 'فحمي', '#263238'],
   ].map(([id, name, hex]) => ({ id, name, hex }));
   const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'flame';
+  // the dark surfaces of the new look «كبسولة وموجة» (the bottom bar, the greeting, the balance card). Owner 2026-11-16: the navy was «مش حلو»;
+  // «قهوة دافية و اعملها اوبشن اغيرها براحتى»; then he sent a picture and asked for «اللون الأخضر … بنفس درجته اللي في الصورة»: the green is the DEFAULT now,
+  // taken from that picture (its teal #018b90 is the lighter step; the surface is the same hue deepened so white text reads, 5.9:1). Four sets that suit
+  // the orange, none of them blue, plus any color of his own; each gives the surface, a lighter step of it and the near-black one for the night look.
+  // The bot keeps its choice under asker-dark, the store under asker-store-dark (store/theme.js).
+  const DARKS = [
+    ['teal', 'أخضر مائي', '#066f74', '#018b90', '#03292c'], ['warm', 'قهوة دافية', '#3a2018', '#5b3322', '#1c0e0a'],
+    ['charcoal', 'فحمي', '#25282c', '#3d434b', '#101214'], ['plum', 'برقوقي', '#3a1c33', '#5a2d4f', '#1a0c17'],
+  ].map(([id, name, dark, dark2, deep]) => ({ id, name, dark, dark2, deep }));
+  const DARK_KEY = 'asker-dark', DARK_DEFAULT = 'teal';
+  // «c:#rrggbb» = a color of his own: darkened until white text on it reads, with its lighter step and its near-black worked out
+  function darkOf(id) {
+    const own = /^c:(#[0-9a-f]{6})$/i.exec(String(id || ''));
+    if (own) {
+      const rgb = hexToRgb(own[1]);
+      let [h, s, l] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+      let dark = hslToHex(h, s, l);
+      while (contrast(dark, '#ffffff') < 4.5 && l > 4) { l -= 2; dark = hslToHex(h, s, l); }
+      return { id: 'custom', name: '', dark, dark2: hslToHex(h, s, Math.min(l + 10, 60)), deep: hslToHex(h, Math.min(s, 70), Math.max(l * 0.4, 4)) };
+    }
+    return DARKS.find((x) => x.id === id) || DARKS[0];
+  }
 
   // ---------- colors (pure) ----------
   function hexToRgb(h) { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -77,8 +99,19 @@
     const hex = p ? p.hex : /^c:#[0-9a-f]{6}$/i.test(a) ? a.slice(2) : PRESETS[0].hex;
     return { id: p ? p.id : /^c:/.test(a) ? 'custom' : DEFAULT_ID, hex, night };
   }
+  // the dark set on the page: --dark (the surface), --dark-2 (a lighter step), --dark-deep (the night look's near-black), --dark-rgb (for soft shadows)
+  function applyDark(id) {
+    const d = darkOf(id), s = document.documentElement.style;
+    s.setProperty('--dark', d.dark);
+    s.setProperty('--dark-2', d.dark2);
+    s.setProperty('--dark-deep', d.deep);
+    s.setProperty('--dark-rgb', hexToRgb(d.dark).join(', '));
+    document.documentElement.dataset.dark = d.id;
+    return d;
+  }
   function apply() {
     const c = choice(), t = palette(c.hex, c.night), s = document.documentElement.style;
+    applyDark(read(DARK_KEY, DARK_DEFAULT));
     s.setProperty('--crimson', t.main);
     s.setProperty('--crimson-deep', t.deep);
     s.setProperty('--crimson-ink', t.ink);
@@ -94,7 +127,7 @@
     if (meta) meta.setAttribute('content', c.night ? t.tint : t.main);
     return c;
   }
-  root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice };
+  root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice, DARKS, DARK_DEFAULT, darkOf, applyDark };
   if (typeof document === 'undefined') return;
   apply(); // before the page paints
 
@@ -107,6 +140,15 @@
     if ($('accentCustom')) $('accentCustom').value = c.hex;
     $('accentCustomRow')?.classList.toggle('on', c.id === 'custom');
     if ($('nightMode')) $('nightMode').checked = c.night;
+    drawDark();
+  }
+  function drawDark() {
+    const box = $('darkPick');
+    if (!box) return;
+    const d0 = darkOf(read(DARK_KEY, DARK_DEFAULT)), cur = d0.id;
+    box.innerHTML = DARKS.map((d) => `<button type="button" role="radio" aria-checked="${d.id === cur}" data-dark="${d.id}" class="accent${d.id === cur ? ' on' : ''}"><span style="background:linear-gradient(135deg,${d.dark},${d.dark2})"></span>${d.name}</button>`).join('');
+    if ($('darkCustom')) $('darkCustom').value = d0.dark;
+    $('darkCustomRow')?.classList.toggle('on', cur === 'custom');
   }
   function openSheet(on) {
     const p = $('settingsPanel');
@@ -127,6 +169,16 @@
       apply();
       drawPick();
     });
+    $('darkPick')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-dark]');
+      if (!b) return;
+      write(DARK_KEY, b.dataset.dark);
+      applyDark(b.dataset.dark);
+      drawDark();
+    });
+    const darkOwn = (e) => { if (!/^#[0-9a-f]{6}$/i.test(e.target.value)) return; write(DARK_KEY, 'c:' + e.target.value.toLowerCase()); applyDark(read(DARK_KEY, DARK_DEFAULT)); drawDark(); };
+    $('darkCustom')?.addEventListener('input', darkOwn);
+    $('darkCustom')?.addEventListener('change', darkOwn);
     // any color: «input» while the picker moves, «change» when it closes
     const custom = (e) => { if (!/^#[0-9a-f]{6}$/i.test(e.target.value)) return; write(KEY, 'c:' + e.target.value.toLowerCase()); apply(); drawPick(); };
     $('accentCustom')?.addEventListener('input', custom);

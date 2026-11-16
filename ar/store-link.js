@@ -60,7 +60,7 @@
       g.save(); g.beginPath(); g.arc(lx, ly, L / 2, 0, Math.PI * 2); g.clip(); g.drawImage(logo, lx - L / 2, ly - L / 2, L, L); g.restore();
     }
     g.textAlign = 'center'; g.direction = 'rtl';
-    g.fillStyle = '#0a4aa6'; g.font = '700 46px "IBM Plex Sans Arabic", Tahoma, sans-serif';
+    g.fillStyle = '#3a2018'; g.font = '700 46px "IBM Plex Sans Arabic", Tahoma, sans-serif';
     g.fillText('صيدلية عسكر', W / 2, pad + size + 70);
     g.fillStyle = '#374151'; g.font = '500 28px "IBM Plex Sans Arabic", Tahoma, sans-serif';
     g.fillText('صوّر الكود واطلب أونلاين · التوصيل لحد البيت', W / 2, pad + size + 118);

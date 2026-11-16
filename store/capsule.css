@@ -3,16 +3,21 @@
    (the 25 colors and the night look), only the shape and the motion are new.
    - the capsule is the shape (buttons, chips, the bottom bar); cards 26 px with a soft shadow, no lines
    - the wave (from the logo) closes every header and drifts slowly
-   - a navy balance card on the account page; the bottom bar is a floating navy capsule with a sliding color pill (store/motion.js)
+   - a dark balance card on the account page; the bottom bar is a floating dark capsule with a sliding color pill (store/motion.js)
    - motion explains (a page comes in, the cards rise one after another, the balance counts) and stops for «reduce motion» */
 
 :root {
-  --navy: #0b1d3f;
+  /* the dark surfaces (the bar, the first slide, the balance card): «قهوة دافية» unless chosen otherwise (store/theme.js sets these from the choice; the owner
+     disliked the navy that was here, 2026-11-16) */
+  --dark: #3a2018;
+  --dark-2: #5b3322;
+  --dark-deep: #1c0e0a;
+  --dark-rgb: 58, 32, 24;
   --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
   --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
   --grad: var(--accent);
-  --sh-1: 0 2px 8px rgba(11, 29, 63, 0.06);
-  --sh-2: 0 12px 28px -12px rgba(11, 29, 63, 0.22);
+  --sh-1: 0 2px 8px rgba(var(--dark-rgb), 0.06);
+  --sh-2: 0 12px 28px -12px rgba(var(--dark-rgb), 0.22);
   --wave-w: 400px;
   /* one period of the wave from the logo (a mask: the header's edge is cut out of the page color) */
   --wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 70' preserveAspectRatio='none'%3E%3Cpath d='M0 34C100 6 300 62 400 34L400 70L0 70Z'/%3E%3C/svg%3E");
@@ -64,20 +69,20 @@ html.night .cart-card { box-shadow: 0 0 0 2px var(--accent); }
 .add, .hero-btn, .hc-go, .ac-btn, .share, .more, .chip, .need { transition: transform 0.12s ease, background-color 0.2s, box-shadow 0.2s; }
 .add:active, .hero-btn:active, .hc-go:active, .share:active, .more:active, .chip:active, .need:active, .sec:active, .home-card:active { transform: scale(0.96); }
 
-/* ---------- the slides: a navy hero with two capsules floating ---------- */
-.hero { border-radius: 30px; background: linear-gradient(135deg, var(--navy) 0%, #14397a 100%); box-shadow: var(--sh-2); }
+/* ---------- the slides: a dark hero with two capsules floating ---------- */
+.hero { border-radius: 30px; background: linear-gradient(135deg, var(--dark) 0%, var(--dark-2) 100%); box-shadow: var(--sh-2); }
 .hero > * { position: relative; z-index: 1; }
 .hero::before, .hero::after { content: ''; position: absolute; z-index: 0; border-radius: 999px; pointer-events: none; animation: cap-float 8s ease-in-out infinite; }
 .hero::before { inset-inline-start: -30px; top: -16px; width: 130px; height: 46px; background: rgba(255, 255, 255, 0.13); --r: 28deg; transform: rotate(28deg); }
 .hero::after { inset-inline-start: auto; inset-inline-end: -34px; bottom: -22px; width: 160px; height: 56px; background: var(--accent); opacity: 0.95; --r: -26deg; transform: rotate(-26deg); animation-delay: -3s; }
 @keyframes cap-float { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-10px) rotate(var(--r)); } }
-.slide.s-rx { background: linear-gradient(135deg, #0a4aa6, #06306e); }
+.slide.s-rx { background: linear-gradient(135deg, var(--dark-2), var(--dark)); }
 .slide.s-find { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); }
 .slide.s-find::after { background: rgba(255, 255, 255, 0.22); }
-.slide.s-wa { background: linear-gradient(135deg, #14397a, var(--navy)); }
+.slide.s-wa { background: linear-gradient(135deg, var(--dark), var(--dark-deep)); }
 .dots i.on { border-radius: 999px; }
 
-/* ---------- the bottom bar: a floating navy capsule, a color pill slides to the page you are on ---------- */
+/* ---------- the bottom bar: a floating dark capsule, a color pill slides to the page you are on ---------- */
 .tabbar {
   inset-inline: 12px;
   bottom: calc(10px + var(--safe-b));
@@ -86,10 +91,10 @@ html.night .cart-card { box-shadow: 0 0 0 2px var(--accent); }
   padding: 6px;
   border: 0;
   border-radius: 999px;
-  background: var(--navy);
-  box-shadow: 0 14px 30px -10px rgba(11, 29, 63, 0.5);
+  background: var(--dark);
+  box-shadow: 0 14px 30px -10px rgba(var(--dark-rgb), 0.5);
 }
-html.night .tabbar { background: #050d1c; box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06); }
+html.night .tabbar { background: var(--dark-deep); box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06); }
 .tabbar::before {
   content: '';
   position: absolute;
@@ -112,16 +117,16 @@ html .tabbar a.on svg, html.night .tabbar a.on svg { color: #fff; background: no
 html:not(.cap-ind) .tabbar a.on { background: var(--accent); }
 .wa-fab { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 
-/* ---------- «حسابي»: the balance first, on a navy card ---------- */
-.ac-bal { position: relative; z-index: 2; overflow: hidden; margin: 14px 16px 0; padding: 22px; border: 0; border-radius: 32px; background: var(--navy); color: #fff; box-shadow: 0 18px 36px -14px rgba(11, 29, 63, 0.5); }
+/* ---------- «حسابي»: the balance first, on a dark card ---------- */
+.ac-bal { position: relative; z-index: 2; overflow: hidden; margin: 14px 16px 0; padding: 22px; border: 0; border-radius: 32px; background: var(--dark); color: #fff; box-shadow: 0 18px 36px -14px rgba(var(--dark-rgb), 0.5); }
 #acctBox > .ac-bal:first-child { margin-top: -10px; }
-html.night .ac-bal { background: #12294f; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.7); }
+html.night .ac-bal { background: var(--dark); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.7); }
 .ac-bal > * { position: relative; }
 .ac-bal::before { content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 60%; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)); pointer-events: none; animation: cap-sheen 4.2s ease-in-out infinite; }
 @keyframes cap-sheen { 0%, 55% { left: -70%; } 100% { left: 130%; } }
 .ac-big { font-size: 40px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
-.ac-big.owe { color: #ffd3b8; }
-.ac-big.paid { color: #c6ecd6; }
+.ac-big.owe, html.night .ac-big.owe { color: #ffe0cc; }
+.ac-big.paid, html.night .ac-big.paid { color: #d6f5e3; }
 .ac-big.zero { color: #fff; }
 .ac-bal .hint-sm { color: rgba(255, 255, 255, 0.78); }
 .ac-two div { border-radius: 18px; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.82); }

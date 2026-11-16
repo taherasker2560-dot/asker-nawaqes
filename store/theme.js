@@ -8,7 +8,7 @@
   'use strict';
   const S = root.AskerSettings;
   if (!S || typeof document === 'undefined') return;
-  const KEY = 'asker-store-accent', NIGHT = 'asker-store-night', DEF = 'asker-store-default';
+  const KEY = 'asker-store-accent', NIGHT = 'asker-store-night', DEF = 'asker-store-default', DKEY = 'asker-store-dark';
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* private window */ } };
   const owner = () => { try { return JSON.parse(read(DEF, '{}')) || {}; } catch (e) { return {}; } };
@@ -19,10 +19,13 @@
     const a = mine || o.color || S.DEFAULT_ID || 'flame';
     const p = S.PRESETS.find((x) => x.id === a);
     const hex = p ? p.hex : /^c:#[0-9a-f]{6}$/i.test(a) ? a.slice(2) : S.PRESETS[0].hex;
-    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : (S.DEFAULT_ID || 'flame'), hex, night: nv === '' ? !!o.night : nv === '1', own: !!mine || nv !== '' };
+    return { id: p ? p.id : /^c:/.test(a) ? 'custom' : (S.DEFAULT_ID || 'flame'), hex, night: nv === '' ? !!o.night : nv === '1', own: !!mine || nv !== '' || read(DKEY, '') !== '' };
   }
+  // the dark surfaces (the bottom bar, the balance card, the first slide): the customer's own pick, else «قهوة دافية» (ar/settings.js has the sets)
+  const darkId = () => (S.darkOf ? S.darkOf(read(DKEY, S.DARK_DEFAULT)).id : '');
   function apply() {
     const c = choice(), t = S.palette(c.hex, c.night), el = document.documentElement, s = el.style;
+    if (S.applyDark) S.applyDark(read(DKEY, S.DARK_DEFAULT));
     s.setProperty('--accent', t.main);
     s.setProperty('--accent-deep', t.deep);
     s.setProperty('--accent-text', t.ink);
@@ -54,6 +57,13 @@
     $('themeCustomRow').classList.toggle('on', c.id === 'custom');
     $('themeNight').checked = c.night;
     $('themeReset').hidden = !c.own;
+    const dbox = $('storeDarkPick');
+    if (dbox && S.DARKS) {
+      const d0 = S.darkOf(read(DKEY, S.DARK_DEFAULT)), cur = d0.id;
+      dbox.innerHTML = S.DARKS.map((d) => `<button type="button" role="radio" aria-checked="${d.id === cur}" data-dark="${d.id}" class="accent${d.id === cur ? ' on' : ''}"><span style="background:linear-gradient(135deg,${d.dark},${d.dark2})"></span>${d.name}</button>`).join('');
+      if ($('storeDarkCustom')) $('storeDarkCustom').value = d0.dark;
+      $('storeDarkCustomRow')?.classList.toggle('on', cur === 'custom');
+    }
   }
   function open(on) {
     const p = $('themeSheet');
@@ -75,11 +85,19 @@
       if (!b) return;
       write(KEY, b.dataset.accent); apply(); draw();
     });
+    $('storeDarkPick')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-dark]');
+      if (!b) return;
+      write(DKEY, b.dataset.dark); apply(); draw();
+    });
+    const darkOwn = (e) => { if (!/^#[0-9a-f]{6}$/i.test(e.target.value)) return; write(DKEY, 'c:' + e.target.value.toLowerCase()); apply(); draw(); };
+    $('storeDarkCustom')?.addEventListener('input', darkOwn);
+    $('storeDarkCustom')?.addEventListener('change', darkOwn);
     const custom = (e) => { if (!/^#[0-9a-f]{6}$/i.test(e.target.value)) return; write(KEY, 'c:' + e.target.value.toLowerCase()); apply(); draw(); };
     $('themeCustom').addEventListener('input', custom);
     $('themeCustom').addEventListener('change', custom);
     $('themeNight').addEventListener('change', (e) => { write(NIGHT, e.target.checked ? '1' : '0'); apply(); draw(); });
-    $('themeReset').addEventListener('click', () => { write(KEY, null); write(NIGHT, null); apply(); draw(); });
+    $('themeReset').addEventListener('click', () => { write(KEY, null); write(NIGHT, null); write(DKEY, null); apply(); draw(); });
   }
   apply(); // before the page paints
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
