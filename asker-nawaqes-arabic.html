@@ -15,10 +15,10 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=orange-20261115a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=cmp-20261116b" />
+    <link rel="stylesheet" href="ar/look.css?v=stmt-20261116a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=cmp-20261116d"></script>
+    <script src="ar/i18n-en.js?v=stmt-20261116a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
@@ -521,6 +521,13 @@
             وتبعت لمحادثة المورد بإيدك: مفيش حاجة بتتبعت لوحدها. الخصم من آخر شرا فعلي أو آخر قايمة نزلتها (الأحدث).
           </p>
           <p id="odInfo" class="status"></p>
+          <!-- «محتاج قرارك قبل أمر الشرا» (owner 2026-11-16): the new / «بالطلب» items the laptop did not put in the purchase order by itself; ar/po-statement.js, file orders/statement.json -->
+          <div id="stBox" class="stmt hidden">
+            <h3>محتاج قرارك قبل أمر الشرا <b id="stCount"></b></h3>
+            <p class="hint">أصناف ما دخلتش أمر الشرا لوحدها: جديدة، أو «بالطلب» (بتتباع وما بتتشاريش تاني يوم). دوس «ضيفه» لو عايزه، أو «مش دلوقتي».</p>
+            <p id="stMsg" class="status bad hidden"></p>
+            <div id="stList"></div>
+          </div>
           <!-- «طلب الجهاز × طلب البوت» (owner 2026-11-16): the night's order on PharmaFly against the bot's purchase order; ar/order-compare.js, file orders/compare2.json -->
           <div id="cmpBox" class="cmp hidden">
             <h3>طلب الجهاز × طلب البوت <small id="cmpNight"></small></h3>
@@ -913,13 +920,14 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
     <script src="ar/cache.js?v=wait-20261113a"></script>
-    <script src="ar/app.js?v=cmp-20261116a"></script>
+    <script src="ar/app.js?v=stmt-20261116a"></script>
     <script src="ar/staff.js?v=chat-20261113a"></script>
     <script src="ar/suppliers.js?v=wait-20261113a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/qty-input.js?v=qty-20261115a"></script>
     <script src="ar/order-drafts.js?v=newpo-20261115a"></script>
     <script src="ar/order-compare.js?v=cmp-20261116d"></script>
+    <script src="ar/po-statement.js?v=stmt-20261116a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=link-20261113a"></script>
     <script src="ar/store-settings.js?v=orange-20261115a"></script>
