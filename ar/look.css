@@ -2159,3 +2159,30 @@ html.night .cmp-why.gray { background: #2a3142; color: #c3cad8; }
 .od-new-offer { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--muted); }
 /* the random count's camera: the first thing on the count page, a thin strip like the temp sale's (2026-11-16) */
 #ctCam { margin: 0 0 10px; }
+
+/* ---------- «محتاج قرارك قبل أمر الشرا» (owner 2026-11-16): ar/po-statement.js, the file orders/statement.json ---------- */
+.stmt { margin: 10px 0; padding: 10px 12px; border: 1px solid #f0c48a; border-radius: 14px; background: #fff8ec; }
+.stmt.hidden, .stmt .hidden { display: none; }
+.stmt h3 { margin: 0 0 2px; font-size: 15px; color: #9a3412; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.st-item { padding: 9px 0; border-bottom: 1px dashed #ead7b8; }
+.st-item:last-child { border-bottom: 0; }
+.st-item strong { display: block; font-size: 13.5px; }
+.st-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 5px 0; }
+.st-chip { font-size: 11.5px; border-radius: 10px; padding: 2px 8px; }
+.st-chip.new { background: #e8f0fb; color: #0a4aa6; }
+.st-chip.req { background: #fff4e5; color: #9a3412; }
+.st-chip.gray { background: #eef0f4; color: #4b5563; }
+.st-btns { display: flex; gap: 8px; margin-top: 6px; }
+.st-btns button { flex: 1; margin: 0; }
+.st-done { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; font-weight: 700; margin-top: 6px; }
+.st-done.ok { background: #e8f6ec; color: #166534; }
+.st-done.skip { background: #eef0f4; color: #4b5563; }
+.st-undo { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; font-weight: 400; font-size: 12.5px; text-decoration: underline; color: inherit; min-height: 0; }
+html.night .stmt { background: #3a2c12; border-color: #b9873a; }
+html.night .stmt h3 { color: #f0c48a; }
+html.night .st-item { border-bottom-color: #5a4524; }
+html.night .st-chip.new { background: #12305e; color: #cfe3ff; }
+html.night .st-chip.req { background: #4a3517; color: #f0c48a; }
+html.night .st-chip.gray { background: #2a3142; color: #c3cad8; }
+html.night .st-done.ok { background: #14301f; color: #7fd69b; }
+html.night .st-done.skip { background: #2a3142; color: #c3cad8; }
