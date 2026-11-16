@@ -56,4 +56,26 @@ offs.forEach((o,k)=>assert.ok(txt.slice(o).startsWith(`${k+1} 0 obj`),`object ${
 txt.slice(xref).split('\n').slice(2,11).forEach(l=>assert.equal(l.length+1,20,'xref lines are 20 bytes'));
 const at=txt.indexOf('/Length 300 >>\nstream\n')+'/Length 300 >>\nstream\n'.length;
 assert.deepEqual([...pdf.slice(at,at+300)],[...jpeg(300)]);
+// the items' pictures (2026-11-16): a page may carry link rectangles (in its own pixels); each becomes a link annotation numbered after the pages' objects
+const url='https://example.invalid/store.html#item=77';
+const pdfL=L.buildPdf([{jpeg:jpeg(300),w:1240,h:1754,links:[{x:620,y:877,w:124,h:175,url},{x:100,y:100,w:50,h:60,url:'https://example.invalid/a(b)\\c\u0627'}]},{jpeg:jpeg(500),w:1240,h:1754}]);
+const tl=Buffer.from(pdfL).toString('latin1');
+assert.match(tl,/\/Type \/Page \/Parent 2 0 R .* \/Annots \[9 0 R 10 0 R\] >>/,'the first page lists its two annotations');
+assert.equal((tl.match(/\/Annots/g)||[]).length,1,'the second page has none');
+assert.equal((tl.match(/\/Subtype \/Link/g)||[]).length,2);
+assert.ok(tl.includes('/A << /S /URI /URI (https://example.invalid/store.html#item=77) >>'));
+assert.ok(tl.includes('(https://example.invalid/a\\(b\\)\\\\c)'),'parentheses and a backslash are escaped, a non-ASCII letter is dropped');
+const rect=/\/Rect \[([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)\]/.exec(tl).slice(1).map(Number);
+const near=(a,b)=>Math.abs(a-b)<0.02;
+assert.ok(near(rect[0],620*595.28/1240)&&near(rect[2],(620+124)*595.28/1240),'left and right in points');
+assert.ok(near(rect[1],841.89-(877+175)*841.89/1754)&&near(rect[3],841.89-877*841.89/1754),'bottom and top in points (the y axis goes up)');
+const xr2=+/startxref\n(\d+)\n%%EOF/.exec(tl)[1];
+assert.ok(tl.slice(xr2).startsWith('xref\n0 11\n'),'10 objects: 2 + 3 per page + 2 annotations');
+tl.slice(xr2).split('\n').slice(3,12).map(l=>+l.slice(0,10)).forEach((o,k)=>assert.ok(tl.slice(o).startsWith(`${k+1} 0 obj`),`object ${k+1} (links too) at its offset`));
+// a page with no links is exactly as before
+assert.equal(Buffer.from(L.buildPdf([{jpeg:jpeg(300),w:1240,h:1754,links:[]},{jpeg:jpeg(500),w:1240,h:1754}])).toString('latin1'),txt,'no links = the same file');
+// the message says so only when the pictures are in
+const base={name:'عميل تجربة',from:'2026-11-05T13:07:00',balance:7174.5,link:'https://x/s.pdf'};
+assert.equal(L.messageText({...base,photos:false}),L.messageText(base),'no pictures = the message as before');
+assert.ok(L.messageText({...base,photos:true}).endsWith('\n\nوفي الكشف صور الأصناف، ولو دوست على أي صنف هتفتح لك صفحته في الستور.'));
 console.log('statement-pdf ok');

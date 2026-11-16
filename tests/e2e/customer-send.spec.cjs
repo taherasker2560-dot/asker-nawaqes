@@ -95,6 +95,34 @@ run('Statement on WhatsApp: the number (typed, or from the phone\'s contacts) is
  // the list shows who has a number
  assert.match(await text(page,'#cuRows [data-cu="101"] strong'),/📱/);
 });
+// the items' pictures (owner 2026-11-16): the store's picture of each item in the PDF, each item a link to its page in the store, and a line in the message
+run('Statement on WhatsApp: the items\' pictures are in the PDF, each item links to the store, his «من غير صورة» is respected',async({page})=>{
+ await setData(page,[{customer_id:101,phone:'201012345678',contact_name:'جار الصيدلية',last_sent_at:null,last_sent_from:null,updated_at:'2026-11-12T10:00:00Z'}]);
+ // PANADOL (store item 10) and OMEZ (store item 10013) have pictures in the catalog; OMEZ is turned off by the owner; the others are not in the store
+ await page.evaluate(()=>{window.__tables.ar_store_items=[{id:10,name:'PANADOL EXTRA 24 TAB'},{id:10013,name:'OMEZ 40 20 CAP'}];window.__tables.ar_store_edits=[{item_id:10013,img:null,img_off:true,descr:null,desc_off:false}]});
+ await openStatement(page);
+ await page.click('[data-cu-send]');
+ await page.waitForSelector('.cu-sendbox [data-cu-from]');
+ await page.waitForFunction(()=>!/بيجيب الحركات/.test(document.querySelector('.cu-sendbox')?.textContent||''));
+ await page.click('[data-cu-make]');
+ await page.waitForSelector('#cuMsg',{timeout:30000});
+ const files=await page.evaluate(()=>Object.keys(window.__storage).filter(k=>k.startsWith('s/')));
+ assert.equal(files.length,1);
+ const pdf=await page.evaluate(k=>window.__storage[k],files[0]);
+ assert.ok(pdf.startsWith('%PDF-1.4'));
+ assert.equal((pdf.match(/\/Subtype \/Link/g)||[]).length,1,'one link: PANADOL (OMEZ has no picture, the others are not in the store)');
+ assert.match(pdf,/\/URI \(https?:\/\/[^)]*\/store\.html#item=10\)/);
+ assert.doesNotMatch(pdf,/#item=10013/);
+ assert.match(await page.inputValue('#cuMsg'),/\n\nوفي الكشف صور الأصناف، ولو دوست على أي صنف هتفتح لك صفحته في الستور\.$/);
+ // nothing of the store's: the statement as before, no link, no extra line
+ await page.evaluate(()=>{window.__tables.ar_store_items=[]});
+ await page.click('[data-cu-from="11"]');
+ await page.click('[data-cu-make]');await page.waitForSelector('#cuMsg',{timeout:30000});
+ const f2=(await page.evaluate(()=>Object.keys(window.__storage).filter(k=>k.startsWith('s/')))).filter(k=>k!==files[0]);
+ assert.equal(f2.length,1);
+ assert.doesNotMatch(await page.evaluate(k=>window.__storage[k],f2[0]),/\/Subtype \/Link/);
+ assert.doesNotMatch(await page.inputValue('#cuMsg'),/صور الأصناف/);
+});
 run('Statement on WhatsApp: from the payment he picks, a detailed PDF, WhatsApp opens on the customer\'s chat',async({page,table})=>{
  await setData(page,[{customer_id:101,phone:'201012345678',contact_name:'جار الصيدلية',last_sent_at:null,last_sent_from:null,updated_at:'2026-11-12T10:00:00Z'},
   {customer_id:101,phone:'201099998888',contact_name:'ابنه',last_sent_at:'2026-11-10T10:00:00Z',last_sent_from:null,updated_at:'2026-11-12T11:00:00Z'}]);
