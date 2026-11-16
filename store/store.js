@@ -501,17 +501,15 @@
     box.innerHTML = (recent.length ? `<h3>دوّرت عليه قبل كده</h3><div class="chips">${recent.map((t) => `<button type="button" class="chip" data-recent="${esc(t)}">🕘 <span dir="auto" translate="no">${esc(t)}</span></button>`).join('')}</div>` : '')
       + `<h3>الناس بتدوّر على</h3><div class="chips">${NEEDS.map((s) => `<a href="#search" data-section="${s.key}" class="chip">${s.name}</a>`).join('')}</div>`;
   }
-  // شريط السلة تحت (الرئيسية والبحث): عدد الأصناف والإجمالي و«كمّل الطلب»
+  // الإجمالي تحت أيقونة «السلة» في المنيو (owner 2026-11-16: «ا»؛ مفيش شريط عايم): العدد على الأيقونة والإجمالي تحتها
   function drawCartBar() {
-    const n = cartCount(cart), cur = (document.querySelector('[data-view]:not([hidden])') || {}).dataset;
-    const show = !!n && cur && (cur.view === 'home' || cur.view === 'search');
-    $('cartBar').hidden = !show;
-    document.body.classList.toggle('has-cartbar', show);
-    if (!n) return;
-    const t = cartTotal(cart), later = cart.filter((x) => x.on_order).length;
-    $('cartBarText').textContent = `${n} صنف` + (t > 0 ? ` · ${money(t)} ج` : '') + (later ? ' + بالطلب' : '');
+    const n = cartCount(cart), t = cartTotal(cart), later = cart.filter((x) => x.on_order).length;
+    document.querySelectorAll('.cart-tot').forEach((el) => {
+      el.hidden = !n;
+      el.textContent = n ? (t > 0 ? money(t) + ' ج' : 'بالطلب') + (t > 0 && later ? ' +' : '') : '';
+    });
   }
-  // كروت الرئيسية: «اطلب طلبك اللي فات تاني» (السلة نفسها بقت في الشريط اللي تحت)
+  // كروت الرئيسية: «اطلب طلبك اللي فات تاني» (السلة نفسها في المنيو اللي تحت)
   function drawHomeCards() {
     const n = cartCount(cart);
     $('cartCard').hidden = true;
