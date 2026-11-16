@@ -33,4 +33,11 @@ assert.equal(P.picUrl(99, idx, { img: 'mine.jpg' }, 'https://s/e/'), 'https://s/
 assert.equal(P.picUrl(10, null, null, ''), '', 'no index');
 assert.deepEqual(P.chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
 assert.deepEqual(P.chunks([], 40), []);
+// the store shows an item only when it is listed and not hidden; a row without those fields counts as shown
+assert.equal(P.inStore({ id: 1, is_listed: true, hidden: false }), true);
+assert.equal(P.inStore({ id: 1, is_listed: false, hidden: false }), false, 'not listed: the store cannot open it');
+assert.equal(P.inStore({ id: 1, is_listed: true, hidden: true }), false, 'hidden');
+assert.equal(P.inStore({ id: 1 }), true);
+assert.equal(P.inStore(null), false);
+
 console.log('PASS: item-photos: the names, the store link, the picture choice');
