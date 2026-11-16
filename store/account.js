@@ -300,6 +300,26 @@
       draw();
     }
   }
+  // the items' pictures (owner 2026-11-16: «الصور تبان فى الحساب لما ابعتله رابط حسابه مش الكشف بس»): when an invoice's items are opened, the store's picture of each
+  // (ar/item-photos.js: by exact name from the store's items), a tap on it opens the item's page in the store; no picture = the line as before
+  const photos = new Map(), photoAsked = new Set();
+  const nameKey = (l) => String((l && l.n) || '').trim();
+  async function loadPhotos(items) {
+    const P = root.AskerItemPhotos;
+    const want = [...new Set(items.map(nameKey).filter((n) => n && !photoAsked.has(n)))];
+    if (!P || !client || !want.length) return;
+    want.forEach((n) => photoAsked.add(n));
+    try {
+      const got = await P.forNames(client, want);
+      got.forEach((v, k) => photos.set(k, v));
+      if (got.size) draw();
+    } catch (e) { /* no pictures: the lines stay as they are */ }
+  }
+  function lineHtml(l) {
+    const ph = photos.get(nameKey(l));
+    return `<div${ph ? ' class="has-pic"' : ''}>` + (ph ? `<a class="ac-pic" href="#item=${esc(ph.id)}"><img src="${esc(ph.img.src)}" alt=""></a>` : '') +
+      `<span dir="ltr" translate="no">${esc(l.n)}</span><span>${esc(qtyText(l))} · ${esc(money(lineValue(l)))}</span></div>`;
+  }
   function moveHtml(m) {
     const t = moveTitle(m), at = parseAt(m.at), items = itemsOf(m), open = st.open.has(m.id);
     const bits = [at ? clock(at) : ''];
@@ -308,7 +328,7 @@
     if (disc) bits.push(`<span>خصم ${esc(money(disc))} ج</span>`);
     if (m.kind === 'sale' && num(m.paid) > 0) bits.push(`<span>دفعت منها ${esc(money(m.paid))} ج</span>`);
     const lines = open && items.length
-      ? '<div class="ac-items">' + items.map((l) => `<div><span dir="ltr" translate="no">${esc(l.n)}</span><span>${esc(qtyText(l))} · ${esc(money(lineValue(l)))}</span></div>`).join('') + '</div>'
+      ? '<div class="ac-items">' + items.map(lineHtml).join('') + '</div>'
       : '';
     return `<div class="ac-mv k-${t.cls}"><div class="ac-mv-l"><span class="ac-k">${esc(t.text)}</span><span class="ac-after">${esc(afterText(m.balance))}</span></div>` +
       `<div class="ac-mv-d">${bits.filter(Boolean).join(' · ')}</div>${lines}</div>`;
@@ -400,7 +420,10 @@
       const start = pdfStart(st.moves, new Date());
       const stmt = start != null ? L.statementFrom(st.moves, start) : null;
       if (!stmt) throw new Error('empty');
-      const out = await P.makePdf(stmt, { name: st.c.name, id: st.c.id, now: new Date() });
+      // the items' pictures in the file too (owner 2026-11-16); any trouble = the file as before
+      let withPics = null;
+      try { const PH = root.AskerItemPhotos; if (PH && client) { const m = await PH.forNames(client, PH.namesOf(stmt)); if (m.size) withPics = m; } } catch (e) { withPics = null; }
+      const out = await P.makePdf(stmt, { name: st.c.name, id: st.c.id, now: new Date(), photos: withPics });
       const url = URL.createObjectURL(out.blob);
       const a = document.createElement('a');
       a.href = url; a.download = `كشف حساب صيدلية عسكر ${dateText(new Date()).replace(/\//g, '-')}.pdf`;
@@ -449,8 +472,8 @@
     if (f) { st.filter = f.dataset.acctFilter; draw(); return; }
     const it = e.target.closest('[data-acct-items]');
     if (it) {
-      const id = (st.moves.find((m) => String(m.id) === it.dataset.acctItems) || {}).id;
-      if (id != null) { if (st.open.has(id)) st.open.delete(id); else st.open.add(id); draw(); }
+      const mv = st.moves.find((m) => String(m.id) === it.dataset.acctItems), id = (mv || {}).id;
+      if (id != null) { if (st.open.has(id)) st.open.delete(id); else { st.open.add(id); loadPhotos(itemsOf(mv)); } draw(); }
       return;
     }
     if (e.target.closest('[data-acct-older]')) { load(true); return; }

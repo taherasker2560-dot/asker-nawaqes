@@ -361,3 +361,8 @@ html, body { overflow-x: clip; max-width: 100%; }
 .tabbar .cart-tot[hidden] { display: none; }
 .tabbar .cart-row { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 0; }
 .tabbar .cart-row .cart-n { margin-top: 0; }
+/* the items' pictures in the customer's own account (2026-11-16): a small picture before the name; a tap opens the item's page in the store */
+.ac-items div.has-pic { align-items: center; }
+.ac-items div.has-pic > span:first-of-type { flex: 1; min-width: 0; }
+.ac-pic { flex: 0 0 auto; display: block; }
+.ac-pic img { display: block; width: 46px; height: 46px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
