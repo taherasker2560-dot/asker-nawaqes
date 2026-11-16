@@ -48,8 +48,11 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-tab="translate"]');await scan('translate');
  // «قبل الموسم» (2026-11-16): the home row, and the card at the top of «النواقص» with its rows
  await page.evaluate(()=>{window.__storage['seasonal/seasonal.json']=JSON.stringify({generated_at:new Date().toISOString(),data_at:'2026-11-16T00:00:58',from:'2026-11-16',to:'2026-12-16',days:30,items:[{i:1001,n:'ALL-VENT 125ML SYP',ex:22.5,y1:24,y2:21,avg:4.5,have:9,strong:true},{i:1002,n:'TADALONG 20MG 4 TAB',ex:21,y1:39,y2:0,avg:6,have:3,strong:false}]})});
+ // one of the two is already in the purchase order (the «✓ added» line), the other has its quantity box and «➕ Add it» (and the bulk button)
+ await page.evaluate(()=>{window.__prevPo=window.__tables.ar_po_items;window.__tables.ar_po_items=[{id:901,item_id:1002,item_name:'TADALONG 20MG 4 TAB',qty:2,status:'open'}]});
  await page.evaluate(()=>window.AskerSeason.load(true));await page.evaluate(()=>window.AskerNotify.tick());await go('[data-group="home"]');await page.waitForTimeout(300);await scan('home/season');
  await go('[data-group="purchases"]');await go('[data-tab="short"]');await go('#seasonBox summary');await page.waitForTimeout(300);await scan('short/season');
+ await page.evaluate(()=>{window.__tables.ar_po_items=window.__prevPo});
  await go('[data-tab="bags"]');await page.waitForTimeout(400);await scan('bags');
  // tick an item, the «move» sheet, a move and its note (2026-11-15)
  await go('#bgList [data-bag="2428"]');await go('#bgList [data-pick="5"]');await go('#bgMoveBtn');await go('#bgSheet [data-to="pv"]');await scan('bags/move');await go('#bgGo');await page.waitForTimeout(400);await scan('bags/moved');

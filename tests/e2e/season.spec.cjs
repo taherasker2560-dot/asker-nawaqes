@@ -26,11 +26,57 @@ run('Before the season: the card in «النواقص» and the home row for the 
  // the Arabic name when the bot has it, the English one under it
  assert.match(rows[0],/اوول فينت شراب ١٢٥\s*ALL-VENT 125ML SYP\s*السنة اللي فاتت بعت 24 في الفترة دي \(المعتاد في الشهر 4.5\)\s*وقبلها بسنة بعت 21\s*ورصيدك دلوقتي 9\s*اتكرر سنتين\s*5× المعتاد/);
  // one year only: no «the year before», no «repeated»
- assert.match(rows[1],/TADALONG 20MG 4 TAB\s*السنة اللي فاتت بعت 39 في الفترة دي \(المعتاد في الشهر 6\)\s*ورصيدك دلوقتي 3\s*3.5× المعتاد$/);
+ assert.match(rows[1],/TADALONG 20MG 4 TAB\s*السنة اللي فاتت بعت 39 في الفترة دي \(المعتاد في الشهر 6\)\s*ورصيدك دلوقتي 3\s*3.5× المعتاد\s*➕ ضيفه$/);
  assert.doesNotMatch(rows[1],/وقبلها بسنة|اتكرر سنتين/);
  assert.match(rows[2],/CETAL COLD & FLU 20CAP.*ورصيدك دلوقتي 0\s*اتكرر سنتين/);
  // no file (or not the laptop's file): the card is not there
  await page.evaluate(()=>{delete window.__storage['seasonal/seasonal.json']});
  await page.evaluate(()=>window.AskerSeason.load(true));
  assert.equal(await page.$eval('#seasonBox',b=>b.classList.contains('hidden')),true,'no file = no card');
+});
+// «اصناف موسم مفيش امكانيه لاضافتها لامر الشرا» (owner 2026-11-16): «➕ ضيفه» with its quantity box, the bulk button, «رجّعه»
+run('Before the season: add to the purchase order one by one or all that repeated, with the quantity he types, and take it back',async({page,table})=>{
+ await page.evaluate((f)=>{window.__storage['seasonal/seasonal.json']=JSON.stringify(f);
+  // item 1002 is in the order already
+  window.__tables.ar_po_items=[{id:900,item_id:1002,item_name:'TADALONG 20MG 4 TAB',qty:2,status:'open'}];},FILE);
+ await page.click('[data-group="home"]');
+ await page.evaluate(()=>window.AskerNotify.tick());
+ await page.waitForSelector('#todoList .todo-row[data-view="season"]');
+ await page.click('#todoList .todo-row[data-view="season"]');
+ await page.waitForSelector('#seasonBox:not(.hidden)');
+ const rows=()=>page.$$eval('#seasonList .ni-row',r=>r.map(x=>({done:x.querySelector('.st-done')?x.querySelector('.st-done').textContent.replace(/\s+/g,' ').trim():null,qty:x.querySelector('[data-se-qty]')?x.querySelector('[data-se-qty]').value:null})));
+ let r=await rows();
+ assert.deepEqual(r.map(x=>x.qty),['14',null,'11'],'what the season still needs on top of the stock: 22.5-9 -> 14, 10.8-0 -> 11');
+ assert.match(r[1].done,/✓ اتضاف لأمر الشرا \(2\)\s*رجّعه/,'the one already in the order says so');
+ assert.equal(await text(page,'#seasonAddAll'),'➕ ضيف الـ 2 اللي اتكرروا سنتين لأمر الشرا');
+ // a wrong quantity writes nothing and says so
+ await page.fill('[data-se-qty="1001"]','0');
+ await page.click('[data-se-add="1001"]');
+ await page.waitForSelector('#seasonMsg:not(.hidden)');
+ assert.equal(await text(page,'#seasonMsg'),'الكمية مش مظبوطة: ALL-VENT 125ML SYP');
+ assert.equal((await table('ar_po_items')).length,1);
+ // the quantity he typed is what is written (the other rows keep what they had)
+ await page.fill('[data-se-qty="1001"]','20');
+ await page.fill('[data-se-qty="1003"]','7');
+ await page.click('[data-se-add="1001"]');
+ await page.waitForSelector('#seasonList .ni-row:nth-child(1) .st-done.ok');
+ assert.equal(await page.$eval('[data-se-qty="1003"]',e=>e.value),'7','the box of the other item keeps what he typed');
+ let po=await table('ar_po_items');assert.equal(po.length,2);
+ const a=po.find(x=>x.item_id===1001);
+ assert.deepEqual([a.item_name,a.qty,a.status,a.bag],['ALL-VENT 125ML SYP',20,'open',null]);
+ assert.deepEqual(a.item,{have:9,sold30:4.5,need:20,season:{ex:22.5,y1:24,y2:21,avg:4.5}});
+ assert.equal(await text(page,'#seasonAddAll'),'➕ ضيف الـ 1 اللي اتكرروا سنتين لأمر الشرا');
+ // the bulk button adds the rest of the ones that repeated: 1003 with the 7 he typed (its bag is not known here: the bags data is not loaded in this test, bagIn is unit-tested)
+ await page.click('#seasonAddAll');
+ await page.waitForSelector('#seasonList .ni-row:nth-child(3) .st-done.ok');
+ po=await table('ar_po_items');assert.equal(po.length,3);
+ const c=po.find(x=>x.item_id===1003);
+ assert.deepEqual([c.qty,c.status,c.bag],[7,'open',null]);
+ assert.ok(await page.$eval('#seasonBulk',b=>b.classList.contains('hidden')),'nothing left to add in bulk');
+ // «رجّعه»: the line is cancelled, the box is back with the suggested quantity
+ await page.click('[data-se-undo="1001"]');
+ await page.waitForSelector('[data-se-add="1001"]');
+ po=await table('ar_po_items');assert.equal(po.find(x=>x.item_id===1001).status,'cancelled');
+ assert.equal(await page.$eval('[data-se-qty="1001"]',e=>e.value),'14');
+ assert.equal(await text(page,'#seasonAddAll'),'➕ ضيف الـ 1 اللي اتكرروا سنتين لأمر الشرا');
 });

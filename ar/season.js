@@ -33,7 +33,12 @@
     item_id: x.i, item_name: String(x.n).slice(0, 200), bag: /^(pv|gs|[0-9]{1,12})$/.test(String(bag || '')) ? String(bag) : null, qty, status: 'open',
     item: { have: x.have, sold30: x.avg, need: qty, season: { ex: x.ex, y1: x.y1, y2: x.y2, avg: x.avg } },
   });
-  const api = { PATH, parse, strongCount, fmt, dm, times, needQty, cleanQty, poRow };
+  // the bag PharmaFly has the item in, from the bags page's data (d.bags.list[].items[].id); null when it is in none or the data is not there
+  const bagIn = (d, id) => {
+    for (const b of (d && d.bags && d.bags.list) || []) for (const i of (b && b.items) || []) if (i && Number(i.id) === id) return String(b.id);
+    return null;
+  };
+  const api = { PATH, parse, strongCount, fmt, dm, times, needQty, cleanQty, poRow, bagIn };
   root.AskerSeasonLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -54,11 +59,7 @@
   }
   // the bag PharmaFly has the item in (the bags page knows it), so the order advisor counts cosmetics apart; null when it is in none
   function bagOf(id) {
-    try {
-      const d = root.AskerAlerts && root.AskerAlerts.data && root.AskerAlerts.data();
-      for (const b of (d && d.bags && d.bags.list) || []) for (const i of b.items || []) if (Number(i.id) === id) return String(b.id);
-    } catch (e) { /* unknown */ }
-    return null;
+    try { return bagIn(root.AskerAlerts && root.AskerAlerts.data && root.AskerAlerts.data(), id); } catch (e) { return null; }
   }
 
   async function load(force) {
@@ -139,13 +140,15 @@
     if (!rows.length) return;
     busy = true; say(''); draw();
     try {
-      const res = await db().from('ar_po_items').insert(rows).select('id,item_id');
+      const res = await db().from('ar_po_items').insert(rows).select('id');
       if (res.error) throw res.error;
-      for (const r of res.data || []) {
-        const row0 = rows.find((w) => w.item_id === Number(r.item_id));
-        inPo.set(Number(r.item_id), { id: r.id, qty: row0 ? row0.qty : 0 });
-        qtyDraft.delete(Number(r.item_id));
-      }
+      // the ids come back in the order of the rows sent
+      (res.data || []).forEach((r, k) => {
+        const w = rows[k];
+        if (!w) return;
+        inPo.set(w.item_id, { id: r.id, qty: w.qty });
+        qtyDraft.delete(w.item_id);
+      });
     } catch (e) { say('ما اتضافش لأمر الشرا: ' + ((e && e.message) || e)); }
     busy = false; draw();
   }
