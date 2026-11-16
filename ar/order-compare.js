@@ -76,6 +76,42 @@
     if (!countsQty(r)) return null;
     return qtySame(r) ? [`وصل ${qtyText(r.arr.q)}: نفس كمية البوت`, 'ok'] : [`البوت ${qtyText(r.qty)} ووصل ${qtyText(r.arr.q)}`, 'warn'];
   }
+  // the MONEY (owner 2026-11-16: «نسبتك هتبقا أدق مني وأبقا عارف أنا عديتها بقد إيه»): what he bought in the 24 hours after the bot's order, at cost price, against the
+  // night's cap (frozen by the laptop from po_cap.json). The purchases split into what the bot's order accounts for, items that are not in it and packs beyond its quantity.
+  const numOrNull = (x) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
+  const money = (x) => Math.round(num(x)).toLocaleString('en-US');
+  function moneyOf(n) {
+    const buy = numOrNull(n && n.buy_value), cap = numOrNull(n && n.cap_money);
+    if (buy == null) return null; // an older file: no money
+    const both = num(n.both_value), extraQty = Math.min(num(n.extra_qty_value), both);
+    return { buy, cap: cap != null && cap > 0 ? cap : null, bot: both - extraQty, extraItems: num(n.extra_items_value), extraQty, misc: num(n.misc_value) };
+  }
+  // the headline: [text, tone]. A night whose invoices are not all in yet only says how far he is; tone: over (went over) / under / wait
+  function capLine(n) {
+    const m = n && n.money;
+    if (!m || m.cap == null) return null;
+    if (!n.final) return [`لحد دلوقتي اشتريت ${money(m.buy)} ج من سقف ${money(m.cap)} ج`, 'wait'];
+    const d = Math.round(m.buy - m.cap), p = pctOf(Math.abs(d), m.cap);
+    if (d > 0) return [`عدّيت سقف البوت بـ ${money(d)} ج (${p}%)`, 'over'];
+    if (d < 0) return [`كنت تحت سقف البوت بـ ${money(-d)} ج (${p}%)`, 'under'];
+    return ['اشتريت على سقف البوت بالظبط', 'under'];
+  }
+  const buyLine = (m) => (!m ? '' : m.cap != null ? `اشتريت ${money(m.buy)} ج بسعر التكلفة، والسقف ${money(m.cap)} ج.` : `اشتريت ${money(m.buy)} ج بسعر التكلفة.`);
+  const splitLine = (m) => (!m ? '' : `منها ${money(m.bot)} ج من أمر البوت، و${money(m.extraItems)} ج أصناف مش في أمره، و${money(m.extraQty)} ج كميات أكتر من أمره.`);
+  const miscLine = (m) => (m && m.misc > 0 ? `وغير كده ${money(m.misc)} ج أصناف متنوعة: مش محسوبة.` : '');
+  // the week's money: only the nights whose invoices are all in (a night still waiting has bought less than it will) and that have a cap
+  function weekMoney(nights) {
+    const list = (nights || []).slice(0, SLOTS).filter((n) => n.final && n.money && n.money.cap != null);
+    if (!list.length) return null;
+    const buy = list.reduce((a, n) => a + n.money.buy, 0), cap = list.reduce((a, n) => a + n.money.cap, 0);
+    return { nights: list.length, buy, cap, over: Math.round(buy - cap) };
+  }
+  function weekMoneyLine(w) {
+    if (!w) return '';
+    const head = `الأسبوع: اشتريت ${money(w.buy)} ج من سقف ${money(w.cap)} ج (الليالي الكاملة: ${w.nights})`;
+    const p = pctOf(Math.abs(w.over), w.cap);
+    return w.over > 0 ? `${head}، وعدّيته بـ ${money(w.over)} ج (${p}%).` : w.over < 0 ? `${head}، وكنت تحته بـ ${money(-w.over)} ج (${p}%).` : `${head}: على السقف بالظبط.`;
+  }
   // one night as the file carries it: counts are recomputed from the lists, so the numbers and the lists never disagree.
   // arrived = what he bought in the window = in both + arrived only; the bot's order = in both + bot only
   function normNight(n) {
@@ -86,7 +122,7 @@
       night: String(n.night), at: String(n.at || ''), late: !!n.late, final: !!n.final, until: String(n.window_end || ''), manual: num(n.manual),
       both: both.length, arrivedOnly: ao.length, botOnly: bo.length, arrived: both.length + ao.length, bot: both.length + bo.length,
       cover: pctOf(both.length, both.length + ao.length), prec: pctOf(both.length, both.length + bo.length),
-      qtyN: counted.length, qtySame: counted.filter(qtySame).length,
+      qtyN: counted.length, qtySame: counted.filter(qtySame).length, money: moneyOf(n),
       bothItems: both, arrivedOnlyItems: ao, botOnlyItems: bo,
     };
   }
@@ -111,7 +147,7 @@
     const list = (nights || []).slice(0, SLOTS).slice().reverse();
     return Array.from({ length: SLOTS }, (_, k) => list[k] || null);
   }
-  const api = { PATH, SLOTS, OLD_HOURS, dm, clock, reason, reasonText, arrival, qtyChip, countsQty, normNight, parseCompare, weekOf, isOld, slots, pctOf };
+  const api = { PATH, SLOTS, OLD_HOURS, dm, clock, reason, reasonText, arrival, qtyChip, countsQty, money, moneyOf, capLine, buyLine, splitLine, miscLine, weekMoney, weekMoneyLine, normNight, parseCompare, weekOf, isOld, slots, pctOf };
   root.AskerOrderCompareLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -171,6 +207,18 @@
     $('cmpOutside').textContent = n.manual ? `وفيه ${n.manual} سطر إنت حطيتهم بإيدك في أمر الشرا: مش محسوبين على البوت.` : '';
     const w = data.week;
     $('cmpWeek').innerHTML = `<span>الأسبوع: ${esc(w.nights)} من ${SLOTS} ليالي اتقارنت${w.cover == null ? '' : `، والبوت جاب في المتوسط ${esc(w.cover)}% من اللي وصلك`}.</span>` + (w.nights < SLOTS ? ' <span>لما يكملوا 7 ليالي قرر على أساسهم.</span>' : '');
+    // the money: how far he is from the bot's cap, and what the purchases are made of
+    const m = n.money, cl = capLine(n);
+    $('cmpMoney').classList.toggle('hidden', !m);
+    $('cmpCap').className = 'cmp-cap' + (cl ? ' ' + cl[1] : ' hidden');
+    $('cmpCap').textContent = cl ? cl[0] : '';
+    $('cmpBuy').textContent = buyLine(m);
+    $('cmpSplit').textContent = splitLine(m);
+    $('cmpMisc').classList.toggle('hidden', !miscLine(m));
+    $('cmpMisc').textContent = miscLine(m);
+    const wm = weekMoneyLine(weekMoney(data.nights));
+    $('cmpWeekMoney').classList.toggle('hidden', !wm);
+    $('cmpWeekMoney').textContent = wm;
     drawBars();
     drawGroups(n);
   }
