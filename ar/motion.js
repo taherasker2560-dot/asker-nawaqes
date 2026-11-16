@@ -1,6 +1,7 @@
 /* The bot's motion (owner 2026-11-16, «كبسولة وموجة»; the look itself is ar/capsule.css). Three small things, none of them changes what the page says:
    1. the home's parts rise one after another the first time it shows (the class «fresh» on #homePanel for a second);
-   2. the two numbers under the greeting (#kShort, #kOrdered) count up to their value once, the first time they get one;
+   2. the two numbers under the greeting (#kShort, #kOrdered) count up to their value once, the first time they get one; so does a customer's
+      balance when his statement opens (and the statement's parts rise one after another);
    3. the bottom bar's color pill slides to the section you are in (--ind-x / --ind-w on .bottomnav, drawn by capsule.css).
    «Reduce motion» = none of it. A browser driven by a test (navigator.webdriver) shows the final numbers at once, because the
    tests read them; window.__askerMotion = true forces the motion on (the motion's own test). Never adds text. */
@@ -46,6 +47,21 @@
     el.textContent = shown(parts, 0);
     requestAnimationFrame(step);
   }
+  // the same count for a box that is drawn again while it counts (the statement is drawn again as its movements arrive): every frame writes the
+  // line into whichever element is there now, and at the end it is exactly the text the page wrote
+  function countLive(box, sel) {
+    const first = box.querySelector(sel);
+    const parts = first && countParts(first.textContent);
+    if (!parts) return;
+    const t0 = performance.now(), dur = 900;
+    const step = (t) => {
+      const el = box.querySelector(sel), p = Math.min(1, (t - t0) / dur);
+      if (el) el.textContent = shown(parts, p);
+      if (p < 1) requestAnimationFrame(step);
+    };
+    first.textContent = shown(parts, 0);
+    requestAnimationFrame(step);
+  }
   // an element that shows «—» and later gets its number: it counts up the first time only
   function watchNumber(el) {
     let done = false, busy = false;
@@ -79,6 +95,25 @@
     ['kShort', 'kOrdered'].forEach((id) => { const el = document.getElementById(id); if (el) watchNumber(el); });
   }
 
+  // a customer's statement (ar/customers.js draws it into #cuSt): its parts rise the first time it opens, and the balance counts up once
+  function watchStatement() {
+    const box = document.getElementById('cuSt');
+    if (!box) return;
+    let seen = false, timer = 0;
+    const check = () => {
+      if (!box.querySelector('.cu-bal')) { seen = false; return; }
+      if (seen) return;
+      seen = true;
+      if (still()) return;
+      box.classList.add('fresh');
+      clearTimeout(timer);
+      timer = setTimeout(() => box.classList.remove('fresh'), 1200);
+      countLive(box, '.cu-bal');
+    };
+    new MutationObserver(check).observe(box, { childList: true });
+    check();
+  }
+
   function placePill() {
     const bar = document.querySelector('.bottomnav');
     if (!bar) return;
@@ -107,6 +142,6 @@
     later();
   }
 
-  function start() { watchHome(); watchBar(); }
+  function start() { watchHome(); watchStatement(); watchBar(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })(typeof window === 'undefined' ? globalThis : window);

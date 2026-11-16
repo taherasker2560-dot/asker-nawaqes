@@ -236,7 +236,15 @@
       'الرابط ده ليك انت بس، ما تبعتهوش لحد.',
     ].join('\n');
   }
-  const api = { OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage };
+  // the letter in the round mark before a customer's name (the new look, owner 2026-11-16): the first letter of the name, after a title like «د/» «م.» and
+  // after digits and signs; «•» when the name has no letter at all
+  function initialOf(name) {
+    const full = String(name == null ? '' : name);
+    const bare = full.replace(/^[^\p{L}]+/u, '').replace(/^\p{L}{1,3}\s*[/.]\s*/u, '');
+    const m = /\p{L}/u.exec(bare) || /\p{L}/u.exec(full);
+    return m ? m[0].toUpperCase() : '•';
+  }
+  const api = { OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage, initialOf };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -330,7 +338,7 @@
     const b = balanceText(c.balance), lim = limitOf(c);
     const pct = lim ? Math.max(0, Math.min(100, Math.round(100 * num(c.balance) / lim))) : 0;
     const last = c.last_at ? `<small>آخر حركة ${esc(whenText(c.last_at, new Date()))} (${esc(KIND_WORD[c.last_kind] || 'بيع')})</small>` : '<small>مفيش حركات</small>';
-    return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}" data-cu="${esc(c.id)}">` +
+    return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}" data-cu="${esc(c.id)}" data-ini="${esc(initialOf(c.name))}">` +
       `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}${isStopped(c.id) ? ' ⛔' : ''}</strong>${last}` +
       (lim && owes(c) ? `<i class="cu-bar"><b class="${isOver(c) ? 'r' : ''}" style="width:${pct}%"></b></i>` : '') + '</span>' +
       `<span class="cu-amt ${b.cls}">${esc(b.text)}${lim ? `<small>الحد ${esc(money(lim))}</small>` : ''}</span></button>`;

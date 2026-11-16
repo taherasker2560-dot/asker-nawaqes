@@ -1,0 +1,20 @@
+// ar/customers.js initialOf (owner 2026-11-16, the customers' look): the letter in the round mark before a customer's name.
+const assert = require('node:assert/strict');
+global.window = global;
+const L = require('../ar/customers.js');
+const f = L.initialOf;
+assert.equal(f('أحمد محمود'), 'أ');
+assert.equal(f('سامية عبد الله'), 'س');
+assert.equal(f('د/سامي حسن'), 'س', 'a title like «د/» is skipped');
+assert.equal(f('م. كمال علي'), 'ك', 'a title with a dot is skipped');
+assert.equal(f('(1500) ليلى زيدان'), 'ل', 'digits and signs before the name are skipped');
+assert.equal(f('01000000000 منى سالم'), 'م');
+assert.equal(f('  رامي فؤاد'), 'ر');
+assert.equal(f('ALPHA-TEST'), 'A', 'a Latin name is upper-cased');
+assert.equal(f('alpha'), 'A');
+assert.equal(f('ب/'), 'ب', 'a name that is only a title keeps its letter');
+assert.equal(f('1234'), '•', 'no letter at all');
+assert.equal(f(''), '•');
+assert.equal(f(null), '•');
+assert.equal(f(undefined), '•');
+console.log('PASS: customers initialOf: the letter before a name');
