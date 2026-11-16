@@ -59,8 +59,10 @@
     $('themeReset').hidden = !c.own;
     const dbox = $('storeDarkPick');
     if (dbox && S.DARKS) {
-      const cur = darkId();
+      const d0 = S.darkOf(read(DKEY, S.DARK_DEFAULT)), cur = d0.id;
       dbox.innerHTML = S.DARKS.map((d) => `<button type="button" role="radio" aria-checked="${d.id === cur}" data-dark="${d.id}" class="accent${d.id === cur ? ' on' : ''}"><span style="background:linear-gradient(135deg,${d.dark},${d.dark2})"></span>${d.name}</button>`).join('');
+      if ($('storeDarkCustom')) $('storeDarkCustom').value = d0.dark;
+      $('storeDarkCustomRow')?.classList.toggle('on', cur === 'custom');
     }
   }
   function open(on) {
@@ -88,6 +90,9 @@
       if (!b) return;
       write(DKEY, b.dataset.dark); apply(); draw();
     });
+    const darkOwn = (e) => { if (!/^#[0-9a-f]{6}$/i.test(e.target.value)) return; write(DKEY, 'c:' + e.target.value.toLowerCase()); apply(); draw(); };
+    $('storeDarkCustom')?.addEventListener('input', darkOwn);
+    $('storeDarkCustom')?.addEventListener('change', darkOwn);
     const custom = (e) => { if (!/^#[0-9a-f]{6}$/i.test(e.target.value)) return; write(KEY, 'c:' + e.target.value.toLowerCase()); apply(); draw(); };
     $('themeCustom').addEventListener('input', custom);
     $('themeCustom').addEventListener('change', custom);

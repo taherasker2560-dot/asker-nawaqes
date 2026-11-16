@@ -20,11 +20,20 @@ const hsl = (h) => {
   return { h: hue, s: s * 100, l: l * 100 };
 };
 
-assert.deepEqual(S.DARKS.map((d) => d.id), ['warm', 'charcoal', 'teal', 'plum']);
-assert.equal(S.DARK_DEFAULT, 'warm', 'the default is the warm brown');
+assert.deepEqual(S.DARKS.map((d) => d.id), ['teal', 'warm', 'charcoal', 'plum']);
+assert.equal(S.DARK_DEFAULT, 'teal', 'the default is the picture\'s green');
 assert.equal(S.darkOf('warm').name, 'قهوة دافية');
-assert.equal(S.darkOf('nonsense').id, 'warm', 'an unknown choice falls back to the default');
-assert.equal(S.darkOf(undefined).id, 'warm');
+assert.equal(S.darkOf('teal').dark2, '#018b90', 'the lighter step is exactly the picture\'s green');
+assert.equal(S.darkOf('nonsense').id, 'teal', 'an unknown choice falls back to the default');
+assert.equal(S.darkOf(undefined).id, 'teal');
+// a color of his own: darkened until white text reads, always with a lighter step and a near-black one
+for (const own of ['c:#e0a030', 'c:#ffffff', 'c:#000000', 'c:#066f74']) {
+  const o = S.darkOf(own);
+  assert.equal(o.id, 'custom');
+  assert.ok(S.contrast(o.dark, '#ffffff') >= 4.5, own + ': white text reads on it: ' + o.dark);
+  for (const k of ['dark', 'dark2', 'deep']) assert.match(o[k], /^#[0-9a-f]{6}$/, own + ' ' + k);
+}
+assert.equal(S.darkOf('c:#zzzzzz').id, 'teal', 'a broken color falls back to the default');
 assert.equal(new Set(S.DARKS.map((d) => d.name)).size, 4, 'four different names');
 for (const d of S.DARKS) {
   for (const k of ['dark', 'dark2', 'deep']) {
@@ -33,8 +42,8 @@ for (const d of S.DARKS) {
     // no navy: a saturated blue (hue 200-265) is exactly what he refused (a faint gray-blue tint in the charcoal is not navy)
     assert.ok(!(c.h >= 200 && c.h <= 265 && c.s >= 25), `${d.id}.${k} must not be navy: ${JSON.stringify(c)}`);
   }
-  assert.ok(S.contrast(d.dark, '#ffffff') >= 7, d.id + ': white text on the surface reads');
-  assert.ok(S.contrast(d.dark2, '#ffffff') >= 4.5, d.id + ': white text on the lighter step reads');
+  assert.ok(S.contrast(d.dark, '#ffffff') >= 4.5, d.id + ': white text on the surface reads (AA)');
+  assert.ok(S.contrast(d.dark2, '#ffffff') >= 3, d.id + ': white big text on the lighter step reads (the gradient\'s end, large text)');
   assert.ok(hsl(d.deep).l < hsl(d.dark).l && hsl(d.dark).l < hsl(d.dark2).l, d.id + ': deep < surface < lighter step');
 }
 // the page gets the variables (a tiny stand-in document)

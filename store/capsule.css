@@ -79,7 +79,7 @@ html.night .cart-card { box-shadow: 0 0 0 2px var(--accent); }
 .slide.s-rx { background: linear-gradient(135deg, var(--dark-2), var(--dark)); }
 .slide.s-find { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); }
 .slide.s-find::after { background: rgba(255, 255, 255, 0.22); }
-.slide.s-wa { background: linear-gradient(135deg, var(--dark-2), var(--accent-deep)); }
+.slide.s-wa { background: linear-gradient(135deg, var(--dark), var(--dark-deep)); }
 .dots i.on { border-radius: 999px; }
 
 /* ---------- the bottom bar: a floating dark capsule, a color pill slides to the page you are on ---------- */
@@ -120,13 +120,13 @@ html:not(.cap-ind) .tabbar a.on { background: var(--accent); }
 /* ---------- «حسابي»: the balance first, on a dark card ---------- */
 .ac-bal { position: relative; z-index: 2; overflow: hidden; margin: 14px 16px 0; padding: 22px; border: 0; border-radius: 32px; background: var(--dark); color: #fff; box-shadow: 0 18px 36px -14px rgba(var(--dark-rgb), 0.5); }
 #acctBox > .ac-bal:first-child { margin-top: -10px; }
-html.night .ac-bal { background: var(--dark-2); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.7); }
+html.night .ac-bal { background: var(--dark); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.7); }
 .ac-bal > * { position: relative; }
 .ac-bal::before { content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 60%; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)); pointer-events: none; animation: cap-sheen 4.2s ease-in-out infinite; }
 @keyframes cap-sheen { 0%, 55% { left: -70%; } 100% { left: 130%; } }
 .ac-big { font-size: 40px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
-.ac-big.owe { color: #ffd3b8; }
-.ac-big.paid { color: #c6ecd6; }
+.ac-big.owe, html.night .ac-big.owe { color: #ffe0cc; }
+.ac-big.paid, html.night .ac-big.paid { color: #d6f5e3; }
 .ac-big.zero { color: #fff; }
 .ac-bal .hint-sm { color: rgba(255, 255, 255, 0.78); }
 .ac-two div { border-radius: 18px; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.82); }

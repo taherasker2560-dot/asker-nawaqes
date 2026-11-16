@@ -23,13 +23,13 @@ run('New look (bot): the wave, the dark greeting, the pill numbers, the floating
  assert.equal(look.barRadius,'0px');
  assert.match(look.wave,/data:image\/svg/,'the wave hangs from the header');
  assert.equal(look.waveAnim,'cap-wave');
- assert.match(look.hero,/rgb\(58, 32, 24\)/,'the dark greeting');
+ assert.match(look.hero,/rgb\(6, 111, 116\)/,'the dark greeting (the picture\'s green)');
  assert.equal(look.float,'cap-float');
- assert.ok(contrast(look.h2,'rgb(58, 32, 24)')>=4.5);
+ assert.ok(contrast(look.h2,'rgb(6, 111, 116)')>=4.5);
  assert.match(look.h2Font,/Readex Pro/);
  assert.equal(look.navRadius,'999px','the bottom bar is a capsule');
  assert.ok(look.navBottom>=10,'and it floats above the edge');
- assert.equal(look.navBg,'rgb(58, 32, 24)');
+ assert.equal(look.navBg,'rgb(6, 111, 116)');
  assert.equal(look.navPos,'fixed');
  assert.equal(look.pillRadius,'999px','the number in «محتاج شغل» is a pill');
  assert.ok(look.pillW>=40&&look.pillH>=40&&look.pillH<=42);
@@ -58,9 +58,9 @@ run('New look (bot): night — the greeting, its link, the bar and the pill numb
  await page.evaluate(()=>{document.getElementById('todoCard').classList.remove('hidden');document.getElementById('todoList').innerHTML='<button type="button" class="todo-row" data-go="read"><b>23</b><span>جديد في الوارد</span></button>'});
  const n=await page.evaluate(()=>{const cs=e=>getComputedStyle(e),nav=document.querySelector('.bottomnav'),b=document.querySelector('.todo-row b'),link=document.querySelector('.hero-link'),h2=document.querySelector('.hero h2'),card=document.querySelector('#homePanel');
   return {nav:cs(nav).backgroundColor,pillBg:cs(b).backgroundColor,pillFg:cs(b).color,link:cs(link).color,linkBg:cs(link).backgroundColor,h2:cs(h2).color,card:cs(card).backgroundColor}});
- assert.equal(n.nav,'rgb(28, 14, 10)');
+ assert.equal(n.nav,'rgb(3, 41, 44)');
  assert.ok(contrast(n.pillFg,n.pillBg)>=4.5,'the number reads on its pill at night');
- assert.ok(contrast(n.h2,'rgb(58, 32, 24)')>=4.5);
+ assert.ok(contrast(n.h2,'rgb(6, 111, 116)')>=4.5);
  assert.ok(contrast(n.link,n.linkBg)>=4.5,'«الموقع» reads on the greeting at night: '+n.link+' on '+n.linkBg);
 },{home:true});
 
@@ -92,28 +92,36 @@ const navyScan=()=>{const out=[];for(const e of document.querySelectorAll('body 
   if(h>=205&&h<=265&&s>=0.25&&l<=0.45)out.push((e.id?'#'+e.id:e.tagName.toLowerCase()+'.'+String(e.className).split(' ')[0])+' '+p+' '+m[0])}}}
  return out.slice(0,8)};
 
-run('Dark color (bot): no navy anywhere on the home, four sets in ⚙️ (warm brown by default), kept after a reload',async({page})=>{
+run('Dark color (bot): no navy anywhere on the home, aqua green (the picture\'s) by default, four sets and his own color in ⚙️, kept after a reload',async({page})=>{
  await ready(page);
  await page.waitForTimeout(400);
  assert.deepEqual(await page.evaluate(navyScan),[],'no navy on the home');
- assert.equal(await page.evaluate(()=>document.documentElement.dataset.dark),'warm');
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.dark),'teal');
  const bar=()=>page.evaluate(()=>getComputedStyle(document.querySelector('.bottomnav')).backgroundColor);
- assert.equal(await bar(),'rgb(58, 32, 24)','the warm brown by default');
+ assert.equal(await bar(),'rgb(6, 111, 116)','the picture\'s green by default');
  await page.click('#settingsBtn');
- assert.deepEqual(await page.$$eval('#darkPick [data-dark]',b=>b.map(x=>x.dataset.dark)),['warm','charcoal','teal','plum']);
- assert.equal(await page.$eval('#darkPick .on',b=>b.dataset.dark),'warm');
- assert.equal(await page.$eval('#darkPick .on',b=>b.textContent.trim()),'قهوة دافية');
- await page.click('#darkPick [data-dark="teal"]');
- assert.equal(await bar(),'rgb(15, 59, 61)','the bar follows the pick at once');
+ assert.deepEqual(await page.$$eval('#darkPick [data-dark]',b=>b.map(x=>x.dataset.dark)),['teal','warm','charcoal','plum']);
  assert.equal(await page.$eval('#darkPick .on',b=>b.dataset.dark),'teal');
- assert.equal(await page.evaluate(()=>localStorage.getItem('asker-dark')),'teal');
+ assert.equal(await page.$eval('#darkPick .on',b=>b.textContent.trim()),'أخضر مائي');
+ await page.click('#darkPick [data-dark="warm"]');
+ assert.equal(await bar(),'rgb(58, 32, 24)','the bar follows the pick at once');
+ assert.equal(await page.$eval('#darkPick .on',b=>b.dataset.dark),'warm');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker-dark')),'warm');
  const hero=await page.evaluate(()=>getComputedStyle(document.querySelector('.hero')).backgroundImage);
- assert.match(hero,/rgb\(15, 59, 61\)/,'the greeting too');
+ assert.match(hero,/rgb\(58, 32, 24\)/,'the greeting too');
  await page.reload();await ready(page);
- assert.equal(await bar(),'rgb(15, 59, 61)','kept after a reload');
- // the night look keeps the set: its near-black
+ assert.equal(await bar(),'rgb(58, 32, 24)','kept after a reload');
+ // a color of his own: darkened until white text on it reads
+ await page.click('#settingsBtn');
+ await page.$eval('#darkCustom',e=>{e.value='#e0a030';e.dispatchEvent(new Event('input',{bubbles:true}))});
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.dark),'custom');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker-dark')),'c:#e0a030');
+ assert.ok(contrast(await bar(),'rgb(255, 255, 255)')>=4.5,'white text reads on his own color: '+await bar());
+ assert.equal(await page.$eval('#darkCustomRow',e=>e.classList.contains('on')),true);
+ // back to the green; the night look keeps the set: its near-black
+ await page.click('#darkPick [data-dark="teal"]');
  await page.evaluate(()=>localStorage.setItem('asker-night','1'));
  await page.reload();await ready(page);
- assert.equal(await bar(),'rgb(6, 28, 29)');
+ assert.equal(await bar(),'rgb(3, 41, 44)');
  assert.deepEqual(await page.evaluate(navyScan),[],'no navy at night either');
 },{home:true});
