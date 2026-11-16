@@ -52,6 +52,11 @@ window.AskerEN = {
  "وصل بعد {0} ساعة: اتطلب من مخزن تاني": "Arrived after {0} hours: ordered from another warehouse",
  "لسه ما وصلش: بنستنى الفواتير": "Not arrived yet: waiting for the invoices",
  "ما وصلش خلال يومين: غالبًا ما اتطلبش": "Did not arrive within two days: probably not ordered",
+ "وصل {0}: نفس كمية البوت": "Arrived {0}: same as the bot's quantity",
+ "البوت {0} ووصل {1}": "The bot {0}, arrived {1}",
+ "الكمية: {0} من {1} صنف وصلوا بنفس كمية البوت.": "Quantity: {0} of {1} items arrived in the same quantity as the bot.",
+ "الكمية اللي وصلت ممكن تقل لو المخزن ما كانش عنده كلها، لأن فارمافلاي مش بيحفظ الكمية اللي طلبتها.": "The quantity that arrived may be lower if the warehouse did not have it all, because PharmaFly does not keep the quantity you ordered."
+ ,
  "مش في فارمافلاي لسه ومفيش عليها عرض. دي الأسماء والكميات والأسعار التقريبية اللي كتبتها: انسخ الرسالة وابعتها للمورد اللي تختاره.": "Not in PharmaFly yet and no offer to compare. These are the names, quantities and approximate prices you typed: copy the message and send it to the supplier you choose.",
  "علّمهم اتطلبوا": "Mark them as ordered",
  "رسالة الأصناف الجديدة اتنسخت: الزقها في محادثة المورد اللي تختاره.": "The new products message was copied: paste it into the chat of the supplier you choose.",

@@ -77,3 +77,17 @@ const nF=C.normNight({...night('2026-11-16',50,10,0),bot:50,only_bot_items:[],fi
 // the week uses the adjusted numbers of every night
 const wk=C.weekOf([nE,nF]);assert.equal(wk.cover,C.pctOf(52+50,62+60));assert.equal(wk.nights,2);
 console.log('PASS: order-compare arrivals');
+// the QUANTITY: the bot's quantity against what arrived on the invoice (PharmaFly does not keep the quantity he orders)
+const Q=(r)=>C.qtyChip(r);
+assert.deepEqual(Q({qty:3,arr:{q:3}}),['وصل 3: نفس كمية البوت','ok'],'a line in both, same quantity');
+assert.deepEqual(Q({qty:2,arr:{q:3}}),['البوت 2 ووصل 3','warn'],'a different quantity');
+assert.deepEqual(Q({qty:2,arr:{q:2.4}}),['وصل 2.4: نفس كمية البوت','ok'],'rounded to whole packs');
+assert.deepEqual(Q({qty:2,arr:{q:1.5}}),['وصل 1.5: نفس كمية البوت','ok']);
+assert.equal(Q({qty:2,arr:{q:3.6}})[0],'البوت 2 ووصل 3.6');
+assert.deepEqual(Q({qty:1,why:'skipped',arr:{q:1}}),['وصل 1: نفس كمية البوت','ok'],'the bot line that arrived from another warehouse counts');
+assert.equal(Q({qty:1,why:'carried',arr:{q:1}}),null,'an old line is not tonight\'s order');
+assert.equal(Q({why:'had_stock',arr:{q:1}}),null,'a machine-only item has no bot quantity');
+assert.equal(Q({qty:2}),null,'nothing arrived yet');assert.equal(Q({qty:2,arr:{vendor:'X',h:3}}),null,'an older file without the quantity');assert.equal(Q(null),null);
+const nQ=C.normNight({...night('2026-11-16',3,0,2),bot:5,both_items:[{id:1,name:'B1',qty:3,arr:{q:3}},{id:2,name:'B2',qty:2,arr:{q:3}},{id:3,name:'B3',qty:1}],only_bot_items:[{id:4,name:'E1',qty:2,why:'skipped',arr:{q:2}},{id:5,name:'C1',qty:1,why:'carried',arr:{q:1}}]});
+assert.equal(nQ.qtyN,3,'B1, B2 and E1 count; B3 has not arrived, C1 is an old line');assert.equal(nQ.qtySame,2,'B1 and E1 are the same quantity');
+console.log('PASS: order-compare quantity');

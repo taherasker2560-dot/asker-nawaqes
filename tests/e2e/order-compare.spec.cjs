@@ -88,10 +88,11 @@ run('orders card in English: the texts are drawn from codes, so they translate; 
 });
 run('orders card: what arrived on the invoices counts as ordered at another warehouse; the rate is final after 48 h',async({page})=>{
  // 50 on both sides, 10 machine-only, 4 bot-only: one arrived from another warehouse (counts), one is his own line that arrived (counts), one old line that arrived (does not), one did not arrive
- const ob=[{id:1,name:'ARRIVED ELSEWHERE',qty:2,why:'skipped',arr:{vendor:'الفتح',code:'55/1',h:14.9}},{id:2,name:'HIS OWN LINE',qty:1,why:'manual',arr:{vendor:'AMG',code:'7',h:30}},
+ const ob=[{id:1,name:'ARRIVED ELSEWHERE',qty:2,why:'skipped',arr:{vendor:'الفتح',code:'55/1',h:14.9,q:1.5}},{id:2,name:'HIS OWN LINE',qty:1,why:'manual',arr:{vendor:'AMG',code:'7',h:30,q:1}},
   {id:3,name:'OLD LINE ARRIVED',qty:1,why:'carried',days:3,arr:{vendor:'AMG',code:'8',h:12}},{id:4,name:'NOT ARRIVED',qty:1,why:'skipped'}];
  const n=night('2026-11-16',50,4,0,{bot:54,only_bot:4,only_bot_items:ob,final:false,window_end:'2026-11-18 00:42'});
  n.only_machine_items[0].arr={vendor:'الفتح',code:'88',h:16.2};
+ n.both_items[0].arr={vendor:'AMG',code:'9',h:14,q:1};n.both_items[1].arr={vendor:'AMG',code:'9',h:14,q:3};
  await put(page,file([n]));
  await openOrders(page);
  await page.waitForSelector('#cmpMain:not(.hidden)');
@@ -102,10 +103,15 @@ run('orders card: what arrived on the invoices counts as ordered at another ware
  assert.match(await text(page,'#cmpElse'),/منهم 2 صنف البوت طالبهم وإنت ما علّمتش عليهم على الجهاز، بس وصلوا بفواتير: اتطلبوا من مخزن تاني/);
  await page.click('#cmpGroups [data-grp="ob"] summary');
  const rows=await page.$$eval('#cmpGroups [data-grp="ob"] .cmp-row',r=>r.map(x=>[x.querySelector('strong').textContent.trim(),[...x.querySelectorAll('.cmp-why')].map(c=>c.textContent.trim()+'|'+c.className.replace('cmp-why','').trim())]));
- assert.deepEqual(rows[0],['ARRIVED ELSEWHERE',['البوت طلبه ومش معلّم عليه على الجهاز|warn','وصل من الفتح بعد 15 ساعة: اتطلب من مخزن تاني|ok']]);
- assert.deepEqual(rows[1],['HIS OWN LINE',['إنت حطيته بإيدك في أمر الشرا|own','وصل من AMG بعد 30 ساعة: اتطلب من مخزن تاني|ok']]);
+ assert.deepEqual(rows[0],['ARRIVED ELSEWHERE',['البوت طلبه ومش معلّم عليه على الجهاز|warn','وصل من الفتح بعد 15 ساعة: اتطلب من مخزن تاني|ok','وصل 1.5: نفس كمية البوت|ok']]);
+ assert.deepEqual(rows[1],['HIS OWN LINE',['إنت حطيته بإيدك في أمر الشرا|own','وصل من AMG بعد 30 ساعة: اتطلب من مخزن تاني|ok','وصل 1: نفس كمية البوت|ok']]);
  assert.deepEqual(rows[2],['OLD LINE ARRIVED',['سطر قديم من 3 يوم ولسه مفتوح|gray','وصل من AMG بعد 12 ساعة|ok']],'an old line that arrived is only a fact');
  assert.deepEqual(rows[3],['NOT ARRIVED',['البوت طلبه ومش معلّم عليه على الجهاز|warn','لسه ما وصلش: بنستنى الفواتير|gray']]);
+ // the quantity: the bot's against what arrived (his lines in both + the bot lines that arrived from another warehouse): 4 counted, 3 the same
+ assert.equal(await text(page,'#cmpQty'),'الكمية: 3 من 4 صنف وصلوا بنفس كمية البوت.');assert.ok(await page.isVisible('#cmpQtyNote'));
+ await page.click('#cmpGroups [data-grp="both"] summary');
+ const bq=await page.$$eval('#cmpGroups [data-grp="both"] .cmp-row',r=>r.slice(0,3).map(x=>[...x.querySelectorAll('.cmp-why')].map(c=>c.textContent.trim()+'|'+c.className.replace('cmp-why','').trim())));
+ assert.deepEqual(bq,[['وصل 1: نفس كمية البوت|ok'],['البوت 1 ووصل 3|warn'],[]],'a difference in orange, nothing yet for a line that did not arrive');
  // a machine-only item that arrived shows it too
  const om=await page.$$eval('#cmpGroups [data-grp="om"] .cmp-row',r=>r.map(x=>[...x.querySelectorAll('.cmp-why')].map(c=>c.textContent.trim())));
  assert.deepEqual(om[0],['عنده رصيد 3 (البوت بيطلب الصفر بس)','وصل من الفتح بعد 16 ساعة']);

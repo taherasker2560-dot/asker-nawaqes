@@ -55,6 +55,16 @@
   // tick on the machine but that arrived were ordered from another warehouse (owner 2026-11-16: «كنت بعلم على أصنافه، واللي ما بلاقوش عنده كنت ببعته على مخزن تاني»)
   const isElsewhere = (r) => !!(r && r.arr && (r.why === 'skipped' || r.why === 'manual'));
   const hoursText = (h) => String(Math.max(1, Math.round(num(h))));
+  // the QUANTITY (owner 2026-11-16: «نحكم … طلبك وتحديد كمياتك متطابقة مع اللي انا هعمله ولا لا»): PharmaFly does not keep the quantity he orders, so the bot's
+  // quantity is set against what ARRIVED on the invoice (arr.q, packs of that invoice, the free bonus left out). It counts the lines that are his order:
+  // the lines in both, and the bot's own lines that arrived from another warehouse. A warehouse that sent less shows as a difference too.
+  const qtyText = (x) => String(Math.round(num(x) * 10) / 10);
+  const countsQty = (r) => !!(r && r.arr && r.arr.q != null && num(r.qty) > 0 && (!r.why || isElsewhere(r)));
+  const qtySame = (r) => Math.round(num(r.qty)) === Math.round(num(r.arr.q));
+  function qtyChip(r) {
+    if (!countsQty(r)) return null;
+    return qtySame(r) ? [`وصل ${qtyText(r.arr.q)}: نفس كمية البوت`, 'ok'] : [`البوت ${qtyText(r.qty)} ووصل ${qtyText(r.arr.q)}`, 'warn'];
+  }
   // the second chip of a line: [text, tone] or null. final = the 48 h are over
   function arrival(r, final) {
     if (!r) return null;
@@ -74,7 +84,9 @@
     const machine = both.length + om.length || num(n.machine), bot = num(n.bot);
     const bothScope = Math.min(num(n.both_scope), both.length);
     const elsewhere = ob.filter(isElsewhere).length;
+    const counted = both.concat(ob).filter(countsQty);
     return {
+      qtyN: counted.length, qtySame: counted.filter(qtySame).length,
       night: String(n.night), at: String(n.at || ''), late: !!n.late, final: !!n.final, until: String(n.window_end || ''), machine, bot, outside: num(n.outside),
       both: both.length, onlyMachine: om.length, onlyBot: ob.length, elsewhere,
       cover: pctOf(both.length + elsewhere, machine + elsewhere), prec: pctOf(bothScope + elsewhere, bot),
@@ -103,7 +115,7 @@
     const list = (nights || []).slice(0, SLOTS).slice().reverse();
     return Array.from({ length: SLOTS }, (_, k) => list[k] || null);
   }
-  const api = { PATH, SLOTS, OLD_HOURS, dm, clock, reason, reasonText, arrival, isElsewhere, normNight, parseCompare, weekOf, isOld, slots, pctOf };
+  const api = { PATH, SLOTS, OLD_HOURS, dm, clock, reason, reasonText, arrival, isElsewhere, qtyChip, countsQty, normNight, parseCompare, weekOf, isOld, slots, pctOf };
   root.AskerOrderCompareLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -120,9 +132,9 @@
     ['both', '🟢 اتطلبوا في الاتنين', 'bothItems', false],
   ];
   function rowHtml(r, withWhy, final) {
-    const [txt, tone] = reason(r), a = withWhy ? arrival(r, final) : null;
+    const [txt, tone] = reason(r), a = withWhy ? arrival(r, final) : null, qc = qtyChip(r);
     const qty = r.qty != null && num(r.qty) > 0 ? ` <span class="cmp-qty">× ${esc(String(num(r.qty)))}</span>` : '';
-    return `<div class="cmp-row"><strong dir="ltr" class="notr">${esc(r.name)}</strong>${qty}${withWhy && txt ? ` <span class="cmp-why ${tone}">${esc(txt)}</span>` : ''}${a ? ` <span class="cmp-why ${a[1]}">${esc(a[0])}</span>` : ''}</div>`;
+    return `<div class="cmp-row"><strong dir="ltr" class="notr">${esc(r.name)}</strong>${qty}${withWhy && txt ? ` <span class="cmp-why ${tone}">${esc(txt)}</span>` : ''}${a ? ` <span class="cmp-why ${a[1]}">${esc(a[0])}</span>` : ''}${qc ? ` <span class="cmp-why ${qc[1]}">${esc(qc[0])}</span>` : ''}</div>`;
   }
   function drawGroups(n) {
     $('cmpGroups').innerHTML = GROUPS.map(([id, title, list, why]) => {
@@ -155,6 +167,9 @@
     // the rate is final only when the 48 hours for the invoices are over (some items he orders from another warehouse without ticking them on the machine)
     const until = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d)/.exec(n.until);
     $('cmpFinal').textContent = n.final ? 'النسبة دي بعد ما شفنا اللي وصل في الفواتير.' : until ? `مؤقتة: لسه بنستنى الفواتير لحد ${clock(until[1] + ' ' + until[2])} يوم ${dm(until[1])}.` : '';
+    $('cmpQty').classList.toggle('hidden', !n.qtyN);
+    $('cmpQty').textContent = n.qtyN ? `الكمية: ${n.qtySame} من ${n.qtyN} صنف وصلوا بنفس كمية البوت.` : '';
+    $('cmpQtyNote').classList.toggle('hidden', !n.qtyN);
     $('cmpElse').classList.toggle('hidden', !n.elsewhere);
     $('cmpElse').textContent = n.elsewhere ? `منهم ${n.elsewhere} صنف البوت طالبهم وإنت ما علّمتش عليهم على الجهاز، بس وصلوا بفواتير: اتطلبوا من مخزن تاني واتحسبوا في النسبة.` : '';
     $('cmpLate').classList.toggle('hidden', !n.late);
