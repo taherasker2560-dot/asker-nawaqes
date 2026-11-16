@@ -196,7 +196,12 @@ async function itemInfo(c: Ctx, name: string, now: number): Promise<Answer> {
   const bits: string[] = [];
   bits.push(nm + (Number(it.price) > 0 ? ': ' + num(Number(it.price)) + ' جنيه' : ''));
   bits.push(have >= 0.05 ? 'عندنا ' + num(have) : 'مش موجود عندنا دلوقتي');
-  if (inStock && it.exp_near) bits.push('وفيه منه صلاحيته قربت');
+  // exp_near = the nearest expiry date of what is in stock (a date, 2026-11-17): said only when it is within 3 months
+  const exp = Date.parse(String(it.exp_near || ''));
+  if (inStock && !isNaN(exp) && exp - now < 92 * 86400000) {
+    const d = new Date(exp);
+    bits.push(exp <= now ? 'وفيه منه صلاحيته خلصت' : 'وفيه منه صلاحيته قربت، شهر ' + (d.getUTCMonth() + 1));
+  }
   // its bag / the general shortages, from the bags file
   const j = await bags(c, now);
   for (const b of bagList(j)) {
