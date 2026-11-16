@@ -41,6 +41,12 @@ run('Chronic: the home row, a card per customer, the message (WhatsApp or copied
  assert.match(cards[0].items[0],/^ALPHA-TEST 10MG 30TAB\s*بياخده كل 30 يوم \(6 مرة\) آخر مرة من 40 يوم أخد 1 علبة عندك 2$/);
  assert.match(cards[0].items[1],/^BETA-TEST DROPS\s*بياخده كل 31 يوم \(5 مرة\) آخر مرة من 38 يوم أخد أقل من علبة خلص من عندك$/);
  assert.deepEqual([cards[1].name,cards[1].owed],['منى سالم 📱',null],'the saved number has the phone sign; no debt = no amount');
+ // the customer's name can be SEEN (it is a button: its text was white on the white card once, and the test above only read the text)
+ const seen=await page.$eval('.cu-chron-top .linklike',e=>{const lum=c=>{const m=c.match(/\d+(\.\d+)?/g).map(Number);return 0.299*m[0]+0.587*m[1]+0.114*m[2]};return Math.abs(lum(getComputedStyle(e).color)-lum(getComputedStyle(e.closest('.cu-chron')).backgroundColor))});
+ assert.ok(seen>120,'the name has a readable colour on the card: '+seen);
+ // the «💊 مزمن» chip is in sight when the row of chips is wider than the screen
+ const chipIn=await page.$eval('#cuChips .chip.on',e=>{const a=document.getElementById('cuChips').getBoundingClientRect(),b=e.getBoundingClientRect();return b.left>=a.left-1&&b.right<=a.right+1});
+ assert.ok(chipIn,'the chosen chip is scrolled into view');
  // the message, no number saved: copied, by his first name (no title), the medicines by name, no money in it
  await page.click('#cuRows [data-cu-chron="9001"]');
  await page.waitForFunction(()=>/ALPHA-TEST/.test(window.__copied));

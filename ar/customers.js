@@ -383,6 +383,12 @@
     if (AC && !chronAsked) { chronAsked = true; AC.load(false).then(() => drawList()); }
     $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('old', 'ديون قديمة', od.n) + (AC && AC.loaded() ? chip('chronic', '💊 مزمن', AC.count()) : '') + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all) +
       (r.view === 'old' ? '<span class="cu-days" role="group" aria-label="مدة من غير حركة">' + OLD_DAYS.map((d) => `<button type="button" class="chip small${oldDays === d ? ' on' : ''}" data-cu-days="${d}">${d} يوم</button>`).join('') + '</span>' : '');
+    // the chosen chip stays in sight when the row is wider than the screen (the «💊 مزمن» one sits near the far end; the pin button covers the very end)
+    const chipsEl = $('cuChips'), onChip = chipsEl.querySelector('.chip.on');
+    if (onChip && chipsEl.scrollWidth > chipsEl.clientWidth) {
+      const a = chipsEl.getBoundingClientRect(), b = onChip.getBoundingClientRect();
+      if (b.left < a.left + 56 || b.right > a.right) chipsEl.scrollLeft += (b.left + b.right) / 2 - (a.left + a.right) / 2;
+    }
     $('cuClear')?.classList.toggle('hidden', !query);
     let html = '';
     if (r.view === 'over') {
