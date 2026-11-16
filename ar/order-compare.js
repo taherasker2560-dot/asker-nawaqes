@@ -1,15 +1,17 @@
-/* «طلب الجهاز × طلب البوت» (card at the top of «الطلبيات», owner 2026-11-16: «عشان انا متعود على الطلب من على الجهاز، فمش عارف لسه اعتمد عليه»).
-   Every night the laptop (Hub\orders\ORDER_COMPARE.ps1, read only) takes the items he ordered on PharmaFly (Items.LastOrderTime) and the
-   lines of the bot's purchase order that were open at that moment, sorts each item into «in both / only on the machine / only in the
-   bot» with the likely reason, keeps 7 nights and uploads ONE file: asker-private/orders/compare.json. This card only READS it
-   (owner's login; no table, no migration). The compared bag is the daily bag «نواقص يوميه»; other bags are counted apart.
-   Nothing here writes anything and nothing is sent. The reason texts are drawn here from a CODE the laptop writes (plus the
-   stock, the bag's name or the days), so the English switch (ar/i18n.js) translates them like any other text. */
+/* «طلب البوت × مشتريات تاني يوم» (card at the top of «الطلبيات», owner 2026-11-16: «عشان انا متعود على الطلب من على الجهاز، فمش عارف لسه اعتمد عليه»).
+   v2 (owner 2026-11-16, later): «ما تقارنش بالامر الشراء اللي انا مسجله على الجهاز … هتقارن بالمشتريات اللي دخلت لك تاني يوم، هتقارن اللي انت حددته من الكميات
+   دي بنفسك باللي انا هحدده عن طريق اللي هيخش من مشتريات تاني يوم». Every night the laptop (Hub\orders\ORDER_COMPARE.ps1, read only) takes the bot's order at the
+   cut (the automatic lines of the purchase order that were open then) and the supplier invoices entered in the 30 hours after it, sorts each item into
+   «ordered and arrived / arrived and not in the bot's order, with the likely reason / in the bot's order and did not arrive», keeps 7 nights and uploads ONE
+   file: asker-private/orders/compare2.json. This card only READS it (owner's login; no table, no migration).
+   The quantity: the bot's quantity against the packs on the invoice (the free bonus left out). The rate is provisional until the 30 hours are over.
+   Nothing here writes anything and nothing is sent. The reason texts are drawn here from a CODE the laptop writes (plus the stock, the bag's name or the
+   days), so the English switch (ar/i18n.js) translates them like any other text. */
 (function (root) {
   'use strict';
 
   // ---------- pure helpers (also used by tests/order-compare.cjs) ----------
-  const PATH = 'orders/compare.json';
+  const PATH = 'orders/compare2.json';
   const SLOTS = 7; // the week
   const OLD_HOURS = 36; // the file is rewritten whenever something changes and every 30 minutes; a day and a half old = the laptop is not updating
   const num = (x) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
@@ -29,60 +31,66 @@
   }
   // the reason of a line: [text, tone]. tone: red = the bot got it wrong, own = something he did, warn = a rule of the bot, gray = a plain fact
   const BAG_TXT = (r) => String(r.bag || '').trim();
+  const numText = (x) => String(Math.round(num(x) * 10) / 10);
   const REASONS = {
+    // arrived and the bot had no automatic line at the cut
+    manual: () => ['إنت حطيته بإيدك في أمر الشرا', 'own'],
     postponed: () => ['إنت أجّلته (نقلته لكل الشركات)', 'own'],
     cancelled_me: () => ['إنت لغيته من أمر الشرا', 'own'],
-    closed_auto: () => ['البوت قفل سطره قبل طلبك (الرصيد رجع أو خرج من الحقيبة)', 'gray'],
+    closed_auto: () => ['البوت قفل سطره قبل الطلب (الرصيد رجع أو خرج من الحقيبة)', 'gray'],
     unknown: () => ['السبب مش معروف (اتحسب بعد الطلب بوقت طويل)', 'gray'],
     gs: () => ['في النواقص العامة', 'gray'],
-    had_stock: (r) => [`عنده رصيد ${String(num(r.have))} (البوت بيطلب الصفر بس)`, 'warn'],
+    had_stock: (r) => [r.cover != null ? `رصيده ${numText(r.have)} يكفي ${numText(r.cover)} يوم` : `عنده رصيد ${numText(r.have)}`, 'warn'],
     dup: () => ['ممكن نفس الصنف: مستني قرارك', 'gray'],
-    missed: (r) => [BAG_TXT(r) ? `رصيده صفر في ${BAG_TXT(r)} والبوت ما دخلهوش: محتاج نبص` : 'رصيده صفر والبوت ما دخلهوش: محتاج نبص', 'red'],
+    missed: (r) => [BAG_TXT(r) ? `رصيده قليل في ${BAG_TXT(r)} والبوت ما دخلهوش: محتاج نبص` : 'رصيده قليل والبوت ما دخلهوش: محتاج نبص', 'red'],
     other_bag: (r) => [BAG_TXT(r) ? `في حقيبة تانية (${BAG_TXT(r)})` : 'في حقيبة تانية', 'gray'],
     no_bag: () => ['مش في أي حقيبة', 'gray'],
-    not_short: () => ['مش ظاهر ناقص عند البوت', 'gray'],
-    manual: () => ['إنت حطيته بإيدك في أمر الشرا', 'own'],
-    ordered_before: () => ['اتطلب في طلب الليلة اللي فاتت ولسه ما وصلش', 'gray'],
+    not_short: () => ['مش ظاهر ناقص عند البوت وقتها', 'gray'],
+    // in the bot's order and did not arrive
     carried: (r) => [`سطر قديم من ${String(Math.max(1, Math.round(num(r.days))))} يوم ولسه مفتوح`, 'gray'],
-    skipped: () => ['البوت طلبه ومش معلّم عليه على الجهاز', 'warn'],
+    new: () => ['', 'gray'],
   };
   function reason(r) {
     const f = r && REASONS[r.why];
     return f ? f(r) : [String((r && r.txt) || ''), 'gray'];
   }
   const reasonText = (r) => reason(r)[0];
-  // what ARRIVED on a supplier's invoice within 48 h after the order (the laptop writes r.arr = {vendor, code, h}): the bot's own lines that he did not
-  // tick on the machine but that arrived were ordered from another warehouse (owner 2026-11-16: «كنت بعلم على أصنافه، واللي ما بلاقوش عنده كنت ببعته على مخزن تاني»)
-  const isElsewhere = (r) => !!(r && r.arr && (r.why === 'skipped' || r.why === 'manual'));
   const hoursText = (h) => String(Math.max(1, Math.round(num(h))));
-  // the second chip of a line: [text, tone] or null. final = the 48 h are over
+  // the second chip of a line: what arrived (the vendor and how long after the cut), or for the bot's lines that did not arrive: still waiting / probably not ordered
+  // final = the 30 hours are over
   function arrival(r, final) {
     if (!r) return null;
     if (r.arr) {
       const v = String(r.arr.vendor || '').trim(), h = hoursText(r.arr.h);
-      if (isElsewhere(r)) return [v ? `وصل من ${v} بعد ${h} ساعة: اتطلب من مخزن تاني` : `وصل بعد ${h} ساعة: اتطلب من مخزن تاني`, 'ok'];
       return [v ? `وصل من ${v} بعد ${h} ساعة` : `وصل بعد ${h} ساعة`, 'ok'];
     }
-    if (r.why === 'skipped' || r.why === 'manual') return final ? ['ما وصلش خلال يومين: غالبًا ما اتطلبش', 'warn'] : ['لسه ما وصلش: بنستنى الفواتير', 'gray'];
+    if (r.why === 'new' || r.why === 'carried') return final ? ['ما وصلش لحد دلوقتي: غالبًا ما اتطلبش', 'warn'] : ['لسه ما وصلش: بنستنى الفواتير', 'gray'];
     return null;
   }
-  // one night as the file carries it: counts are recomputed from the lists when they are there, so the numbers and the lists never disagree.
-  // The rate counts the bot lines that arrived as his order too (elsewhere), so it is the real one once the 48 h are over (final)
+  // the QUANTITY (owner 2026-11-16: «هتقارن اللي انت حددته من الكميات دي بنفسك»): the bot's quantity against the packs of the invoice (arr.q), the free bonus
+  // left out. It counts the bot's lines that arrived. A warehouse that sent less shows as a difference too.
+  const qtyText = (x) => String(Math.round(num(x) * 10) / 10);
+  const countsQty = (r) => !!(r && r.arr && r.arr.q != null && num(r.qty) > 0 && !r.why);
+  const qtySame = (r) => Math.round(num(r.qty)) === Math.round(num(r.arr.q));
+  function qtyChip(r) {
+    if (!countsQty(r)) return null;
+    return qtySame(r) ? [`وصل ${qtyText(r.arr.q)}: نفس كمية البوت`, 'ok'] : [`البوت ${qtyText(r.qty)} ووصل ${qtyText(r.arr.q)}`, 'warn'];
+  }
+  // one night as the file carries it: counts are recomputed from the lists, so the numbers and the lists never disagree.
+  // arrived = what he bought in the window = in both + arrived only; the bot's order = in both + bot only
   function normNight(n) {
     if (!n || typeof n !== 'object' || !/^\d{4}-\d\d-\d\d$/.test(String(n.night || '')) || n.comparable === false) return null;
-    const both = arr(n.both_items), om = arr(n.only_machine_items), ob = arr(n.only_bot_items);
-    const machine = both.length + om.length || num(n.machine), bot = num(n.bot);
-    const bothScope = Math.min(num(n.both_scope), both.length);
-    const elsewhere = ob.filter(isElsewhere).length;
+    const both = arr(n.both_items), ao = arr(n.arrived_only_items), bo = arr(n.bot_only_items);
+    const counted = both.filter(countsQty);
     return {
-      night: String(n.night), at: String(n.at || ''), late: !!n.late, final: !!n.final, until: String(n.window_end || ''), machine, bot, outside: num(n.outside),
-      both: both.length, onlyMachine: om.length, onlyBot: ob.length, elsewhere,
-      cover: pctOf(both.length + elsewhere, machine + elsewhere), prec: pctOf(bothScope + elsewhere, bot),
-      machineAdj: machine + elsewhere, bothAdj: both.length + elsewhere, bothScopeAdj: bothScope + elsewhere,
-      bothScope, bothItems: both, onlyMachineItems: om, onlyBotItems: ob,
+      night: String(n.night), at: String(n.at || ''), late: !!n.late, final: !!n.final, until: String(n.window_end || ''), manual: num(n.manual),
+      both: both.length, arrivedOnly: ao.length, botOnly: bo.length, arrived: both.length + ao.length, bot: both.length + bo.length,
+      cover: pctOf(both.length, both.length + ao.length), prec: pctOf(both.length, both.length + bo.length),
+      qtyN: counted.length, qtySame: counted.filter(qtySame).length,
+      bothItems: both, arrivedOnlyItems: ao, botOnlyItems: bo,
     };
   }
-  // the file must look like what the laptop writes; anything else is treated as «no comparison yet»
+  // the file must look like what the laptop writes (v2); anything else is treated as «no comparison yet»
   function parseCompare(o) {
     if (!o || typeof o !== 'object' || !Array.isArray(o.nights)) return null;
     const nights = o.nights.map(normNight).filter(Boolean).sort((a, b) => (a.night < b.night ? 1 : a.night > b.night ? -1 : 0)).slice(0, SLOTS);
@@ -91,8 +99,8 @@
   // the week: the nights together (not an average of percentages, so a big night weighs more than a small one)
   function weekOf(nights) {
     const list = (nights || []).slice(0, SLOTS);
-    const s = list.reduce((a, n) => ({ machine: a.machine + n.machineAdj, both: a.both + n.bothAdj, bot: a.bot + n.bot, bothScope: a.bothScope + n.bothScopeAdj }), { machine: 0, both: 0, bot: 0, bothScope: 0 });
-    return { nights: list.length, cover: pctOf(s.both, s.machine), prec: pctOf(s.bothScope, s.bot) };
+    const s = list.reduce((a, n) => ({ arrived: a.arrived + n.arrived, both: a.both + n.both, bot: a.bot + n.bot }), { arrived: 0, both: 0, bot: 0 });
+    return { nights: list.length, cover: pctOf(s.both, s.arrived), prec: pctOf(s.both, s.bot) };
   }
   function isOld(generatedAt, now = new Date()) {
     const t = new Date(generatedAt).getTime();
@@ -103,7 +111,7 @@
     const list = (nights || []).slice(0, SLOTS).slice().reverse();
     return Array.from({ length: SLOTS }, (_, k) => list[k] || null);
   }
-  const api = { PATH, SLOTS, OLD_HOURS, dm, clock, reason, reasonText, arrival, isElsewhere, normNight, parseCompare, weekOf, isOld, slots, pctOf };
+  const api = { PATH, SLOTS, OLD_HOURS, dm, clock, reason, reasonText, arrival, qtyChip, countsQty, normNight, parseCompare, weekOf, isOld, slots, pctOf };
   root.AskerOrderCompareLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -112,17 +120,17 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
-  let data = null, sel = '', opened = new Set(['om']), loaded = false;
+  let data = null, sel = '', opened = new Set(['ao']), loaded = false;
 
   const GROUPS = [
-    ['om', '🟠 الجهاز بس: البوت فاته', 'onlyMachineItems', true],
-    ['ob', '🔵 البوت بس: مش معلّم عليه على الجهاز', 'onlyBotItems', true],
-    ['both', '🟢 اتطلبوا في الاتنين', 'bothItems', false],
+    ['ao', '🟠 وصل ومش في أمر البوت', 'arrivedOnlyItems', true],
+    ['bo', '🔵 في أمر البوت وما وصلش', 'botOnlyItems', true],
+    ['both', '🟢 اتطلبوا ووصلوا', 'bothItems', false],
   ];
   function rowHtml(r, withWhy, final) {
-    const [txt, tone] = reason(r), a = withWhy ? arrival(r, final) : null;
+    const [txt, tone] = reason(r), a = withWhy ? arrival(r, final) : null, qc = qtyChip(r);
     const qty = r.qty != null && num(r.qty) > 0 ? ` <span class="cmp-qty">× ${esc(String(num(r.qty)))}</span>` : '';
-    return `<div class="cmp-row"><strong dir="ltr" class="notr">${esc(r.name)}</strong>${qty}${withWhy && txt ? ` <span class="cmp-why ${tone}">${esc(txt)}</span>` : ''}${a ? ` <span class="cmp-why ${a[1]}">${esc(a[0])}</span>` : ''}</div>`;
+    return `<div class="cmp-row"><strong dir="ltr" class="notr">${esc(r.name)}</strong>${qty}${withWhy && txt ? ` <span class="cmp-why ${tone}">${esc(txt)}</span>` : ''}${a ? ` <span class="cmp-why ${a[1]}">${esc(a[0])}</span>` : ''}${qc ? ` <span class="cmp-why ${qc[1]}">${esc(qc[0])}</span>` : ''}</div>`;
   }
   function drawGroups(n) {
     $('cmpGroups').innerHTML = GROUPS.map(([id, title, list, why]) => {
@@ -148,20 +156,21 @@
     $('cmpNight').textContent = n ? `ليلة ${dm(n.night)}` : '';
     $('cmpOld').classList.toggle('hidden', !(data && isOld(data.generatedAt)));
     if (!n) return;
-    $('cmpSub').textContent = n.at ? `طلبك على فارمافلاي الساعة ${clock(n.at)} قدام طلب البوت في نفس الوقت (نواقص يوميه)` : 'طلبك على فارمافلاي قدام طلب البوت في نفس الوقت (نواقص يوميه)';
-    $('cmpThree').innerHTML = `<div class="cmp-n g"><b>${esc(n.both)}</b><span>اتطلبوا في الاتنين</span></div><div class="cmp-n o"><b>${esc(n.onlyMachine)}</b><span>الجهاز بس (البوت فاته)</span></div><div class="cmp-n b"><b>${esc(n.onlyBot)}</b><span>البوت بس (مش معلّم على الجهاز)</span></div>`;
-    $('cmpBig').textContent = n.cover == null ? '' : `البوت جاب ${n.cover}% من اللي طلبته إنت`; // one text node, so the English switch can translate it
-    $('cmpPrec').textContent = n.prec == null ? '' : `و${n.prec}% من اللي طلبه البوت إنت طلبته كمان.`;
-    // the rate is final only when the 48 hours for the invoices are over (some items he orders from another warehouse without ticking them on the machine)
+    $('cmpSub').textContent = n.at ? `أمر البوت الساعة ${clock(n.at)} قدام المشتريات اللي دخلت بعده (فواتير تاني يوم)` : 'أمر البوت قدام المشتريات اللي دخلت بعده (فواتير تاني يوم)';
+    $('cmpThree').innerHTML = `<div class="cmp-n g"><b>${esc(n.both)}</b><span>اتطلبوا ووصلوا</span></div><div class="cmp-n o"><b>${esc(n.arrivedOnly)}</b><span>وصل ومش في أمر البوت</span></div><div class="cmp-n b"><b>${esc(n.botOnly)}</b><span>في أمر البوت وما وصلش</span></div>`;
+    $('cmpBig').textContent = n.cover == null ? '' : `البوت جاب ${n.cover}% من اللي وصلك`; // one text node, so the English switch can translate it
+    $('cmpPrec').textContent = n.prec == null ? '' : `و${n.prec}% من أمر البوت وصل.`;
+    // the rate is final only when the 30 hours for the invoices are over
     const until = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d)/.exec(n.until);
-    $('cmpFinal').textContent = n.final ? 'النسبة دي بعد ما شفنا اللي وصل في الفواتير.' : until ? `مؤقتة: لسه بنستنى الفواتير لحد ${clock(until[1] + ' ' + until[2])} يوم ${dm(until[1])}.` : '';
-    $('cmpElse').classList.toggle('hidden', !n.elsewhere);
-    $('cmpElse').textContent = n.elsewhere ? `منهم ${n.elsewhere} صنف البوت طالبهم وإنت ما علّمتش عليهم على الجهاز، بس وصلوا بفواتير: اتطلبوا من مخزن تاني واتحسبوا في النسبة.` : '';
+    $('cmpFinal').textContent = n.final ? 'النسبة دي بعد ما شفنا مشتريات تاني يوم.' : until ? `مؤقتة: لسه بنستنى الفواتير لحد ${clock(until[1] + ' ' + until[2])} يوم ${dm(until[1])}.` : '';
+    $('cmpQty').classList.toggle('hidden', !n.qtyN);
+    $('cmpQty').textContent = n.qtyN ? `الكمية: ${n.qtySame} من ${n.qtyN} صنف وصلوا بنفس كمية البوت.` : '';
+    $('cmpQtyNote').classList.toggle('hidden', !n.qtyN);
     $('cmpLate').classList.toggle('hidden', !n.late);
-    $('cmpOutside').classList.toggle('hidden', !n.outside);
-    $('cmpOutside').textContent = n.outside ? `وفي ${n.outside} صنف تانيين في أمر البوت من حقايب تانية (سرحان / كل الشركات) مش داخلين في المقارنة.` : '';
+    $('cmpOutside').classList.toggle('hidden', !n.manual);
+    $('cmpOutside').textContent = n.manual ? `وفيه ${n.manual} سطر إنت حطيتهم بإيدك في أمر الشرا: مش محسوبين على البوت.` : '';
     const w = data.week;
-    $('cmpWeek').innerHTML = `<span>الأسبوع: ${esc(w.nights)} من ${SLOTS} ليالي اتقارنت${w.cover == null ? '' : `، والبوت جاب في المتوسط ${esc(w.cover)}% من طلبك`}.</span>` + (w.nights < SLOTS ? ' <span>لما يكملوا 7 ليالي قرر على أساسهم.</span>' : '');
+    $('cmpWeek').innerHTML = `<span>الأسبوع: ${esc(w.nights)} من ${SLOTS} ليالي اتقارنت${w.cover == null ? '' : `، والبوت جاب في المتوسط ${esc(w.cover)}% من اللي وصلك`}.</span>` + (w.nights < SLOTS ? ' <span>لما يكملوا 7 ليالي قرر على أساسهم.</span>' : '');
     drawBars();
     drawGroups(n);
   }
