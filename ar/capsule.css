@@ -1,0 +1,144 @@
+/* The bot's new look «كبسولة وموجة» (owner 2026-11-16, Claude Design board; he said «أيوه، كمّل التطبيق» after the site got it, store/capsule.css).
+   A layer over ar/app.css + ar/look.css (loaded last): the same ids and classes, no code moves; taking its <link> out brings the
+   previous look back. The colors still come from ar/settings.js (--crimson = the chosen color), only the shape and the motion are new.
+   - the capsule is the shape (the main buttons, the chips, the floating bottom bar); cards 26 px
+   - the logo's wave hangs from the header and drifts slowly
+   - the home: a navy greeting with two capsules floating, «محتاج شغل» rows whose number is a pill
+   - the bottom bar is a floating navy capsule; a color pill slides to the section you are in (ar/motion.js)
+   - motion explains and stops for «reduce motion» */
+
+:root {
+  --navy: #0b1d3f;
+  --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --radius: 26px;
+  --nav-h: 76px;
+  --grad: var(--crimson);
+  --sh-1: 0 2px 8px rgba(11, 29, 63, 0.06);
+  --sh-2: 0 12px 28px -12px rgba(11, 29, 63, 0.22);
+  --wave-w: 400px;
+  /* one period of the logo's wave, the fill ABOVE the curve (it hangs from the header) */
+  --wave-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 70' preserveAspectRatio='none'%3E%3Cpath d='M0 0L400 0L400 34C300 62 100 6 0 34Z'/%3E%3C/svg%3E");
+}
+
+/* ---------- type ---------- */
+h1, h2, h3, .brand h1, .hero h2, .kpi strong, .todo-row b, .qa-h, .stat strong { font-family: var(--head); }
+body::before { display: none; }
+
+/* ---------- the header and the wave that hangs from it ---------- */
+.appbar { border-radius: 0; background: var(--crimson); box-shadow: none; padding-bottom: 14px; }
+.appbar::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% - 1px);
+  height: 22px;
+  background: var(--crimson);
+  pointer-events: none;
+  -webkit-mask-image: var(--wave-down);
+  mask-image: var(--wave-down);
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  -webkit-mask-size: var(--wave-w) 100%;
+  mask-size: var(--wave-w) 100%;
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+  animation: cap-wave 9s linear infinite;
+}
+@keyframes cap-wave { to { -webkit-mask-position: var(--wave-w) 0; mask-position: var(--wave-w) 0; } }
+main { padding-top: 28px; }
+.dataage { margin-top: 28px; }
+
+/* ---------- cards and buttons: capsule and soft ---------- */
+html:not(.night) .card { box-shadow: var(--sh-2); }
+button:not([class]), #loginBtn, .pgroups button, .chips .chip { border-radius: 999px; }
+.search input, .topsearch input { border-radius: 999px; }
+.qa button { border: 0; border-radius: 24px; box-shadow: var(--sh-1); }
+.qa button svg { border-radius: 999px; }
+.card.home .qa button { border-radius: 999px; box-shadow: none; }
+html.night .qa button { box-shadow: 0 0 0 1px var(--line); }
+.kpi { border-radius: 22px; }
+.kpi strong { font-weight: 700; }
+
+/* ---------- «الرئيسية»: a navy greeting with two capsules floating ---------- */
+.hero { border-radius: 28px; background: linear-gradient(135deg, var(--navy) 0%, #14397a 100%); box-shadow: var(--sh-2); }
+.hero > * { position: relative; z-index: 1; }
+.hero::before, .hero::after { content: ''; position: absolute; z-index: 0; border-radius: 999px; pointer-events: none; animation: cap-float 8s ease-in-out infinite; }
+.hero::before { inset-inline-start: -30px; top: -16px; width: 130px; height: 46px; background: rgba(255, 255, 255, 0.13); --r: 28deg; transform: rotate(28deg); }
+.hero::after { inset-inline-end: -34px; bottom: -22px; width: 150px; height: 52px; background: var(--crimson); opacity: 0.95; --r: -26deg; transform: rotate(-26deg); animation-delay: -3s; }
+@keyframes cap-float { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-10px) rotate(var(--r)); } }
+
+/* «الموقع» on the greeting: at night its text was a light peach on white (unreadable) */
+html.night .hero-link { color: var(--navy); }
+
+/* «محتاج شغل»: the number is a pill */
+.todo-row { border: 0; border-inline-start: 0; border-radius: 24px; box-shadow: var(--sh-1); }
+.todo-row b, html.night .todo-row b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--crimson);
+  color: #fff;
+}
+html.night .todo-row { box-shadow: 0 0 0 1px var(--line); }
+
+/* ---------- the bottom bar: a floating navy capsule, a color pill slides to the section you are in ---------- */
+.bottomnav {
+  inset-inline: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  max-width: 560px;
+  height: 64px;
+  margin-inline: auto;
+  padding: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--navy);
+  box-shadow: 0 14px 30px -10px rgba(11, 29, 63, 0.5);
+}
+html.night .bottomnav { background: #050d1c; box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.bottomnav::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: var(--ind-w, 0px);
+  transform: translateX(var(--ind-x, 0px));
+  border-radius: 999px;
+  background: var(--crimson);
+  opacity: var(--ind-o, 0);
+  transition: transform 0.38s var(--spring), width 0.38s var(--spring), opacity 0.2s;
+}
+.bottomnav.no-tr::before { transition: none; }
+.bottomnav button, .bottomnav button.secondary { position: relative; z-index: 1; border-radius: 999px; color: rgba(255, 255, 255, 0.74); }
+.bottomnav button svg, .bottomnav:has(> button:nth-child(5)) button svg { width: 22px; height: 22px; padding: 0; background: none; box-shadow: none; transform: none; border-radius: 0; }
+html .bottomnav button:not(.secondary), html.night .bottomnav button:not(.secondary) { color: #fff; }
+html .bottomnav button:not(.secondary) svg, html.night .bottomnav button:not(.secondary) svg,
+html .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg, html.night .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg { color: #fff; background: none; box-shadow: none; transform: none; }
+html.night .bottomnav button.secondary { color: rgba(255, 255, 255, 0.74); }
+/* before the pill is placed (no script yet): the section you are in has its own capsule */
+html:not(.cap-ind) .bottomnav button:not(.secondary) { background: var(--crimson); }
+/* the red numbers sit on navy now */
+.bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--navy); }
+html.night .bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px #050d1c; }
+
+/* ---------- motion: the home's parts rise one after another the first time it shows (ar/motion.js adds «fresh») ---------- */
+section#homePanel:not(.hidden) { animation: none; }
+@keyframes cap-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+#homePanel.fresh > * { animation: cap-rise 0.55s var(--ease) both; }
+#homePanel.fresh > :nth-child(2) { animation-delay: 50ms; }
+#homePanel.fresh > :nth-child(3) { animation-delay: 100ms; }
+#homePanel.fresh > :nth-child(4) { animation-delay: 150ms; }
+#homePanel.fresh > :nth-child(5) { animation-delay: 200ms; }
+#homePanel.fresh > :nth-child(6) { animation-delay: 250ms; }
+#homePanel.fresh > :nth-child(n+7) { animation-delay: 300ms; }
+
+html.cap-still .appbar::after, html.cap-still .hero::before, html.cap-still .hero::after { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .appbar::after, .hero::before, .hero::after, #homePanel.fresh > * { animation: none !important; }
+  .bottomnav::before { transition: none; }
+}
