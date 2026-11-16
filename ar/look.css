@@ -2247,3 +2247,21 @@ html.night .rep-chip.good, html.night .rep-note.good { background: #14301f; colo
 html.night .rep-chip.warn, html.night .rep-note.warn { background: rgba(240, 160, 60, 0.15); color: #f5b36b; }
 html.night .rep-chip.bad, html.night .rep-note.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
 html.night .rep-chip, html.night .rep-note { background: #2a3142; color: #c3cad8; }
+/* «↩️ المرتجعات» (2026-11-16): the returns per company and invoice number, on top of «الموردين» */
+.rtbox { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; }
+.rtbox h3 { margin: 0 0 6px; font-size: 16px; }
+.rtbox h3 b { font-size: 12.5px; background: #b42318; color: #fff; border-radius: 10px; padding: 0 7px; margin-inline-start: 4px; }
+.rt-v { border-top: 1px solid var(--line); padding: 8px 0; }
+.rt-v summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; }
+.rt-v summary::-webkit-details-marker { display: none; }
+.rt-v summary > b { color: var(--ink); font-size: 15px; }
+.rt-sum { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.rt-sum b { color: var(--ink); }
+.rt-ret { padding: 7px 0; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 3px; }
+.rt-top { display: flex; align-items: baseline; gap: 8px; color: var(--ink); font-weight: 700; }
+.rt-top small { color: var(--muted); font-weight: 400; }
+.rt-top b { margin-inline-start: auto; }
+.rt-items { color: var(--muted); font-size: 12.8px; line-height: 1.6; }
+.rt-items span { color: var(--ink); }
+.rt-body > button { margin-top: 8px; }
+html.night .rt-v .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
