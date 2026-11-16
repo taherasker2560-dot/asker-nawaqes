@@ -1223,7 +1223,7 @@ window.AskerEN = {
   "اطلب من صيدلية عسكر أونلاين وهنوصّلك لحد البيت 🏠 دوّر على الدوا، ضيفه للسلة، أو صوّر الروشتة وابعتها: {0}": "Order from Asker Pharmacy online and we'll deliver to your door 🏠 Search for the medicine, add it to the cart, or photograph the prescription and send it: {0}",
   "اتنسخ ✓ الصقه في أي رسالة": "Copied ✓ paste it in any message",
   "مقدرتش أنسخ. دوس مطوّل على الرابط وانسخه": "Could not copy. Long-press the link and copy it",
-  "صوّر الكود واطلب أونلاين · التوصيل لحد البيت": "Scan the code and order online · delivery to your door",
+  "صوّر الكود واطلب أونلاين · واستلم من الصيدلية": "Scan the code and order online · pick it up at the pharmacy",
   "بيعمل الكود…": "Making the code…",
   "صوّر الكود بموبايل تاني وجرّبه، وبعدين حمّله واطبعه": "Scan the code with another phone to test it, then download and print it",
   "الكود ماتعملش. اتأكد من النت وجرب تاني": "The code was not made. Check the internet and try again",

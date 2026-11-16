@@ -63,7 +63,7 @@
     g.fillStyle = '#3a2018'; g.font = '700 46px "IBM Plex Sans Arabic", Tahoma, sans-serif';
     g.fillText('صيدلية عسكر', W / 2, pad + size + 70);
     g.fillStyle = '#374151'; g.font = '500 28px "IBM Plex Sans Arabic", Tahoma, sans-serif';
-    g.fillText('صوّر الكود واطلب أونلاين · التوصيل لحد البيت', W / 2, pad + size + 118);
+    g.fillText('صوّر الكود واطلب أونلاين · واستلم من الصيدلية', W / 2, pad + size + 118);
     return c.toDataURL('image/png');
   }
   $('slQr').addEventListener('click', async () => {
