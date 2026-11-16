@@ -2216,3 +2216,34 @@ html.night .ct-why .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a
 .cu-chron-it .pill.bad { background: #fde8e6; color: #b42318; }
 html.night .cu-chron-it .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
 .cu-chron .cu-oldact { padding: 8px 0 0; }
+/* «📄 فواتير المندوبين» (2026-11-16): a card at the top of «الطلبيات»; one folding block per invoice, its lines with what the laptop found */
+.repbox { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; }
+.repbox h3 { margin: 0 0 6px; font-size: 16px; }
+.repbox h3 b { font-size: 12.5px; background: var(--accent, #0a4aa6); color: #fff; border-radius: 10px; padding: 0 7px; margin-inline-start: 4px; }
+.rep-inv { border-top: 1px solid var(--line); padding: 8px 0; }
+.rep-inv summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; }
+.rep-inv summary::-webkit-details-marker { display: none; }
+.rep-h { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rep-h b { font-size: 15px; color: var(--ink); }
+.rep-h small { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.rep-t { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; white-space: nowrap; }
+.rep-t b { font-size: 15px; color: var(--ink); }
+.rep-line { padding: 7px 0; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 3px; }
+.rep-ln { display: flex; flex-direction: column; gap: 1px; }
+.rep-ln b { color: var(--ink); }
+.rep-ln small { color: var(--muted); font-size: 12px; text-align: start; }
+.rep-nums { display: flex; gap: 8px; align-items: baseline; color: var(--muted); font-size: 12.5px; }
+.rep-nums b { margin-inline-start: auto; color: var(--ink); }
+.rep-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.rep-chip { border-radius: 8px; padding: 0 7px; font-size: 12px; background: #eef0f4; color: #4b5563; }
+.rep-chip.good { background: #e8f6ec; color: #166534; }
+.rep-chip.warn { background: #fff4e5; color: #9a3412; }
+.rep-chip.bad { background: #fde8e6; color: #b42318; }
+.rep-note { margin: 6px 0 0; border-radius: 9px; padding: 6px 9px; font-size: 12.8px; background: #eef0f4; color: #4b5563; }
+.rep-note.good { background: #e8f6ec; color: #166534; }
+.rep-note.warn { background: #fff4e5; color: #9a3412; }
+.rep-note.bad { background: #fde8e6; color: #b42318; }
+html.night .rep-chip.good, html.night .rep-note.good { background: #14301f; color: #7fd69b; }
+html.night .rep-chip.warn, html.night .rep-note.warn { background: rgba(240, 160, 60, 0.15); color: #f5b36b; }
+html.night .rep-chip.bad, html.night .rep-note.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
+html.night .rep-chip, html.night .rep-note { background: #2a3142; color: #c3cad8; }
