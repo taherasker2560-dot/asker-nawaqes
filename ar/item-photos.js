@@ -31,7 +31,9 @@
     return index && index[id] ? 'store/img/' + index[id] : '';
   }
   const chunks = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
-  const api = { MAX_NAMES, namesOf, storeLink, picUrl, chunks };
+  // the store shows an item only when it is listed and not hidden (the public read rule of ar_store_items): only those get a link (a row without the two fields counts as shown)
+  const inStore = (row) => !!row && row.is_listed !== false && row.hidden !== true;
+  const api = { MAX_NAMES, namesOf, storeLink, picUrl, chunks, inStore };
   root.AskerItemPhotosLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -63,11 +65,11 @@
     const out = new Map();
     if (!db || !names || !names.length) return out;
     const idx = await loadIndex();
-    const idOf = new Map();
+    const idOf = new Map(), shownIn = new Map();   // name -> id; id -> true when the store shows that item
     for (const part of chunks(names, CHUNK)) {
       try {
-        const { data, error } = await db.from('ar_store_items').select('id,name').in('name', part);
-        if (!error) for (const r of data || []) if (!idOf.has(String(r.name).trim())) idOf.set(String(r.name).trim(), Number(r.id));
+        const { data, error } = await db.from('ar_store_items').select('id,name,is_listed,hidden').in('name', part);
+        if (!error) for (const r of data || []) if (!idOf.has(String(r.name).trim())) { idOf.set(String(r.name).trim(), Number(r.id)); shownIn.set(Number(r.id), inStore(r)); }
       } catch (e) { /* no store items: no pictures */ }
     }
     const ids = [...new Set(idOf.values())];
@@ -83,7 +85,7 @@
     await pool(todo, async (x) => {
       let img = await loadImage(x.src);
       if (!img && x.alt && x.alt !== x.src) img = await loadImage(x.alt);   // his own picture did not load: the catalog's
-      if (img) out.set(x.name, { id: x.id, img, url: storeLink(x.id) });
+      if (img) out.set(x.name, { id: x.id, img, url: shownIn.get(x.id) ? storeLink(x.id) : '' });   // an item the store does not show: the picture, no link
     });
     return out;
   }

@@ -462,7 +462,7 @@
   }
   function itemLineHtml(l) {
     const ph = pics.get(picKey(l));
-    return `<div${ph ? ' class="has-pic"' : ''}>` + (ph ? `<a class="cu-pic" href="${esc(ph.url)}" target="_blank" rel="noopener"><img src="${esc(ph.img.src)}" alt=""></a>` : '') +
+    return `<div${ph ? ' class="has-pic"' : ''}>` + (ph ? (ph.url ? `<a class="cu-pic" href="${esc(ph.url)}" target="_blank" rel="noopener"><img src="${esc(ph.img.src)}" alt=""></a>` : `<span class="cu-pic"><img src="${esc(ph.img.src)}" alt=""></span>`) : '') +
       `<span class="notr" dir="ltr">${esc(l.n)}</span><span>${esc(qtyText(l))} · ${esc(money(lineValue(l)))} ج</span></div>`;
   }
   function moveHtml(m) {
