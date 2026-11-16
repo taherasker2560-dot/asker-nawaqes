@@ -39,7 +39,8 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
     return f;
   }
   const req = (body, key = KEY) => new Request('https://p.supabase.co/functions/v1/asker-adam', { method: 'POST', headers: { 'content-type': 'application/json', ...(key ? { 'x-adam-key': key } : {}) }, body: JSON.stringify(body) });
-  const ask = async (body, opts) => { const f = fake(opts); const r = await F.handle(req(body), env, f); return { r, j: await r.json(), f }; };
+  const NOW = Date.UTC(2026, 10, 17, 10, 0, 0);   // the tests' «today»
+  const ask = async (body, opts) => { const f = fake(opts); const r = await F.handle(req(body), env, f, NOW); return { r, j: await r.json(), f }; };
   const gem = (f) => f.calls.filter((c) => c.url.includes('generateContent'));
 
   // keys: only Adam's own devices
@@ -55,13 +56,15 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
 
   // item_info: price, stock, its bag, the last purchase; the strength he said comes first; the context remembers the item
   const stock = () => [
-    { item_id: 777, name: 'ALFAZOL 20MG 14 TAB', arabic_name: 'الفازول ٢٠ مجم ١٤ قرص', price: 60, packs: 3, units: 0, parts: 14, exp_near: false },
-    { item_id: 501, name: 'ALFAZOL 40MG 14 TAB', arabic_name: 'الفازول ٤٠ مجم ١٤ قرص', price: 95.5, packs: 1, units: 7, parts: 14, exp_near: true },
+    { item_id: 777, name: 'ALFAZOL 20MG 14 TAB', arabic_name: 'الفازول ٢٠ مجم ١٤ قرص', price: 60, packs: 3, units: 0, parts: 14, exp_near: '2028-03-28' },
+    { item_id: 501, name: 'ALFAZOL 40MG 14 TAB', arabic_name: 'الفازول ٤٠ مجم ١٤ قرص', price: 95.5, packs: 1, units: 7, parts: 14, exp_near: '2026-12-28' },
   ];
   x = await ask({ text: 'الفازول 40 عندنا كام', history: [{ who: 'me', text: 'آدم' }, { who: 'adam', text: 'أيوه' }] },
     { gemini: { call: { name: 'item_info', args: { name: 'الفازول 40' } }, status: 200 }, rows: { ar_stock: stock, ar_item_buys: () => [{ supplier: 'المخزن الأول', last_date: '2026-11-10', discount_pct: 24 }] } });
   assert.equal(x.j.tool, 'item_info');
-  assert.match(x.j.speak, /^الفازول ٤٠ مجم: 95\.5 جنيه، عندنا 1\.5، وفيه منه صلاحيته قربت، وهو ناقص في حقيبة نواقص يوميه، بيتباع 33 في الشهر، آخر شرا من المخزن الأول يوم 10\/11 بخصم 24٪\./);
+  assert.match(x.j.speak, /^الفازول ٤٠ مجم: 95\.5 جنيه، عندنا 1\.5، وفيه منه صلاحيته قربت، شهر 12، وهو ناقص في حقيبة نواقص يوميه، بيتباع 33 في الشهر، آخر شرا من المخزن الأول يوم 10\/11 بخصم 24٪\./);
+  // an expiry far away is not said (exp_near is the nearest expiry DATE, not a flag)
+  assert.doesNotMatch((await ask({ text: 'الفازول 20' }, { gemini: { call: { name: 'item_info', args: { name: 'الفازول 20' } }, status: 200 }, rows: { ar_stock: stock } })).j.speak, /صلاحيته/);
   assert.deepEqual(x.j.ctx, { item: { id: 501, name: 'الفازول ٤٠ مجم' } });
   assert.deepEqual(x.j.open, { q: 'ALFAZOL 40MG 14 TAB' });
   const g0 = JSON.parse(gem(x.f)[0].o.body);
