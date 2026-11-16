@@ -286,9 +286,28 @@
   }
 
   // ---------- the camera (random count): the sticker's barcode, read like the temp sale (3 reads for ITF) ----------
+  // 2026-11-16 (owner: «لو عايز اجرد 20 30 50 ألف صنف ورا بعض … الكاميرا مفتوحة، مش لازم ادوس على زرار تاني»): the camera STAYS open after
+  // an item is read, like the temp sale: the item's card shows under it, the next sticker replaces it. The same sticker still in front
+  // of the camera counts once (it must leave the view for GONE_MS), and a read never replaces the item being edited. The camera box is
+  // the first thing on the panel (the very top of the page) and the page goes to the top when it opens. It stops only when he stops it,
+  // leaves the count, or the phone's screen goes away (it comes back by itself); the screen is kept awake while it is open.
   let randomId = null, stream = null, timer = null, detector = null, busy = false, seen = '', streak = 0, seenAt = 0, canvas = null;
+  let wantCam = false, lastRaw = '', lastAt = 0, wake = null, actx = null;
+  const GONE_MS = 2000;
+  // a short beep so he knows without looking (a low one when he must do something first)
+  function beep(ok) {
+    try {
+      actx = actx || new (root.AudioContext || root.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+      o.type = 'sine'; o.frequency.value = ok ? 1100 : 300;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + (ok ? 0.12 : 0.25));
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 0.3);
+    } catch (e) {}
+  }
   async function startCam() {
     const L = root.AskerTempSaleLib;
+    try { actx = actx || new (root.AudioContext || root.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {}   // from his tap: the beep may play later
     if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !L) return say('الموبايل ده مش بيقرا الباركود من البوت. اكتب الاسم أو الكود.', 'bad');
     try {
       const all = await root.BarcodeDetector.getSupportedFormats();
@@ -302,6 +321,9 @@
       $('ctCam').classList.remove('hidden');
       clearInterval(timer);
       timer = setInterval(tick, 250);
+      wantCam = true;
+      try { root.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* no scrolling here */ }
+      try { if (navigator.wakeLock) wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; }
       say('وجّه الكاميرا على باركود الملصق');
     } catch (e) { stopCam(); say('الكاميرا ما اتفتحتش: ' + ((e && e.message) || e), 'bad'); }
   }
@@ -321,6 +343,8 @@
     raw = String(raw || '').trim();
     const now = Date.now(), L = root.AskerTempSaleLib;
     if (!raw || !L) return;
+    // the same sticker still in front of the camera counts once: it must leave the view first
+    if (raw === lastRaw && now - lastAt < GONE_MS) { lastAt = now; return; }
     if (!sure) {
       if (raw === seen && now - seenAt < 1200) streak++; else { seen = raw; streak = 1; }
       seenAt = now;
@@ -329,17 +353,25 @@
     streak = 0;
     const r = L.stickerRead(raw), it = r && byId.get(r.code);
     if (!it) return;
+    lastRaw = raw; lastAt = now;
+    // the item on the screen is being edited: another sticker must not throw its numbers away
+    if (editId === it.i) return;
+    if (editId != null) { beep(false); return say('خلّص الصنف اللي قدامك الأول: احفظ أو إلغاء', 'bad'); }
     randomId = it.i;
     $('ctQ').value = '';
+    beep(true);
     if (navigator.vibrate) navigator.vibrate(60);
-    stopCam();
-    say('');
+    say(`اتقرا: ${nameOf(it)}`, 'ok');
     drawRandom();
   }
-  function stopCam() {
+  // keep = the camera only pauses (the screen went away) and comes back by itself; otherwise he stopped it or left the count
+  function stopCam(keep) {
+    if (!keep) wantCam = false;
     clearInterval(timer); timer = null;
     if (stream) stream.getTracks().forEach((t) => t.stop());
     stream = null;
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+    lastRaw = ''; lastAt = 0;
     $('ctCam')?.classList.add('hidden');
   }
 
@@ -376,6 +408,7 @@
       if (!t || !panel.contains(t)) return;
       if (t.dataset.ctView) { view = t.dataset.ctView; if (view !== 'sections') stopCam(); return draw(); }
       if (t.id === 'ctScanBtn') return stream ? stopCam() : startCam();
+      if (t.id === 'ctCamStop') { say(''); return stopCam(); }
       if (t.dataset.ctOpen != null) { curSec = Number(t.dataset.ctOpen); view = 'section'; filter = 'todo'; shown = PAGE; secQ = ''; $('ctSecQ').value = ''; stopCam(); return draw(); }
       if (t.hasAttribute('data-ct-back')) { view = 'sections'; return draw(); }
       if (t.dataset.ctFilter) { filter = t.dataset.ctFilter; shown = PAGE; return drawSection(); }
@@ -398,6 +431,11 @@
       if (row && (t.hasAttribute('data-ct-applied') || t.hasAttribute('data-ct-drop'))) return mark(row.dataset.ctEntry, t.hasAttribute('data-ct-applied') ? 'applied' : 'cancelled');
     });
     root.addEventListener('online', flush);
+    // the screen goes away (another app, the phone locks): the camera pauses and comes back by itself when he returns to the count
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { if (stream) stopCam(true); return; }
+      if (wantCam && !stream && view === 'sections' && !panel.classList.contains('hidden')) startCam();
+    });
   }
   async function mark(id, status) {
     if (status === 'cancelled' && !root.confirm('تلغي الفرق ده؟ مش هيتطبق في فارمافلاي.')) return;
