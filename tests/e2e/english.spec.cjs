@@ -48,8 +48,11 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-tab="translate"]');await scan('translate');
  // «قبل الموسم» (2026-11-16): the home row, and the card at the top of «النواقص» with its rows
  await page.evaluate(()=>{window.__storage['seasonal/seasonal.json']=JSON.stringify({generated_at:new Date().toISOString(),data_at:'2026-11-16T00:00:58',from:'2026-11-16',to:'2026-12-16',days:30,items:[{i:1001,n:'ALL-VENT 125ML SYP',ex:22.5,y1:24,y2:21,avg:4.5,have:9,strong:true},{i:1002,n:'TADALONG 20MG 4 TAB',ex:21,y1:39,y2:0,avg:6,have:3,strong:false}]})});
+ // one of the two is already in the purchase order (the «✓ added» line), the other has its quantity box and «➕ Add it» (and the bulk button)
+ await page.evaluate(()=>{window.__prevPo=window.__tables.ar_po_items;window.__tables.ar_po_items=[{id:901,item_id:1002,item_name:'TADALONG 20MG 4 TAB',qty:2,status:'open'}]});
  await page.evaluate(()=>window.AskerSeason.load(true));await page.evaluate(()=>window.AskerNotify.tick());await go('[data-group="home"]');await page.waitForTimeout(300);await scan('home/season');
  await go('[data-group="purchases"]');await go('[data-tab="short"]');await go('#seasonBox summary');await page.waitForTimeout(300);await scan('short/season');
+ await page.evaluate(()=>{window.__tables.ar_po_items=window.__prevPo});
  await go('[data-tab="bags"]');await page.waitForTimeout(400);await scan('bags');
  // tick an item, the «move» sheet, a move and its note (2026-11-15)
  await go('#bgList [data-bag="2428"]');await go('#bgList [data-pick="5"]');await go('#bgMoveBtn');await go('#bgSheet [data-to="pv"]');await scan('bags/move');await go('#bgGo');await page.waitForTimeout(400);await scan('bags/moved');
@@ -69,11 +72,15 @@ run('English: the switch, every section in English, names and messages untouched
   window.__tables.ar_cash_accounts=[{id:1,name:'درج خزينة النقدية',type:0,balance:2150,last_at:at(d,9)},{id:2,name:'الخزينة الرئيسية',type:0,balance:-580.5,last_at:null}];
   window.__tables.ar_cash_moves=[{id:-1,account_id:1,at:at(d,9),op:1,kind:'sales',amount:700,n:12},{id:10,account_id:1,at:at(d,8),op:2,kind:'customer',amount:150,who:'أحمد'},{id:11,account_id:1,at:at(old,8),op:1002,kind:'expense',amount:-50,who:'فواتير كهرباة',memo:'كهربا'},{id:12,account_id:1,at:at(old,7),op:5,kind:'drawer_out',amount:-90},{id:13,account_id:1,at:at(old,6),op:52,kind:'transfer_out',amount:-10,who:'احتياطى'},{id:14,account_id:1,at:at(old,5),op:9,kind:'vendor',amount:-5,who:'مخزن'},{id:15,account_id:1,at:at(old,4),op:51,kind:'other_out',amount:-1},{id:16,account_id:1,at:at(old,3),op:50,kind:'other_in',amount:1},{id:17,account_id:1,at:at(old,2),op:53,kind:'transfer_in',amount:2,who:'احتياطى'},{id:18,account_id:1,at:at(old,1),op:6,kind:'drawer_in',amount:3}];
   window.__tables.ar_customer_phones=[{customer_id:5,phone:'201012345678',contact_name:'TEST',last_sent_at:new Date(Date.now()-864e5).toISOString(),last_sent_from:null}]});
+ // «💊 مزمن» (2026-11-16): the file of the laptop for two of these customers (one with a saved number); item names stay as they are
+ await page.evaluate(()=>{const p=n=>String(n).padStart(2,'0'),ymd=k=>{const x=new Date(Date.now()-k*864e5);return `${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}`};
+  window.__storage['chronic/chronic.json']=JSON.stringify({generated_at:new Date().toISOString(),data_at:'2026-11-16T00:00:58',rows:[{c:9,i:1001,n:'ALPHA-TEST 10MG 30TAB',gap:30,times:6,q:1,have:2,last:ymd(40)},{c:9,i:1002,n:'BETA-TEST DROPS',gap:31,times:5,q:0.5,have:0,last:ymd(38)},{c:5,i:1003,n:'GAMMA-TEST 5MG',gap:28,times:4,q:2,have:5,last:ymd(36)}]})});
  // the old debts (2026-11-16): the home row, the list with its days and the reminder
  await page.evaluate(()=>window.AskerNotify.tick());await go('[data-group="home"]');await page.waitForTimeout(300);await scan('home/old-debts');
  await go('[data-group="accounts"]');await page.waitForTimeout(400);for(const v of ['over','owing','prepaid','all'])await go(`#cuChips [data-cu-view="${v}"]`);await scan('customers');
  await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{}},configurable:true})});   // the copy works: the note says so (the customer's message itself stays Arabic)
  await go('#cuChips [data-cu-view="old"]');await go('#cuRows [data-cu-remind="9"]');await page.waitForTimeout(300);await scan('customers/old');await go('#cuChips [data-cu-view="all"]');
+ await go('#cuChips [data-cu-view="chronic"]');await page.waitForTimeout(300);await scan('customers/chronic');await go('#cuRows [data-cu-chron="9"]');await page.waitForTimeout(300);await scan('customers/chronic-sent');await go('#cuChips [data-cu-view="all"]');
  await page.fill('#cuQ','zzz');await page.waitForTimeout(200);await scan('customers/search');await go('#cuClear');
  await go('#cuRows [data-cu="5"]');await page.waitForTimeout(400);await go('[data-cu-items="11"]');await scan('statement');
  // its WhatsApp number and the send box (2026-11-12); the message itself is for the customer, in Arabic (a textarea)
