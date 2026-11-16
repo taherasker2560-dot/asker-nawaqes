@@ -128,6 +128,8 @@
     if (od) { out.oldN = od.n; out.oldAmt = Math.round(od.amount); out.oldDays = od.days; }
     // «قبل الموسم» (owner 2026-11-16): the seasonal items that repeated in both years and are short now (the card itself lists them all)
     if (root.AskerSeason) { try { await root.AskerSeason.load(false); out.seasonN = root.AskerSeason.count(); } catch (e) { /* no seasonal file yet */ } }
+    // «فواتير المندوبين» (owner 2026-11-16): the rep invoices of the last two days that need a look (the card is at the top of «الطلبيات»)
+    if (root.AskerRepInvoices) { try { await root.AskerRepInvoices.load(false); out.repN = root.AskerRepInvoices.count(); } catch (e) { /* no invoices file yet */ } }
     // «💊 مزمن» (owner 2026-11-16): the customers whose regular medicine is late (the list is in «العملاء»)
     if (root.AskerChronic) { try { await root.AskerChronic.load(false); out.chronicN = root.AskerChronic.count(); } catch (e) { /* no chronic file yet */ } }
     if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
@@ -160,6 +162,7 @@
     for (const t of (root.AskerAlerts && root.AskerAlerts.todo()) || []) rows.push(t);
     // the old debts: N customers, the total after the sentence (not translated: digits), a tap opens «العملاء» on that list
     if (counts.oldN) rows.push({ tab: 'customers', view: 'old', n: counts.oldN, text: `عميل عليهم فلوس من أكتر من ${counts.oldDays || 60} يوم`, name: `${Number(counts.oldAmt || 0).toLocaleString('en-US')} ج` });
+    if (counts.repN) rows.push({ tab: 'drafts', n: counts.repN, text: 'فاتورة مندوب فيها تنبيهات' });
     if (counts.chronicN) rows.push({ tab: 'customers', view: 'chronic', n: counts.chronicN, text: 'عميل ميعاد أدويتهم الدايمة عدّى' });
     if (counts.seasonN) rows.push({ tab: 'short', view: 'season', n: counts.seasonN, text: 'صنف موسمي رصيده أقل من اللي هيتباع الشهر الجاي' });
     $('todoCard')?.classList.toggle('hidden', !rows.length);

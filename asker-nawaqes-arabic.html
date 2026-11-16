@@ -530,6 +530,12 @@
             وتبعت لمحادثة المورد بإيدك: مفيش حاجة بتتبعت لوحدها. الخصم من آخر شرا فعلي أو آخر قايمة نزلتها (الأحدث).
           </p>
           <p id="odInfo" class="status"></p>
+          <!-- «فواتير المندوبين» (owner 2026-11-16): the invoice picture a warehouse's rep sends on WhatsApp, read and checked by the laptop; ar/rep-invoices.js, file repinv/invoices.json -->
+          <div id="repBox" class="repbox hidden">
+            <h3>📄 فواتير المندوبين <b id="repCount"></b></h3>
+            <p id="repOld" class="status bad hidden">الملف قديم: اللاب لسه ما حدّثهوش.</p>
+            <div id="repList"></div>
+          </div>
           <!-- «محتاج قرارك قبل أمر الشرا» (owner 2026-11-16): the new / «بالطلب» items the laptop did not put in the purchase order by itself; ar/po-statement.js, file orders/statement.json -->
           <div id="stBox" class="stmt hidden">
             <h3>محتاج قرارك قبل أمر الشرا <b id="stCount"></b></h3>
@@ -952,6 +958,7 @@
     <script src="ar/qty-input.js?v=qty-20261115a"></script>
     <script src="ar/order-drafts.js?v=newpo-20261115a"></script>
     <script src="ar/order-compare.js?v=money-20261116a"></script>
+<script src="ar/rep-invoices.js?v=rep-20261116a"></script>
     <script src="ar/po-statement.js?v=stmt-20261116a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=link-20261113a"></script>
