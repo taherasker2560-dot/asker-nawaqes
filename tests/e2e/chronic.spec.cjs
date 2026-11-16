@@ -78,7 +78,7 @@ run('Chronic: the home row, a card per customer, the message (WhatsApp or copied
  await page.click('[data-group="accounts"]');
  await page.click('#cuChips [data-cu-view="owing"]');await page.click('#cuChips [data-cu-view="chronic"]');
  await page.waitForFunction(()=>document.querySelectorAll('#cuRows .cu-chron').length===2);
- const back=await page.$$eval('#cuRows .cu-chron:first-of-type .cu-chron-it',r=>r.map(x=>x.textContent.replace(/\s+/g,' ').trim()));
+ const back=await page.$eval('#cuRows .cu-chron',c=>[...c.querySelectorAll('.cu-chron-it')].map(x=>x.textContent.replace(/\s+/g,' ').trim()));
  assert.equal(back.length,1);assert.match(back[0],/^ALPHA-TEST 10MG 30TAB\s*.* آخر مرة من 35 يوم/);
  // a file the laptop stopped updating (4 days), then no file at all: nothing is shown or counted
  await put(page,FILE({generated_at:new Date(Date.now()-96*3600e3).toISOString()}));
@@ -87,4 +87,47 @@ run('Chronic: the home row, a card per customer, the message (WhatsApp or copied
  await page.evaluate(()=>{delete window.__storage['chronic/chronic.json']});
  await page.evaluate(()=>window.AskerChronic.load(true));
  assert.equal(await page.evaluate(()=>window.AskerChronic.count()),0,'no file: nothing');
+});
+
+// «كل المعتادين» (owner 2026-11-16: «لستة بالاصناف اللي هو متعود ياخدها»): the second list in the same place: every regular item of each customer, the nearest next refill first
+run('Chronic: «كل المعتادين» lists everything each customer is used to taking, with where each stands; «متأخرين» is the first list',async({page})=>{
+ await page.evaluate(([c,at])=>{window.__tables.ar_customers=c;window.__tables.ar_customer_moves=[];window.__tables.ar_customer_phones=[];window.AskerChronic=window.AskerChronic},[CUSTOMERS,new Date().toISOString()]);
+ const REG=[
+  {c:9001,i:1001,n:'ALPHA-TEST 10MG 30TAB',gap:30,times:6,q:1,have:2,last:ymd(40),since:40},
+  {c:9001,i:1002,n:'BETA-TEST DROPS',gap:31,times:5,q:1,have:0,last:ymd(27),since:27},
+  {c:9002,i:1003,n:'GAMMA-TEST 5MG',gap:28,times:4,q:2,have:5,last:ymd(6),since:6},
+ ];
+ await put(page,FILE({regular:REG}));
+ await page.click('[data-group="home"]');
+ await page.evaluate(()=>window.AskerNotify.tick());
+ await page.waitForSelector('#todoList .todo-row[data-view="chronic"]');
+ await page.click('#todoList .todo-row[data-view="chronic"]');
+ await page.waitForSelector('#cuRows .cu-chron');
+ // the first list is the late one; the two buttons carry their numbers
+ assert.deepEqual(await page.$$eval('#cuRows .cu-chronmode .chip',b=>b.map(x=>[x.classList.contains('on'),x.textContent.replace(/\s+/g,' ').trim()])),[[true,'متأخرين 2'],[false,'كل المعتادين 2']]);
+ assert.ok(await page.$('#cuRows [data-cu-chron="9001"]'),'the late list has its message buttons');
+ // all the regular ones: both customers, the nearest next refill first (9001 has a late one), each item with its state
+ await page.click('#cuRows [data-cu-chron-mode="all"]');
+ await page.waitForSelector('#cuRows .cu-chronmode .chip.on[data-cu-chron-mode="all"]');
+ assert.match(await text(page,'#cuRows .hint'),/الأصناف اللي كل عميل متعود ياخدها بانتظام \(آخر 6 شهور، 4 مرات أو أكتر\)، ومعاها ميعاد الجاي\./);
+ const cards=await page.$$eval('#cuRows .cu-chron',r=>r.map(x=>({name:x.querySelector('.cu-chron-top .linklike').textContent.trim(),items:[...x.querySelectorAll('.cu-chron-it')].map(i=>i.textContent.replace(/\s+/g,' ').trim()),buttons:x.querySelectorAll('[data-cu-chron],[data-cu-chron-done]').length})));
+ assert.deepEqual(cards.map(c=>c.name),['د/سامي حسن','منى سالم']);
+ assert.match(cards[0].items[0],/^ALPHA-TEST 10MG 30TAB\s*بياخده كل 30 يوم \(6 مرة\) آخر مرة من 40 يوم متأخر 10 يوم عندك 2$/);
+ assert.match(cards[0].items[1],/^BETA-TEST DROPS\s*بياخده كل 31 يوم \(5 مرة\) آخر مرة من 27 يوم الجاي كمان 4 يوم خلص من عندك$/);
+ assert.match(cards[1].items[0],/^GAMMA-TEST 5MG\s*بياخده كل 28 يوم \(4 مرة\) آخر مرة من 6 يوم الجاي كمان 22 يوم عندك 5$/);
+ assert.deepEqual(cards.map(c=>c.buttons),[0,0],'a list to look at: no message buttons');
+ // a search by name narrows it; a name opens his statement
+ await page.fill('#cuQ','منى');
+ assert.equal((await page.$$('#cuRows .cu-chron')).length,1);
+ await page.click('#cuClear');
+ // back to the late list
+ await page.click('#cuRows [data-cu-chron-mode="late"]');
+ await page.waitForSelector('#cuRows [data-cu-chron="9001"]');
+ assert.equal((await page.$$('#cuRows .cu-chron')).length,2);
+ // an old file with no regular list: the second list says so, the first still works
+ const old=FILE();delete old.regular;await put(page,old);
+ await page.evaluate(()=>window.AskerChronic.load(true));
+ await page.click('#cuChips [data-cu-view="all"]');await page.click('#cuChips [data-cu-view="chronic"]');
+ await page.click('#cuRows [data-cu-chron-mode="all"]');
+ assert.equal(await text(page,'#cuRows .hint:last-child'),'مفيش أصناف معتادة');
 });

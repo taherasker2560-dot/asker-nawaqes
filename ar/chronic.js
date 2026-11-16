@@ -14,12 +14,28 @@
 
   // ---------- pure helpers (also used by tests/chronic.cjs) ----------
   // the file must look like what the laptop writes; anything else is «no chronic data»
+  const mapRows = (list) => (Array.isArray(list) ? list : []).filter((x) => x && x.c != null && x.i != null && x.n).map((x) => ({
+    c: num(x.c), i: num(x.i), n: String(x.n), gap: num(x.gap), times: num(x.times), q: num(x.q), have: num(x.have), last: String(x.last || ''), since: num(x.since),
+  }));
   function parse(o) {
     if (!o || typeof o !== 'object' || !Array.isArray(o.rows)) return null;
-    const rows = o.rows.filter((x) => x && x.c != null && x.i != null && x.n).map((x) => ({
-      c: num(x.c), i: num(x.i), n: String(x.n), gap: num(x.gap), times: num(x.times), q: num(x.q), have: num(x.have), last: String(x.last || ''),
-    }));
-    return { generatedAt: String(o.generated_at || ''), dataAt: String(o.data_at || ''), rows };
+    // rows = the late ones; regular = every item a customer buys at a steady gap and still buys (late or not): «الأصناف اللي هو متعود ياخدها» (owner 2026-11-16)
+    return { generatedAt: String(o.generated_at || ''), dataAt: String(o.data_at || ''), rows: mapRows(o.rows), regular: mapRows(o.regular) };
+  }
+  // where a regular item stands today: the days since the last refill, the days to the next one (the usual gap minus the days since; negative = late), and its state:
+  // «late» (the laptop's own rule: 1.15 gaps, at least 3 days more than the gap), «soon» (due within 5 days), «ok»
+  function standing(r, now) {
+    const s = sinceDays(r, now), since = s == null ? r.since : s;
+    const due = Math.round(r.gap - since);
+    const lateAt = Math.max(1.15 * r.gap, r.gap + 3);
+    return { since, due, state: since >= lateAt ? 'late' : due <= 5 ? 'soon' : 'ok' };
+  }
+  // all the regular items by customer: the ones that are late first, then the soonest due; a customer with a late item first, then the one whose next refill is nearest
+  function regularGroups(rows, now) {
+    const by = new Map();
+    for (const r of rows || []) { if (!by.has(r.c)) by.set(r.c, []); by.get(r.c).push({ ...r, ...standing(r, now) }); }
+    const out = [...by.entries()].map(([c, list]) => ({ c, rows: list.sort((a, b) => a.due - b.due || a.n.localeCompare(b.n)) }));
+    return out.sort((a, b) => a.rows[0].due - b.rows[0].due || b.rows.length - a.rows.length || a.c - b.c);
   }
   function isOld(generatedAt, now) {
     const t = new Date(generatedAt).getTime();
@@ -70,7 +86,7 @@
       'تحب نجهّزها لك؟',
     ].join('\n');
   }
-  const api = { PATH, KEY, SNOOZE_DAYS, parse, isOld, sinceDays, keyOf, isSnoozed, groups, firstName, message, fmt };
+  const api = { PATH, KEY, SNOOZE_DAYS, parse, isOld, sinceDays, keyOf, isSnoozed, groups, firstName, message, fmt, standing, regularGroups };
   root.AskerChronicLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -144,5 +160,27 @@
     }
     return { html: cards.join(''), n: cards.length };
   }
-  root.AskerChronic = { load, data: () => data, count, listHtml, snooze, rowsOf, messageFor, loaded: () => !!data };
+  // «كل المعتادين» (owner 2026-11-16: «لستة بالاصناف اللي هو متعود ياخدها»): every customer with the items he is used to taking, late or not, the nearest next refill first
+  const allGroups = () => (usable() ? regularGroups(data.regular, new Date()) : []);
+  const allCount = () => allGroups().length;
+  function listAllHtml(list, h) {
+    const byId = new Map((list || []).map((c) => [String(c.id), c]));
+    const cards = [];
+    for (const g of allGroups()) {
+      const c = byId.get(String(g.c));
+      if (!c) continue;
+      const owed = num(c.balance) > 0.5 ? `<span class="cu-amt owe">${esc(`عليه ${h.money(c.balance)} ج`)}</span>` : '';
+      const items = g.rows.map((r) => {
+        const ar = arName.get(r.i);
+        const next = r.state === 'late' ? `<span class="pill bad">${esc(`متأخر ${Math.abs(r.due)} يوم`)}</span>` : r.due <= 0 ? '<span class="pill warn">الجاي النهارده</span>'
+          : `<span class="pill ${r.state === 'soon' ? 'warn' : 'good'}">${esc(`الجاي كمان ${r.due} يوم`)}</span>`;
+        const stock = r.have > 0 ? `<span class="pill good">${esc(`عندك ${fmt(r.have)}`)}</span>` : '<span class="pill bad">خلص من عندك</span>';
+        return `<div class="cu-chron-it"><b class="notr" dir="auto">${esc(ar || r.n)}</b>${ar ? `<small class="ni-meta notr" dir="ltr">${esc(r.n)}</small>` : ''}` +
+          `<small class="ni-meta"><span>${esc(`بياخده كل ${fmt(r.gap)} يوم (${fmt(r.times)} مرة)`)}</span> <span>${esc(`آخر مرة من ${r.since} يوم`)}</span> ${next} ${stock}</small></div>`;
+      }).join('');
+      cards.push(`<div class="cu-oldrow cu-chron"><div class="cu-chron-top"><button type="button" class="linklike notr" data-cu="${esc(c.id)}">${esc(c.name)}${h.hasPhone(c.id) ? ' 📱' : ''}${h.isStopped(c.id) ? ' ⛔' : ''}</button>${owed}</div>${items}</div>`);
+    }
+    return { html: cards.join(''), n: cards.length };
+  }
+  root.AskerChronic = { load, data: () => data, count, listHtml, listAllHtml, allCount, snooze, rowsOf, messageFor, loaded: () => !!data };
 })(typeof window === 'undefined' ? globalThis : window);
