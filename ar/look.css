@@ -2265,3 +2265,8 @@ html.night .rep-chip, html.night .rep-note { background: #2a3142; color: #c3cad8
 .rt-items span { color: var(--ink); }
 .rt-body > button { margin-top: 8px; }
 html.night .rt-v .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
+/* the items' pictures on the owner's own statement screen (2026-11-16) */
+.cu-items div.has-pic { align-items: center; }
+.cu-items div.has-pic > span:first-of-type { flex: 1; min-width: 0; }
+.cu-pic { flex: 0 0 auto; display: block; }
+.cu-pic img { display: block; width: 44px; height: 44px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }

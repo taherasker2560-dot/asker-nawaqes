@@ -109,3 +109,28 @@ run('Customers: no accounts yet = the alerts list stays',async({page})=>{
  assert.ok(await page.$eval('#cuBox',e=>e.classList.contains('hidden')));
  assert.equal(await page.$eval('#alCustomers',e=>e.classList.contains('hidden')),false);
 });
+
+// the items' pictures on the owner's own statement screen (owner 2026-11-16: «يعني انا لما افتح كشف حساب العميل انا بنفسي دلوقتي هلاقي الصور»)
+run('Customers: opening an invoice\'s items on his own screen shows the store\'s picture of each item (a link to its page), the others as before',async({page})=>{
+ await setData(page);
+ // PANADOL is store item 10 (it has a picture in store/img); VITACID is not in the store
+ await page.evaluate(()=>{window.__tables.ar_store_items=[{id:10,name:'PANADOL EXTRA 24 TAB'}];window.__tables.ar_store_edits=[]});
+ await page.click('[data-group="accounts"]');
+ await page.waitForSelector('#cuBox:not(.hidden)');
+ await page.fill('#cuQ','احمد');
+ await page.click('#cuRows [data-cu="101"]');
+ await page.waitForSelector('#cuSt:not(.hidden) .cu-mv');
+ assert.equal(await page.$('#cuMoves .cu-pic'),null,'nothing opened yet: no pictures asked for');
+ await page.click('#cuMoves [data-cu-items="11"]');
+ await page.waitForSelector('#cuMoves .cu-items .has-pic a.cu-pic');
+ const lines=await page.$$eval('#cuMoves .cu-items > div',r=>r.map(d=>({pic:!!d.querySelector('a.cu-pic'),href:d.querySelector('a.cu-pic')?d.querySelector('a.cu-pic').getAttribute('href'):null,target:d.querySelector('a.cu-pic')?d.querySelector('a.cu-pic').target:null,loaded:d.querySelector('img')?d.querySelector('img').naturalWidth>0:null,text:d.textContent.replace(/\s+/g,' ').trim()})));
+ assert.equal(lines.length,2);
+ assert.deepEqual([lines[0].pic,lines[0].loaded,lines[0].target],[true,true,'_blank']);
+ assert.match(lines[0].href,/\/store\.html#item=10$/);
+ assert.match(lines[0].text,/PANADOL EXTRA 24 TAB\s*1 علبة · 66.70 ج/);
+ assert.deepEqual([lines[1].pic,lines[1].text],[false,'VITACID C 10002 وحدة · 100 ج'],'an item the store does not have: the line as before');
+ // close and open again: no new asking, the pictures stay
+ await page.click('#cuMoves [data-cu-items="11"]');await page.click('#cuMoves [data-cu-items="11"]');
+ assert.equal((await page.$$('#cuMoves .cu-items a.cu-pic')).length,1);
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>/customer|store/.test(w.table||w.rpc||''))),[],'nothing is written');
+});
