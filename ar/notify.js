@@ -126,6 +126,8 @@
     if (store != null) out.store = store;
     if (care != null) out.care = care;
     if (od) { out.oldN = od.n; out.oldAmt = Math.round(od.amount); out.oldDays = od.days; }
+    // «قبل الموسم» (owner 2026-11-16): the seasonal items that repeated in both years and are short now (the card itself lists them all)
+    if (root.AskerSeason) { try { await root.AskerSeason.load(false); out.seasonN = root.AskerSeason.count(); } catch (e) { /* no seasonal file yet */ } }
     if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
     // the other bags: only the late items count here (the home card shows every bag's shortages anyway)
     if (a && a.bags) out.bags = root.AskerAlertsLib ? root.AskerAlertsLib.lateBags(a) : 0;
@@ -156,6 +158,7 @@
     for (const t of (root.AskerAlerts && root.AskerAlerts.todo()) || []) rows.push(t);
     // the old debts: N customers, the total after the sentence (not translated: digits), a tap opens «العملاء» on that list
     if (counts.oldN) rows.push({ tab: 'customers', view: 'old', n: counts.oldN, text: `عميل عليهم فلوس من أكتر من ${counts.oldDays || 60} يوم`, name: `${Number(counts.oldAmt || 0).toLocaleString('en-US')} ج` });
+    if (counts.seasonN) rows.push({ tab: 'short', view: 'season', n: counts.seasonN, text: 'صنف موسمي رصيده أقل من اللي هيتباع الشهر الجاي' });
     $('todoCard')?.classList.toggle('hidden', !rows.length);
     // a bag's line: its name as written in PharmaFly (never translated), and its late note under it
     box.innerHTML = rows.map((r) => `<button type="button" class="todo-row${r.late ? ' late' : ''}" data-go="${esc(r.tab)}"${r.view ? ` data-view="${esc(r.view)}"` : ''}><b>${esc(r.n)}</b>` +

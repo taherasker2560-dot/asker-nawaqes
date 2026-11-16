@@ -46,6 +46,10 @@ run('English: the switch, every section in English, names and messages untouched
  await go('[data-group="purchases"]');await scan('shortages');await page.evaluate(()=>window.AskerNewItems.open());await page.waitForSelector('#niBox:not(.hidden)');await page.evaluate(()=>{document.getElementById('niBox').open=true});await page.waitForTimeout(300);await scan('new-items');await go('#niOld summary');await scan('new-items/closed');await go('#niList [data-ni-edit]');await scan('new-items/edit');await go('#niAdd');await scan('new-items/empty-name');
  await go('[data-tab="read"]');for(const s of ['manual','companies','today'])await go(`[data-sub="${s}"]`);await scan('read');
  await go('[data-tab="translate"]');await scan('translate');
+ // «قبل الموسم» (2026-11-16): the home row, and the card at the top of «النواقص» with its rows
+ await page.evaluate(()=>{window.__storage['seasonal/seasonal.json']=JSON.stringify({generated_at:new Date().toISOString(),data_at:'2026-11-16T00:00:58',from:'2026-11-16',to:'2026-12-16',days:30,items:[{i:1001,n:'ALL-VENT 125ML SYP',ex:22.5,y1:24,y2:21,avg:4.5,have:9,strong:true},{i:1002,n:'TADALONG 20MG 4 TAB',ex:21,y1:39,y2:0,avg:6,have:3,strong:false}]})});
+ await page.evaluate(()=>window.AskerSeason.load(true));await page.evaluate(()=>window.AskerNotify.tick());await go('[data-group="home"]');await page.waitForTimeout(300);await scan('home/season');
+ await go('[data-group="purchases"]');await go('[data-tab="short"]');await go('#seasonBox summary');await page.waitForTimeout(300);await scan('short/season');
  await go('[data-tab="bags"]');await page.waitForTimeout(400);await scan('bags');
  // tick an item, the «move» sheet, a move and its note (2026-11-15)
  await go('#bgList [data-bag="2428"]');await go('#bgList [data-pick="5"]');await go('#bgMoveBtn');await go('#bgSheet [data-to="pv"]');await scan('bags/move');await go('#bgGo');await page.waitForTimeout(400);await scan('bags/moved');
