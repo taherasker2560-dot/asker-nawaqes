@@ -45,4 +45,33 @@ object Api {
         val b = JSONObject().put("p_key", Config.deviceKey(ctx)).put("p_id", id)
         return call(ctx, "ar_adam_get", b)
     }
+
+    /**
+     * «آدم 2» (2026-11-17): the FAST brain on the server (function asker-adam). One call, no queue: [history] = the conversation so far
+     * ([{who: "me"|"adam", text}], the last 8), [talkCtx] = what the server said we are talking about. The answer has the same shape as
+     * the laptop's ({speak, show, do_now, open, walk}) plus ctx / end / handoff. null = no answer (no net, server down): the laptop is
+     * asked instead, as before.
+     */
+    fun talk(ctx: Context, text: String, history: org.json.JSONArray, talkCtx: JSONObject?): JSONObject? {
+        val c = URL(Config.url(ctx) + "/functions/v1/asker-adam").openConnection() as HttpURLConnection
+        try {
+            c.requestMethod = "POST"
+            c.connectTimeout = 6000
+            c.readTimeout = 15000
+            c.doOutput = true
+            c.setRequestProperty("x-adam-key", Config.deviceKey(ctx))
+            c.setRequestProperty("apikey", Config.apiKey(ctx))
+            c.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            val b = JSONObject().put("text", text).put("history", history)
+            if (talkCtx != null) b.put("ctx", talkCtx)
+            c.outputStream.use { it.write(b.toString().toByteArray(Charsets.UTF_8)) }
+            if (c.responseCode != 200) return null
+            val t = c.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            return JSONObject(t)
+        } catch (e: Exception) {
+            return null
+        } finally {
+            c.disconnect()
+        }
+    }
 }

@@ -56,6 +56,36 @@
             </intent-filter>
         </activity>
 
+        <!-- «اسأل آدم»: a second app entry that starts a conversation at once (the side key can open it; it shows over the lock screen) -->
+        <activity
+            android:name=".ListenActivity"
+            android:exported="true"
+            android:label="اسأل آدم"
+            android:icon="@android:drawable/ic_btn_speak_now"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- the «آدم» tile in the quick panel: one tap = a conversation -->
+        <service
+            android:name=".AdamTileService"
+            android:exported="true"
+            android:label="آدم"
+            android:icon="@android:drawable/ic_btn_speak_now"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <service
             android:name=".AdamService"
             android:exported="false"
