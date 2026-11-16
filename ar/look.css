@@ -2201,3 +2201,5 @@ html.night .st-done.skip { background: #2a3142; color: #c3cad8; }
 .cu-oldact { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px 0; color: var(--muted); }
 .cu-oldact button { margin: 0; }
 .cu-days { display: inline-flex; gap: 6px; margin-inline-start: 8px; }
+/* «قبل الموسم»: the quantity box beside «➕ ضيفه» (2026-11-16) */
+.st-btns .se-qty { flex: 0 0 76px; min-width: 0; margin: 0; text-align: center; }

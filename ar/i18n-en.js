@@ -158,6 +158,8 @@ window.AskerEN = {
  "الشركة / ملاحظة": "Company / note",
  "🆕 أصناف جديدة": "🆕 New products",
  "📅 قبل الموسم": "📅 Before the season",
+ "➕ ضيف الـ {0} اللي اتكرروا سنتين لأمر الشرا": "➕ Add the {0} that repeated in both years to the purchase order",
+ "الكمية مش مظبوطة: {0}": "The quantity is not valid: {0}",
  "الفترة: {0} ← {1}": "Period: {0} ← {1}",
  "السنة اللي فاتت بعت {0} في الفترة دي (المعتاد في الشهر {1})": "Last year it sold {0} in this period (a normal month: {1})",
  "وقبلها بسنة بعت {0}": "and the year before {0}",
