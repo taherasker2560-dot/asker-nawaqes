@@ -445,6 +445,26 @@
       if (st === me) drawStatement();
     }
   }
+  // the items' pictures on the owner's own statement screen (owner 2026-11-16: «يعني انا لما افتح كشف حساب العميل انا بنفسي دلوقتي هلاقي الصور»): when an invoice's items
+  // are opened, the store's picture of each (ar/item-photos.js, by exact name); a tap opens the item's page in the store; no picture = the line as before
+  const pics = new Map(), picAsked = new Set();
+  const picKey = (l) => String((l && l.n) || '').trim();
+  async function loadPics(items) {
+    const P = root.AskerItemPhotos, me = st;
+    const want = [...new Set(items.map(picKey).filter((n) => n && !picAsked.has(n)))];
+    if (!P || !db() || !want.length) return;
+    want.forEach((n) => picAsked.add(n));
+    try {
+      const got = await P.forNames(db(), want);
+      got.forEach((v, k) => pics.set(k, v));
+      if (got.size && st === me) drawStatement();
+    } catch (e) { /* no pictures: the lines stay as they are */ }
+  }
+  function itemLineHtml(l) {
+    const ph = pics.get(picKey(l));
+    return `<div${ph ? ' class="has-pic"' : ''}>` + (ph ? `<a class="cu-pic" href="${esc(ph.url)}" target="_blank" rel="noopener"><img src="${esc(ph.img.src)}" alt=""></a>` : '') +
+      `<span class="notr" dir="ltr">${esc(l.n)}</span><span>${esc(qtyText(l))} · ${esc(money(lineValue(l)))} ج</span></div>`;
+  }
   function moveHtml(m) {
     const t = moveTitle(m), at = parseAt(m.at);
     // only a sale or a return has items (a payment ticket in PharmaFly carries a placeholder line «أصناف متنوعة» at 0)
@@ -456,7 +476,7 @@
     if (disc) bits.push(`<span>خصم ${esc(money(disc))} ج</span>`);
     if (m.kind === 'sale' && num(m.paid) > 0) bits.push(`<span>دفع منها ${esc(money(m.paid))} ج</span>`);
     const lines = open && items.length
-      ? '<div class="cu-items">' + items.map((l) => `<div><span class="notr" dir="ltr">${esc(l.n)}</span><span>${esc(qtyText(l))} · ${esc(money(lineValue(l)))} ج</span></div>`).join('') + '</div>'
+      ? '<div class="cu-items">' + items.map(itemLineHtml).join('') + '</div>'
       : '';
     return `<div class="cu-mv k-${t.cls}"><div class="cu-mv-l"><span class="cu-k">${esc(t.text)}</span><span class="cu-after">${esc(afterText(m.balance))}</span></div>` +
       `<div class="cu-mv-d">${bits.filter(Boolean).join(' · ')}</div>${lines}</div>`;
@@ -904,8 +924,8 @@
       if (f && st) { st.filter = f.dataset.cuFilter; drawStatement(); return; }
       const it = e.target.closest('[data-cu-items]');
       if (it && st) {
-        const id = st.moves.find((m) => String(m.id) === it.dataset.cuItems)?.id;
-        if (id != null) { if (st.open.has(id)) st.open.delete(id); else st.open.add(id); drawStatement(); }
+        const mv = st.moves.find((m) => String(m.id) === it.dataset.cuItems), id = mv?.id;
+        if (id != null) { if (st.open.has(id)) st.open.delete(id); else { st.open.add(id); loadPics(Array.isArray(mv.items) ? mv.items : []); } drawStatement(); }
         return;
       }
       if (e.target.closest('[data-cu-older]')) { loadMoves(); return; }
