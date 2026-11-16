@@ -147,7 +147,8 @@
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
-    installSamsung: 'في متصفح سامسونج: دوس ≡ تحت، وبعدين «إضافة صفحة إلى» ← «الشاشة الرئيسية».',
+    // Samsung Internet's own install is blocked by Google Play Protect: open the account in Chrome (2026-11-16)
+    installSamsung: 'متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن». افتح الرابط في كروم، وبعدين دوس «ثبّت التطبيق الآن».',
     installOther: 'افتح قايمة المتصفح (⋮ أو ≡)، واختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
     installed: 'اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.',
   };
@@ -183,6 +184,17 @@
   // an Android browser other than Chrome (Firefox, Samsung, …): it can open the same account in Google Chrome, where the
   // install is one tap (owner 2026-11-13: «يظهر له الخيار بين الفايرفوكس وبين … بتاع جوجل»)
   const offerChrome = (ua) => /Android/i.test(String(ua || '')) && /Firefox|SamsungBrowser|OPR\/|Opera|EdgA\/|YaBrowser|UCBrowser|MiuiBrowser|HuaweiBrowser|HeyTap/.test(String(ua || ''));
+  // Samsung Internet makes its own app when it installs a web app, and Google Play Protect blocks that one: «Unsafe app blocked — this app was built for an
+  // older version of Android» (owner 2026-11-16: a customer, Maryam, got it on her phone; Progressier reports the same for every site on Samsung Internet).
+  // So there the browser's own install is never offered: the account goes to Chrome, which installs it properly.
+  const mintsOwnApp = (ua) => /Android/i.test(String(ua || '')) && /SamsungBrowser/.test(String(ua || ''));
+  // what the install button does: the browser's own prompt (Chrome and the like), a hand-off to Chrome, the iPhone guide, or the written steps
+  function installPlan(ua, platform, touch, hasPrompt, handedOff) {
+    if (hasPrompt && !mintsOwnApp(ua)) return 'prompt';
+    if (offerChrome(ua) && !handedOff) return 'chrome';
+    if (isIos(ua, platform, touch)) return 'guide';
+    return 'steps';
+  }
   // the link that opens this page in Chrome on Android (an intent: link cannot carry the #me= part, so the secret rides in
   // ?me=, which the page takes out of the address at once); with no Chrome on the phone it opens here again
   function chromeIntent(pageUrl, token) {
@@ -200,7 +212,7 @@
     const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^(me|install)=/.test(p));
     return rest.length ? '?' + rest.join('&') : '';
   }
-  const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
+  const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, mintsOwnApp, installPlan, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') { root.AskerStoreAccountLib = api; return; }
   root.AskerStoreAccountLib = api;
@@ -451,14 +463,15 @@
       await waitOffer(2500);
       installBusy = false;
     }
-    if (installEvt) {
+    const plan = installPlan(ua, navigator.platform, navigator.maxTouchPoints, !!installEvt, handedOff);
+    if (plan === 'prompt') {
       const e = installEvt;
       installEvt = null;
       try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = installSteps(ua, navigator.platform, navigator.maxTouchPoints); }
       draw();
       return;
     }
-    if (offerChrome(ua) && !handedOff) { location.href = chromeIntent(location.href, token); return; }
+    if (plan === 'chrome') { location.href = chromeIntent(location.href, token); return; }
     if (ios) {
       try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ }
       guide = true;

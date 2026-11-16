@@ -204,6 +204,48 @@ run('Customer link install: iPhone gets the big guide; Firefox with no Chrome (b
  await page.evaluate(()=>{sessionStorage.removeItem('__ua');localStorage.removeItem('__fakeTables')});
 },{home:true});
 
+// Samsung Internet (owner 2026-11-16: a customer got Google Play Protect's «Unsafe app blocked … built for an older version of Android» installing from it):
+// its own install is never offered, even when it fires the install offer; the account goes to Chrome, and with no Chrome the steps say «open it in Chrome»
+run('Customer link install: Samsung Internet never gets its own install (Play Protect blocks it); with no Chrome to go to, the steps say open it in Chrome',async({page,base})=>{
+ const tok='c'.repeat(64);
+ await page.evaluate(([c,m,t])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[]})),[CUSTOMERS,MOVES,tok]);
+ await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua})});
+ await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36'));
+ // back from the hand-off with no Chrome on the phone: its offer comes, the button is tapped, its prompt is NOT called, the note says «open it in Chrome»
+ await page.goto(base+'store.html?me='+tok+'&install=1');
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-install-note');
+ assert.match(await text(page,'.ac-install-note'),/^متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن»\. افتح الرابط في كروم/);
+ await page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
+ await page.$eval('[data-acct-install]',b=>b.click());
+ await page.waitForTimeout(700);
+ assert.equal(await page.evaluate(()=>window.__prompted),false,'Samsung Internet\'s own install is never started');
+ assert.match(await text(page,'.ac-install-note'),/افتح الرابط في كروم/,'the steps stay on screen');
+ // Chrome on the same phone model: its prompt is called as before
+ await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'));
+ await page.goto(base+'store.html?x=1#me='+tok);await page.reload();
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ await page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
+ await page.click('[data-acct-install]');
+ await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
+ await page.evaluate(()=>{sessionStorage.removeItem('__ua');localStorage.removeItem('__fakeTables')});
+},{home:true});
+// the store home's own «نزّل الصيدلية» box (not the account's): shown to Chrome when it offers, never on Samsung Internet (the same Play Protect block)
+run('Store home install box: Chrome gets it when it offers, Samsung Internet never does',async({page,base})=>{
+ await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua})});
+ const offer=()=>page.evaluate(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{};e.userChoice=Promise.resolve({outcome:'dismissed'});window.dispatchEvent(e)});
+ await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36'));
+ await page.goto(base+'store.html?x=3');
+ await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
+ await offer();
+ await page.waitForTimeout(500);
+ assert.equal(await page.$eval('#installBox',e=>e.hidden),true,'Samsung Internet: no install box');
+ await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'));
+ await page.goto(base+'store.html?x=4');
+ await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
+ await offer();
+ await page.waitForFunction(()=>!document.getElementById('installBox').hidden,null,{timeout:5000});
+ await page.evaluate(()=>sessionStorage.removeItem('__ua'));
+},{home:true});
 // the items' pictures in his own account and in the PDF he downloads (owner 2026-11-16: «الصور تبان فى الحساب لما ابعتله رابط حسابه مش الكشف بس»)
 run('Customer link: the items\' pictures show in his account when he opens an invoice, and the PDF he downloads carries them with links',async({page,base})=>{
  const tok='c'.repeat(64);
@@ -238,7 +280,7 @@ run('Customer link: he lands on his account (the balance first), the install but
  assert.ok(order.indexOf('install')<order.indexOf('chips'),'but before his movements');
  // not the big button any more
  const h=await page.$eval('[data-acct-install]',b=>b.getBoundingClientRect().height);
- assert.ok(h<=56,'a plain button, not the 64 px one: '+h);
+ assert.ok(h<=57,'a plain button, not the 64 px one (the capsule look makes it 56, with a hair of rounding): '+h);
  const lum=await page.$eval('[data-acct-install]',e=>{const l=c=>{const m=c.match(/\d+(\.\d+)?/g).map(Number);return 0.299*m[0]+0.587*m[1]+0.114*m[2]};const s=getComputedStyle(e);return Math.abs(l(s.color)-l(s.backgroundColor))});
  assert.ok(lum>120,'its text is readable on its own colour: '+lum);
  // «🏪 الموقع» in the header: a tap goes to the site's home, the account is still one tap away
