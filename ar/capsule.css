@@ -221,3 +221,8 @@ button.cu-stop, button.cu-unstop { border-radius: 999px; }
 #cuSt.fresh > :nth-child(n+5) { animation-delay: 240ms; }
 html.cap-still .cu-bal::before { animation: none; }
 @media (prefers-reduced-motion: reduce) { .cu-bal::before, #cuSt.fresh > * { animation: none !important; } }
+/* ---------- the action buttons that were still a color of their own (owner 2026-11-16, «كمّل باقي الشاشات»): the yellow «صوّر فاتورة جديدة» and the WhatsApp greens
+   (the customer chat's reply, a draft's send, the supplier's link) are the bot's color now; «احفظ البيعة» / «مرتجع» keep green / red (a sale is not a return) ---------- */
+.dc-pick { background: var(--crimson); color: #fff; border-radius: 999px; box-shadow: none; }
+.ch-reply button, .ch-draft .ch-dsend, .sup-row [data-send-link] { background: var(--crimson); color: #fff; }
+.ts-save { border-radius: 999px; }
