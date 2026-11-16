@@ -2157,3 +2157,5 @@ html.night .cmp-why.gray { background: #2a3142; color: #c3cad8; }
 .od-new-group:first-of-type { border-top: 0; padding-top: 0; }
 .od-new-group h4 { margin: 0 0 4px; font-size: 14px; }
 .od-new-offer { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--muted); }
+/* the random count's camera: the first thing on the count page, a thin strip like the temp sale's (2026-11-16) */
+#ctCam { margin: 0 0 10px; }

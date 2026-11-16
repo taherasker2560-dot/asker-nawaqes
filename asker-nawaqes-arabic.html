@@ -771,6 +771,8 @@
         <!-- «جرد المخزون» (owner 2026-11-13, ar/count.js): PharmaFly's sections or a random item by its sticker; only the
              difference per expiry batch is recorded, applied in PharmaFly later by the owner's order -->
         <section id="countPanel" class="card hidden">
+          <!-- the random count's camera is the first thing on the page and STAYS open after each item (owner 2026-11-16: «لو عايز اجرد 20 30 50 ألف صنف ورا بعض … الكاميرا مفتوحة») -->
+          <div id="ctCam" class="ts-scan hidden"><video id="ctVideo" playsinline muted></video><button id="ctCamStop" type="button" class="ts-cam" aria-label="اقفل الكاميرا">✕</button></div>
           <div class="ts-top">
             <h2>جرد المخزون</h2>
             <div class="tabs seg" role="group" aria-label="جرد المخزون">
@@ -782,7 +784,6 @@
           <p id="ctStatus" class="status"></p>
           <div id="ctSections">
             <button id="ctScanBtn" type="button" class="ct-scan"><i aria-hidden="true">📷</i><span>جرد عشوائي<small>صوّر باركود الملصق، أو اكتب الاسم أو الكود تحت</small></span></button>
-            <div id="ctCam" class="ts-scan hidden"><video id="ctVideo" playsinline muted></video></div>
             <div class="search">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               <input id="ctQ" type="search" autocomplete="off" aria-label="صنف للجرد" placeholder="اسم الصنف أو الكود أو رقم الملصق…" />
