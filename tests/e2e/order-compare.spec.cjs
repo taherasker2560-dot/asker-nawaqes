@@ -9,11 +9,13 @@ const night=(key,both,ao,bo,extra={})=>({v:2,night:key,at:key+' 00:45',comparabl
  arrived_only_items:[{id:100,name:'BETACOR 30TAB',why:'had_stock',have:3,cover:9,arr:arr(16,2,'الفتح')},{id:101,name:'HISTAZINE-1 100ML SYR',why:'missed',bag:'نواقص يوميه',arr:arr(16,1,'الفتح')},
   {id:102,name:'RINGER SOL. 500CC. P.',why:'cancelled_me',arr:arr(17,1)},{id:103,name:'LICID 60CC LOTION',why:'other_bag',bag:'مالك',arr:arr(17,1)}].slice(0,ao),
  bot_only_items:Array.from({length:bo},(_,k)=>({id:200+k,name:'BOT ONLY '+k,qty:2,bag:'2428',why:k===0?'new':'carried',days:3})),...extra});
+// the money fields the laptop writes (cost price, the first 24 hours): bought 20,000 = 10,500 the bot's order + 8,000 items not in it + 1,500 packs beyond its quantity (+ 400 misc, not counted)
+const cash=(buy=20000,cap=17680)=>({buy_value:buy,both_value:12000,extra_items_value:buy-12000,extra_qty_value:1500,misc_value:400,cap_money:cap,bot_cost:17607});
 const file=(nights,at=new Date().toISOString())=>({generated_at:at,v:2,week:{nights:nights.length},nights});
 const put=(page,o)=>page.evaluate(o=>{window.__storage['orders/compare2.json']=JSON.stringify(o)},o);
 const openOrders=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]')};
 run('orders card: counts, rate, 7 nights, the three lists with their reasons and the quantity',async({page})=>{
- await put(page,file([night('2026-11-14',50,2,1),night('2026-11-15',60,4,2),night('2026-11-16',55,3,9,{manual:4,final:true})]));
+ await put(page,file([night('2026-11-14',50,2,1),night('2026-11-15',60,4,2),night('2026-11-16',55,3,9,{manual:4,final:true,...cash()})]));
  await openOrders(page);
  await page.waitForSelector('#cmpMain:not(.hidden)');
  assert.ok(await page.isVisible('#cmpBox'));assert.ok(!(await page.isVisible('#cmpEmpty')));assert.ok(!(await page.isVisible('#cmpOld')));
@@ -28,6 +30,13 @@ run('orders card: counts, rate, 7 nights, the three lists with their reasons and
  assert.equal(await text(page,'#cmpQty'),'الكمية: 55 من 55 صنف وصلوا بنفس كمية البوت.');assert.ok(await page.isVisible('#cmpQtyNote'));
  // the week: 3 of 7 nights, all together (165 of 174)
  assert.match(await text(page,'#cmpWeek'),/الأسبوع: 3 من 7 ليالي اتقارنت، والبوت جاب في المتوسط 95% من اللي وصلك/);assert.match(await text(page,'#cmpWeek'),/لما يكملوا 7 ليالي/);
+ // the money: how far over the bot's cap he went that night, what the purchases are made of, the week (only complete nights with a cap = just that one)
+ assert.ok(await page.isVisible('#cmpMoney'));
+ assert.equal(await text(page,'#cmpCap'),'عدّيت سقف البوت بـ 2,320 ج (13%)');assert.ok(await page.$eval('#cmpCap',e=>e.classList.contains('over')));
+ assert.equal(await text(page,'#cmpBuy'),'اشتريت 20,000 ج بسعر التكلفة، والسقف 17,680 ج.');
+ assert.equal(await text(page,'#cmpSplit'),'منها 10,500 ج من أمر البوت، و8,000 ج أصناف مش في أمره، و1,500 ج كميات أكتر من أمره.');
+ assert.equal(await text(page,'#cmpMisc'),'وغير كده 400 ج أصناف متنوعة: مش محسوبة.');assert.ok(await page.isVisible('#cmpMisc'));
+ assert.equal(await text(page,'#cmpWeekMoney'),'الأسبوع: اشتريت 20,000 ج من سقف 17,680 ج (الليالي الكاملة: 1)، وعدّيته بـ 2,320 ج (13%).');
  // 7 slots, oldest first: 3 filled, 4 free
  assert.equal(await page.$$eval('#cmpBars .cmp-bar',b=>b.length),7);assert.equal(await page.$$eval('#cmpBars .cmp-bar.e',b=>b.length),4);
  assert.deepEqual(await page.$$eval('#cmpBars [data-night]',b=>b.map(x=>x.dataset.night)),['2026-11-14','2026-11-15','2026-11-16']);
@@ -47,6 +56,7 @@ run('orders card: counts, rate, 7 nights, the three lists with their reasons and
  assert.equal(await text(page,'#cmpNight'),'ليلة 15/11');
  assert.deepEqual(await page.$$eval('#cmpThree .cmp-n b',d=>d.map(x=>x.textContent.trim())),['60','4','2']);
  assert.match(await text(page,'#cmpBig'),/البوت جاب 94%/);assert.ok(!(await page.isVisible('#cmpOutside')),'no hand-made lines that night = no note');
+ assert.ok(!(await page.isVisible('#cmpMoney')),'an older night without money fields shows no money');
  assert.match(await text(page,'#cmpFinal'),/مؤقتة: لسه بنستنى الفواتير لحد 6:45 ص يوم 18\/11/,'a night inside the 30 hours is provisional and says until when');
  assert.ok(await page.$eval('#cmpGroups [data-grp="bo"]',d=>d.open));
  assert.ok(await page.isVisible('#draftsPanel'));
@@ -90,7 +100,7 @@ run('orders card in English: the texts are drawn from codes, so they translate; 
  await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
  await page.reload();
  await page.waitForFunction(()=>window.__tables);
- await put(page,file([night('2026-11-15',60,4,2),night('2026-11-16',55,3,9,{manual:2})]));
+ await put(page,file([night('2026-11-15',60,4,2,{final:true,...cash(20000,17680)}),night('2026-11-16',55,3,9,{manual:2,...cash(15000,17680)})]));
  await openOrders(page);
  await page.waitForSelector('#cmpMain:not(.hidden)');
  assert.equal(await text(page,'#cmpNight'),'Night 16/11');
@@ -100,6 +110,15 @@ run('orders card in English: the texts are drawn from codes, so they translate; 
  assert.match(await text(page,'#cmpFinal'),/Provisional: still waiting for the invoices until/);
  assert.match(await text(page,'#cmpOutside'),/And 2 lines you added by hand to the purchase order/);
  assert.match(await text(page,'#cmpQty'),/Quantity: 55 of 55 items arrived in the same quantity as the bot/);
+ // the money in English: a night still waiting only says how far he is; a complete night says how much he went over; the week; the split
+ assert.equal(await text(page,'#cmpCap'),'So far you bought 15,000 EGP of a 17,680 EGP cap');
+ assert.equal(await text(page,'#cmpBuy'),'You bought 15,000 EGP at cost price, and the cap is 17,680 EGP.');
+ assert.equal(await text(page,'#cmpSplit'),'Of it, 10,500 EGP is from the bot\'s order, 3,000 EGP is items not in its order, and 1,500 EGP is quantities beyond its order.');
+ assert.equal(await text(page,'#cmpMisc'),'Plus 400 EGP of miscellaneous items: not counted.');
+ assert.equal(await text(page,'#cmpWeekMoney'),'Week: you bought 20,000 EGP against a 17,680 EGP cap (complete nights: 1), and went over it by 2,320 EGP (13%).');
+ await page.click('#cmpBars [data-night="2026-11-15"]');
+ assert.equal(await text(page,'#cmpCap'),'You went over the bot\'s cap by 2,320 EGP (13%)');
+ await page.click('#cmpBars [data-night="2026-11-16"]');
  assert.deepEqual(await page.$$eval('#cmpThree .cmp-n span',s=>s.map(x=>x.textContent.trim())),['Ordered and arrived','Arrived, not in the bot\'s order','In the bot\'s order, did not arrive']);
  const why=await page.$$eval('#cmpGroups [data-grp="ao"] .cmp-row',r=>r.map(x=>[...x.querySelectorAll('.cmp-why')].map(c=>c.textContent.trim()).join(' | ')));
  assert.equal(why[0],'Stock 3 lasts 9 days | Arrived from El Fath after 16 hours','the vendor\'s name is translated like everywhere else');

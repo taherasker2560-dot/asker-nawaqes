@@ -75,4 +75,29 @@ assert.equal(C.slots([]).filter(Boolean).length,0);
 // is the file old (the laptop stopped updating)
 const now=new Date('2026-11-16T12:00:00Z');
 assert.equal(C.isOld('2026-11-16T09:00:00Z',now),false);assert.equal(C.isOld('2026-11-14T09:00:00Z',now),true);assert.equal(C.isOld('bad',now),true);assert.equal(C.isOld('',now),true);
+// the MONEY: what he bought in 24 hours (at cost) against the night's cap; the split = the bot's order / items not in it / packs beyond its quantity
+const mon=(x,final=true)=>C.normNight({...night('2026-11-16',2,1,0,{final}),...x});
+const base={buy_value:20000,both_value:12000,extra_items_value:8000,extra_qty_value:1500,misc_value:400,cap_money:17680};
+assert.equal(mon({}).money,null,'an older file without money shows none');assert.equal(C.capLine(mon({})),null);assert.equal(C.buyLine(null),'');assert.equal(C.miscLine(null),'');
+const over=mon(base);
+assert.deepEqual(over.money,{buy:20000,cap:17680,bot:10500,extraItems:8000,extraQty:1500,misc:400},'the bot\'s part = what arrived of its items minus the packs beyond its quantity; the three add up to what he bought');
+assert.equal(over.money.bot+over.money.extraItems+over.money.extraQty,over.money.buy);
+assert.deepEqual(C.capLine(over),['عدّيت سقف البوت بـ 2,320 ج (13%)','over']);
+assert.equal(C.buyLine(over.money),'اشتريت 20,000 ج بسعر التكلفة، والسقف 17,680 ج.');
+assert.equal(C.splitLine(over.money),'منها 10,500 ج من أمر البوت، و8,000 ج أصناف مش في أمره، و1,500 ج كميات أكتر من أمره.');
+assert.equal(C.miscLine(over.money),'وغير كده 400 ج أصناف متنوعة: مش محسوبة.');assert.equal(C.miscLine(mon({...base,misc_value:0}).money),'','no «أصناف متنوعة» = no line');
+assert.deepEqual(C.capLine(mon({...base,buy_value:15000,both_value:9000,extra_items_value:6000})),['كنت تحت سقف البوت بـ 2,680 ج (15%)','under']);
+assert.deepEqual(C.capLine(mon({...base,buy_value:17680})),['اشتريت على سقف البوت بالظبط','under']);
+assert.deepEqual(C.capLine(mon({...base,buy_value:15000},false)),['لحد دلوقتي اشتريت 15,000 ج من سقف 17,680 ج','wait'],'a night still waiting for its invoices only says how far he is');
+const nocap=mon({...base,cap_money:null});assert.equal(nocap.money.cap,null);assert.equal(C.capLine(nocap),null,'no cap for that night = no headline');assert.equal(C.buyLine(nocap.money),'اشتريت 20,000 ج بسعر التكلفة.');
+assert.equal(mon({...base,cap_money:0}).money.cap,null,'a zero cap is no cap');
+assert.equal(mon({...base,extra_qty_value:99999}).money.extraQty,12000,'the extra packs can not be more than what arrived of the bot\'s items');
+assert.equal(C.money(1234567.4),'1,234,567');assert.equal(C.money('x'),'0');
+// the week's money: only the complete nights that have a cap; the nights together
+const w1=C.weekMoney([over,mon({...base,buy_value:15000,both_value:9000,extra_items_value:6000}),mon(base,false),mon({...base,cap_money:null}),mon({})]);
+assert.deepEqual(w1,{nights:2,buy:35000,cap:35360,over:-360},'the night still waiting, the night without a cap and the old night are left out');
+assert.equal(C.weekMoney([mon({})]),null);assert.equal(C.weekMoney(null),null);assert.equal(C.weekMoney([mon(base,false)]),null);
+assert.equal(C.weekMoneyLine(w1),'الأسبوع: اشتريت 35,000 ج من سقف 35,360 ج (الليالي الكاملة: 2)، وكنت تحته بـ 360 ج (1%).');
+assert.equal(C.weekMoneyLine({nights:3,buy:60000,cap:53040,over:6960}),'الأسبوع: اشتريت 60,000 ج من سقف 53,040 ج (الليالي الكاملة: 3)، وعدّيته بـ 6,960 ج (13%).');
+assert.equal(C.weekMoneyLine({nights:1,buy:100,cap:100,over:0}),'الأسبوع: اشتريت 100 ج من سقف 100 ج (الليالي الكاملة: 1): على السقف بالظبط.');assert.equal(C.weekMoneyLine(null),'');
 console.log('PASS: order-compare helpers (v2)');

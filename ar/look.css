@@ -2117,6 +2117,12 @@ html.night .bg-po-done summary { color: #7fd69b; }
 .cmp-n.o { background: #fff4e5; color: #9a3412; }
 .cmp-n.b { background: #e8f0fb; color: #0a4aa6; }
 .cmp-big { margin: 12px 2px 2px; font-size: 18px; font-weight: 800; color: #166534; }
+.cmp-money { background: #fff8ee; border: 1px solid #f0c48a; border-radius: 12px; padding: 9px 11px; margin: 10px 0; }
+.cmp-money p { margin: 3px 0; }
+.cmp-cap { font-size: 17px; font-weight: 800; }
+.cmp-cap.over { color: #9a3412; }
+.cmp-cap.under { color: #166534; }
+.cmp-cap.wait { color: var(--muted); font-weight: 700; }
 .cmp-bars { display: flex; gap: 6px; align-items: flex-end; height: 100px; margin: 10px 2px 2px; }
 .cmp-bar { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 11px; font-weight: 400; box-shadow: none; margin: 0; cursor: pointer; }
 .cmp-bar.e { cursor: default; }
@@ -2142,6 +2148,9 @@ html.night .cmp-n.g { background: #14301f; color: #7fd69b; }
 html.night .cmp-n.o { background: #3a2c12; color: #f0c48a; }
 html.night .cmp-n.b { background: #12305e; color: #cfe3ff; }
 html.night .cmp-big { color: #7fd69b; }
+html.night .cmp-money { background: #2b2314; border-color: #6b5326; }
+html.night .cmp-cap.over { color: #f0c48a; }
+html.night .cmp-cap.under { color: #7fd69b; }
 html.night .cmp-bar i { background: #3b4863; }
 html.night .cmp-bar.on i { background: #5a9bff; }
 html.night .cmp-bar.e i { background: #2a3142; }
@@ -2191,3 +2200,9 @@ html.night .st-done.skip { background: #2a3142; color: #c3cad8; }
 .ct-why { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
 .ct-why .pill.bad { background: #fde8e6; color: #b42318; }
 html.night .ct-why .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
+/* «ديون قديمة» (2026-11-16): the customer's row, how long nothing moved on his account, and the reminder under it */
+.cu-oldrow { margin-bottom: 8px; }
+.cu-oldrow .cu-row { margin-bottom: 0; }
+.cu-oldact { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 6px 0; color: var(--muted); }
+.cu-oldact button { margin: 0; }
+.cu-days { display: inline-flex; gap: 6px; margin-inline-start: 8px; }

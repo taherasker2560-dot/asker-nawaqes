@@ -95,15 +95,27 @@
   // read by ar/app.js when the bot opens (read once: tests/e2e/fast-load), and asked again here once a minute after that.
   // Empty = not loaded yet (unknown: it neither rings nor is remembered).
   const incomingNow = () => { const b = $('subBadge'); const t = b ? b.textContent.trim() : ''; return t === '' ? undefined : Number(t) || 0; };
+  // «ديون قديمة» (owner 2026-11-16): customers who owe and nothing moved for N days (the N chosen in «العملاء», 60 unless changed);
+  // for the home card only (it neither rings nor counts on a badge)
+  const oldDays = () => { try { const v = Number(localStorage.getItem('asker-cu-old-days')); return [30, 60, 90].includes(v) ? v : 60; } catch (e) { return 60; } };
+  async function oldDebts(c, days) {
+    const t = new Date(Date.now() - days * 864e5), p = (n) => String(n).padStart(2, '0');
+    const cut = `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}T${p(t.getHours())}:${p(t.getMinutes())}:00`;
+    try {
+      const { data, error } = await c.from('ar_customers').select('balance').gt('balance', 0.5).lt('last_at', cut).limit(2000);
+      return error ? null : { n: (data || []).length, amount: (data || []).reduce((s, r) => s + (Number(r.balance) || 0), 0), days };
+    } catch (e) { return null; }
+  }
   let ticks = 0;
   async function measure() {
     const c = db();
     if (!c) return null;
     if (ticks++ > 0 && $('inboxRefresh')) { $('inboxRefresh').click(); await new Promise((r) => setTimeout(r, 1200)); }
-    const [docs, store, care] = await Promise.all([
+    const [docs, store, care, od] = await Promise.all([
       count(c.from('ar_documents').select('id').eq('status', 'new')),
       count(c.from('ar_store_orders').select('id').eq('status', 'new')),
       count(c.from('ar_chats').select('id').gte('waiting', 1)),
+      oldDebts(c, oldDays()),
     ]);
     const a = root.AskerAlerts && root.AskerAlerts.data();
     const today = (l) => (l || []).filter((x) => Number(x.today) > 0).length;
@@ -113,6 +125,7 @@
     if (docs != null) out.docs = docs;
     if (store != null) out.store = store;
     if (care != null) out.care = care;
+    if (od) { out.oldN = od.n; out.oldAmt = Math.round(od.amount); out.oldDays = od.days; }
     if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
     // the other bags: only the late items count here (the home card shows every bag's shortages anyway)
     if (a && a.bags) out.bags = root.AskerAlertsLib ? root.AskerAlertsLib.lateBags(a) : 0;
@@ -141,6 +154,8 @@
     if (counts.docs) rows.push({ tab: 'docs', n: counts.docs, text: 'صورة مستنية في الفواتير' });
     if (counts.store) rows.push({ tab: 'storeorders', n: counts.store, text: 'طلب جديد من الموقع' });
     for (const t of (root.AskerAlerts && root.AskerAlerts.todo()) || []) rows.push(t);
+    // the old debts: N customers, the total after the sentence (not translated: digits), a tap opens «العملاء» on that list
+    if (counts.oldN) rows.push({ tab: 'customers', view: 'old', n: counts.oldN, text: `عميل عليهم فلوس من أكتر من ${counts.oldDays || 60} يوم`, name: `${Number(counts.oldAmt || 0).toLocaleString('en-US')} ج` });
     $('todoCard')?.classList.toggle('hidden', !rows.length);
     // a bag's line: its name as written in PharmaFly (never translated), and its late note under it
     box.innerHTML = rows.map((r) => `<button type="button" class="todo-row${r.late ? ' late' : ''}" data-go="${esc(r.tab)}"${r.view ? ` data-view="${esc(r.view)}"` : ''}><b>${esc(r.n)}</b>` +
