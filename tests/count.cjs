@@ -27,4 +27,29 @@ const items=[{i:1,s:3},{i:2,s:3},{i:3,s:33}];
 const p=C.progress(items,new Set([2,3]));assert.deepEqual(p.get(3),{n:2,done:1});assert.deepEqual(p.get(33),{n:1,done:1});
 const L=C.latest([{id:'s1',item_id:1,counted_at:'2026-11-10',result:'ok'},{id:'s2',item_id:2,counted_at:'2026-11-10',status:'cancelled'}],[{id:'q1',item_id:1,counted_at:'2026-11-13',result:'diff'}]);
 assert.equal(L.get(1).id,'q1','the phone\'s newer entry wins');assert.equal(L.has(2),false,'a cancelled entry does not count');
-console.log('PASS: count helpers: differences in words, the row, progress, latest entry');
+// «الأولى بالجرد» (owner 2026-11-16): what is most likely wrong, or dearest to get wrong, first; counted in the last 30 days is left out
+{
+  const mk=(i,v,b)=>({i,n:'ITEM '+i,s:3,p:1,v,b:b||[{x:'2029-01',k:1,u:0}]});
+  const items=[mk(1,100),mk(2,50000),mk(3,20),mk(4,30,[{x:'2029-01',k:-2,u:0}]),mk(5,10),mk(6,40000),mk(7,0),mk(8,150),mk(9,900),mk(10,120)];
+  const flags={soldNeg:new Set([3]),mix:new Set([8,3]),expSold:new Set([5])};
+  const out=C.priority(items,new Map(),flags);
+  const id=(o)=>o.it.i;
+  // a negative balance first (60), then sold negative + mixed (40+35=75 beats 60!), then the dearest ones
+  assert.deepEqual(out.map(id).slice(0,2),[3,4],'sold negative AND mixed (75) before a negative balance alone (60)');
+  const by=new Map(out.map((o)=>[o.it.i,o]));
+  assert.deepEqual(by.get(4).why,['neg'],'a negative batch in stock');
+  assert.deepEqual(by.get(3).why,['soldNeg','mix']);
+  assert.deepEqual(by.get(5).why,['expSold']);
+  assert.equal(by.get(2).why.includes('value'),true,'the dearest has the value reason');
+  assert.equal(by.get(2).score,30);assert.equal(by.get(5).score,35);
+  // a cheap item with nothing wrong is not listed at all
+  assert.equal(by.has(7),false,'no stock worth, nothing wrong');assert.equal(by.has(1),false,'a cheap item (44% of the values) with nothing wrong is not listed');
+  assert.deepEqual(out.map(id),[3,4,8,5,2,6,9,10],'the whole order: score, then the value');
+  // counted recently (any result): left out; a map without it brings it back
+  const counted=new Map([[3,{item_id:3,counted_at:'2026-11-15T10:00:00',result:'ok'}]]);
+  assert.equal(C.priority(items,counted,flags).some((o)=>o.it.i===3),false);
+  // no flags, no stock worth: only the value ranks; empty input is fine
+  assert.deepEqual(C.priority(items,new Map(),{}).map(id).slice(0,2),[4,2],'without the alerts: negative balance 60, then the dearest 30');
+  assert.deepEqual(C.priority([],new Map(),flags),[]);assert.deepEqual(C.priority(null,null,null),[]);
+  assert.equal(C.PRIO_WHY.neg,'رصيده بالسالب في فارمافلاي');
+}console.log('PASS: count helpers: differences in words, the row, progress, latest entry');

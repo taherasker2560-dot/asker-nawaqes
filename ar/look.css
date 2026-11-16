@@ -2186,3 +2186,8 @@ html.night .st-chip.req { background: #4a3517; color: #f0c48a; }
 html.night .st-chip.gray { background: #2a3142; color: #c3cad8; }
 html.night .st-done.ok { background: #14301f; color: #7fd69b; }
 html.night .st-done.skip { background: #2a3142; color: #c3cad8; }
+/* «الأولى بالجرد» (2026-11-16): the reasons above each card */
+.ct-prio { margin-bottom: 12px; }
+.ct-why { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.ct-why .pill.bad { background: #fde8e6; color: #b42318; }
+html.night .ct-why .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }

@@ -121,7 +121,8 @@
   const isQueued = (e) => queue.some((q) => q.id === e.id);
 
   let data = null, items = [], byId = new Map(), sections = [], arName = new Map(), server = [], queue = load(QKEY, []);
-  let view = 'sections', curSec = null, filter = 'todo', shown = PAGE, secQ = '', editId = null, edits = {}, extra = [], secTo = null, flushing = false, ready = false;
+  const PRIO_PAGE = 30;
+  let view = 'sections', curSec = null, filter = 'todo', shown = PAGE, secQ = '', editId = null, edits = {}, extra = [], secTo = null, flushing = false, ready = false, prioShown = PRIO_PAGE;
 
   function say(text, kind) { const el = $('ctStatus'); if (el) { el.textContent = text || ''; el.className = 'status' + (kind ? ' ' + kind : ''); } }
   const nameOf = (it) => arName.get(it.i) || it.n;
@@ -273,6 +274,23 @@
       (list.length > shown ? `<button type="button" class="secondary ct-more" data-ct-more>اعرض ${Math.min(PAGE, list.length - shown)} كمان</button>` : '') +
       (!list.length ? `<p class="hint">${filter === 'todo' ? 'القسم ده اتجرد كله ✓' : 'مفيش أصناف هنا'}</p>` : '');
   }
+  // «الأولى بالجرد»: the alerts' sold-negative / mixed-batches / sold-expired items, as ids (nothing yet = no flags, the rest still ranks)
+  function flagsNow() {
+    const a = root.AskerAlerts && root.AskerAlerts.data && root.AskerAlerts.data();
+    const ids = (l) => new Set((l || []).map((x) => Number(x.id)));
+    return { soldNeg: ids(a && a.negative), mix: ids(a && a.mix), expSold: ids(a && a.expiredSold) };
+  }
+  function drawPriority() {
+    const box = $('ctPrioList');
+    if (!box) return;
+    const list = priority(items, lastOf(), flagsNow());
+    const money = (n) => Math.round(Number(n) || 0).toLocaleString('en-US');
+    if ($('ctPrioCount')) $('ctPrioCount').textContent = list.length ? `${list.length} صنف` : '';
+    box.innerHTML = list.slice(0, prioShown).map(({ it, why, value }) =>
+      `<div class="ct-prio"><div class="ct-why">${why.map((w) => `<span class="pill${w === 'neg' || w === 'soldNeg' ? ' bad' : ''}">${esc(w === 'value' ? `${PRIO_WHY.value} (${money(value)} ج)` : PRIO_WHY[w])}</span>`).join('')}</div>${itemCard(it, true)}</div>`).join('') +
+      (list.length > prioShown ? `<button type="button" class="secondary ct-more" data-ct-prio-more>اعرض ${Math.min(PRIO_PAGE, list.length - prioShown)} كمان</button>` : '') +
+      (!list.length ? '<p class="hint">مفيش صنف محتاج جرد دلوقتي ✅</p>' : '');
+  }
   function drawRandom() {
     const q = $('ctQ').value.trim(), F = root.AskerFuzzy, box = $('ctHits');
     if (!q) { box.innerHTML = randomId && byId.get(randomId) ? itemCard(byId.get(randomId), true) : ''; return; }
@@ -312,9 +330,11 @@
     $('ctSections').classList.toggle('hidden', view !== 'sections');
     $('ctSection').classList.toggle('hidden', view !== 'section');
     $('ctResults').classList.toggle('hidden', view !== 'results');
+    $('ctPriority')?.classList.toggle('hidden', view !== 'priority');
     document.querySelectorAll('[data-ct-view]').forEach((b) => b.classList.toggle('secondary', b.dataset.ctView !== (view === 'section' ? 'sections' : view)));
     if (view === 'sections') { drawSections(); drawRandom(); }
     if (view === 'section') drawSection();
+    if (view === 'priority') drawPriority();
     drawResults();
   }
 
@@ -439,7 +459,8 @@
     panel.addEventListener('click', (e) => {
       const t = e.target.closest('button');
       if (!t || !panel.contains(t)) return;
-      if (t.dataset.ctView) { view = t.dataset.ctView; if (view !== 'sections') stopCam(); return draw(); }
+      if (t.dataset.ctView) { view = t.dataset.ctView; if (view === 'priority') prioShown = PRIO_PAGE; if (view !== 'sections') stopCam(); return draw(); }
+      if (t.hasAttribute('data-ct-prio-more')) { prioShown += PRIO_PAGE; return drawPriority(); }
       if (t.id === 'ctScanBtn') return stream ? stopCam() : startCam();
       if (t.id === 'ctCamStop') { say(''); return stopCam(); }
       if (t.dataset.ctOpen != null) { curSec = Number(t.dataset.ctOpen); view = 'section'; filter = 'todo'; shown = PAGE; secQ = ''; $('ctSecQ').value = ''; stopCam(); return draw(); }
@@ -489,6 +510,8 @@
     }
     draw();
     flush();
+    // the alerts (sold negative / mixed / sold expired) rank «الأولى بالجرد»: once they are in, redraw that view
+    try { Promise.resolve(root.AskerAlerts && root.AskerAlerts.load && root.AskerAlerts.load(false)).then(() => { if (view === 'priority') draw(); }, () => {}); } catch (e) {}
   }
   function close() { stopCam(); }
   root.AskerCount = { open, close, flush, scanned };
