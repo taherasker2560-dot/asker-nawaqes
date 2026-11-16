@@ -2270,3 +2270,5 @@ html.night .rt-v .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95
 .cu-items div.has-pic > span:first-of-type { flex: 1; min-width: 0; }
 .cu-pic { flex: 0 0 auto; display: block; }
 .cu-pic img { display: block; width: 44px; height: 44px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+/* «💊 مزمن»: the two lists (late / all the regular ones), 2026-11-16 */
+.cu-chronmode { margin: 2px 0 8px; display: flex; gap: 6px; }

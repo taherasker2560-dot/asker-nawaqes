@@ -15,7 +15,7 @@ const FILE = {
 };
 const d = C.parse(FILE);
 assert.equal(d.rows.length, 3, 'a row with no customer, no item or no name is dropped');
-assert.deepEqual(d.rows[0], { c: 9001, i: 1001, n: 'ALPHA-TEST 10MG 30TAB', gap: 30, times: 6, q: 1, have: 2, last: '2026-10-07' });
+assert.deepEqual(d.rows[0], { c: 9001, i: 1001, n: 'ALPHA-TEST 10MG 30TAB', gap: 30, times: 6, q: 1, have: 2, last: '2026-10-07', since: 0 }, 'a row from an older file has no «since»: 0');
 assert.equal(C.parse(null), null);
 assert.equal(C.parse({}), null);
 assert.equal(C.parse({ rows: 'x' }), null, 'anything that is not the laptop\'s file is no data');
@@ -73,4 +73,31 @@ assert.doesNotMatch(msg, /ج\b|جنيه|رصيد|فلوس/);
 assert.equal(C.message('', ['X']).split('\n')[0], 'أهلًا بحضرتك 🌷', 'no usable name: no «يا»');
 assert.equal(C.fmt(2), '2');
 assert.equal(C.fmt(0.5), '0.5');
+// «كل المعتادين» (2026-11-16): the file carries every regular item too; where each stands today; the customers in the order of their nearest next refill
+const REG = { generated_at: '2026-11-16T01:00:00Z', rows: [], regular: [
+  { c: 9001, i: 1001, n: 'ALPHA-TEST 10MG 30TAB', gap: 30, times: 6, q: 1, have: 2, last: '2026-10-07', since: 40 },   // 40 days since, gap 30 -> 10 days late
+  { c: 9001, i: 1002, n: 'BETA-TEST DROPS', gap: 31, times: 5, q: 1, have: 0, last: '2026-10-20', since: 27 },        // 27 since -> due in 4 (soon)
+  { c: 9002, i: 1003, n: 'GAMMA-TEST 5MG', gap: 28, times: 4, q: 2, have: 5, last: '2026-11-10', since: 6 },         // due in 22 (ok)
+  { c: 9003, i: 1004, n: 'DELTA-TEST 20TAB', gap: 30, times: 4, q: 1, have: 1, last: '2026-10-27', since: 20 },     // due in 10 (ok)
+  { n: 'no customer' }, null,
+] };
+const dr = C.parse(REG);
+assert.equal(dr.regular.length, 4, 'a regular row with no customer is dropped');
+assert.equal(dr.regular[0].since, 40);
+assert.deepEqual(C.parse({ rows: [] }).regular, [], 'an old file with no regular list');
+assert.deepEqual(C.parse({ rows: [], regular: 'x' }).regular, []);
+// where one stands today (from the last refill's date, so it is right whenever the file was written)
+assert.deepEqual(C.standing(dr.regular[0], NOW), { since: 40, due: -10, state: 'late' });
+assert.deepEqual(C.standing(dr.regular[1], NOW), { since: 27, due: 4, state: 'soon' });
+assert.deepEqual(C.standing(dr.regular[2], NOW), { since: 6, due: 22, state: 'ok' });
+// the laptop's own rule for late: 1.15 gaps and at least 3 days past the gap: a 30-day item is late from day 34 (not 31), a 100-day one from day 115
+assert.equal(C.standing({ gap: 30, last: '2026-10-12' }, NOW).state, 'late', '35 days: past 34.5');
+assert.equal(C.standing({ gap: 30, last: '2026-10-13' }, NOW).state, 'soon', '34 days: past the gap but not late yet');
+assert.equal(C.standing({ gap: 100, last: '2026-07-24' }, NOW).state, 'late', '115 days = 1.15 gaps');
+assert.equal(C.standing({ gap: 100, last: '2026-07-25' }, NOW).state, 'soon', '114 days');
+// customers: the one with the nearest next refill first (a late one is the nearest), its items the same way
+const rg = C.regularGroups(dr.regular, NOW);
+assert.deepEqual(rg.map((x) => [x.c, x.rows.map((r) => r.i)]), [[9001, [1001, 1002]], [9003, [1004]], [9002, [1003]]]);
+assert.equal(rg[0].rows[0].state, 'late');
+assert.deepEqual(C.regularGroups(null, NOW), []);
 console.log('PASS: chronic: the file, days since, «خلصنا», the groups, the name and the message');

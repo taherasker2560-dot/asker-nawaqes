@@ -250,7 +250,7 @@
     return f ? f(l.p, l.u, l.k) : `${num(l.p)} علبة` + (num(l.u) ? ` و${num(l.u)} وحدة` : '');
   };
   let list = null, loading = null, loadedAt = 0, failed = '';
-  let view = null, query = '', shown = SHOW, chronAsked = false;
+  let view = null, query = '', shown = SHOW, chronAsked = false, chronMode = 'late';   // «💊 مزمن»: 'late' (refill late) or 'all' (everything he is used to taking)
   // «ديون قديمة»: how many days of no movement (30 / 60 / 90), kept on this phone; ar/notify.js reads the same key for the home card
   const DAYS_KEY = 'asker-cu-old-days';
   let oldDays = (() => { try { const v = Number(localStorage.getItem(DAYS_KEY)); return OLD_DAYS.includes(v) ? v : OLD_DEFAULT; } catch (e) { return OLD_DEFAULT; } })();
@@ -397,9 +397,15 @@
         (near.length ? `<h3 class="al-h">قربوا من الحد (90% أو أكتر) <b class="al-n">${near.length}</b></h3>` + near.map(rowHtml).join('') : '');
       $('cuCount').textContent = '';
     } else if (r.view === 'chronic') {
-      const ch = AC ? AC.listHtml(r.rows, { money, hasPhone: (id) => !!(phones && phones.has(String(id))), isStopped }) : { html: '', n: 0 };
-      html = '<p class="hint">عملاء بياخدوا نفس الدوا بانتظام (كل شهر تقريبًا) وميعاده عدّى. دوس «رسالة» وهتتجهز لك، وإنت اللي تبعتها.</p>' +
-        (ch.html || `<p class="hint">${query ? 'مفيش عميل بالاسم ده.' : 'مفيش ميعاد دوا متأخر ✅'}</p>`);
+      const helpers = { money, hasPhone: (id) => !!(phones && phones.has(String(id))), isStopped };
+      const all = chronMode === 'all';
+      const ch = !AC ? { html: '', n: 0 } : all ? AC.listAllHtml(r.rows, helpers) : AC.listHtml(r.rows, helpers);
+      // two lists (owner 2026-11-16): the ones whose refill is late, and every item each customer is used to taking
+      const mode = (m, label, n) => `<button type="button" class="chip small${chronMode === m ? ' on' : ''}" data-cu-chron-mode="${m}">${label} <b>${n}</b></button>`;
+      html = `<div class="chips cu-chronmode" role="group">${mode('late', 'متأخرين', AC ? AC.count() : 0)}${mode('all', 'كل المعتادين', AC ? AC.allCount() : 0)}</div>` +
+        (all ? '<p class="hint">الأصناف اللي كل عميل متعود ياخدها بانتظام (آخر 6 شهور، 4 مرات أو أكتر)، ومعاها ميعاد الجاي.</p>'
+          : '<p class="hint">عملاء بياخدوا نفس الدوا بانتظام (كل شهر تقريبًا) وميعاده عدّى. دوس «رسالة» وهتتجهز لك، وإنت اللي تبعتها.</p>') +
+        (ch.html || `<p class="hint">${query ? 'مفيش عميل بالاسم ده.' : all ? 'مفيش أصناف معتادة' : 'مفيش ميعاد دوا متأخر ✅'}</p>`);
       $('cuCount').textContent = ch.n ? `${ch.n} عميل` : '';
       note('');
     } else {
@@ -898,7 +904,7 @@
     // «محتاج شغل» on the home: its «ديون قديمة» row opens this list on that view (before the tab opens)
     document.addEventListener('click', (e) => {
       const b = e.target.closest('.todo-row[data-go="customers"][data-view]');
-      if (b) { view = b.dataset.view; shown = SHOW; query = ''; if ($('cuQ')) $('cuQ').value = ''; if (st) closeStatement(); }
+      if (b) { view = b.dataset.view; if (view === 'chronic') chronMode = 'late'; shown = SHOW; query = ''; if ($('cuQ')) $('cuQ').value = ''; if (st) closeStatement(); }
     }, true);
     panel.addEventListener('click', (e) => {
       const v = e.target.closest('[data-cu-view]');
@@ -909,6 +915,8 @@
       const rm = e.target.closest('[data-cu-remind]');
       if (rm) { remind(rm.dataset.cuRemind); return; }
       // «💊 مزمن»: the refill message, and «✓ خلصنا» (hidden on this phone until he buys again or 14 days)
+      const cm = e.target.closest('[data-cu-chron-mode]');
+      if (cm) { chronMode = cm.dataset.cuChronMode === 'all' ? 'all' : 'late'; drawList(); return; }
       const cr = e.target.closest('[data-cu-chron]');
       if (cr) { chronRemind(cr.dataset.cuChron); return; }
       const cd = e.target.closest('[data-cu-chron-done]');
