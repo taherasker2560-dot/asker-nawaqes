@@ -71,7 +71,18 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.ok(g0.tools[0].functionDeclarations.some((d) => d.name === 'laptop'));
   // the search is by Arabic name, letters written several ways match each other, numbers are left out of it
   const q = decodeURIComponent(x.f.calls.find((c) => c.url.includes('/rest/v1/ar_stock')).url);
-  assert.match(q, /and=\(arabic_name\.ilike\.\*_لف_ز_ل\*\)/);
+  assert.match(q, /and=\(arabic_name\.ilike\.\*\*لف_ز_ل\*\)/, 'a vowel at the start may be missing');
+  // the name as he says it is shorter than the written one («بنادول» / «بانادول»): only the consonants, in order
+  x = await ask({ text: 'سعر بنادول اكسترا' }, { gemini: { call: { name: 'item_info', args: { name: 'بنادول اكسترا' } }, status: 200 },
+    rows: { ar_stock: (u) => decodeURIComponent(u.search).includes('ب*ن*د*ل') ? [{ item_id: 68432, name: 'PANADOL EXTRA 48 TAB', arabic_name: 'بانادول اكسترا ٤٨ قرص', price: 116, packs: 64, units: 0, parts: 4 }] : [] } });
+  assert.match(x.j.speak, /^بانادول اكسترا: 116 جنيه، عندنا 64\./, 'the pack size is not said');
+  assert.deepEqual(F.skeleton('بنادول اكسترا'), ['ب*ن*د*ل', 'ك*س*ت*ر']);
+  assert.deepEqual(F.words('وبيديا شور'), ['*ب_د*', 'ش_ر'], 'the «و» of «and» in front of a name does not stop the search');
+  // no strength said: the one that sells most comes first (the tablets, not the vial); the warehouse code is said by its name
+  x = await ask({ text: 'زوركال عندنا كام' }, { gemini: { call: { name: 'item_info', args: { name: 'زوركال' } }, status: 200 },
+    rows: { ar_stock: () => [{ item_id: 63228, name: 'ZURCAL VIAL', arabic_name: 'زوركال فيال', price: 84, packs: 20, units: 0, parts: 1 }, { item_id: 62386, name: 'ZURCAL 40MG 14 TAB', arabic_name: 'زوركال ٤٠ مجم ١٤ قرص', price: 120, packs: 1, units: 0, parts: 14 }],
+      ar_store_items: () => [{ id: 62386, popular_rank: 12 }, { id: 63228, popular_rank: 51 }], ar_item_buys: () => [{ supplier: 'ELFATH', last_date: '2026-09-23', discount_pct: 0 }] } });
+  assert.match(x.j.speak, /^زوركال ٤٠ مجم: 120 جنيه، عندنا 1، آخر شرا من الفتح يوم 23\/9\./);
   // not in stock: the store list says so
   x = await ask({ text: 'سعر الفازول' }, { gemini: { call: { name: 'item_info', args: { name: 'الفازول' } }, status: 200 }, rows: { ar_store_items: () => [{ id: 9, name: 'ALFAZOL SYRUP', arabic_name: 'الفازول شراب', price: 40 }] } });
   assert.match(x.j.speak, /^الفازول شراب: 40 جنيه، مش موجود عندنا دلوقتي\./);
@@ -102,20 +113,34 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.match(x.j.speak, /^فيه 2 موردين بالاسم ده: أ، ب\. تقصد مين؟$/);
 
   // sales: summed by kind, returns taken off
-  x = await ask({ text: 'مبيعات النهارده' }, { gemini: { call: { name: 'sales', args: { period: 'today' } }, status: 200 }, rows: { ar_sales: () => [{ kind: 'cash', total: 1000 }, { kind: 'credit', total: 500 }, { kind: 'return', total: 100 }] } });
-  assert.equal(x.j.speak, 'مبيعات النهارده: 1 400 جنيه في 3 فاتورة. كاش 1 000، آجل 500، مرتجع 100.');
+  x = await ask({ text: 'مبيعات النهارده' }, { gemini: { call: { name: 'sales', args: { period: 'today' } }, status: 200 }, rows: { ar_sales: () => [{ kind: 'sale', total: 1000 }, { kind: 'sale', total: 500 }, { kind: 'return', total: 100 }] } });
+  assert.equal(x.j.speak, 'مبيعات النهارده: 1 400 جنيه في 3 فاتورة، والمرتجع 100.');
+  // warehouses: the main one wins over a small one with the same word; an English-named one by its Arabic name, both accounts
+  x = await ask({ text: 'رصيد الفتح' }, { gemini: { call: { name: 'balance', args: { party: 'vendor', name: 'الفتح' } }, status: 200 },
+    rows: { ar_vendors: () => [{ id: 2540, name: 'مخزن الفتح للادوية', balance: 1000, invoices: 900 }, { id: 9, name: 'مخزن دار الفتح اكسسوار', balance: 5, invoices: 3 }] } });
+  assert.equal(x.j.speak, 'مخزن الفتح للادوية: علينا له 1 000 جنيه. أفتحلك حسابه؟');
+  x = await ask({ text: 'وابن سينا' }, { gemini: { call: { name: 'balance', args: { party: 'vendor', name: 'ابن سينا' } }, status: 200 },
+    rows: { ar_vendors: (u) => decodeURIComponent(u.search).includes('IBN SINA') ? [{ id: 188, name: 'IBN SINA 2', balance: 200, invoices: 50 }, { id: 2495, name: 'IBN SINA 1', balance: 0, invoices: 40 }] : [] } });
+  assert.equal(x.j.speak, 'IBN SINA 2: علينا له 200 جنيه. IBN SINA 1: حسابه خالص.');
+  // «اقرالي أهمهم» right after a bag: that bag, even when Gemini did not name it
+  x = await ask({ text: 'اقرالي أهمهم', ctx: { list: 'bag', bag: '2434' } }, { gemini: { call: { name: 'shortages', args: { which: 'general', read_aloud: true } }, status: 200 } });
+  assert.equal(x.j.walk.items[0].say, 'TISSUE 700، عندنا 0، والمتوسط 34');
+  // «افتح + a page» opens at once, without Gemini; anything longer is not taken for a page
+  assert.equal(F.pageOf('افتح الطلبيات'), 'drafts'); assert.equal(F.pageOf('افتحلي طلبات الموقع'), 'storeorders');
+  assert.equal(F.pageOf('افتح حقيبة النواقص اليومية'), null); assert.equal(F.pageOf('الطلبيات'), null);
   assert.equal(F.cairoMidnight(Date.UTC(2026, 10, 17, 1, 0, 0)), '2026-11-16T22:00:00.000Z', 'Cairo is UTC+2 in November');
 
   // pages, small talk, the laptop, Gemini down, a model without the «no thinking» switch
   x = await ask({ text: 'افتح الطلبيات' }, { gemini: { call: { name: 'open_page', args: { page: 'drafts' } }, status: 200 } });
   assert.deepEqual(x.j.do_now, [{ type: 'open_tab', tab: 'drafts' }]); assert.equal(x.j.speak, 'فتحتلك الطلبيات');
+  assert.equal(gem(x.f).length, 0, '«افتح الطلبيات» needs no Gemini');
   x = await ask({ text: 'ازيك' }, { gemini: { text: 'تمام الحمد لله، أؤمرني' , status: 200 } });
   assert.equal(x.j.speak, 'تمام الحمد لله، أؤمرني'); assert.equal(x.j.tool, 'chat');
   x = await ask({ text: 'سجل دفعة 500 للفتح' }, { gemini: { call: { name: 'laptop', args: {} }, status: 200 } });
   assert.equal(x.j.handoff, true, 'anything that records goes to the laptop (the spoken-yes gate is there)');
   x = await ask({ text: 'سعر الفازول' }, { gemini: { status: 503 } });
   assert.equal(x.j.handoff, true, 'Gemini down: the laptop answers');
-  x = await ask({ text: 'افتح الطلبيات' }, { gemini: { call: { name: 'open_page', args: { page: 'drafts' } }, status: 200 }, thinking400: true });
+  x = await ask({ text: 'عايز اشوف الطلبيات' }, { gemini: { call: { name: 'open_page', args: { page: 'drafts' } }, status: 200 }, thinking400: true });
   assert.equal(x.j.tool, 'open_page'); assert.equal(gem(x.f).length, 2);
 
   // the Arabic helpers

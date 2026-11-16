@@ -13,7 +13,46 @@ type Env = Record<string, string | undefined>;
 type Json = Record<string, unknown>;
 type Turn = { who?: unknown; text?: unknown };
 
-export const TEXT_MODEL = 'gemini-3.8-flash-lite';
+// the fast «lite» text model this key has (2026-11-17: there is no 3.8 lite text model; the env GEMINI_TEXT_MODEL can change it)
+export const TEXT_MODEL = 'gemini-3.5-flash-lite';
+// the warehouses' codes in ar_item_buys, said by their names (only the sure ones; any other code is said as it is)
+export const SUPPLIERS: Record<string, string> = {
+  ELFATH: 'الفتح', FATH: 'الفتح', IBNSINA: 'ابن سينا', SINA: 'سينا', NEWCITY: 'نيو سيتي', AMG: 'إيه إم جي', REDA: 'رضا',
+  PHARMA: 'فارما', PMM: 'فارما مول', DOC: 'الدكتور',
+};
+// warehouses whose PharmaFly name is English: the spoken (normalized) Arabic name → a piece of the English one
+export const VENDOR_ALIASES: Record<string, string> = {
+  'ابن سينا': 'IBN SINA', 'ابن سيناء': 'IBN SINA', 'فارما': 'pharmaoverseas', 'فارما اوفرسيز': 'pharmaoverseas',
+  'ايه ام جي': 'A M group', 'اي ام جي': 'A M group', 'ايه ام جروب': 'A M group', 'نيو سيتي': 'new city',
+};
+// «افتح X»: the bot's pages by the words he uses (the same lists as the laptop's AdamFast.ps1), so it opens at once without Gemini
+const PAGE_WORDS: [string, string][] = ([
+  ['drafts', ['الطلبيات', 'طلبيات', 'الطلبيه', 'مسودات الطلبيات', 'طلبيات المخازن']],
+  ['storeorders', ['طلبات الموقع', 'طلبات المتجر', 'طلبات الاونلاين']],
+  ['short', ['النواقص', 'نواقص', 'النواقص العامه', 'قايمه النواقص', 'قائمه النواقص']],
+  ['bags', ['الحقائب', 'حقائب', 'الشنط', 'الحقايب']],
+  ['read', ['الوارد', 'وارد', 'رسايل المخازن']],
+  ['docs', ['الفواتير', 'فواتير', 'فواتير المشتريات']],
+  ['suppliers', ['قوايم المخازن', 'قوائم المخازن', 'لستات المخازن']],
+  ['stock', ['المخزون', 'مخزون', 'الاستوك', 'الستوك']],
+  ['count', ['الجرد', 'جرد']],
+  ['expiry', ['الصلاحيات', 'صلاحيات', 'الاكسباير']],
+  ['customers', ['العملاء', 'عملاء', 'الزباين', 'حسابات العملاء']],
+  ['vendors', ['الموردين', 'موردين', 'حسابات الموردين', 'حسابات المخازن']],
+  ['ops', ['العمليات', 'عمليات']],
+  ['sales', ['المبيعات', 'مبيعات', 'حركه البيع']],
+  ['tempsale', ['البيع المؤقت', 'بيع مؤقت']],
+  ['care', ['خدمه العملاء', 'الرسايل']],
+  ['home', ['الرئيسيه', 'الصفحه الرئيسيه', 'البوت']],
+] as [string, string[]][]).flatMap(([tab, ws]) => ws.map((w) => [w, tab] as [string, string]));
+/** «افتح الطلبيات» → «drafts»; null when the sentence is more than «افتح + a page». */
+export function pageOf(text: string): string | null {
+  const n = norm(text).replace(/^(افتحلي|افتح لي|افتح|افتحي|وريني|روح علي|روح ل|روح|ادخل علي|ادخل|اعرض)\s+/, '')
+    .replace(/^(صفحه|قسم|تاب)\s+/, '').trim();
+  if (n === norm(text)) return null;
+  for (const [w, tab] of PAGE_WORDS) if (n === w) return tab;
+  return null;
+}
 export const MAX_TEXT = 400;
 const KEY_RE = /^[0-9a-f]{64}$/;
 const MODEL_RE = /^gemini-[a-z0-9.\-]{1,60}$/;
@@ -34,10 +73,16 @@ export function norm(s: string): string {
 }
 const STOP = new Set(['سعر', 'بكام', 'كام', 'عندنا', 'موجود', 'الموجود', 'صنف', 'الصنف', 'رصيد', 'حساب', 'دوا', 'دواء', 'عن', 'في', 'من', 'يا', 'ال']);
 /** The words of a spoken name, each as a PostgREST ilike pattern where every letter written several ways matches any of them. */
+const nameWords = (q: string) => norm(q).split(' ').filter((w) => w.length >= 2 && !STOP.has(w) && !/^[\d.%]+$/.test(w)).slice(0, 4);
 export function words(q: string): string[] {
-  // numbers are left out of the search (the names keep Arabic-Indic digits, «٤٠»); they only rank the matches (rankByNumber)
-  return norm(q).split(' ').filter((w) => w.length >= 2 && !STOP.has(w) && !/^[\d.%]+$/.test(w)).slice(0, 4)
-    .map((w) => w.replace(/[اوي]/g, '_').replace(/ه$/, '_'));
+  // numbers are left out of the search (the names keep Arabic-Indic digits, «٤٠»); they only rank the matches (rankByNumber).
+  // A vowel letter at the start or the end may be missing or extra («وبيديا» = «بيديا»: the «و» of «and»), inside it is any one letter.
+  return nameWords(q).map((w) => w.replace(/^[اوي]+/, '*').replace(/[اويه]+$/, '*').replace(/[اوي]/g, '_').replace(/^\*|\*$/g, '*'))
+    .map((w) => w.replace(/\*+/g, '*')).filter((w) => w.replace(/[*_]/g, '').length >= 2);
+}
+/** Looser: only the word's consonants, in order, anything between them («بنادول» finds «بانادول»). Used when [words] finds nothing. */
+export function skeleton(q: string): string[] {
+  return nameWords(q).map((w) => w.replace(/[اويهء]/g, '')).filter((w) => w.length >= 2).map((w) => w.split('').join('*'));
 }
 const toIndic = (s: string) => s.replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
 /** The numbers he said («زوركال 40»), in both digit forms, to put the right strength first. */
@@ -120,18 +165,28 @@ const PAGES: Record<string, string> = {
 };
 
 async function itemInfo(c: Ctx, name: string, now: number): Promise<Answer> {
-  const ws = words(name);
+  const ws = words(name), sk = skeleton(name);
   if (!ws.length) return { speak: 'قول اسم الصنف تاني' };
-  let rows = (await rest(c, 'ar_stock?select=item_id,name,arabic_name,price,packs,units,parts,exp_near&' + ilikeAll('arabic_name', ws) + '&limit=8')).rows;
+  const STOCK = 'ar_stock?select=item_id,name,arabic_name,price,packs,units,parts,exp_near&';
+  let rows = (await rest(c, STOCK + ilikeAll('arabic_name', ws) + '&limit=8')).rows;
   let inStock = true;
-  if (!rows.length && /[a-z]/i.test(name)) rows = (await rest(c, 'ar_stock?select=item_id,name,arabic_name,price,packs,units,parts,exp_near&' + ilikeAll('name', ws) + '&limit=8')).rows;
+  if (!rows.length && /[a-z]/i.test(name)) rows = (await rest(c, STOCK + ilikeAll('name', ws) + '&limit=8')).rows;
+  if (!rows.length && sk.length) rows = (await rest(c, STOCK + ilikeAll('arabic_name', sk) + '&limit=8')).rows;   // «بنادول» → «بانادول»
   if (!rows.length) {
     inStock = false;
-    rows = (await rest(c, 'ar_store_items?select=id,name,arabic_name,price&' + ilikeAll('arabic_name', ws) + '&limit=8')).rows.map((r) => ({ ...r, item_id: r.id }));
+    const STORE = 'ar_store_items?select=id,name,arabic_name,price&';
+    rows = (await rest(c, STORE + ilikeAll('arabic_name', ws) + '&limit=8')).rows;
+    if (!rows.length && sk.length) rows = (await rest(c, STORE + ilikeAll('arabic_name', sk) + '&limit=8')).rows;
+    rows = rows.map((r) => ({ ...r, item_id: r.id }));
   }
   if (!rows.length) return { speak: 'مش لاقي صنف بالاسم ده', open: { q: name } };
-  // the strength he said first («زوركال 40»), then the shortest name (the plain product before its variants)
+  // the strength he said first («زوركال 40»), then the one that sells most (ar_store_items.popular_rank, 1 = the most sold:
+  // «زوركال» = the 40 mg tablets, not the vial), then the shortest name
+  const pop = new Map<number, number>();
+  for (const p of (await rest(c, 'ar_store_items?select=id,popular_rank&id=in.(' + rows.map((r) => Number(r.item_id)).join(',') + ')')).rows) if (p.popular_rank != null) pop.set(Number(p.id), Number(p.popular_rank));
+  const rank = (r: Json) => pop.has(Number(r.item_id)) ? pop.get(Number(r.item_id)) as number : 1e9;
   rows.sort((a, b) => (rankByNumber(name, String(b.arabic_name || b.name)) - rankByNumber(name, String(a.arabic_name || a.name)))
+    || (rank(a) - rank(b))
     || (String(a.arabic_name || a.name).length - String(b.arabic_name || b.name).length));
   const it = rows[0];
   const id = Number(it.item_id);
@@ -154,7 +209,7 @@ async function itemInfo(c: Ctx, name: string, now: number): Promise<Answer> {
   if (buys.length) {
     const b = buys[0];
     const d = String(b.last_date || '').slice(0, 10).split('-');
-    bits.push('آخر شرا من ' + String(b.supplier) + (d.length === 3 ? ' يوم ' + Number(d[2]) + '/' + Number(d[1]) : '') + (Number(b.discount_pct) > 0 ? ' بخصم ' + num(Number(b.discount_pct)) + '٪' : ''));
+    bits.push('آخر شرا من ' + (SUPPLIERS[String(b.supplier).toUpperCase()] || String(b.supplier)) + (d.length === 3 ? ' يوم ' + Number(d[2]) + '/' + Number(d[1]) : '') + (Number(b.discount_pct) > 0 ? ' بخصم ' + num(Number(b.discount_pct)) + '٪' : ''));
   }
   const more = rows.length > 1 ? 'وفيه ' + (rows.length - 1) + ' أصناف تانية قريبة من الاسم على الشاشة' : '';
   return {
@@ -164,7 +219,7 @@ async function itemInfo(c: Ctx, name: string, now: number): Promise<Answer> {
   };
 }
 
-async function shortages(c: Ctx, which: string, bagName: string, readAloud: boolean, now: number): Promise<Answer> {
+async function shortages(c: Ctx, which: string, bagName: string, readAloud: boolean, now: number, ctxBag = ''): Promise<Answer> {
   if (which !== 'bag') {
     const { rows, total } = await rest(c, 'ar_shortages?select=product_name,name_key,suggested_qty&is_active=eq.true&order=suggested_qty.desc.nullslast,product_name&limit=' + (readAloud ? 30 : 5), true);
     const keys = rows.map((r) => String(r.name_key)).filter(Boolean);
@@ -176,7 +231,9 @@ async function shortages(c: Ctx, which: string, bagName: string, readAloud: bool
     return { speak: intro + (rows.length ? '. أكتر المطلوب: ' + rows.slice(0, 3).map(nameOf).join('، ') + '. أقرالك الباقي؟' : '.'), show: rows.map((r) => nameOf(r) + ' — ' + num(Number(r.suggested_qty || 1))).join('\n'), do_now: [{ type: 'open_tab', tab: 'short' }], ctx: { list: 'general' } };
   }
   const all = bagList(await bags(c, now));
-  const b = findBag(all, bagName);
+  // «اقرالي أهمهم» right after a bag: the bag we were talking about
+  const fromCtx = ctxBag ? all.find((x) => x.id === ctxBag) || null : null;
+  const b = (bagName.trim() ? findBag(all, bagName) : null) || fromCtx || findBag(all, bagName);
   if (!b) return { speak: 'مش عارف أنهي حقيبة. عندنا: ' + all.map((x) => x.id === 'pv' ? 'نواقص كل الشركات' : x.name).join('، ') };
   const items = [...b.items].sort((x, y) => y.sold30 - x.sold30);
   const names = await arabicNames(c, items.slice(0, readAloud ? 30 : 3).map((x) => x.id));
@@ -191,15 +248,26 @@ async function balance(c: Ctx, party: string, name: string): Promise<Answer> {
   const ws = words(name);
   if (!ws.length) return { speak: 'قول الاسم تاني' };
   if (party === 'vendor') {
-    let rows = (await rest(c, 'ar_vendors?select=id,name,short,balance,last_invoice_at,last_payment_at,last_payment&' + ilikeAll('name', ws) + '&limit=6')).rows;
-    if (!rows.length) rows = (await rest(c, 'ar_vendors?select=id,name,short,balance,last_invoice_at,last_payment_at,last_payment&' + ilikeAll('short', ws) + '&limit=6')).rows;
+    const SEL = 'ar_vendors?select=id,name,short,balance,invoices,last_invoice_at,last_payment_at,last_payment&order=invoices.desc.nullslast&';
+    let rows = (await rest(c, SEL + ilikeAll('name', ws) + '&limit=6')).rows;
+    // warehouses written in English in PharmaFly («IBN SINA 1»): their spoken Arabic name
+    const alias = VENDOR_ALIASES[norm(name).replace(/^(مخزن|شركه|شركة)\s+/, '').replace(/^و(?=\S{3})/, '')];
+    if (!rows.length && alias) rows = (await rest(c, SEL + 'name=ilike.*' + alias + '*&limit=6')).rows;
+    if (!rows.length) rows = (await rest(c, SEL + ilikeAll('short', ws) + '&limit=6')).rows;
     if (!rows.length) return { speak: 'مش لاقي مورد بالاسم ده', do_now: [{ type: 'open_tab', tab: 'vendors' }] };
+    const say1 = (v: Json) => {
+      const bal = Number(v.balance || 0);
+      return String(v.name) + ': ' + (Math.abs(bal) < 0.5 ? 'حسابه خالص' : bal > 0 ? 'علينا له ' + money(bal) + ' جنيه' : 'لينا عنده ' + money(-bal) + ' جنيه');
+    };
+    // the one he deals with most wins when it is clearly the main one («الفتح» = the medicines warehouse, not the accessories one)
+    if (rows.length > 1 && Number(rows[0].invoices || 0) >= 3 * Math.max(1, Number(rows[1].invoices || 0))) rows = [rows[0]];
+    // the same warehouse with two accounts («ابن سينا 1 / 2»): both balances
+    if (rows.length > 1 && alias && rows.length <= 3) return { speak: rows.map(say1).join('. ') + '.', do_now: [{ type: 'open_tab', tab: 'vendors' }] };
     if (rows.length > 1) return { speak: 'فيه ' + rows.length + ' موردين بالاسم ده: ' + rows.slice(0, 4).map((r) => String(r.name)).join('، ') + '. تقصد مين؟', ctx: { choose: 'vendor' } };
-    const v = rows[0], bal = Number(v.balance || 0);
-    const s = Math.abs(bal) < 0.5 ? 'حسابه خالص' : bal > 0 ? 'علينا له ' + money(bal) + ' جنيه' : 'لينا عنده ' + money(-bal) + ' جنيه';
+    const v = rows[0];
     const d = String(v.last_payment_at || '').slice(0, 10).split('-');
     const pay = Number(v.last_payment) > 0 && d.length === 3 ? '، وآخر دفعة ' + money(Number(v.last_payment)) + ' يوم ' + Number(d[2]) + '/' + Number(d[1]) : '';
-    return { speak: String(v.name) + ': ' + s + pay + '. أفتحلك حسابه؟', open: { vendor: Number(v.id) }, ctx: { vendor: { id: Number(v.id), name: String(v.name) } } };
+    return { speak: say1(v) + pay + '. أفتحلك حسابه؟', open: { vendor: Number(v.id) }, ctx: { vendor: { id: Number(v.id), name: String(v.name) } } };
   }
   const rows = (await rest(c, 'ar_customers?select=id,name,balance,credit_limit,last_at&' + ilikeAll('name', ws) + '&order=last_at.desc.nullslast&limit=6')).rows;
   if (!rows.length) return { speak: 'مش لاقي عميل بالاسم ده', do_now: [{ type: 'open_tab', tab: 'customers' }] };
@@ -227,10 +295,10 @@ async function sales(c: Ctx, period: string, now: number): Promise<Answer> {
   for (const r of rows) { const k = String(r.kind || 'other'); sum[k] = (sum[k] || 0) + Number(r.total || 0); n++; }
   const label = period === 'yesterday' ? 'امبارح' : period === 'week' ? 'آخر 7 أيام' : period === 'month' ? 'آخر 30 يوم' : 'النهارده';
   if (!n) return { speak: 'مفيش مبيعات ' + label + ' لسه', do_now: [{ type: 'open_tab', tab: 'sales' }] };
-  const names: Record<string, string> = { cash: 'كاش', credit: 'آجل', return: 'مرتجع', returns: 'مرتجع' };
-  const net = Object.entries(sum).reduce((a, [k, v]) => a + (/return/.test(k) ? -Math.abs(v) : v), 0);
-  const parts = Object.entries(sum).map(([k, v]) => (names[k] || k) + ' ' + money(Math.abs(v)));
-  return { speak: 'مبيعات ' + label + ': ' + money(net) + ' جنيه في ' + n + ' فاتورة. ' + parts.join('، ') + '.', do_now: [{ type: 'open_tab', tab: 'sales' }] };
+  // ar_sales.kind: «sale» / «return» (2026-11-17)
+  const ret = Object.entries(sum).filter(([k]) => /return/.test(k)).reduce((a, [, v]) => a + Math.abs(v), 0);
+  const gross = Object.entries(sum).filter(([k]) => !/return/.test(k)).reduce((a, [, v]) => a + v, 0);
+  return { speak: 'مبيعات ' + label + ': ' + money(gross - ret) + ' جنيه في ' + n + ' فاتورة' + (ret >= 1 ? '، والمرتجع ' + money(ret) : '') + '.', do_now: [{ type: 'open_tab', tab: 'sales' }] };
 }
 
 // ---------- Gemini: understand the sentence, pick one tool ----------
@@ -248,7 +316,7 @@ const TOOLS = [{
     { name: 'shortages', description: 'The shortage lists: «النواقص العامة» (general) or a bag («حقيبة النواقص اليومية»، «حقيبة سرحان»، «نواقص كل الشركات»).', parameters: { type: 'OBJECT', properties: { which: { type: 'STRING', enum: ['general', 'bag'] }, bag: { type: 'STRING', description: 'The bag as he named it, when which=bag.' }, read_aloud: { type: 'BOOLEAN', description: 'true when he wants the items read one by one («اقرالي»، «قولي اللي فيها»).' } }, required: ['which'] } },
     { name: 'balance', description: 'The account balance of a customer («عميل») or a supplier / warehouse («مورد»، «مخزن»، e.g. الفتح، ابن سينا، فارما).', parameters: { type: 'OBJECT', properties: { party: { type: 'STRING', enum: ['customer', 'vendor'] }, name: { type: 'STRING' } }, required: ['party', 'name'] } },
     { name: 'sales', description: 'Sales totals for a period.', parameters: { type: 'OBJECT', properties: { period: { type: 'STRING', enum: ['today', 'yesterday', 'week', 'month'] } }, required: ['period'] } },
-    { name: 'open_page', description: 'Open a page of the bot app.', parameters: { type: 'OBJECT', properties: { page: { type: 'STRING', enum: Object.keys(PAGES) } }, required: ['page'] } },
+    { name: 'open_page', description: 'Open a page of the bot app. Pages: ' + Object.entries(PAGES).map(([k, v]) => k + '=«' + v + '»').join('، ') + '. «الطلبيات» is drafts (orders to the warehouses); «طلبات الموقع» is storeorders.', parameters: { type: 'OBJECT', properties: { page: { type: 'STRING', enum: Object.keys(PAGES) } }, required: ['page'] } },
     { name: 'laptop', description: 'Hand the request to the laptop assistant (anything that records/changes/sends, or that the other tools cannot answer).' },
     { name: 'end', description: 'He ended the conversation.' },
   ],
@@ -321,6 +389,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   const done = (a: Answer, tool: string) => reply(200, { ok: true, ...a, show: a.show || a.speak, tool, ms: Date.now() - t0 });
 
   if (ENDS.test(norm(text))) return done({ speak: 'تمام', end: true }, 'end');
+  const page = pageOf(text);
+  if (page) return done({ speak: 'فتحتلك ' + PAGES[page], do_now: [{ type: 'open_tab', tab: page }] }, 'open_page');
   const model = (env.GEMINI_TEXT_MODEL || TEXT_MODEL).trim();
   if (!MODEL_RE.test(model)) return reply(500, { error: 'model' });
   const { pick, why } = await understand(env, fetchImpl, model, text, history, ctx);
@@ -332,7 +402,12 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   try {
     switch (pick.tool) {
       case 'item_info': return done(await itemInfo(c, String(a.name || ''), now), 'item_info');
-      case 'shortages': return done(await shortages(c, String(a.which || 'general'), String(a.bag || ''), a.read_aloud === true, now), 'shortages');
+      case 'shortages': {
+        const ctxBag = ctx && ctx.list === 'bag' ? String(ctx.bag || '') : '';
+        // «اقرالي الباقي» right after a bag means that bag, not the general list (unless he says «العامة»)
+        const which = ctxBag && !a.bag && !/عام/.test(norm(text)) ? 'bag' : String(a.which || 'general');
+        return done(await shortages(c, which, String(a.bag || ''), a.read_aloud === true, now, ctxBag), 'shortages');
+      }
       case 'balance': return done(await balance(c, String(a.party || 'customer'), String(a.name || '')), 'balance');
       case 'sales': return done(await sales(c, String(a.period || 'today'), now), 'sales');
       case 'open_page': {
