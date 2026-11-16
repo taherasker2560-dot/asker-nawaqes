@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=orange-20261115a" />
     <link rel="stylesheet" href="store/look.css?v=orange-20261115a" />
-    <link rel="stylesheet" href="store/polish.css?v=hours-20261115a" />
+    <link rel="stylesheet" href="store/polish.css?v=carttab-20261116a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=orange-20261115a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
@@ -314,8 +314,7 @@
       <img id="zoomImg" alt="" />
     </div>
 
-    <!-- the cart, always at hand on the home and the search (owner 2026-11-15) -->
-    <a href="#cart" id="cartBar" class="cart-bar" hidden><span id="cartBarText"></span><b>كمّل الطلب ‹</b></a>
+
 
     <!-- الألوان والوضع الليلي (store/theme.js): نفس اختيارات البوت -->
     <div id="themeSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="themeTitle" hidden>
@@ -341,14 +340,14 @@
       <a href="#search" data-go="search"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>بحث</a>
       <a href="#chat" data-go="chat"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8M8 12h5" /></svg>الرسايل</a>
       <a href="#orders" data-go="orders"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21zM9 8h6M9 12h6M9 16h4" /></svg>طلباتي</a>
-      <a href="#cart" data-go="cart"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>السلة <span class="cart-n" hidden>0</span></a>
+      <a href="#cart" data-go="cart"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l-1 12H7L6 7z" /><path d="M9 7a3 3 0 0 1 6 0" /></svg>السلة <span class="cart-row"><span class="cart-n" hidden>0</span><small class="cart-tot" hidden></small></span></a>
     </nav>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/statement-pdf.js?v=year-20261112a"></script>
     <script src="store/account.js?v=notme-20261114a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=hours-20261115a"></script>
+    <script src="store/store.js?v=carttab-20261116a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
   </body>

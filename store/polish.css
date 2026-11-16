@@ -317,13 +317,6 @@ html.night .ch-ok { background: #183524; border-color: #2f6b45; color: #bdf0cd; 
 /* section tiles with a real product photo */
 .sec-mark.has-pic { background: #fff !important; border: 1px solid var(--line); overflow: hidden; padding: 3px; }
 .sec-mark.has-pic img { width: 100%; height: 100%; object-fit: contain; }
-/* the cart bar above the bottom menu (home and search) */
-.cart-bar { position: fixed; z-index: 35; inset-inline: 12px; bottom: calc(96px + var(--safe-b, 0px)); max-width: 536px; margin-inline: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px 10px 14px; border-radius: 18px; background: #13213a; color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.55); animation: bar-up 0.25s ease-out; }
-.cart-bar b { background: var(--accent); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; white-space: nowrap; }
-.cart-bar[hidden] { display: none; }
-@keyframes bar-up { from { transform: translateY(20px); opacity: 0; } }
-body.has-cartbar [data-view="home"], body.has-cartbar [data-view="search"] { padding-bottom: 150px; }
-body.has-cartbar .wa-fab { bottom: calc(164px + env(safe-area-inset-bottom, 0px)); }
 /* the search when the box is empty: recent searches and common needs */
 .recent-box { padding: 0 16px; }
 .recent-box[hidden] { display: none; }
@@ -353,7 +346,7 @@ details.ds-sec ul { margin: 0 0 8px; }
 .zoom img { max-width: 94vw; max-height: 86vh; object-fit: contain; background: #fff; border-radius: 16px; cursor: zoom-in; transition: transform 0.2s; }
 .zoom img.big { max-width: none; max-height: none; width: 180vw; cursor: zoom-out; border-radius: 0; }
 .zoom .sheet-x { position: fixed; top: 14px; inset-inline-end: 14px; z-index: 1; }
-@media (prefers-reduced-motion: reduce) { .cart-bar, .pcard.skel .pc-pic, .pcard.skel i { animation: none; } }body.sheet-open .cart-bar { display: none; }
+@media (prefers-reduced-motion: reduce) { .pcard.skel .pc-pic, .pcard.skel i { animation: none; } }
 
 /* «مفتوح دلوقتي» under the pharmacy's name (owner 2026-11-15: 9 to 12, summer to 2, Friday 3 to 11) */
 .open-now { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; width: max-content; font-style: normal; font-size: 11.5px; font-weight: 700; color: #fff; background: rgba(255, 255, 255, 0.16); border-radius: 999px; padding: 2px 10px; }
@@ -363,3 +356,8 @@ details.ds-sec ul { margin: 0 0 8px; }
 .top .brand > div { display: flex; flex-direction: column; }
 /* the page never scrolls or shrinks sideways (2026-11-16: a phone showed the home at ~87% with blank bands left and the bottom bar shifted); the rails scroll inside themselves */
 html, body { overflow-x: clip; max-width: 100%; }
+/* the cart total under the «السلة» icon in the bottom menu (owner 2026-11-16) */
+.tabbar .cart-tot { font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff; white-space: nowrap; }
+.tabbar .cart-tot[hidden] { display: none; }
+.tabbar .cart-row { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 0; }
+.tabbar .cart-row .cart-n { margin-top: 0; }
