@@ -12,10 +12,12 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
   window.__tables.ar_vendors=[{id:5,name:'A M group',short:'AMG'},{id:6,name:'رضا عطية',short:'REDA'}];
   window.__tables.ar_store_items=[{id:101,name:'PANADOL EXTRA 24 TAB',arabic_name:'بانادول اكسترا ٢٤ قرص'},{id:102,name:'LONG LIFE CREAM',arabic_name:null},{id:103,name:'FLAGYL 125MG SYRUP',arabic_name:'فلاجيل ١٢٥ شراب'},{id:104,name:'OLDER ONE',arabic_name:null}];
   window.__tables.ar_vendor_moves=[
-   {id:1,vendor_id:5,at:ago(0,10),kind:'purchase',code:'11/26/1',lines:[L(101,10,1,exp(8)),L(102,5,1,exp(30)),L(103,2,1,exp(3))]},
+   // today's moves are at 00:00 (not 10:00 / 11:00 / 12:00): a return only takes a purchase entered before it or at the same moment, so a
+   // fixed hour later than «now» made this test fail whenever it ran before 10:00 (found 2026-11-16 at 02:40 and 05:45)
+   {id:1,vendor_id:5,at:ago(0,0),kind:'purchase',code:'11/26/1',lines:[L(101,10,1,exp(8)),L(102,5,1,exp(30)),L(103,2,1,exp(3))]},
    {id:2,vendor_id:6,at:ago(2,12),kind:'purchase',code:'11/26/7',lines:[L(104,3,1,exp(14))]},
-   {id:3,vendor_id:5,at:ago(0,11),kind:'return',code:'~11/26/1',lines:[L(101,3,1,exp(8))]},
-   {id:4,vendor_id:5,at:ago(0,12),kind:'payment',code:null,lines:null}];});
+   {id:3,vendor_id:5,at:ago(0,0),kind:'return',code:'~11/26/1',lines:[L(101,3,1,exp(8))]},
+   {id:4,vendor_id:5,at:ago(0,0),kind:'payment',code:null,lines:null}];});
  await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');
  assert.deepEqual(await names(page,'#alViews [data-al-view]').then(a=>a.map(x=>x.replace(/\d+/,'').trim())),['النهارده','منتهية','قربت','فواتير']);
  await page.click('#alViews [data-al-view="short"]');
@@ -36,7 +38,8 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
  await page.waitForFunction(()=>document.querySelectorAll('#alExpiry .sd-row').length===2);
  assert.ok(!(await names(page,'#alExpiry .sd-row')).join('|').includes('OLDER ONE'));
  // everything returned: the good-news line
- await page.evaluate(()=>{window.__tables.ar_vendor_moves.push({id:5,vendor_id:5,at:new Date().toISOString().slice(0,16)+':00',kind:'return',code:null,lines:[{i:101,p:7,u:0,k:1,b:0,x:window.__expX(8)},{i:103,p:2,u:0,k:1,b:0,x:window.__expX(3)}]})});
+ await page.evaluate(()=>{const p=n=>String(n).padStart(2,'0'),d=new Date(),here=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00`;   // «now» in the same local form as the others
+  window.__tables.ar_vendor_moves.push({id:5,vendor_id:5,at:here,kind:'return',code:null,lines:[{i:101,p:7,u:0,k:1,b:0,x:window.__expX(8)},{i:103,p:2,u:0,k:1,b:0,x:window.__expX(3)}]})});
  await page.click('#alExpiry [data-sd-period="7"]');await page.click('#alExpiry [data-sd-period="today"]');
  await page.waitForFunction(()=>/مفيش في الفواتير دي صنف/.test(document.getElementById('alExpiry').textContent));
  // the other views still work and the page fits the phone
