@@ -203,3 +203,24 @@ run('Customer link install: iPhone gets the big guide; Firefox with no Chrome (b
  assert.equal(await text(page,'[data-acct-install]'),'📲 ثبّت التطبيق الآن');
  await page.evaluate(()=>{sessionStorage.removeItem('__ua');localStorage.removeItem('__fakeTables')});
 },{home:true});
+
+// the items' pictures in his own account and in the PDF he downloads (owner 2026-11-16: «الصور تبان فى الحساب لما ابعتله رابط حسابه مش الكشف بس»)
+run('Customer link: the items\' pictures show in his account when he opens an invoice, and the PDF he downloads carries them with links',async({page,base})=>{
+ const tok='c'.repeat(64);
+ // PANADOL is store item 10 (it has a picture in store/img); VITACID is not in the store
+ await page.evaluate(([c,m,p,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:p,ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[],
+   ar_store_items:[{id:10,name:'PANADOL EXTRA 24 TAB',status:'in_stock',price:66.7,cat:'meds',needs_rx:false,is_listed:true}],ar_store_edits:[]}))},[CUSTOMERS,MOVES,PHONES,tok]);
+ await page.goto(base+'store.html#me='+tok);
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ await page.click('[data-acct-items="11"]');
+ await page.waitForSelector('.ac-items .has-pic a.ac-pic');
+ const pics=await page.$$eval('.ac-items > div',r=>r.map(d=>({pic:!!d.querySelector('a.ac-pic'),href:d.querySelector('a.ac-pic')?d.querySelector('a.ac-pic').getAttribute('href'):null,loaded:d.querySelector('img')?d.querySelector('img').naturalWidth>0:null,text:d.textContent.replace(/\s+/g,' ').trim()})));
+ assert.deepEqual(pics.map(x=>[x.pic,x.href,x.loaded]),[[true,'#item=10',true],[false,null,null]],'a picture only for the item the store has');
+ assert.match(pics[0].text,/PANADOL EXTRA 24 TAB.*66.70/);assert.match(pics[1].text,/VITACID C 1000.*100/,'the other line as before');
+ // the PDF he downloads: the picture and a link to the item in the store
+ const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.click('[data-acct-pdf]')]);
+ const fs=require('node:fs');const pdf=fs.readFileSync(await dl.path()).toString('latin1');
+ assert.ok(pdf.startsWith('%PDF-1.4'));
+ assert.equal((pdf.match(/\/Subtype \/Link/g)||[]).length,1,'one link: PANADOL');
+ assert.match(pdf,/\/URI \(https?:\/\/[^)]*\/store\.html#item=10\)/);
+},{home:true});
