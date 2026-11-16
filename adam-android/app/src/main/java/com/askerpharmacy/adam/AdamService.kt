@@ -194,7 +194,11 @@ class AdamService : Service() {
         wake.prepare { ok ->
             main.post {
                 if (!alive) return@post
-                if (ok) goIdle() else setState("no-model", "نموذج الكلمة ما اشتغلش")
+                if (ok) {
+                    goIdle()
+                    // started by the side key / the tile before the word's model was ready: the conversation starts now
+                    if (askWhenReady) { askWhenReady = false; wake.stop(); startConvo() }
+                } else setState("no-model", "نموذج الكلمة ما اشتغلش")
             }
         }
         main.postDelayed({ guard() }, 15_000)
@@ -216,7 +220,8 @@ class AdamService : Service() {
                 }
             }
             // «اسأل» on the notification: also cuts a list that is being read (he cannot be heard while Adam speaks)
-            ACTION_ASK_AGAIN -> if (wake.ready) { walk = null; speaker.stop(); listener.cancel(); wake.stop(); beginRequestListening() }
+            // also the side key («اسأل آدم», ListenActivity) and the tile: a conversation starts at once, without the word
+            ACTION_ASK_AGAIN -> if (wake.ready) { walk = null; speaker.stop(); listener.cancel(); wake.stop(); startConvo() } else askWhenReady = true
             ACTION_STOP_WALK -> { walk = null; speaker.stop(); listener.cancel(); log("walk stopped from the notification"); goIdle() }
             ACTION_TEXT -> {
                 val t = intent.getStringExtra("text")?.trim() ?: ""
@@ -247,6 +252,8 @@ class AdamService : Service() {
         collecting = false
         dictation.setLength(0)
         walk = null
+        if (inConvo) log("conversation ended after $replyCount answer(s)")
+        inConvo = false; talkHistory.clear(); talkCtx = null; silentTurns = 0; replyCount = 0
         setState("idle")
         if (!wake.start()) {
             log("wake word did not start, again in 5 s")
@@ -259,8 +266,37 @@ class AdamService : Service() {
         wakes++
         log("heard the word")
         wake.stop()
+        startConvo()
+    }
+
+    // ---------- «آدم 2»: a conversation (owner 2026-11-17: «ياخد ويدي معايا … مش صنم») ----------
+    // Called once (the word, the side key, the tile, «اسأل»); after every answer Adam listens again by himself, until he says
+    // «خلاص / شكرا / كده تمام», the server says end, or he says nothing twice. The fast brain on the server (Api.talk) answers first;
+    // what it hands over (anything that records or sends) and anything it cannot answer goes to the laptop's queue as before.
+    private var inConvo = false
+    private val talkHistory = ArrayList<JSONObject>()
+    private var talkCtx: JSONObject? = null
+    private var silentTurns = 0
+    private var replyCount = 0
+    private var askWhenReady = false
+    private val ENDS = Regex("^(خلاص|شكرا|شكراً|متشكر|متشكرين|كده تمام|تمام كده|مع السلامة|مع السلامه|سلام|لا خلاص|خلاص كده)( شكرا| يا آدم| يا ادم)?[.!؟]*$")
+
+    private fun startConvo() {
+        inConvo = true; talkHistory.clear(); talkCtx = null; silentTurns = 0; replyCount = 0
         beep()
         main.postDelayed({ if (alive) beginRequestListening() }, 250)
+    }
+
+    private fun addTurn(who: String, text: String) {
+        if (text.isBlank()) return
+        talkHistory.add(JSONObject().put("who", who).put("text", text.take(400)))
+        while (talkHistory.size > 8) talkHistory.removeAt(0)
+    }
+
+    /** After an answer: in a conversation, listen again (a short beep says so); otherwise back to waiting for the word. */
+    private fun afterTurn() {
+        if (!alive) return
+        if (inConvo) { beepShort(); main.postDelayed({ if (alive && inConvo) beginRequestListening() }, 200) } else goIdle()
     }
 
     private fun beep() {
@@ -291,13 +327,18 @@ class AdamService : Service() {
 
     private fun beginRequestListening() {
         if (!Config.ready(this)) { speaker.say("لسه ماتظبطتش الإعدادات") { goIdle() }; return }
-        setState("listening", if (collecting) "كمّل… وقول «خلاص» لما تخلص" else "سامعك…")
+        setState("listening", if (collecting) "كمّل… وقول «خلاص» لما تخلص" else if (inConvo && replyCount > 0) "في محادثة… قول «خلاص» للخروج" else "سامعك…")
         listener.listen(
             { text -> onHeard(text) },
             { code ->
                 log("request not heard ($code)")
                 if (collecting) { finishDictation(); return@listen }
                 val nothingSaid = code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                // in a conversation, after an answer: one more quiet try, then the conversation ends (he walked away)
+                if (inConvo && replyCount > 0) {
+                    if (nothingSaid && silentTurns == 0) { silentTurns = 1; beginRequestListening() } else goIdle()
+                    return@listen
+                }
                 if (nothingSaid && !notHeardOnce) {
                     notHeardOnce = true
                     setState("speaking")
@@ -309,6 +350,13 @@ class AdamService : Service() {
 
     private fun onHeard(text: String) {
         notHeardOnce = false
+        silentTurns = 0
+        // «خلاص / شكرا / كده تمام» ends the conversation (in a dictation «خلاص» ends the dictation instead, below)
+        if (!collecting && ENDS.matches(text.trim().replace(Regex("\\s+"), " "))) {
+            inConvo = false
+            saySimple("تمام")
+            return
+        }
         val (piece, done) = stripDone(text)
         if (collecting) {
             if (piece.isNotBlank()) { dictation.append(' ').append(piece); pieces++ }
@@ -342,10 +390,29 @@ class AdamService : Service() {
         setState("thinking", "«" + text.take(60) + "» بيدوّر…")
         log("asking: " + text.take(80))
         val c = convo
+        val hist = org.json.JSONArray(); for (t in talkHistory) hist.put(t)
+        val tc = talkCtx
         Thread {
+            // the fast brain first (one call, ~2 s); handed over / no answer: the laptop's queue, as before
+            val t0 = System.currentTimeMillis()
+            val t = Api.talk(this, text, hist, tc)
+            if (t != null && t.optBoolean("ok") && !t.optBoolean("handoff")) {
+                log("fast brain: " + t.optString("tool") + " in " + (System.currentTimeMillis() - t0) + " ms (server " + t.optLong("ms") + ")")
+                main.post { if (alive) onTalk(text, t) }
+                return@Thread
+            }
+            log(if (t == null) "fast brain: no answer, asking the laptop" else "fast brain handed over (" + t.optString("tool") + "), asking the laptop")
+            main.post { if (alive) { addTurn("me", text); if (t != null) speaker.say("ثانية بدوّر") { } } }
             val r = Api.ask(this, c, text)
             main.post { if (alive) onAsked(r) }
         }.start()
+    }
+
+    private fun onTalk(text: String, t: JSONObject) {
+        addTurn("me", text)
+        t.optJSONObject("ctx")?.let { talkCtx = it }
+        if (t.optBoolean("end")) inConvo = false
+        onReply(0L, t, true)
     }
 
     private fun onAsked(r: JSONObject?) {
@@ -409,6 +476,7 @@ class AdamService : Service() {
         postResult(show, openUrl)
         if (current == id) current = 0
         if (!interactive && state != "idle") return
+        if (interactive) { replyCount++; addTurn("adam", speak) }
         setState("speaking")
         val walkObj = if (interactive) reply.optJSONObject("walk") else null
         if (walkObj != null) { startWalk(id, walkObj); return }
@@ -417,7 +485,7 @@ class AdamService : Service() {
             askedConfirmAgain = false
             speaker.say(confirm.optString("say", speak)) { listenConfirm() }
         } else {
-            speaker.say(speak) { if (interactive && reply.optBoolean("listen_again")) beginRequestListening() else goIdle() }
+            speaker.say(speak) { if (interactive && reply.optBoolean("listen_again")) beginRequestListening() else if (interactive) afterTurn() else goIdle() }
         }
     }
 
@@ -496,7 +564,7 @@ class AdamService : Service() {
 
     private fun walkEnd() {
         val w = walk ?: return goIdle()
-        if (w.optString("mode") == "read") { walk = null; speaker.say(w.optString("end_say", "خلصت")) { goIdle() }; return }
+        if (w.optString("mode") == "read") { walk = null; speaker.say(w.optString("end_say", "خلصت")) { afterTurn() }; return }
         if (walkPicked.isEmpty()) { walk = null; speaker.say(w.optString("none_say", "ماختارتش حاجة")) { goIdle() }; return }
         val say = w.optString("final_tpl", "أكمّل؟").replace("{n}", walkPicked.size.toString())
         askedConfirmAgain = false
