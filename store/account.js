@@ -350,15 +350,16 @@
     }
     const b = balanceWords(st.c.balance), now = new Date();
     const upd = updatedText(st.data_at, now);
-    // first thing on the page, big (owner 2026-11-13: «زرار كبير مكتوب عليه ثبت التطبيق الان»); not in the installed app
-    let html = '';
+    // 2026-11-16 (owner: «اللي يهمني لما العميل يفتح ياخد الرابط يدوس عليه يوصل لحسابه»): the account comes FIRST; the install button (owner 2026-11-13: «زرار كبير مكتوب
+    // عليه ثبت التطبيق الان») is now a plain button after the account's own buttons, not the first thing the customer sees; not in the installed app
+    let html = '', installHtml = '';
     if (pharmacyPhone) {
       // the owner (or staff) looking at a customer's account: back to the bot, nothing installed or kept
       html += `<a class="ac-btn ac-back" href="asker-nawaqes-arabic.html">${esc(TEXTS.backBot)}</a><p class="hint-sm center ac-install-why">${esc(TEXTS.preview)}</p>`;
     } else if (!standalone()) {
       // one button, one tap (owner: «يا اما تثبت التطبيق يا اما تاخده للسكة اللي هيثبت بها التطبيق مباشر … فلاحين»)
       const again = handedOff && !installNote;
-      html += `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
+      installHtml = `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
     }
     // the iPhone's guide: big, over the page, the arrow points at Safari's Share button below
@@ -380,6 +381,7 @@
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
       (root.AskerStoreChat ? `<a class="share" href="#chat">${esc(TEXTS.chat)}</a>` : wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>' +
+      installHtml +
       (pharmacyPhone ? '' : `<p class="center"><button type="button" class="linklike ac-notmine" data-acct-forget>${esc(TEXTS.notMine)}</button></p>`);
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
     const chip = (f, label) => `<button type="button" class="chip${st.filter === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
