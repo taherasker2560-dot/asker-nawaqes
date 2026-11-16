@@ -1030,7 +1030,10 @@
   });
   // «نزّل الصيدلية على موبايلك»: الزرار بيظهر بس لما المتصفح يقول إن التنزيل متاح (كروم على أندرويد)
   let installEvt = null;
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; $('installBox').hidden = false; });
+  // not on Samsung Internet: its own install makes an app that Google Play Protect blocks («Unsafe app blocked … older version of Android», 2026-11-16);
+  // there a customer installs from Chrome (his account's install button sends him there)
+  const samsungInternet = /Android/i.test(navigator.userAgent) && /SamsungBrowser/.test(navigator.userAgent);
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); if (samsungInternet) return; installEvt = e; $('installBox').hidden = false; });
   window.addEventListener('appinstalled', () => { installEvt = null; $('installBox').hidden = true; });
   $('installBtn').addEventListener('click', async () => {
     if (!installEvt) return;

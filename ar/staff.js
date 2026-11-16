@@ -312,7 +312,10 @@
     const bar = $('installBar');
     if (bar) bar.classList.toggle('hidden', !installEvt || standalone() || Date.now() - no < 3 * 864e5);
   }
-  root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; showInstall(); });
+  // not on Samsung Internet: its own install makes an app that Google Play Protect blocks («Unsafe app blocked … older version of Android», 2026-11-16);
+  // there the bot is installed from Chrome
+  const samsungInternet = /Android/i.test(navigator.userAgent) && /SamsungBrowser/.test(navigator.userAgent);
+  root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); if (samsungInternet) return; installEvt = e; showInstall(); });
   root.addEventListener('appinstalled', () => { installEvt = null; showInstall(); });
 
   function bind() {

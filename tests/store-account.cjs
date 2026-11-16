@@ -106,7 +106,28 @@ assert.equal(A.offerChrome(UA.samsung), true);
 assert.equal(A.offerChrome(UA.opera), true);
 assert.equal(A.offerChrome(UA.chrome), false, 'already Chrome');
 assert.equal(A.offerChrome(UA.iosFirefox), false, 'no Chrome hand-off on iPhone');
-const intent = A.chromeIntent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html#account', tok);
+// Samsung Internet's own install is blocked by Google Play Protect («Unsafe app blocked … older version of Android»): never offered there, the account goes to Chrome
+assert.equal(A.mintsOwnApp(UA.samsung), true);
+assert.equal(A.mintsOwnApp(UA.chrome), false);
+assert.equal(A.mintsOwnApp(UA.firefox), false);
+assert.equal(A.mintsOwnApp(UA.opera), false);
+assert.equal(A.mintsOwnApp(UA.edge), false);
+assert.equal(A.mintsOwnApp('Mozilla/5.0 (Windows NT 10.0) SamsungBrowser/26.0'), false, 'only on Android');
+assert.equal(A.mintsOwnApp(''), false);
+const plan = (ua, hasPrompt, handed) => A.installPlan(ua, ua === UA.iosChrome ? 'iPhone' : 'Linux armv81', 5, hasPrompt, handed);
+assert.equal(plan(UA.chrome, true, false), 'prompt', 'Chrome: its own prompt');
+assert.equal(plan(UA.chrome, true, true), 'prompt', 'Chrome after the hand-off: the prompt');
+assert.equal(plan(UA.edge, true, false), 'prompt', 'a browser that offers its prompt is trusted, as before');
+assert.equal(plan(UA.samsung, true, false), 'chrome', 'Samsung Internet WITH a prompt: still no prompt, the account goes to Chrome');
+assert.equal(plan(UA.samsung, false, false), 'chrome');
+assert.equal(plan(UA.samsung, true, true), 'steps', 'Samsung Internet back from the hand-off (no Chrome): the written steps, never its prompt');
+assert.equal(plan(UA.samsung, false, true), 'steps');
+assert.equal(plan(UA.firefox, false, false), 'chrome');
+assert.equal(plan(UA.firefox, false, true), 'steps');
+assert.equal(plan(UA.iosChrome, false, false), 'guide');
+assert.equal(plan('', false, false), 'steps');
+assert.match(A.TEXTS.installSamsung, /كروم/, 'the Samsung steps say: open it in Chrome');
+assert.doesNotMatch(A.TEXTS.installSamsung, /إضافة صفحة إلى/, 'and no longer send him to Samsung\'s own add-to-home-screen');const intent = A.chromeIntent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html#account', tok);
 assert.equal(intent, 'intent://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok + '&install=1' +
   '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok + '&install=1') + ';end');
 // ?me= is read and then taken out of the address (other parts kept)
