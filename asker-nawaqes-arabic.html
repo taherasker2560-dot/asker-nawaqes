@@ -654,6 +654,14 @@
           <div id="veListView">
             <h2>الموردين</h2>
             <div id="veTotal"></div>
+            <!-- «المرتجعات» (owner 2026-11-16): the returns booked in PharmaFly per company and invoice number, and whether the company's notice photo came; ar/returns.js, file returns/returns.json -->
+            <div id="rtBox" class="rtbox hidden">
+              <h3>↩️ المرتجعات اللي لسه ما راحتش للشركات <b id="rtCount"></b></h3>
+              <p id="rtOld" class="status bad hidden">الملف قديم: اللاب لسه ما حدّثهوش.</p>
+              <p class="hint">المرتجع بيتحسب «راح» لما صورة إشعار الشركة (الورقة الملونة المكتوبة بخط اليد) توصل في جروب الفواتير بنفس رقم الفاتورة والمبلغ.</p>
+              <p id="rtNote" class="status hidden"></p>
+              <div id="rtList"></div>
+            </div>
             <button id="veItemBtn" type="button" class="secondary small ve-itembtn">🔎 الصنف ده جه من مين؟</button>
             <div class="chips ve-views" role="group" aria-label="الموردين"
               ><button type="button" class="chip on" data-ve-view="year">اتعاملنا معاهم السنة دي</button
@@ -959,6 +967,7 @@
     <script src="ar/order-drafts.js?v=newpo-20261115a"></script>
     <script src="ar/order-compare.js?v=money-20261116a"></script>
 <script src="ar/rep-invoices.js?v=rep-20261116a"></script>
+<script src="ar/returns.js?v=returns-20261116a"></script>
     <script src="ar/po-statement.js?v=stmt-20261116a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=link-20261113a"></script>

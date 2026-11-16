@@ -286,7 +286,7 @@
     $('customersPanel')?.classList.toggle('hidden', tab !== 'customers');
     $('vendorsPanel')?.classList.toggle('hidden', tab !== 'vendors');
     // «الموردين» (ar/vendors.js, owner 2026-11-14): balances, statements, an item's purchases
-    if (tab === 'vendors') window.AskerVendors?.open();
+    if (tab === 'vendors') { window.AskerReturns?.open(); window.AskerVendors?.open(); }
     $('salesPanel')?.classList.toggle('hidden', tab !== 'sales');
     // «حركة البيع» (ar/sales.js, owner 2026-11-14): one year of sales
     if (tab === 'sales') window.AskerSales?.open();

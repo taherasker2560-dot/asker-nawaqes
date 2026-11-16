@@ -130,6 +130,8 @@
     if (root.AskerSeason) { try { await root.AskerSeason.load(false); out.seasonN = root.AskerSeason.count(); } catch (e) { /* no seasonal file yet */ } }
     // «فواتير المندوبين» (owner 2026-11-16): the rep invoices of the last two days that need a look (the card is at the top of «الطلبيات»)
     if (root.AskerRepInvoices) { try { await root.AskerRepInvoices.load(false); out.repN = root.AskerRepInvoices.count(); } catch (e) { /* no invoices file yet */ } }
+    // «↩️ المرتجعات» (owner 2026-11-16): returns booked in PharmaFly that the companies have no notice for yet (the list is in «الموردين»)
+    if (root.AskerReturns) { try { await root.AskerReturns.load(false); out.returnsN = root.AskerReturns.count().n; out.returnsAmt = Math.round(root.AskerReturns.count().amount); } catch (e) { /* no returns file yet */ } }
     // «💊 مزمن» (owner 2026-11-16): the customers whose regular medicine is late (the list is in «العملاء»)
     if (root.AskerChronic) { try { await root.AskerChronic.load(false); out.chronicN = root.AskerChronic.count(); } catch (e) { /* no chronic file yet */ } }
     if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
@@ -162,6 +164,7 @@
     for (const t of (root.AskerAlerts && root.AskerAlerts.todo()) || []) rows.push(t);
     // the old debts: N customers, the total after the sentence (not translated: digits), a tap opens «العملاء» on that list
     if (counts.oldN) rows.push({ tab: 'customers', view: 'old', n: counts.oldN, text: `عميل عليهم فلوس من أكتر من ${counts.oldDays || 60} يوم`, name: `${Number(counts.oldAmt || 0).toLocaleString('en-US')} ج` });
+    if (counts.returnsN) rows.push({ tab: 'vendors', n: counts.returnsN, text: 'مرتجع لسه ما راحش للشركات', name: `${Number(counts.returnsAmt || 0).toLocaleString('en-US')} ج` });
     if (counts.repN) rows.push({ tab: 'drafts', n: counts.repN, text: 'فاتورة مندوب فيها تنبيهات' });
     if (counts.chronicN) rows.push({ tab: 'customers', view: 'chronic', n: counts.chronicN, text: 'عميل ميعاد أدويتهم الدايمة عدّى' });
     if (counts.seasonN) rows.push({ tab: 'short', view: 'season', n: counts.seasonN, text: 'صنف موسمي رصيده أقل من اللي هيتباع الشهر الجاي' });
