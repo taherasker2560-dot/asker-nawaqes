@@ -147,3 +147,77 @@ html.cap-still .appbar::after, html.cap-still .hero::before, html.cap-still .her
   .appbar::after, .hero::before, .hero::after, #homePanel.fresh > * { animation: none !important; }
   .bottomnav::before { transition: none; }
 }
+
+/* ---------- «العملاء»: the list and the statement (owner 2026-11-16: «شاشات العملاء والكشف بالتفصيل»; the board's customers screen) ---------- */
+/* a round mark with the first letter before each name (data-ini, ar/customers.js), the balance a pill on the right of the row */
+.cu-row { border: 0; border-radius: 26px; padding: 12px 14px; gap: 12px; box-shadow: var(--sh-1); }
+.cu-row::before {
+  content: attr(data-ini);
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: var(--rose);
+  color: var(--crimson-ink);
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cu-row.warn { border-inline-start: 0; box-shadow: 0 0 0 2px var(--crimson), var(--sh-1); }
+.cu-row.warn::before { background: var(--crimson); color: #fff; }
+html.night .cu-row, html.night .cu-mv { box-shadow: 0 0 0 1px var(--line); }
+html.night .cu-row.warn { box-shadow: 0 0 0 2px var(--crimson); }
+.cu-amt { padding: 6px 14px; border-radius: 999px; background: color-mix(in srgb, currentColor 11%, transparent); text-align: center; }
+.cu-bar { height: 6px; border-radius: 999px; }
+.cu-bar b { border-radius: 999px; }
+button.stat.cu-stat { border-radius: 24px; }
+.cu-net { border-radius: 26px; background: var(--dark); box-shadow: var(--sh-2); }
+.cu-net b { font-family: var(--head); }
+.cu-oldrow .cu-row { margin-bottom: 0; }
+.cu-chron { border: 0; border-radius: 24px; box-shadow: var(--sh-1); }
+.cu-more { border-radius: 999px; }
+
+/* the statement: the customer's name, his balance on a dark capsule that counts up, the month's two numbers as tiles */
+.cu-head { border: 0; border-radius: 28px; padding: 16px; box-shadow: var(--sh-2); }
+html.night .cu-head { box-shadow: 0 0 0 1px var(--line); }
+.cu-name strong { font-family: var(--head); font-size: 20px; }
+.cu-bal, html.night .cu-bal {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  margin: 10px 0 8px;
+  padding: 14px 18px;
+  border-radius: 24px;
+  background: var(--dark);
+  color: #fff;
+  font-family: var(--head);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.cu-bal.owe, html.night .cu-bal.owe { color: #ffe0cc; }
+.cu-bal.paid, html.night .cu-bal.paid { color: #d6f5e3; }
+.cu-bal.zero, html.night .cu-bal.zero { color: #fff; }
+.cu-bal::before { content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 60%; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)); pointer-events: none; animation: cap-sheen 4.2s ease-in-out infinite; }
+@keyframes cap-sheen { 0%, 55% { left: -70%; } 100% { left: 130%; } }
+.cu-sum div { border-radius: 18px; }
+.cu-mv { border: 0; border-radius: 22px; padding: 12px 14px; box-shadow: var(--sh-1); }
+.cu-phone { border-radius: 20px; }
+/* the main buttons: capsules in the bot's color (the WhatsApp green is not part of the look) */
+button.cu-send { min-height: 52px; border-radius: 999px; background: var(--crimson); color: #fff; box-shadow: none; }
+.cu-sendbox { border: 2px solid var(--crimson); border-radius: 26px; }
+.cu-opt { border-radius: 20px; }
+button.cu-stop, button.cu-unstop { border-radius: 999px; }
+
+/* the statement's parts rise one after another the first time it opens (ar/motion.js adds «fresh» for a second) */
+#cuSt.fresh > * { animation: cap-rise 0.5s var(--ease) both; }
+#cuSt.fresh > :nth-child(2) { animation-delay: 60ms; }
+#cuSt.fresh > :nth-child(3) { animation-delay: 120ms; }
+#cuSt.fresh > :nth-child(4) { animation-delay: 180ms; }
+#cuSt.fresh > :nth-child(n+5) { animation-delay: 240ms; }
+html.cap-still .cu-bal::before { animation: none; }
+@media (prefers-reduced-motion: reduce) { .cu-bal::before, #cuSt.fresh > * { animation: none !important; } }
