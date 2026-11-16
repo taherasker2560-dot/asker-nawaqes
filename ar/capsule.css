@@ -3,19 +3,24 @@
    previous look back. The colors still come from ar/settings.js (--crimson = the chosen color), only the shape and the motion are new.
    - the capsule is the shape (the main buttons, the chips, the floating bottom bar); cards 26 px
    - the logo's wave hangs from the header and drifts slowly
-   - the home: a navy greeting with two capsules floating, «محتاج شغل» rows whose number is a pill
-   - the bottom bar is a floating navy capsule; a color pill slides to the section you are in (ar/motion.js)
+   - the home: a dark greeting with two capsules floating, «محتاج شغل» rows whose number is a pill
+   - the bottom bar is a floating dark capsule; a color pill slides to the section you are in (ar/motion.js)
    - motion explains and stops for «reduce motion» */
 
 :root {
-  --navy: #0b1d3f;
+  /* the dark surfaces (the bar, the greeting): «قهوة دافية» unless chosen otherwise (ar/settings.js sets these from the choice; the owner
+     disliked the navy that was here, 2026-11-16) */
+  --dark: #3a2018;
+  --dark-2: #5b3322;
+  --dark-deep: #1c0e0a;
+  --dark-rgb: 58, 32, 24;
   --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
   --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
   --radius: 26px;
   --nav-h: 76px;
   --grad: var(--crimson);
-  --sh-1: 0 2px 8px rgba(11, 29, 63, 0.06);
-  --sh-2: 0 12px 28px -12px rgba(11, 29, 63, 0.22);
+  --sh-1: 0 2px 8px rgba(var(--dark-rgb), 0.06);
+  --sh-2: 0 12px 28px -12px rgba(var(--dark-rgb), 0.22);
   --wave-w: 400px;
   /* one period of the logo's wave, the fill ABOVE the curve (it hangs from the header) */
   --wave-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 70' preserveAspectRatio='none'%3E%3Cpath d='M0 0L400 0L400 34C300 62 100 6 0 34Z'/%3E%3C/svg%3E");
@@ -60,8 +65,8 @@ html.night .qa button { box-shadow: 0 0 0 1px var(--line); }
 .kpi { border-radius: 22px; }
 .kpi strong { font-weight: 700; }
 
-/* ---------- «الرئيسية»: a navy greeting with two capsules floating ---------- */
-.hero { border-radius: 28px; background: linear-gradient(135deg, var(--navy) 0%, #14397a 100%); box-shadow: var(--sh-2); }
+/* ---------- «الرئيسية»: a dark greeting with two capsules floating ---------- */
+.hero { border-radius: 28px; background: linear-gradient(135deg, var(--dark) 0%, var(--dark-2) 100%); box-shadow: var(--sh-2); }
 .hero > * { position: relative; z-index: 1; }
 .hero::before, .hero::after { content: ''; position: absolute; z-index: 0; border-radius: 999px; pointer-events: none; animation: cap-float 8s ease-in-out infinite; }
 .hero::before { inset-inline-start: -30px; top: -16px; width: 130px; height: 46px; background: rgba(255, 255, 255, 0.13); --r: 28deg; transform: rotate(28deg); }
@@ -69,7 +74,7 @@ html.night .qa button { box-shadow: 0 0 0 1px var(--line); }
 @keyframes cap-float { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-10px) rotate(var(--r)); } }
 
 /* «الموقع» on the greeting: at night its text was a light peach on white (unreadable) */
-html.night .hero-link { color: var(--navy); }
+html.night .hero-link { color: var(--dark); }
 
 /* «محتاج شغل»: the number is a pill */
 .todo-row { border: 0; border-inline-start: 0; border-radius: 24px; box-shadow: var(--sh-1); }
@@ -86,7 +91,7 @@ html.night .hero-link { color: var(--navy); }
 }
 html.night .todo-row { box-shadow: 0 0 0 1px var(--line); }
 
-/* ---------- the bottom bar: a floating navy capsule, a color pill slides to the section you are in ---------- */
+/* ---------- the bottom bar: a floating dark capsule, a color pill slides to the section you are in ---------- */
 .bottomnav {
   inset-inline: 12px;
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
@@ -96,10 +101,10 @@ html.night .todo-row { box-shadow: 0 0 0 1px var(--line); }
   padding: 6px;
   border: 0;
   border-radius: 999px;
-  background: var(--navy);
-  box-shadow: 0 14px 30px -10px rgba(11, 29, 63, 0.5);
+  background: var(--dark);
+  box-shadow: 0 14px 30px -10px rgba(var(--dark-rgb), 0.5);
 }
-html.night .bottomnav { background: #050d1c; box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06); }
+html.night .bottomnav { background: var(--dark-deep); box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06); }
 .bottomnav::before {
   content: '';
   position: absolute;
@@ -122,9 +127,9 @@ html .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg, html.nigh
 html.night .bottomnav button.secondary { color: rgba(255, 255, 255, 0.74); }
 /* before the pill is placed (no script yet): the section you are in has its own capsule */
 html:not(.cap-ind) .bottomnav button:not(.secondary) { background: var(--crimson); }
-/* the red numbers sit on navy now */
-.bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--navy); }
-html.night .bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px #050d1c; }
+/* the red numbers sit on the dark bar now */
+.bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--dark); }
+html.night .bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--dark-deep); }
 
 /* ---------- motion: the home's parts rise one after another the first time it shows (ar/motion.js adds «fresh») ---------- */
 section#homePanel:not(.hidden) { animation: none; }
