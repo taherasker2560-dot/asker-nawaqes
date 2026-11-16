@@ -72,7 +72,40 @@
     }
     return m;
   }
-  const api = { SEC_AR, secName, toUnits, amountText, expText, diffLine, mixedDates, entry, progress, latest };
+  // «الأولى بالجرد» (owner 2026-11-16, idea 4 of the three he picked): instead of counting at random, the items most likely to be wrong, or
+  // dearest to get wrong, come first. Score = the sum of: a negative balance in PharmaFly 60 · sold with a negative balance 40 · its
+  // batches mixed up by the sales 35 · sold expired 35 · its stock's worth at the public price (top 5% 30, top 20% 20, top half 8).
+  // An item counted in the last 30 days (a cancelled count does not count) is left out. items = stock.json's ({i, n, s, p, v, b}),
+  // counted = Map item id -> latest entry, flags = { soldNeg, mix, expSold } (Sets of item ids).
+  const PRIO_WHY = { neg: 'رصيده بالسالب في فارمافلاي', soldNeg: 'اتباع بالسالب', mix: 'صلاحياته اتلخبطت من البيع', expSold: 'اتباع منتهي الصلاحية', value: 'قيمته كبيرة' };
+  const PRIO_SCORE = { neg: 60, soldNeg: 40, mix: 35, expSold: 35 };
+  function priority(items, counted, flags, minScore) {
+    const f = flags || {};
+    const vals = (items || []).map((it) => Number(it.v) || 0).filter((v) => v > 0).sort((a, b) => a - b);
+    const rank = (v) => { // the share of items worth no more than v (binary search)
+      if (!(v > 0) || !vals.length) return 0;
+      let lo = 0, hi = vals.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (vals[mid] <= v) lo = mid + 1; else hi = mid; }
+      return lo / vals.length;
+    };
+    const out = [];
+    for (const it of items || []) {
+      if (counted && counted.has(it.i)) continue;
+      const why = [];
+      let score = 0;
+      const add = (k, n) => { why.push(k); score += n; };
+      if ((it.b || []).some((b) => Number(b.k) < 0 || Number(b.u) < 0)) add('neg', PRIO_SCORE.neg);
+      if (f.soldNeg && f.soldNeg.has(it.i)) add('soldNeg', PRIO_SCORE.soldNeg);
+      if (f.mix && f.mix.has(it.i)) add('mix', PRIO_SCORE.mix);
+      if (f.expSold && f.expSold.has(it.i)) add('expSold', PRIO_SCORE.expSold);
+      const r = rank(Number(it.v) || 0);
+      const vs = r >= 0.95 ? 30 : r >= 0.8 ? 20 : r >= 0.5 ? 8 : 0;
+      if (vs) add('value', vs);
+      if (score >= (minScore == null ? 8 : minScore)) out.push({ it, score, why, value: Number(it.v) || 0 });
+    }
+    return out.sort((a, b) => b.score - a.score || b.value - a.value || String(a.it.n).localeCompare(String(b.it.n)));
+  }
+  const api = { SEC_AR, PRIO_WHY, secName, toUnits, amountText, expText, diffLine, mixedDates, entry, progress, latest, priority };
   root.AskerCountLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -88,7 +121,8 @@
   const isQueued = (e) => queue.some((q) => q.id === e.id);
 
   let data = null, items = [], byId = new Map(), sections = [], arName = new Map(), server = [], queue = load(QKEY, []);
-  let view = 'sections', curSec = null, filter = 'todo', shown = PAGE, secQ = '', editId = null, edits = {}, extra = [], secTo = null, flushing = false, ready = false;
+  const PRIO_PAGE = 30;
+  let view = 'sections', curSec = null, filter = 'todo', shown = PAGE, secQ = '', editId = null, edits = {}, extra = [], secTo = null, flushing = false, ready = false, prioShown = PRIO_PAGE;
 
   function say(text, kind) { const el = $('ctStatus'); if (el) { el.textContent = text || ''; el.className = 'status' + (kind ? ' ' + kind : ''); } }
   const nameOf = (it) => arName.get(it.i) || it.n;
@@ -240,6 +274,23 @@
       (list.length > shown ? `<button type="button" class="secondary ct-more" data-ct-more>اعرض ${Math.min(PAGE, list.length - shown)} كمان</button>` : '') +
       (!list.length ? `<p class="hint">${filter === 'todo' ? 'القسم ده اتجرد كله ✓' : 'مفيش أصناف هنا'}</p>` : '');
   }
+  // «الأولى بالجرد»: the alerts' sold-negative / mixed-batches / sold-expired items, as ids (nothing yet = no flags, the rest still ranks)
+  function flagsNow() {
+    const a = root.AskerAlerts && root.AskerAlerts.data && root.AskerAlerts.data();
+    const ids = (l) => new Set((l || []).map((x) => Number(x.id)));
+    return { soldNeg: ids(a && a.negative), mix: ids(a && a.mix), expSold: ids(a && a.expiredSold) };
+  }
+  function drawPriority() {
+    const box = $('ctPrioList');
+    if (!box) return;
+    const list = priority(items, lastOf(), flagsNow());
+    const money = (n) => Math.round(Number(n) || 0).toLocaleString('en-US');
+    if ($('ctPrioCount')) $('ctPrioCount').textContent = list.length ? `${list.length} صنف` : '';
+    box.innerHTML = list.slice(0, prioShown).map(({ it, why, value }) =>
+      `<div class="ct-prio"><div class="ct-why">${why.map((w) => `<span class="pill${w === 'neg' || w === 'soldNeg' ? ' bad' : ''}">${esc(w === 'value' ? `${PRIO_WHY.value} (${money(value)} ج)` : PRIO_WHY[w])}</span>`).join('')}</div>${itemCard(it, true)}</div>`).join('') +
+      (list.length > prioShown ? `<button type="button" class="secondary ct-more" data-ct-prio-more>اعرض ${Math.min(PRIO_PAGE, list.length - prioShown)} كمان</button>` : '') +
+      (!list.length ? '<p class="hint">مفيش صنف محتاج جرد دلوقتي ✅</p>' : '');
+  }
   function drawRandom() {
     const q = $('ctQ').value.trim(), F = root.AskerFuzzy, box = $('ctHits');
     if (!q) { box.innerHTML = randomId && byId.get(randomId) ? itemCard(byId.get(randomId), true) : ''; return; }
@@ -279,9 +330,11 @@
     $('ctSections').classList.toggle('hidden', view !== 'sections');
     $('ctSection').classList.toggle('hidden', view !== 'section');
     $('ctResults').classList.toggle('hidden', view !== 'results');
+    $('ctPriority')?.classList.toggle('hidden', view !== 'priority');
     document.querySelectorAll('[data-ct-view]').forEach((b) => b.classList.toggle('secondary', b.dataset.ctView !== (view === 'section' ? 'sections' : view)));
     if (view === 'sections') { drawSections(); drawRandom(); }
     if (view === 'section') drawSection();
+    if (view === 'priority') drawPriority();
     drawResults();
   }
 
@@ -406,7 +459,8 @@
     panel.addEventListener('click', (e) => {
       const t = e.target.closest('button');
       if (!t || !panel.contains(t)) return;
-      if (t.dataset.ctView) { view = t.dataset.ctView; if (view !== 'sections') stopCam(); return draw(); }
+      if (t.dataset.ctView) { view = t.dataset.ctView; if (view === 'priority') prioShown = PRIO_PAGE; if (view !== 'sections') stopCam(); return draw(); }
+      if (t.hasAttribute('data-ct-prio-more')) { prioShown += PRIO_PAGE; return drawPriority(); }
       if (t.id === 'ctScanBtn') return stream ? stopCam() : startCam();
       if (t.id === 'ctCamStop') { say(''); return stopCam(); }
       if (t.dataset.ctOpen != null) { curSec = Number(t.dataset.ctOpen); view = 'section'; filter = 'todo'; shown = PAGE; secQ = ''; $('ctSecQ').value = ''; stopCam(); return draw(); }
@@ -456,6 +510,8 @@
     }
     draw();
     flush();
+    // the alerts (sold negative / mixed / sold expired) rank «الأولى بالجرد»: once they are in, redraw that view
+    try { Promise.resolve(root.AskerAlerts && root.AskerAlerts.load && root.AskerAlerts.load(false)).then(() => { if (view === 'priority') draw(); }, () => {}); } catch (e) {}
   }
   function close() { stopCam(); }
   root.AskerCount = { open, close, flush, scanned };

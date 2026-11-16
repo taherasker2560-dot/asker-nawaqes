@@ -794,6 +794,7 @@
             <h2>جرد المخزون</h2>
             <div class="tabs seg" role="group" aria-label="جرد المخزون">
               <button type="button" data-ct-view="sections">الأقسام</button
+              ><button type="button" class="secondary" data-ct-view="priority">الأولى بالجرد</button
               ><button type="button" class="secondary" data-ct-view="results">النتيجة <span id="ctResN" class="ts-badge hidden"></span></button>
             </div>
           </div>
@@ -808,6 +809,12 @@
             <div id="ctHits"></div>
             <h3 class="ts-h">الأقسام</h3>
             <div id="ctSecList"></div>
+          </div>
+          <!-- «الأولى بالجرد» (owner 2026-11-16, idea 4): what is most likely wrong, or dearest to get wrong, first -->
+          <div id="ctPriority" class="hidden">
+            <p class="hint">الأصناف دي أغلب الظن فيها غلط، أو غلطتها غالية: رصيد بالسالب، أو اتباعت بالسالب، أو صلاحياتها اتلخبطت من البيع، أو قيمتها كبيرة. بتختفي من هنا لما تجردها، واللي اتجرد في آخر 30 يوم مش بيظهر.</p>
+            <p id="ctPrioCount" class="sr-count"></p>
+            <div id="ctPrioList"></div>
           </div>
           <div id="ctSection" class="hidden">
             <button type="button" class="linklike" data-ct-back>← الأقسام</button>
