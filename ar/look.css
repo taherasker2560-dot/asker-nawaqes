@@ -2208,3 +2208,11 @@ html.night .ct-why .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a
 .cu-days { display: inline-flex; gap: 6px; margin-inline-start: 8px; }
 /* «قبل الموسم»: the quantity box beside «➕ ضيفه» (2026-11-16) */
 .st-btns .se-qty { flex: 0 0 76px; min-width: 0; margin: 0; text-align: center; }
+/* «💊 مزمن» (2026-11-16): a customer's card with his late regular medicines and the message button */
+.cu-chron { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.cu-chron-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.cu-chron-top .linklike { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; font-weight: 700; font-size: 15px; text-align: start; min-height: 0; }
+.cu-chron-it { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-top: 1px dashed var(--line); }
+.cu-chron-it .pill.bad { background: #fde8e6; color: #b42318; }
+html.night .cu-chron-it .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
+.cu-chron .cu-oldact { padding: 8px 0 0; }

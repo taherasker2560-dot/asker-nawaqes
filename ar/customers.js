@@ -250,7 +250,7 @@
     return f ? f(l.p, l.u, l.k) : `${num(l.p)} علبة` + (num(l.u) ? ` و${num(l.u)} وحدة` : '');
   };
   let list = null, loading = null, loadedAt = 0, failed = '';
-  let view = null, query = '', shown = SHOW;
+  let view = null, query = '', shown = SHOW, chronAsked = false;
   // «ديون قديمة»: how many days of no movement (30 / 60 / 90), kept on this phone; ar/notify.js reads the same key for the home card
   const DAYS_KEY = 'asker-cu-old-days';
   let oldDays = (() => { try { const v = Number(localStorage.getItem(DAYS_KEY)); return OLD_DAYS.includes(v) ? v : OLD_DEFAULT; } catch (e) { return OLD_DEFAULT; } })();
@@ -341,17 +341,27 @@
     return `<div class="cu-oldrow">${rowHtml(c)}<div class="cu-oldact"><small>${d == null ? 'من غير حركات' : `بقاله ${d} يوم من غير حركة`}</small>` +
       `<button type="button" class="small" data-cu-remind="${esc(c.id)}"><span>رسالة تذكير</span>${linkNumber(c.id) ? ' 📱' : ''}</button></div></div>`;
   }
-  function remind(id) {
-    const c = (list || []).find((x) => String(x.id) === String(id));
-    if (!c) return;
-    const msg = reminderMessage(c.name, c.balance, c.last_at), phone = linkNumber(c.id);
+  // a message he sends himself: WhatsApp when the customer's number is saved, else it is copied (nothing is sent from here)
+  function deliver(c, msg, sentNote) {
+    const phone = linkNumber(c.id);
     if (phone) {
       if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(msg, phone);
       else root.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
-      return note('اتفتح واتساب برسالة التذكير: ابعتها بإيدك.');
+      return note(sentNote);
     }
     const fail = () => note('مقدرتش أنسخ لوحدي: ' + msg.replace(/\n/g, ' | '));
     try { navigator.clipboard.writeText(msg).then(() => note('مفيش رقم محفوظ للعميل ده، فالرسالة اتنسخت: الزقها في محادثته.'), fail); } catch (e) { fail(); }
+  }
+  function remind(id) {
+    const c = (list || []).find((x) => String(x.id) === String(id));
+    if (!c) return;
+    deliver(c, reminderMessage(c.name, c.balance, c.last_at), 'اتفتح واتساب برسالة التذكير: ابعتها بإيدك.');
+  }
+  // «💊 مزمن» (ar/chronic.js): the refill message for a customer's late medicines
+  function chronRemind(id) {
+    const c = (list || []).find((x) => String(x.id) === String(id));
+    if (!c || !root.AskerChronic) return;
+    deliver(c, root.AskerChronic.messageFor(c.name, c.id), 'اتفتح واتساب برسالة الدوا: ابعتها بإيدك.');
   }
   function drawList() {
     const box = $('cuBox');
@@ -368,7 +378,10 @@
     const r = pick(list, view, query, oldDays);
     const od = oldCounts(list, oldDays);
     const chip = (v, label, x) => `<button type="button" class="chip${r.view === v ? ' on' : ''}" data-cu-view="${v}">${label} <b>${x}</b></button>`;
-    $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('old', 'ديون قديمة', od.n) + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all) +
+    // «💊 مزمن» (owner 2026-11-16): the file comes from the laptop; ask for it once, then draw again
+    const AC = root.AskerChronic;
+    if (AC && !chronAsked) { chronAsked = true; AC.load(false).then(() => drawList()); }
+    $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('old', 'ديون قديمة', od.n) + (AC && AC.loaded() ? chip('chronic', '💊 مزمن', AC.count()) : '') + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all) +
       (r.view === 'old' ? '<span class="cu-days" role="group" aria-label="مدة من غير حركة">' + OLD_DAYS.map((d) => `<button type="button" class="chip small${oldDays === d ? ' on' : ''}" data-cu-days="${d}">${d} يوم</button>`).join('') + '</span>' : '');
     $('cuClear')?.classList.toggle('hidden', !query);
     let html = '';
@@ -377,13 +390,19 @@
       html = (over.length ? over.map(rowHtml).join('') : '<p class="hint">مفيش عميل عدّى حده.</p>') +
         (near.length ? `<h3 class="al-h">قربوا من الحد (90% أو أكتر) <b class="al-n">${near.length}</b></h3>` + near.map(rowHtml).join('') : '');
       $('cuCount').textContent = '';
+    } else if (r.view === 'chronic') {
+      const ch = AC ? AC.listHtml(r.rows, { money, hasPhone: (id) => !!(phones && phones.has(String(id))), isStopped }) : { html: '', n: 0 };
+      html = '<p class="hint">عملاء بياخدوا نفس الدوا بانتظام (كل شهر تقريبًا) وميعاده عدّى. دوس «رسالة» وهتتجهز لك، وإنت اللي تبعتها.</p>' +
+        (ch.html || `<p class="hint">${query ? 'مفيش عميل بالاسم ده.' : 'مفيش ميعاد دوا متأخر ✅'}</p>`);
+      $('cuCount').textContent = ch.n ? `${ch.n} عميل` : '';
+      note('');
     } else {
       const one = r.view === 'old' ? oldRowHtml : rowHtml;
       html = r.rows.slice(0, shown).map(one).join('') || `<p class="hint">${r.view === 'old' && !query ? 'مفيش ديون قديمة بالمدة دي ✅' : 'مفيش عميل بالاسم ده.'}</p>`;
       if (r.rows.length > shown) html += `<button type="button" class="secondary cu-more" data-cu-more>اعرض ${Math.min(SHOW, r.rows.length - shown)} كمان</button>`;
       $('cuCount').textContent = query ? `${r.rows.length} عميل` : r.view === 'owing' ? `${r.rows.length} عميل عليهم ${money(n.owed)} ج` : r.view === 'old' ? `${r.rows.length} عميل عليهم ${money(od.amount)} ج` : `${r.rows.length} عميل`;
     }
-    if (r.view !== 'old') note('');
+    if (r.view !== 'old' && r.view !== 'chronic') note('');
     $('cuRows').innerHTML = html;
   }
 
@@ -860,6 +879,11 @@
       if (dd) { oldDays = Number(dd.dataset.cuDays); try { localStorage.setItem(DAYS_KEY, String(oldDays)); } catch (e2) { /* private window */ } shown = SHOW; note(''); drawList(); return; }
       const rm = e.target.closest('[data-cu-remind]');
       if (rm) { remind(rm.dataset.cuRemind); return; }
+      // «💊 مزمن»: the refill message, and «✓ خلصنا» (hidden on this phone until he buys again or 14 days)
+      const cr = e.target.closest('[data-cu-chron]');
+      if (cr) { chronRemind(cr.dataset.cuChron); return; }
+      const cd = e.target.closest('[data-cu-chron-done]');
+      if (cd) { if (root.AskerChronic) root.AskerChronic.snooze(cd.dataset.cuChronDone); drawList(); return; }
       const row = e.target.closest('[data-cu]');
       if (row) { openStatement(row.dataset.cu); return; }
       if (e.target.closest('[data-cu-more]')) { shown += SHOW; drawList(); return; }
