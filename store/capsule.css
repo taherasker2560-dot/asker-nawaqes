@@ -1,0 +1,159 @@
+/* The store's new look «كبسولة وموجة» (owner 2026-11-16, Claude Design board «صيدلية عسكر — شكل وحركة التطبيق والموقع»; he said «ا» to the site first).
+   A layer over store.css + look.css + polish.css (loaded last), so nothing else changes: the colors still come from store/theme.js
+   (the 25 colors and the night look), only the shape and the motion are new.
+   - the capsule is the shape (buttons, chips, the bottom bar); cards 26 px with a soft shadow, no lines
+   - the wave (from the logo) closes every header and drifts slowly
+   - a navy balance card on the account page; the bottom bar is a floating navy capsule with a sliding color pill (store/motion.js)
+   - motion explains (a page comes in, the cards rise one after another, the balance counts) and stops for «reduce motion» */
+
+:root {
+  --navy: #0b1d3f;
+  --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --grad: var(--accent);
+  --sh-1: 0 2px 8px rgba(11, 29, 63, 0.06);
+  --sh-2: 0 12px 28px -12px rgba(11, 29, 63, 0.22);
+  --wave-w: 400px;
+  /* one period of the wave from the logo (a mask: the header's edge is cut out of the page color) */
+  --wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 70' preserveAspectRatio='none'%3E%3Cpath d='M0 34C100 6 300 62 400 34L400 70L0 70Z'/%3E%3C/svg%3E");
+}
+
+/* ---------- type: the headings and the numbers ---------- */
+h1, h2, h3, .brand strong, .hc-text strong, .ac-big, .ac-two b, .ac-k, .price, .cart-tot, .hero-btn, .sheet-card h2 { font-family: var(--head); }
+body { padding-bottom: calc(100px + var(--safe-b)); }
+body::before { display: none; }
+
+/* ---------- the header and its wave ---------- */
+.top { position: relative; padding: 16px 16px 40px; border-radius: 0; background: var(--accent); box-shadow: none; }
+.bar { padding: 12px 16px 28px; border-radius: 0; background: var(--accent); box-shadow: none; }
+.top::after, .bar::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 30px;
+  background: var(--bg);
+  pointer-events: none;
+  -webkit-mask-image: var(--wave);
+  mask-image: var(--wave);
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+  -webkit-mask-size: var(--wave-w) 100%;
+  mask-size: var(--wave-w) 100%;
+  -webkit-mask-position: 0 100%;
+  mask-position: 0 100%;
+  animation: cap-wave 9s linear infinite;
+}
+.bar::after { height: 20px; --wave-w: 300px; }
+@keyframes cap-wave { to { -webkit-mask-position: var(--wave-w) 100%; mask-position: var(--wave-w) 100%; } }
+.top-search { margin-top: 0; }
+.top-search input { border: 0; box-shadow: var(--sh-2); }
+.brand img { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 8px 18px -8px rgba(0, 0, 0, 0.4); }
+.top .acct-site { background: rgba(255, 255, 255, 0.22); border: 0; color: #fff; min-height: 44px; padding: 0 16px; }
+
+/* ---------- cards: soft, no lines ---------- */
+.item, .panel, .order, .home-card, .install, .done, .ac-mv, .note.dashed { border: 0; box-shadow: var(--sh-1); }
+.item, .panel, .order, .home-card, .install, .done { border-radius: 26px; }
+.sec { border: 0; border-radius: 24px; box-shadow: var(--sh-1); }
+.cart-card { box-shadow: 0 0 0 2px var(--accent), var(--sh-1); }
+.thumb { border-radius: 20px; border-color: transparent; }
+.sh-pic { border-radius: 26px; }
+.hc-ico, .sec-mark { border-radius: 999px; }
+html.night .item, html.night .panel, html.night .order, html.night .home-card, html.night .install, html.night .done, html.night .sec, html.night .ac-mv { box-shadow: 0 0 0 1px var(--line); }
+html.night .cart-card { box-shadow: 0 0 0 2px var(--accent); }
+.add, .hero-btn, .hc-go, .ac-btn, .share, .more, .chip, .need { transition: transform 0.12s ease, background-color 0.2s, box-shadow 0.2s; }
+.add:active, .hero-btn:active, .hc-go:active, .share:active, .more:active, .chip:active, .need:active, .sec:active, .home-card:active { transform: scale(0.96); }
+
+/* ---------- the slides: a navy hero with two capsules floating ---------- */
+.hero { border-radius: 30px; background: linear-gradient(135deg, var(--navy) 0%, #14397a 100%); box-shadow: var(--sh-2); }
+.hero > * { position: relative; z-index: 1; }
+.hero::before, .hero::after { content: ''; position: absolute; z-index: 0; border-radius: 999px; pointer-events: none; animation: cap-float 8s ease-in-out infinite; }
+.hero::before { inset-inline-start: -30px; top: -16px; width: 130px; height: 46px; background: rgba(255, 255, 255, 0.13); --r: 28deg; transform: rotate(28deg); }
+.hero::after { inset-inline-start: auto; inset-inline-end: -34px; bottom: -22px; width: 160px; height: 56px; background: var(--accent); opacity: 0.95; --r: -26deg; transform: rotate(-26deg); animation-delay: -3s; }
+@keyframes cap-float { 0%, 100% { transform: translateY(0) rotate(var(--r)); } 50% { transform: translateY(-10px) rotate(var(--r)); } }
+.slide.s-rx { background: linear-gradient(135deg, #0a4aa6, #06306e); }
+.slide.s-find { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); }
+.slide.s-find::after { background: rgba(255, 255, 255, 0.22); }
+.slide.s-wa { background: linear-gradient(135deg, #14397a, var(--navy)); }
+.dots i.on { border-radius: 999px; }
+
+/* ---------- the bottom bar: a floating navy capsule, a color pill slides to the page you are on ---------- */
+.tabbar {
+  inset-inline: 12px;
+  bottom: calc(10px + var(--safe-b));
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--navy);
+  box-shadow: 0 14px 30px -10px rgba(11, 29, 63, 0.5);
+}
+html.night .tabbar { background: #050d1c; box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.tabbar::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: var(--ind-w, 0px);
+  transform: translateX(var(--ind-x, 0px));
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: var(--ind-o, 0);
+  transition: transform 0.38s var(--spring), width 0.38s var(--spring), opacity 0.2s;
+}
+.tabbar.no-tr::before { transition: none; }
+.tabbar a { position: relative; z-index: 1; padding: 6px 0; border-radius: 999px; color: rgba(255, 255, 255, 0.72); }
+.tabbar svg, .tabbar a.on svg { width: 22px; height: 22px; padding: 0; background: none; box-shadow: none; transform: none; border-radius: 0; }
+html .tabbar a.on, html.night .tabbar a.on { color: #fff; }
+html .tabbar a.on svg, html.night .tabbar a.on svg { color: #fff; background: none; }
+/* before the pill is placed (no script yet): the active page has its own capsule */
+html:not(.cap-ind) .tabbar a.on { background: var(--accent); }
+.wa-fab { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- «حسابي»: the balance first, on a navy card ---------- */
+.ac-bal { position: relative; z-index: 2; overflow: hidden; margin: 14px 16px 0; padding: 22px; border: 0; border-radius: 32px; background: var(--navy); color: #fff; box-shadow: 0 18px 36px -14px rgba(11, 29, 63, 0.5); }
+#acctBox > .ac-bal:first-child { margin-top: -10px; }
+html.night .ac-bal { background: #12294f; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.7); }
+.ac-bal > * { position: relative; }
+.ac-bal::before { content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 60%; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)); pointer-events: none; animation: cap-sheen 4.2s ease-in-out infinite; }
+@keyframes cap-sheen { 0%, 55% { left: -70%; } 100% { left: 130%; } }
+.ac-big { font-size: 40px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
+.ac-big.owe { color: #ffd3b8; }
+.ac-big.paid { color: #c6ecd6; }
+.ac-big.zero { color: #fff; }
+.ac-bal .hint-sm { color: rgba(255, 255, 255, 0.78); }
+.ac-two div { border-radius: 18px; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.82); }
+.ac-two b, .ac-two b.paid { color: #fff; }
+.ac-two b.paid { color: #c6ecd6; }
+#acctBox .ac-btn { min-height: 56px; border-radius: 999px; }
+#acctBox .ac-order { background: var(--accent); box-shadow: var(--sh-2); }
+#acctBox .ac-install { border: 0; border-radius: 999px; box-shadow: var(--sh-1); }
+#acctBox .ac-back { border-radius: 999px; }
+.ac-row .share { min-height: 52px; border: 0; background: var(--card); box-shadow: var(--sh-1); }
+.ac-chips .chip { min-height: 40px; border: 0; box-shadow: var(--sh-1); }
+.ac-mv { border-radius: 22px; }
+.ac-pic img { width: 52px; height: 52px; border: 0; border-radius: 14px; box-shadow: var(--sh-1); }
+.ac-stop { border-radius: 22px; }
+
+/* ---------- motion: a page comes in, the cards rise one after another ---------- */
+[data-view]:not([hidden]) { animation: cap-in 0.4s var(--ease) both; }
+[data-view="home"]:not([hidden]) { animation: none; }
+@keyframes cap-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes cap-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+[data-view="home"]:not([hidden]) > *, #acctBox.fresh > * { animation: cap-rise 0.55s var(--ease) both; }
+[data-view="home"] > :nth-child(2), #acctBox.fresh > :nth-child(2) { animation-delay: 50ms; }
+[data-view="home"] > :nth-child(3), #acctBox.fresh > :nth-child(3) { animation-delay: 100ms; }
+[data-view="home"] > :nth-child(4), #acctBox.fresh > :nth-child(4) { animation-delay: 150ms; }
+[data-view="home"] > :nth-child(5), #acctBox.fresh > :nth-child(5) { animation-delay: 200ms; }
+[data-view="home"] > :nth-child(6), #acctBox.fresh > :nth-child(6) { animation-delay: 250ms; }
+[data-view="home"] > :nth-child(7), #acctBox.fresh > :nth-child(7) { animation-delay: 300ms; }
+[data-view="home"] > :nth-child(8), #acctBox.fresh > :nth-child(8) { animation-delay: 350ms; }
+[data-view="home"] > :nth-child(n+9), #acctBox.fresh > :nth-child(n+9) { animation-delay: 400ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .top::after, .bar::after, .hero::before, .hero::after, .ac-bal::before, [data-view]:not([hidden]), [data-view="home"]:not([hidden]) > *, #acctBox.fresh > * { animation: none !important; }
+  .tabbar::before { transition: none; }
+  .add, .hero-btn, .hc-go, .ac-btn, .share, .more, .chip, .need { transition: none; }
+}
