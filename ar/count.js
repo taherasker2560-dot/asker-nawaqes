@@ -72,7 +72,40 @@
     }
     return m;
   }
-  const api = { SEC_AR, secName, toUnits, amountText, expText, diffLine, mixedDates, entry, progress, latest };
+  // «الأولى بالجرد» (owner 2026-11-16, idea 4 of the three he picked): instead of counting at random, the items most likely to be wrong, or
+  // dearest to get wrong, come first. Score = the sum of: a negative balance in PharmaFly 60 · sold with a negative balance 40 · its
+  // batches mixed up by the sales 35 · sold expired 35 · its stock's worth at the public price (top 5% 30, top 20% 20, top half 8).
+  // An item counted in the last 30 days (a cancelled count does not count) is left out. items = stock.json's ({i, n, s, p, v, b}),
+  // counted = Map item id -> latest entry, flags = { soldNeg, mix, expSold } (Sets of item ids).
+  const PRIO_WHY = { neg: 'رصيده بالسالب في فارمافلاي', soldNeg: 'اتباع بالسالب', mix: 'صلاحياته اتلخبطت من البيع', expSold: 'اتباع منتهي الصلاحية', value: 'قيمته كبيرة' };
+  const PRIO_SCORE = { neg: 60, soldNeg: 40, mix: 35, expSold: 35 };
+  function priority(items, counted, flags, minScore) {
+    const f = flags || {};
+    const vals = (items || []).map((it) => Number(it.v) || 0).filter((v) => v > 0).sort((a, b) => a - b);
+    const rank = (v) => { // the share of items worth no more than v (binary search)
+      if (!(v > 0) || !vals.length) return 0;
+      let lo = 0, hi = vals.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (vals[mid] <= v) lo = mid + 1; else hi = mid; }
+      return lo / vals.length;
+    };
+    const out = [];
+    for (const it of items || []) {
+      if (counted && counted.has(it.i)) continue;
+      const why = [];
+      let score = 0;
+      const add = (k, n) => { why.push(k); score += n; };
+      if ((it.b || []).some((b) => Number(b.k) < 0 || Number(b.u) < 0)) add('neg', PRIO_SCORE.neg);
+      if (f.soldNeg && f.soldNeg.has(it.i)) add('soldNeg', PRIO_SCORE.soldNeg);
+      if (f.mix && f.mix.has(it.i)) add('mix', PRIO_SCORE.mix);
+      if (f.expSold && f.expSold.has(it.i)) add('expSold', PRIO_SCORE.expSold);
+      const r = rank(Number(it.v) || 0);
+      const vs = r >= 0.95 ? 30 : r >= 0.8 ? 20 : r >= 0.5 ? 8 : 0;
+      if (vs) add('value', vs);
+      if (score >= (minScore == null ? 8 : minScore)) out.push({ it, score, why, value: Number(it.v) || 0 });
+    }
+    return out.sort((a, b) => b.score - a.score || b.value - a.value || String(a.it.n).localeCompare(String(b.it.n)));
+  }
+  const api = { SEC_AR, PRIO_WHY, secName, toUnits, amountText, expText, diffLine, mixedDates, entry, progress, latest, priority };
   root.AskerCountLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
