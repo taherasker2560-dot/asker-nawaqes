@@ -75,6 +75,8 @@
       '',
       'الكشف بالتفصيل بالأصناف (PDF):',
       o.link,
+      // 2026-11-16 (owner's idea: the items' pictures in the statement): the pictures are in the file, and a tap on an item opens its page in the store
+      ...(o.photos ? ['', 'وفي الكشف صور الأصناف، ولو دوست على أي صنف هتفتح لك صفحته في الستور.'] : []),
     ].join('\n');
   }
   // where the PDF is kept: s/<year>-<month>/<random>.pdf (the bucket's rule)
@@ -87,16 +89,25 @@
     let pos = 0;
     const push = (x) => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); pos += b.length; };
     const W = '595.28', H = '841.89';
-    const n = pages.length, count = 2 + 3 * n;
+    const n = pages.length;
+    // links (2026-11-16, the items' pictures): a page may carry {x, y, w, h, url} rectangles in its own pixels; each becomes a link annotation, numbered after the pages' objects
+    let nextId = 3 + 3 * n;
+    const annots = pages.map((p) => (p.links || []).map(() => nextId++));
+    const count = nextId - 1;
     push('%PDF-1.4\n%âãÏÓ\n');
     const obj = (id, body) => { offsets[id] = pos; push(`${id} 0 obj\n`); body(); push('\nendobj\n'); };
     obj(1, () => push('<< /Type /Catalog /Pages 2 0 R >>'));
     obj(2, () => push(`<< /Type /Pages /Kids [${pages.map((_, i) => `${3 + 3 * i} 0 R`).join(' ')}] /Count ${n} >>`));
     pages.forEach((p, i) => {
       const pg = 3 + 3 * i, im = pg + 1, ct = pg + 2, draw = `q ${W} 0 0 ${H} 0 0 cm /Im${i} Do Q`;
-      obj(pg, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im${i} ${im} 0 R >> >> /Contents ${ct} 0 R >>`));
+      obj(pg, () => push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im${i} ${im} 0 R >> >> /Contents ${ct} 0 R${annots[i].length ? ` /Annots [${annots[i].map((id) => `${id} 0 R`).join(' ')}]` : ''} >>`));
       obj(im, () => { push(`<< /Type /XObject /Subtype /Image /Width ${p.w} /Height ${p.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpeg.length} >>\nstream\n`); push(p.jpeg); push('\nendstream'); });
       obj(ct, () => push(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`));
+      (p.links || []).forEach((l, k) => {
+        const f = (v) => v.toFixed(2), sx = Number(W) / p.w, sy = Number(H) / p.h;
+        const url = String(l.url || '').replace(/[^\x21-\x7e]/g, '').replace(/[\\()]/g, (c) => '\\' + c);
+        obj(annots[i][k], () => push(`<< /Type /Annot /Subtype /Link /Rect [${f(l.x * sx)} ${f(Number(H) - (l.y + l.h) * sy)} ${f((l.x + l.w) * sx)} ${f(Number(H) - l.y * sy)}] /Border [0 0 0] /A << /S /URI /URI (${url}) >> >>`));
+      });
     });
     const xref = pos;
     let x = `xref\n0 ${count + 1}\n0000000000 65535 f \n`;
@@ -118,11 +129,20 @@
   const BLUE = '#0a4aa6', NAVY = '#062e67', GREY = '#6b7280', LINE = '#e3e7ef', RED = '#c41a30', GREEN = '#1b7f3b', AMBER = '#a35d00';
   const AR = /[؀-ۿ]/;
   const L = M, R = PW - M;
+  // an item's row: 34 px, or 70 px when the item has a picture (owner 2026-11-16: the items' pictures in the statement); the picture is 62 px (about 1 cm on the A4 page)
+  const ROW = 34, ROW_PHOTO = 70, PHOTO = 62;
   // columns, right to left: date | what | charged | paid | balance
   // the date column holds the whole date with the year (owner 2026-11-12: «التاريخ … مش باين السنة»)
   const COL = { date: [R - 255, R], what: [L + 480, R - 255], debit: [L + 330, L + 480], paid: [L + 175, L + 330], bal: [L, L + 175] };
   function loadImage(src) {
     return new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+  }
+  // an item's picture in a square box, the whole picture (not cropped), a thin frame
+  function drawPhoto(ctx, img, x, y, s) {
+    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, s, s);
+    const k = Math.min(s / img.width, s / img.height), w = img.width * k, h = img.height * k;
+    ctx.drawImage(img, x + (s - w) / 2, y + (s - h) / 2, w, h);
+    ctx.strokeStyle = LINE; ctx.lineWidth = 2; ctx.strokeRect(x, y, s, s);
   }
   function fit(ctx, s, w) {
     s = String(s || '');
@@ -149,11 +169,12 @@
     return `${qtyText(l)}${unit != null ? ` × ${money(unit)}` : ''} = ${money(lineValue(l))}`;
   }
   // the blocks to lay out: one per movement (with its items), so an invoice stays on one page when it can
-  function blocks(st) {
+  const photoOf = (photos, l) => (photos && photos.get(String(l.n))) || null;
+  function blocks(st, photos) {
     const out = [{ h: 44, kind: 'opening' }];
     for (const m of st.rows) {
       const items = itemsOf(m);
-      out.push({ h: 44 + items.length * 34 + (items.length ? 8 : 0), kind: 'move', m, items });
+      out.push({ h: 44 + items.reduce((s, l) => s + (photoOf(photos, l) ? ROW_PHOTO : ROW), 0) + (items.length ? 8 : 0), kind: 'move', m, items });
     }
     return out;
   }
@@ -163,11 +184,12 @@
     }
     const logo = await loadImage(o.logo || 'icons/arabic-192.png?v=logo2');
     const now = o.now || new Date();
-    const all = blocks(st), pages = [];
+    const photos = o.photos || null, all = blocks(st, photos), pages = [];
     let i = 0;
     while (i < all.length || !pages.length) {
       const c = document.createElement('canvas');
       c.width = PW; c.height = PH;
+      const links = []; c.__links = links;   // the link rectangles of this page (an item's picture and name -> its page in the store)
       const ctx = c.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, PW, PH);
       let y;
@@ -212,9 +234,16 @@
           num2(m.balance, COL.bal);
           let yy = y + 44;
           for (const l of b.items) {
-            text(ctx, l.n, R - 30, yy + 24, { size: 20, color: '#3f4656', w: R - 30 - COL.what[0] + 40 });
-            text(ctx, lineText(l), COL.debit[1] - 10, yy + 24, { size: 20, color: GREY, w: COL.debit[1] - L - 20 });
-            yy += 34;
+            const ph = photoOf(photos, l), rh = ph ? ROW_PHOTO : ROW, mid = yy + rh / 2 + 7;
+            let nameR = R - 30;
+            if (ph) {
+              drawPhoto(ctx, ph.img, R - 30 - PHOTO, yy + (rh - PHOTO) / 2, PHOTO);
+              nameR = R - 30 - PHOTO - 14;
+              if (ph.url) links.push({ x: COL.what[0] - 20, y: yy, w: R - 30 - (COL.what[0] - 20), h: rh, url: ph.url });
+            }
+            text(ctx, l.n, nameR, mid, { size: 20, color: '#3f4656', w: nameR - COL.what[0] + 40 });
+            text(ctx, lineText(l), COL.debit[1] - 10, mid, { size: 20, color: GREY, w: COL.debit[1] - L - 20 });
+            yy += rh;
           }
         }
         ctx.fillStyle = LINE; ctx.fillRect(L, y + b.h - 2, R - L, 2);
@@ -243,7 +272,7 @@
   async function makePdf(st, o) {
     const canvases = await renderPages(st, o);
     const pages = [];
-    for (const c of canvases) pages.push({ jpeg: await toJpeg(c), w: c.width, h: c.height });
+    for (const c of canvases) pages.push({ jpeg: await toJpeg(c), w: c.width, h: c.height, links: c.__links || [] });
     return { blob: new Blob([buildPdf(pages)], { type: 'application/pdf' }), pages: canvases.length, canvases };
   }
   root.AskerStatement = { makePdf, renderPages };

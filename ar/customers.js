@@ -700,7 +700,10 @@
     s.busy = true; s.error = ''; drawStatement();
     try {
       const now = new Date();
-      const pdf = await root.AskerStatement.makePdf(stmt, { name: me.c.name, id: me.c.id, now });
+      // the items' pictures from the store (owner 2026-11-16); no picture / any trouble = the statement as before
+      let photos = null;
+      try { const P = root.AskerItemPhotos; if (P) { const m = await P.forNames(db(), P.namesOf(stmt)); if (m.size) photos = m; } } catch (e) { photos = null; }
+      const pdf = await root.AskerStatement.makePdf(stmt, { name: me.c.name, id: me.c.id, now, photos });
       const rand = (root.crypto && root.crypto.randomUUID && root.crypto.randomUUID()) || Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const key = L2.fileKey(now, rand);
       const up = await db().storage.from('ar-statements').upload(key, pdf.blob, { contentType: 'application/pdf', upsert: false });
@@ -710,7 +713,7 @@
       if (!link) throw new Error((sg && sg.error && sg.error.message) || 'مفيش لينك');
       if (s.pdfUrl) URL.revokeObjectURL(s.pdfUrl);
       Object.assign(s, { stmt, link, pages: pdf.pages, pdfUrl: URL.createObjectURL(pdf.blob), sent: false });
-      s.msg = L2.messageText({ name: me.c.name, from: stmt.from, balance: stmt.closing, link });
+      s.msg = L2.messageText({ name: me.c.name, from: stmt.from, balance: stmt.closing, link, photos: !!photos });
     } catch (e) {
       s.error = errText(e);
     } finally {
