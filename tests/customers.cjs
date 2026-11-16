@@ -87,4 +87,30 @@ assert.deepEqual(L.numbersIn('BEGIN:VCARD\r\nVERSION:2.1\r\nFN;CHARSET=UTF-8;ENC
 assert.deepEqual(L.numbersIn('BEGIN:VCARD\nFN:A\nTEL:01011112222\nEND:VCARD\nBEGIN:VCARD\nFN:B\nTEL:01033334444\nEND:VCARD').map(x=>x.name+x.p),['A201011112222','B201033334444']);
 assert.deepEqual(L.numbersIn('جار الصيدلية'),[]);
 assert.deepEqual(L.numbersIn(''),[]);
-console.log('customers ok');
+// «ديون قديمة» (owner 2026-11-16): owes AND nothing moved for 30 / 60 / 90 days; most owed first; no movement date = not counted
+{
+  const now=new Date(), ago=(d)=>{const x=new Date(now.getTime()-d*864e5);const p=n=>String(n).padStart(2,'0');return `${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())}T${p(x.getHours())}:${p(x.getMinutes())}:00`};
+  const O=[
+   {id:1,name:'قديم كبير',balance:3000,last_at:ago(70)},{id:2,name:'قديم صغير',balance:400,last_at:ago(95)},
+   {id:3,name:'حديث',balance:800,last_at:ago(5)},{id:4,name:'مقدم',balance:-100,last_at:ago(80)},
+   {id:5,name:'من غير تاريخ',balance:50,last_at:null},{id:6,name:'خالص',balance:0.2,last_at:ago(200)},
+   {id:7,name:'على الحد بالظبط',balance:100,last_at:ago(60)},
+  ];
+  assert.equal(L.daysSince(O[0],now),70);assert.equal(L.daysSince(O[4],now),null);
+  assert.deepEqual(O.filter(c=>L.isOld(c,60,now)).map(c=>c.id),[1,2,7],'60 days: 60 itself counts; a prepaid, a crumb, a recent and a dateless one do not');
+  assert.deepEqual(O.filter(c=>L.isOld(c,90,now)).map(c=>c.id),[2]);
+  assert.deepEqual(O.filter(c=>L.isOld(c,30,now)).map(c=>c.id),[1,2,7]);
+  assert.deepEqual(L.oldCounts(O,60,now),{n:3,amount:3500});
+  assert.deepEqual(L.oldCounts(O,90,now),{n:1,amount:400});
+  assert.deepEqual(L.oldCounts([],60,now),{n:0,amount:0});
+  // pick(list,'old',q,days): biggest debt first, searchable by name
+  const pk=(q,d)=>L.pick(O,'old',q,d).rows.map(c=>c.id);
+  assert.deepEqual(pk('',60),[1,2,7],'the biggest debt first');
+  assert.deepEqual(pk('',90),[2]);
+  assert.equal(L.pick(O,'old','',60).view,'old');
+  assert.deepEqual(pk('صغير',60),[2]);
+  // the reminder: the name, the amount, the day of the last movement; none of it when there is no date
+  const m=L.reminderMessage('أحمد',1250.5,'2026-09-02T10:00:00');
+  assert.match(m,/يا أحمد/);assert.match(m,/1,250.50 ج/);assert.match(m,/آخر حركة على الحساب يوم 02\/09\/2026/);
+  assert.doesNotMatch(L.reminderMessage('أحمد',100,null),/آخر حركة/);
+}console.log('customers ok');

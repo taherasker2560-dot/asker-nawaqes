@@ -51,12 +51,39 @@
     owed = Math.round(owed * 100) / 100; credit = Math.round(credit * 100) / 100;
     return { over, near, owing, prepaid: pre, all: list.length, owed, credit, net: Math.round((owed - credit) * 100) / 100 };
   }
+  // «ديون قديمة» (owner 2026-11-16, picked from the ideas): he owes us and NOTHING has moved on his account for 30 / 60 / 90 days
+  // (60 unless changed); most owed first. A customer with no movement date at all is not counted (nothing to measure from).
+  const OLD_DAYS = [30, 60, 90], OLD_DEFAULT = 60;
+  function daysSince(c, now) {
+    const t = parseAt(c && c.last_at);
+    return t ? Math.floor(((now || new Date()) - t) / 864e5) : null;
+  }
+  function isOld(c, days, now) {
+    if (!owes(c)) return false;
+    const d = daysSince(c, now);
+    return d != null && d >= (days || OLD_DEFAULT);
+  }
+  function oldCounts(list, days, now) {
+    let n = 0, amount = 0;
+    for (const c of list) if (isOld(c, days, now)) { n++; amount += num(c.balance); }
+    return { n, amount: Math.round(amount * 100) / 100 };
+  }
+  // the reminder he sends himself (a phone number is not always saved): the amount and the day of the last movement, polite
+  function reminderMessage(name, amount, lastAt) {
+    const t = parseAt(lastAt);
+    return [
+      'أهلًا بحضرتك 🌿',
+      `بنفكّر حضرتك يا ${String(name || '').trim()} إن على حسابك في صيدلية عسكر مبلغ ${money(amount)} ج${t ? ` (آخر حركة على الحساب يوم ${dateText(t)})` : ''}.`,
+      'لو سمحت تعدّي علينا في أقرب وقت، ولو سددت خلاص تجاهل الرسالة دي.',
+      'شكرًا لحضرتك.',
+    ].join('\n');
+  }
   // the list for a view and a search; searching from «عدّوا الحد» looks in everyone
-  function pick(list, view, q) {
+  function pick(list, view, q, days) {
     const words = norm(q).split(' ').filter(Boolean);
     let v = view;
     if (words.length && v === 'over') v = 'all';
-    let out = list.filter((c) => (v === 'over' ? isOver(c) || isNear(c) : v === 'owing' ? owes(c) : v === 'prepaid' ? prepaid(c) : true));
+    let out = list.filter((c) => (v === 'over' ? isOver(c) || isNear(c) : v === 'owing' ? owes(c) : v === 'old' ? isOld(c, days) : v === 'prepaid' ? prepaid(c) : true));
     if (words.length) {
       out = out.filter((c) => {
         const n = norm(c.name), id = String(c.id);
@@ -66,6 +93,7 @@
     const by = {
       over: (a, b) => (isOver(b) - isOver(a)) || (num(b.balance) - limitOf(b)) - (num(a.balance) - limitOf(a)),
       owing: (a, b) => num(b.balance) - num(a.balance),
+      old: (a, b) => num(b.balance) - num(a.balance),
       prepaid: (a, b) => num(a.balance) - num(b.balance),
       all: (a, b) => String(a.name).localeCompare(String(b.name), 'ar'),
     }[v] || ((a, b) => num(b.balance) - num(a.balance));
@@ -208,7 +236,7 @@
       'الرابط ده ليك انت بس، ما تبعتهوش لحد.',
     ].join('\n');
   }
-  const api = { money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage };
+  const api = { OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -223,6 +251,10 @@
   };
   let list = null, loading = null, loadedAt = 0, failed = '';
   let view = null, query = '', shown = SHOW;
+  // «ديون قديمة»: how many days of no movement (30 / 60 / 90), kept on this phone; ar/notify.js reads the same key for the home card
+  const DAYS_KEY = 'asker-cu-old-days';
+  let oldDays = (() => { try { const v = Number(localStorage.getItem(DAYS_KEY)); return OLD_DAYS.includes(v) ? v : OLD_DEFAULT; } catch (e) { return OLD_DEFAULT; } })();
+  const note = (t) => { const el = $('cuNote'); if (el) el.textContent = t || ''; };
   // the customers' WhatsApp numbers (ar_customer_phones, owner 2026-11-12); null = not there (the send part stays hidden)
   let phones = null;
   // who is stopped (ar_customer_stops, owner 2026-11-13 «وقّف الآجل»): Map id -> row; null = the table is not there yet
@@ -303,6 +335,24 @@
       (lim && owes(c) ? `<i class="cu-bar"><b class="${isOver(c) ? 'r' : ''}" style="width:${pct}%"></b></i>` : '') + '</span>' +
       `<span class="cu-amt ${b.cls}">${esc(b.text)}${lim ? `<small>الحد ${esc(money(lim))}</small>` : ''}</span></button>`;
   }
+  // an old debt: the customer's row, how long nothing moved, and the reminder (WhatsApp when his number is saved, else copied)
+  function oldRowHtml(c) {
+    const d = daysSince(c, new Date());
+    return `<div class="cu-oldrow">${rowHtml(c)}<div class="cu-oldact"><small>${d == null ? 'من غير حركات' : `بقاله ${d} يوم من غير حركة`}</small>` +
+      `<button type="button" class="small" data-cu-remind="${esc(c.id)}"><span>رسالة تذكير</span>${linkNumber(c.id) ? ' 📱' : ''}</button></div></div>`;
+  }
+  function remind(id) {
+    const c = (list || []).find((x) => String(x.id) === String(id));
+    if (!c) return;
+    const msg = reminderMessage(c.name, c.balance, c.last_at), phone = linkNumber(c.id);
+    if (phone) {
+      if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(msg, phone);
+      else root.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+      return note('اتفتح واتساب برسالة التذكير: ابعتها بإيدك.');
+    }
+    const fail = () => note('مقدرتش أنسخ لوحدي: ' + msg.replace(/\n/g, ' | '));
+    try { navigator.clipboard.writeText(msg).then(() => note('مفيش رقم محفوظ للعميل ده، فالرسالة اتنسخت: الزقها في محادثته.'), fail); } catch (e) { fail(); }
+  }
   function drawList() {
     const box = $('cuBox');
     if (!box) return;
@@ -315,9 +365,11 @@
     const stat = (v, x, label) => `<button type="button" class="stat cu-stat${view === v ? ' on' : ''}" data-cu-view="${v}"><strong>${x}</strong>${label}</button>`;
     $('cuStats').innerHTML = stat('over', n.over, 'عدّوا الحد') + stat('owing', n.owing, 'عليهم فلوس') + stat('prepaid', n.prepaid, 'ليهم فلوس');
     if ($('cuNet')) $('cuNet').innerHTML = `<span>صافي الدين</span><b>${money(n.net)} ج</b><small>عليهم ${money(n.owed)} − ليهم ${money(n.credit)}</small>`;
-    const r = pick(list, view, query);
+    const r = pick(list, view, query, oldDays);
+    const od = oldCounts(list, oldDays);
     const chip = (v, label, x) => `<button type="button" class="chip${r.view === v ? ' on' : ''}" data-cu-view="${v}">${label} <b>${x}</b></button>`;
-    $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all);
+    $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('old', 'ديون قديمة', od.n) + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all) +
+      (r.view === 'old' ? '<span class="cu-days" role="group" aria-label="مدة من غير حركة">' + OLD_DAYS.map((d) => `<button type="button" class="chip small${oldDays === d ? ' on' : ''}" data-cu-days="${d}">${d} يوم</button>`).join('') + '</span>' : '');
     $('cuClear')?.classList.toggle('hidden', !query);
     let html = '';
     if (r.view === 'over') {
@@ -326,10 +378,12 @@
         (near.length ? `<h3 class="al-h">قربوا من الحد (90% أو أكتر) <b class="al-n">${near.length}</b></h3>` + near.map(rowHtml).join('') : '');
       $('cuCount').textContent = '';
     } else {
-      html = r.rows.slice(0, shown).map(rowHtml).join('') || '<p class="hint">مفيش عميل بالاسم ده.</p>';
+      const one = r.view === 'old' ? oldRowHtml : rowHtml;
+      html = r.rows.slice(0, shown).map(one).join('') || `<p class="hint">${r.view === 'old' && !query ? 'مفيش ديون قديمة بالمدة دي ✅' : 'مفيش عميل بالاسم ده.'}</p>`;
       if (r.rows.length > shown) html += `<button type="button" class="secondary cu-more" data-cu-more>اعرض ${Math.min(SHOW, r.rows.length - shown)} كمان</button>`;
-      $('cuCount').textContent = query ? `${r.rows.length} عميل` : r.view === 'owing' ? `${r.rows.length} عميل عليهم ${money(n.owed)} ج` : `${r.rows.length} عميل`;
+      $('cuCount').textContent = query ? `${r.rows.length} عميل` : r.view === 'owing' ? `${r.rows.length} عميل عليهم ${money(n.owed)} ج` : r.view === 'old' ? `${r.rows.length} عميل عليهم ${money(od.amount)} ج` : `${r.rows.length} عميل`;
     }
+    if (r.view !== 'old') note('');
     $('cuRows').innerHTML = html;
   }
 
@@ -793,9 +847,19 @@
   function bind() {
     const panel = $('customersPanel');
     if (!panel) return;
+    // «محتاج شغل» on the home: its «ديون قديمة» row opens this list on that view (before the tab opens)
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('.todo-row[data-go="customers"][data-view]');
+      if (b) { view = b.dataset.view; shown = SHOW; query = ''; if ($('cuQ')) $('cuQ').value = ''; if (st) closeStatement(); }
+    }, true);
     panel.addEventListener('click', (e) => {
       const v = e.target.closest('[data-cu-view]');
       if (v) { view = v.dataset.cuView; shown = SHOW; if (query && view === 'over') { query = ''; $('cuQ').value = ''; } drawList(); return; }
+      // «ديون قديمة»: the days with no movement, and the reminder
+      const dd = e.target.closest('[data-cu-days]');
+      if (dd) { oldDays = Number(dd.dataset.cuDays); try { localStorage.setItem(DAYS_KEY, String(oldDays)); } catch (e2) { /* private window */ } shown = SHOW; note(''); drawList(); return; }
+      const rm = e.target.closest('[data-cu-remind]');
+      if (rm) { remind(rm.dataset.cuRemind); return; }
       const row = e.target.closest('[data-cu]');
       if (row) { openStatement(row.dataset.cu); return; }
       if (e.target.closest('[data-cu-more]')) { shown += SHOW; drawList(); return; }
