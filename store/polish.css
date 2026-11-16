@@ -366,3 +366,6 @@ html, body { overflow-x: clip; max-width: 100%; }
 .ac-items div.has-pic > span:first-of-type { flex: 1; min-width: 0; }
 .ac-pic { flex: 0 0 auto; display: block; }
 .ac-pic img { display: block; width: 46px; height: 46px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+/* 2026-11-16 (owner: the customer opens his link and lands on his ACCOUNT): the install button is a plain button after the account's own ones; «🏪 الموقع» in the header is the simple way into the site */
+#acctBox .ac-install { min-height: 50px; font-size: 16px; font-weight: 700; background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+.acct-site { display: inline-flex; align-items: center; gap: 4px; padding: 0 14px; min-height: 40px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none; white-space: nowrap; }

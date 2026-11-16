@@ -331,6 +331,7 @@ window.AskerEN = {
   "مفيش نت أو حصلت مشكلة. جرب تاني": "No internet or a problem happened. Try again",
   "الفويس ما اتسجلش. دوس 🎤 واتكلم، وبعدين دوس ➤": "The voice note was not recorded. Tap 🎤 and talk, then tap ➤",
   "📲 ثبّت التطبيق الآن": "📲 Install the app now",
+  "🏪 الموقع": "🏪 The site",
   "📲 دوسة كمان ويتثبت": "📲 One more tap and it installs",
   "استنى ثانية…": "One second…",
   "التثبيت على الآيفون في 3 دوسات:": "Install on iPhone in 3 taps:",

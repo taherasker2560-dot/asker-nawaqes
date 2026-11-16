@@ -224,3 +224,29 @@ run('Customer link: the items\' pictures show in his account when he opens an in
  assert.equal((pdf.match(/\/Subtype \/Link/g)||[]).length,1,'one link: PANADOL');
  assert.match(pdf,/\/URI \(https?:\/\/[^)]*\/store\.html#item=10\)/);
 },{home:true});
+
+// the account comes FIRST (owner 2026-11-16: «اللي يهمني لما العميل يفتح ياخد الرابط يدوس عليه يوصل لحسابه، ويبقى فيه اوبشن بسيط يخش الموقع»)
+run('Customer link: he lands on his account (the balance first), the install button is a plain one after the account\'s own buttons, «الموقع» is a simple way into the site',async({page,base})=>{
+ const tok='c'.repeat(64);
+ await page.evaluate(([c,m,p,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:p,ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[]}))},[CUSTOMERS,MOVES,PHONES,tok]);
+ await page.goto(base+'store.html#me='+tok);
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ // the order of the page: the balance, the order button, the PDF/chat row, then the install button; nothing big about installing above the balance
+ const order=await page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-order')?'order':e.matches('.ac-row')?'row':e.matches('[data-acct-install]')?'install':e.matches('.ac-install-why')?'why':e.matches('.ac-chips')?'chips':e.className||e.tagName));
+ assert.equal(order[0],'balance','the account is the first thing');
+ assert.ok(order.indexOf('install')>order.indexOf('row'),'the install button comes after the account\'s own buttons: '+order.join(','));
+ assert.ok(order.indexOf('install')<order.indexOf('chips'),'but before his movements');
+ // not the big button any more
+ const h=await page.$eval('[data-acct-install]',b=>b.getBoundingClientRect().height);
+ assert.ok(h<=56,'a plain button, not the 64 px one: '+h);
+ const lum=await page.$eval('[data-acct-install]',e=>{const l=c=>{const m=c.match(/\d+(\.\d+)?/g).map(Number);return 0.299*m[0]+0.587*m[1]+0.114*m[2]};const s=getComputedStyle(e);return Math.abs(l(s.color)-l(s.backgroundColor))});
+ assert.ok(lum>120,'its text is readable on its own colour: '+lum);
+ // «🏪 الموقع» in the header: a tap goes to the site's home, the account is still one tap away
+ assert.equal(await text(page,'[data-acct-site]'),'🏪 الموقع');
+ await page.click('[data-acct-site]');
+ await page.waitForSelector('[data-view="home"]:not([hidden])');
+ assert.ok(await page.isHidden('[data-view="account"]'),'the account view is closed on the site');
+ assert.ok(await page.isVisible('#acctCard'),'the home has «حسابي» to go back');
+ await page.click('#acctCard');
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+},{home:true});
