@@ -1,4 +1,4 @@
-/* «آدم» opens the bot for the owner (owner 2026-11-14: «ابعت لحد حسابه … او اغير لون البوت او اعمل اي حاجه يعملها، يتحكم بدالي»).
+/* «آدم» opens the bot for the owner (owner 2026-11-14: «ابعت لحد حسابه … او اغير لون السيستم او اعمل اي حاجه يعملها، يتحكم بدالي»).
    The Android app (adam-android/) opens this page with its commands in the address (one ?adam=… each), after Adam has answered by voice:
      ?adam=go:sales              a section (the same keys as ?tab=: short, read, drafts, stock, customers, vendors, sales, tempsale ...)
      ?adam=cust:123              a customer's statement

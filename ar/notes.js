@@ -1,4 +1,4 @@
-/* «الرئيسية ← ملاحظاتي» (owner 2026-11-15: «مفكرة صوتية جوه البوت … تفكرني بحاجة وانا في الصيدلية … اللاب هيخش على شبكة الصيدلية
+/* «الرئيسية ← ملاحظاتي» (owner 2026-11-15: «مفكرة صوتية جوه السيستم … تفكرني بحاجة وانا في الصيدلية … اللاب هيخش على شبكة الصيدلية
    فتبتدي تنبهني التنبيهات ايه اللي انا محتاجها في الصيدلية، ويظهر لي زي بيان كده … اللي خلص ادوس عليه ان هو خلص»).
    - he writes a note or says it (the phone's own speech recognition, Egyptian Arabic) and taps «ضيف»;
    - a note «افتكرني في الصيدلية» waits; when the laptop says it is on the pharmacy network (ar_presence, written by the hub: it

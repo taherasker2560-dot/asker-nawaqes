@@ -1,4 +1,4 @@
-/* «رابط الموقع» inside the bot (المبيعات ← الموقع), owner 2026-11-12: «تحطلى رابط الموقع جوة البوت».
+/* «رابط الموقع» inside the bot (المبيعات ← الموقع), owner 2026-11-12: «تحطلى رابط الموقع جوة السيستم».
    Open the store, send its link on WhatsApp (the owner picks the chat and sends it himself), copy it, or make a QR card
    to print for the counter. Reads nothing from the database and sends nothing by itself. */
 (function (root) {
@@ -23,7 +23,7 @@
   $('slUrl').textContent = url.replace(/^https?:\/\//, '');
   const say = (t, cls) => { $('slStatus').textContent = t || ''; $('slStatus').className = 'status' + (cls ? ' ' + cls : ''); };
 
-  // same tab, marked as coming from the bot: the store then shows «البوت» to come back here (store/from-bot.js)
+  // same tab, marked as coming from the bot: the store then shows «السيستم» to come back here (store/from-bot.js)
   $('slOpen').addEventListener('click', () => { location.href = url + '?from=bot'; });
   // WhatsApp Business on Android while the box on the supplier tab is ticked (the default): AskerApp.openWhatsApp (ar/app.js)
   $('slWa').addEventListener('click', () => {

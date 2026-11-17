@@ -49,7 +49,7 @@ const PAGE_WORDS: [string, string][] = ([
   ['sales', ['المبيعات', 'مبيعات', 'حركه البيع']],
   ['tempsale', ['البيع المؤقت', 'بيع مؤقت']],
   ['care', ['خدمه العملاء', 'الرسايل']],
-  ['home', ['الرئيسيه', 'الصفحه الرئيسيه', 'البوت']],
+  ['home', ['الرئيسيه', 'الصفحه الرئيسيه', 'البوت', 'السيستم']],
 ] as [string, string[]][]).flatMap(([tab, ws]) => ws.map((w) => [w, tab] as [string, string]));
 /** «افتح الطلبيات» → «drafts»; null when the sentence is more than «افتح + a page». */
 export function pageOf(text: string): string | null {
@@ -385,7 +385,7 @@ async function shortages(c: Ctx, which: string, bagName: string, readAloud: bool
     if (keys.length) for (const n of (await rest(c, 'ar_names?select=name_key,arabic_name,spoken_name&name_key=in.(' + keys.map((k) => '"' + k.replace(/"/g, '') + '"').join(',') + ')')).rows) ar.set(String(n.name_key), String(n.spoken_name || n.arabic_name || ''));
     const nameOf = (r: Json) => spoken(ar.get(String(r.name_key)), String(r.product_name));
     const intro = 'النواقص العامة فيها ' + total + ' صنف';
-    if (readAloud && rows.length) return { speak: intro, walk: { mode: 'read', intro: intro + '. هقرا أكتر المطلوب. بعد كل 3 قول أيوه أكمّل أو لا أقف', items: rows.map((r, i) => ({ id: i + 1, say: nameOf(r) + '، مطلوب ' + num(Number(r.suggested_qty || 1)) })), end_say: 'خلصت. الباقي على البوت' }, do_now: [{ type: 'open_tab', tab: 'short' }] };
+    if (readAloud && rows.length) return { speak: intro, walk: { mode: 'read', intro: intro + '. هقرا أكتر المطلوب. بعد كل 3 قول أيوه أكمّل أو لا أقف', items: rows.map((r, i) => ({ id: i + 1, say: nameOf(r) + '، مطلوب ' + num(Number(r.suggested_qty || 1)) })), end_say: 'خلصت. الباقي على السيستم' }, do_now: [{ type: 'open_tab', tab: 'short' }] };
     return { speak: intro + (rows.length ? '. أكتر المطلوب: ' + rows.slice(0, 3).map(nameOf).join('، ') + '. أقرالك الباقي؟' : '.'), show: rows.map((r) => nameOf(r) + ' — ' + num(Number(r.suggested_qty || 1))).join('\n'), do_now: [{ type: 'open_tab', tab: 'short' }], ctx: { list: 'general' } };
   }
   const all = bagList(await bags(c, now));

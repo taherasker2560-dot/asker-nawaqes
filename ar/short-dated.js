@@ -1,4 +1,4 @@
-/* «الصلاحيات ← قصيرة» (owner 2026-11-15: «تقرير بعد ما تدخل الفواتير يظهر لي في البوت بالصلاحيات الاصناف اللي انا وافقت عليها وما
+/* «الصلاحيات ← قصيرة» (owner 2026-11-15: «تقرير بعد ما تدخل الفواتير يظهر لي في السيستم بالصلاحيات الاصناف اللي انا وافقت عليها وما
    رجعتهاش وصلاحيتها اقل من سنة وست شهور»).
    After the purchase invoices are entered in PharmaFly: the items on them that he accepted (they are on the invoice) and did NOT
    return to the supplier, whose expiry is less than 18 months away, shortest expiry first, with the supplier, the invoice and what

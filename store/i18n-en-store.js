@@ -1,4 +1,4 @@
-/* The store's English (owner 2026-11-12: «اعمل لي الموقع كمان باللغتين زي البوت»). Same engine as the bot (ar/i18n.js),
+/* The store's English (owner 2026-11-12: «اعمل لي الموقع كمان باللغتين زي السيستم»). Same engine as the system (ar/i18n.js),
    loaded right before it: «exact» = whole texts ({0}, {1} = a number or a name the code puts in), «phrases» = pieces that
    can be joined. Item names show in English; the Arabic item names, what a customer typed and the WhatsApp messages are
    never translated. A new Arabic text on the store needs its line here (tests/store-english.cjs lists the missing ones).
@@ -77,8 +77,8 @@ window.AskerEN = {
   "السلة": "Cart",
   "القائمة": "Menu",
   "رجوع": "Back",
-  "رجوع للبوت": "Back to the bot",
-  "البوت": "Bot",
+  "رجوع للسيستم": "Back to the system",
+  "السيستم": "System",
   "اقفل": "Close",
   "دوّر": "Search",
   "دوّر على دوا أو منتج…": "Search for a medicine or product…",
@@ -355,7 +355,7 @@ window.AskerEN = {
   "انزل واختار «إضافة إلى الشاشة الرئيسية»": "Scroll down and choose “Add to Home Screen”",
   "دوس «إضافة» فوق": "Tap “Add” at the top",
   "تمام": "OK",
-  "→ رجوع للبوت": "→ Back to the bot",
+  "→ رجوع للسيستم": "→ Back to the system",
   "ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.": "This is the customer's account as they will see it. It isn't saved or installed on your phone.",
   "عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية": "Open your account and order from us in one tap from your home screen",
   "على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.": "On iPhone: tap the Share button ⬆️, then “Add to Home Screen”. If you can't find it, open the link in Safari.",
