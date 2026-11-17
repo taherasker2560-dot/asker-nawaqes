@@ -79,6 +79,9 @@
     pin: 'هتأكّد التحويل بنفسك. الصيدلية بتسجّل الدفعة بعد ما تشوف التحويل.',
     noDial: 'افتح تطبيق «أنا فودافون» وحوّل للرقم ده.',
     ipaSteps: 'افتح تطبيق إنستا باي، واختار «تحويل»، والصق العنوان.',
+    copyAmount: '📋 انسخ المبلغ',
+    ipaStepsAmount: 'افتح تطبيق إنستا باي، واختار «تحويل»، والصق العنوان والمبلغ.',
+    ipaStepsLink: '١) دوس «انسخ المبلغ»  ٢) افتح إنستا باي  ٣) الصق المبلغ في خانة المبلغ',
     sheetTitle: 'ادفع حسابك',
     sheetAmount: 'المبلغ (تقدر تعدّله)',
     sheetClose: 'تمام',
@@ -122,15 +125,26 @@
     if (!v) return '';
     const shown = method === 'vodafone' ? v : v.kind === 'link' ? '' : v.value;
     const proof = proofHref(info.whatsapp, method, a, who);
-    let open = '';
-    if (method === 'vodafone') open = android() ? `<a class="pay-btn pay-main" href="${esc(vodafoneDial(v, a))}" data-pay-open>${esc(TEXTS.dial)}</a>` : '';
-    else if (v.kind === 'link') open = `<a class="pay-btn pay-main" href="${esc(v.value)}" target="_blank" rel="noopener" data-pay-open>${esc(TEXTS.openLink)}</a>`;
-    const copyValue = method === 'instapay' && v.kind === 'link' ? v.value : shown;
-    const how = method === 'vodafone' ? (android() ? '' : TEXTS.noDial) : (v.kind === 'link' ? '' : TEXTS.ipaSteps);
+    // the buttons (owner 2026-11-17: «التحويل بتاع انستا كده ما بقاش سهل»; InstaPay's link carries no amount, so «انسخ المبلغ» puts it on the clipboard to paste into the app):
+    // Vodafone Cash: copy the number + the dialer (Android) or copy the amount (a phone that cannot dial);
+    // InstaPay with his link: open the app's link + copy the amount; InstaPay with an address / mobile: copy it + copy the amount
+    const btn = (value, label) => `<button type="button" class="pay-btn" data-pay-copy="${esc(value)}">${esc(label)}</button>`;
+    const amountBtn = a ? btn(String(a), TEXTS.copyAmount) : '';
+    let row, how = '';
+    if (method === 'vodafone') {
+      row = btn(shown, TEXTS.copy) + (android() ? `<a class="pay-btn pay-main" href="${esc(vodafoneDial(v, a))}" data-pay-open>${esc(TEXTS.dial)}</a>` : amountBtn);
+      how = android() ? '' : TEXTS.noDial;
+    } else if (v.kind === 'link') {
+      row = `<a class="pay-btn pay-main" href="${esc(v.value)}" target="_blank" rel="noopener" data-pay-open>${esc(TEXTS.openLink)}</a>` + (a ? amountBtn : btn(v.value, TEXTS.copyIpa));
+      how = a ? TEXTS.ipaStepsLink : '';
+    } else {
+      row = btn(shown, v.kind === 'phone' ? TEXTS.copy : TEXTS.copyIpa) + amountBtn;
+      how = a ? TEXTS.ipaStepsAmount : TEXTS.ipaSteps;
+    }
     return `<div class="pay-card" data-pay-card="${esc(method)}">` +
       `<div class="pay-amt">${esc((a ? TEXTS.amountLine : TEXTS.amountNone).replace('{a}', money(a)).replace('{m}', name))}</div>` +
       (shown ? `<div class="pay-num" dir="ltr" translate="no">${esc(shown)}</div>` : '') +
-      `<div class="pay-row"><button type="button" class="pay-btn" data-pay-copy="${esc(copyValue)}">${esc(method === 'vodafone' || v.kind === 'phone' ? TEXTS.copy : TEXTS.copyIpa)}</button>${open}</div>` +
+      `<div class="pay-row">${row}</div>` +
       (how ? `<p class="pay-how">${esc(how)}</p>` : '') +
       (proof ? `<a class="pay-proof" href="${esc(proof)}" target="_blank" rel="noopener" data-pay-proof>${esc(TEXTS.proof)}</a>` : '') +
       `<p class="pay-pin">${esc(TEXTS.pin)}</p></div>`;
