@@ -318,3 +318,7 @@ body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(s
 .ac-mini.owe b { color: var(--accent-text); }
 .ac-mini small { font-size: 11px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { #acctBox > :not(.ac-tabs) { animation: none; } }
+
+/* ---- «📝 شكوى أو اقتراح» (owner 2026-11-18): the account's tile and the banner on the messages page ---- */
+.ac-fb-tile { text-decoration: none; }
+.ch-topic { margin: 6px 12px 0; padding: 8px 10px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent-text); font-size: 12.5px; line-height: 1.7; }

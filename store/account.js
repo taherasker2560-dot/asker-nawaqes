@@ -145,6 +145,8 @@
     guideOk: 'تمام',
     // the pharmacy's own phone (the bot signed in): a look only
     backBot: '→ رجوع للبوت',
+    feedback: '📝 شكوى أو اقتراح',
+    feedbackHint: 'اكتبها أو سجّلها فويس',
     preview: 'ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
@@ -442,6 +444,8 @@
     html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
     // «⏰ منبه الدوا» (2026-11-17, store/alarm.js): the customer's own dose reminders, kept on his phone
     html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
+    // «📝 شكوى أو اقتراح» (2026-11-18, owner: «رابط يوصل لرسائل الصفحة بالشكاوى والمقترحات … فويس أو مكتوبة»): the messages page, opened as a complaint / suggestion
+    html += root.AskerStoreChat ? `<div class="ac-al-wrap"><a href="#chat" class="ac-reg-btn ac-fb-tile" data-ac-feedback><b>${esc(TEXTS.feedback)}</b><small>${esc(TEXTS.feedbackHint)}</small></a></div>` : '';
     // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number. Also in the owner's look on the pharmacy's own phone
     // (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
     const P = PAY();
@@ -565,6 +569,7 @@
       return;
     }
     if (e.target.closest('[data-acct-guide-close]') || (e.target.id === 'acctGuide')) { guide = false; draw(); return; }
+    if (e.target.closest('[data-ac-feedback]')) { try { root.sessionStorage.setItem('asker_chat_topic', 'feedback'); } catch (err) { /* private window: the plain messages page opens */ } return; }
     const f = e.target.closest('[data-acct-filter]');
     if (f) { st.tab = f.dataset.acctFilter; draw(); toTop(); return; }
     const it = e.target.closest('[data-acct-items]');

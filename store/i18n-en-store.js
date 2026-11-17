@@ -544,7 +544,14 @@ window.AskerEN = {
   "المتاح عندنا {0} علب بس": "We have only {0} packs",
   "المتاح عندنا {0} علبة بس": "We have only {0} packs",
   "خليها {0}": "Make it {0}",
-  "ده آخر المتاح عندنا": "That's all we have"
+  "ده آخر المتاح عندنا": "That's all we have",
+  "📝 شكوى أو اقتراح": "📝 Complaint or suggestion",
+  "اكتبها أو سجّلها فويس": "Write it or record a voice note",
+  "بتكتب شكوى أو اقتراح: اكتبها أو سجّلها فويس وهتوصل للصيدلية": "You are writing a complaint or suggestion: write it or record a voice note and it reaches the pharmacy",
+  "📝 شكوى/اقتراح:": "📝 Complaint/suggestion:",
+  "📝 شكوى/اقتراح (فويس)": "📝 Complaint/suggestion (voice)",
+  "اكتب شكواك أو اقتراحك…": "Write your complaint or suggestion…",
+  "إلغاء": "Cancel"
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",
