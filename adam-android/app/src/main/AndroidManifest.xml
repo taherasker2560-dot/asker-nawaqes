@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- a short buzz when Adam is ready to hear the next sentence in a conversation (2026-11-17) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- lets Adam open the bot / WhatsApp / an app while the phone is in your pocket (you switch it on yourself in the settings) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
