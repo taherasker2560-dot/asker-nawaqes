@@ -324,6 +324,8 @@
     try {
       const last = older ? st.moves[st.moves.length - 1] : null;
       const args = { p_token: token, p_limit: PAGE };
+      // the owner's look on the pharmacy's own phone (the bot's «👁 شوف صفحته»): not counted as the customer opening his link (migration 202611170400)
+      if (pharmacyPhone) args.p_preview = true;
       if (last) { args.p_before_at = last.at; args.p_before_id = last.id; }
       const { data, error } = await client.rpc('ar_customer_view', args);
       if (error) throw error;

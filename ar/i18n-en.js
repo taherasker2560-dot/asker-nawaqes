@@ -3,7 +3,7 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
-  "اللهم صل على النبي ﷺ": "Peace and blessings be upon the Prophet ﷺ",
+ "اللهم صل على النبي ﷺ": "Peace and blessings be upon the Prophet ﷺ",
  "أصناف جديدة في أمر الشراء": "New products in the purchase order",
  "أصناف جديدة في أمر الشراء ({0})": "New products in the purchase order ({0})",
  "طلب الجهاز × طلب البوت": "Machine order × bot order",
@@ -837,6 +837,8 @@ window.AskerEN = {
   "باسورد جديد": "New password",
   "الباسورد الجديد:": "The new password:",
   "ابعته على واتساب": "Send it on WhatsApp",
+  "👁 شوف صفحته": "👁 See his page",
+  "الصفحة ما اتفتحتش: {0}": "The page did not open: {0}",
   "ما فتحش": "Never opened",
   "من {0} يوم": "{0} days ago",
   "من {0} يوم · غالبًا شاله": "{0} days ago · probably removed it",
