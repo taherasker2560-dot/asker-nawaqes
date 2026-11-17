@@ -151,6 +151,7 @@
     // Samsung Internet's own install is blocked by Google Play Protect: open the account in Chrome (2026-11-16)
     installSamsung: 'متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن». افتح الرابط في كروم، وبعدين دوس «ثبّت التطبيق الآن».',
     installOther: 'افتح قايمة المتصفح (⋮ أو ≡)، واختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
+    scan: '📷 كرّر دواك بالباركود',
     // the home page's box, for anyone who opens the site's link, a customer or not (owner 2026-11-17)
     homeInstall: '📲 ثبّته',
     homeAgain: '📲 دوسة كمان',
@@ -432,6 +433,8 @@
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
     html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
+    // «كرّر دواك بالباركود» (2026-11-17, store/scan.js): the camera / the code / the name put his usual items in the order
+    html += `<a href="#scan" class="ac-btn ac-scan">${esc(TEXTS.scan)}</a>`;
     // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number. Also in the owner's look on the pharmacy's own phone
     // (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
     const P = PAY();

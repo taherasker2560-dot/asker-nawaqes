@@ -212,3 +212,40 @@ html.night .sg-err { background: rgba(255, 90, 70, 0.14); color: #ffb4a8; }
 .site-gate-card button.linklike { min-height: 0; height: auto; padding: 6px 8px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
 .site-gate-card .sg-pw button.linklike { font-size: 12.5px; }
 .site-gate-card .sg-switch { display: block; width: 100%; margin-top: 8px; font-size: 14px; }
+
+/* ---------- كرّر دواك بالباركود (2026-11-17): store/scan.js ---------- */
+.scan-intro { margin: 4px 16px 10px; padding: 11px 14px; border-radius: 22px; background: var(--accent-soft, #ebf1f9); color: var(--ink); font-size: 13.5px; font-weight: 600; line-height: 1.9; }
+.scan-modes { display: flex; gap: 8px; margin: 0 16px 10px; }
+.scan-modes button { flex: 1; min-height: 44px; border: 0; border-radius: 999px; background: var(--card); color: var(--ink); box-shadow: var(--sh-1); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.scan-modes button.on { background: var(--dark); color: #fff; }
+.scan-modes button[hidden] { display: none; }
+.scan-cam { position: relative; margin: 0 16px 10px; height: 118px; border-radius: 22px; overflow: hidden; background: #1c1210; }
+.scan-cam[hidden], .scan-code[hidden], .scan-name[hidden] { display: none; }
+.scan-cam video { width: 100%; height: 100%; object-fit: cover; }
+.scan-frame { position: absolute; left: 12%; right: 12%; top: 30%; bottom: 30%; border: 2.5px solid #4ade80; border-radius: 10px; pointer-events: none; }
+.scan-frame::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.scan-hint { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 11.5px; color: #e6dcd6; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
+.scan-switch { position: absolute; top: 6px; inset-inline-start: 8px; min-height: 30px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.88); color: #3a2018; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.scan-code { display: flex; gap: 8px; margin: 0 16px 10px; }
+.scan-code input, .scan-name input { flex: 1; width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); font: inherit; font-size: 17px; }
+.scan-code button { min-width: 84px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.scan-name { margin: 0 16px 10px; }
+.scan-hit { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px dashed var(--line); }
+.scan-hit .scan-nm { flex: 1; min-width: 0; }
+.scan-nm h3 { margin: 0; font-size: 14px; }
+.scan-msg { min-height: 20px; margin: 0 18px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.scan-msg.ok { color: #166534; }
+.scan-msg.bad { color: #b42318; }
+html.night .scan-msg.ok { color: #86efac; }
+html.night .scan-msg.bad { color: #ffb4a8; }
+.scan-list { margin: 0 16px 12px; }
+.scan-line-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+.scan-line-row:last-child { border-bottom: 0; }
+.scan-line-row.fresh { animation: scan-pop 0.6s ease; }
+@keyframes scan-pop { from { background: rgba(74, 222, 128, 0.25); } to { background: transparent; } }
+.scan-new { margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; background: #e6f5ec; color: #166534; font-size: 10.5px; }
+.scan-go { display: flex; align-items: center; justify-content: center; min-height: 54px; margin: 0 16px 12px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 800; text-decoration: none; box-shadow: var(--sh-2); }
+.scan-go[hidden] { display: none; }
+.scan-link { display: block; margin: 6px 16px 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--accent); }
+#acctBox .ac-scan { border: 0; background: var(--card); color: var(--accent); box-shadow: var(--sh-1); }
+@media (prefers-reduced-motion: reduce) { .scan-line-row.fresh { animation: none; } }
