@@ -27,7 +27,7 @@ body { background: var(--bg); }
 
 /* ---------- the blessing strip + the header ---------- */
 .bless { margin: 0; padding: 6px 12px; text-align: center; font-size: 11.5px; font-weight: 500; letter-spacing: 0.2px; color: var(--green); background: var(--card); border-bottom: 1px solid var(--line); }
-html body .appbar { background: var(--card); color: var(--ink); border-radius: 0; border-bottom: 1px solid var(--line); box-shadow: none; padding-bottom: 10px; }
+html body .appbar { background: var(--card); color: var(--ink); border-radius: 0; border-bottom: 1px solid var(--line); box-shadow: none; padding-top: 8px; padding-bottom: 8px; }
 .appbar::after { display: none !important; }
 .appbar .mark { box-shadow: none; border: 1px solid var(--line); }
 .appbar h1 { color: var(--ink); font-weight: 600; }
@@ -80,3 +80,7 @@ html body input[type='search'] { border-radius: 4px !important; }
 
 /* the main buttons of the item editor and the like: the accent, never black */
 .im-edit-btn { background: var(--crimson); color: #fff; }
+
+/* the header a little slimmer; the sale screen keeps its bill high on the page (owner 2026-11-13), so the strip rests there */
+.appbar .mark { width: 40px; height: 40px; }
+body.ts-page .bless { display: none; }
