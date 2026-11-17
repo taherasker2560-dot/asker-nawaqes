@@ -537,6 +537,7 @@ window.AskerEN = {
   "المنبه بيرن لما صفحة الصيدلية تكون مفتوحة على موبايلك. فعّل الإشعارات عشان يوصلك وقت الجرعة حتى والمتصفح مقفول.": "The alarm rings when the pharmacy's page is open on your phone. Turn on notifications so it reaches you at each dose time even when the browser is closed.",
   "🔊 اسمع الاسم": "🔊 Hear the name",
   "تجربة المنبه": "Alarm test",
+  "الموبايل ما نطقش الاسم. اتأكد إن صوت الوسائط مش واطي أو على الصامت، وإن عندك صوت عربي: إعدادات الموبايل ← تحويل النص إلى كلام.": "The phone didn't say the name. Make sure the media volume is not low or on silent and that you have an Arabic voice: phone settings → Text-to-speech.",
   "دوس في أي مكان عشان تسمع اسم الدوا": "Tap anywhere to hear the medicine's name",
   "في صنف طلبت منه أكتر من المتاح عندنا. عدّل الكمية وابعت تاني": "One item is above what we have. Change the quantity and send again",
   "المتاح عندنا علبة واحدة بس": "We have only 1 pack",

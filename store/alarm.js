@@ -37,7 +37,7 @@
     add: '＋ منبه جديد',
     speak: '🔊 ينطق اسم الدوا بصوت الموبايل',
     tryVoice: '▶ جرّب الصوت',
-    tryPhrase: 'ميعاد دواء، تجربة الصوت',
+    tryPhrase: 'ميعاد دواء تجريبي الآن، خدمة مقدمة من صيدلية عسكر',
     notifOn: '🔔 فعّل الإشعارات',
     notifWhy: 'مواعيد الجرعات بس (من غير اسم الدوا) بتتبعت لسيرفر الصيدلية عشان الإشعار يوصلك والمتصفح مقفول. اسم الدوا بيفضل على موبايلك.',
     notifDone: 'الإشعارات شغالة: هيجيلك إشعار وقت الجرعة حتى والمتصفح مقفول، ودوسة عليه تفتح الصفحة وتنطق اسم الدوا.',
@@ -63,7 +63,9 @@
     addTime: '＋ ميعاد',
     removeTime: 'شيل الميعاد',
     says: 'هيقول:',
-    sayName: 'ميعاد دواء {n}',
+    // what the phone says (owner 2026-11-18: «ميعاد فيموجيسال الآن، خدمة مقدمة من صيدلية عسكر بالظبط كده»)
+    sayName: 'ميعاد {n} الآن، خدمة مقدمة من صيدلية عسكر',
+    speakFail: 'الموبايل ما نطقش الاسم. اتأكد إن صوت الوسائط مش واطي أو على الصامت، وإن عندك صوت عربي: إعدادات الموبايل ← تحويل النص إلى كلام.',
     save: 'حفظ المنبه',
     del: '🗑 احذف المنبه',
     needName: 'اكتب اسم الدوا الأول',
@@ -123,9 +125,16 @@
     }
     return out;
   }
-  const sayText = (name) => fill(TEXTS.sayName, { n: name });
-  // the sentence the phone says for what is due now: one medicine, or several («ميعاد دواء أ، وب»)
-  const sayDue = (due) => fill(TEXTS.sayName, { n: due.map((d) => d.say).join('، و') });
+  // the name as it is SAID: the brand only, without the form and the strength after it («فيموجيسال ق» → «فيموجيسال»; «زانبرازان ٢٠ قرص» → «زانبرازان»); the card and the list keep the full name
+  const FORM_TAIL = /^(ق|ك|ش|قرص|اقراص|أقراص|كبسولة|كبسولات|شراب|حقنة|أمبول|امبول|فوار|نقط|نقطة|كريم|مرهم|لبوس|بخاخ|مجم|ملجم|جم|مل|ملي|mg|ml|g)$/i, NUM_TAIL = /^[0-9٠-٩]+(?:[.,٫][0-9٠-٩]+)?$/;
+  function spokenName(name) {
+    const orig = String(name == null ? '' : name).replace(/\s+/g, ' ').trim(), parts = orig.split(' ');
+    while (parts.length > 1 && (FORM_TAIL.test(parts[parts.length - 1]) || NUM_TAIL.test(parts[parts.length - 1]))) parts.pop();
+    return parts.join(' ') || orig;
+  }
+  const sayText = (name) => fill(TEXTS.sayName, { n: spokenName(name) });
+  // the sentence the phone says for what is due now: one medicine, or several («ميعاد أ، وب الآن، خدمة مقدمة من صيدلية عسكر»)
+  const sayDue = (due) => fill(TEXTS.sayName, { n: due.map((d) => spokenName(d.say)).join('، و') });
   const onCount = (data) => data.items.filter((x) => x.on).length;
   const countText = (n) => (n === 1 ? TEXTS.oneOn : n === 2 ? TEXTS.twoOn : fill(n >= 3 && n <= 10 ? TEXTS.someOn : TEXTS.manyOn, { n }));
   const newId = () => 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -143,7 +152,7 @@
       const c = f('Africa/Cairo', new Date(t));
       return `${c.hour}:${c.minute}`;
     } catch (e) { return hhmm; }
-  }  const api = { cairoTime, TEXTS, KEY, PRESETS, LATE_MIN, OPEN_LATE_MIN, SNOOZE_MIN, minutesOf, hhmmOf, timeText, normTimes, clean, dueNow, sayText, sayDue, countText, onCount, dayKey, newId };
+  }  const api = { cairoTime, TEXTS, KEY, PRESETS, LATE_MIN, OPEN_LATE_MIN, SNOOZE_MIN, spokenName, minutesOf, hhmmOf, timeText, normTimes, clean, dueNow, sayText, sayDue, countText, onCount, dayKey, newId };
   root.AskerStoreAlarmLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -172,15 +181,36 @@
     let v = []; try { v = s.getVoices() || []; } catch (e) { v = []; }
     return v.find((x) => /^ar[-_]EG/i.test(x.lang)) || v.find((x) => /^ar/i.test(x.lang)) || null;
   }
+  // Says the sentence with the phone's own voice, trying three ways before giving up (owner 2026-11-18, a photo of the card on his phone: «اسمع الاسم مبينطقش ولا بيعمل حاجة»):
+  // 0 = the Arabic (Egypt) voice the engine lists; 1 = «ar» with the engine's own choice (a listed voice that is not really installed stays silent); 2 = the engine's default.
+  // A try that ends without ever starting, or with an error, goes to the next one; when all fail the card says so with the engine's reason, so a phone that cannot speak is not a silent mystery.
   function say(text) {
     const s = synth(); if (!s || !data.speak) return false;
+    const fail = (code) => { if (ring) { ring.speakErr = code || 'unknown'; drawRing(); } };
+    const attempt = (n) => {
+      try {
+        const u = new root.SpeechSynthesisUtterance(text), v = n === 0 ? arabicVoice() : null;
+        u.lang = n === 0 ? (v ? v.lang : 'ar-EG') : n === 1 ? 'ar' : ''; if (v) u.voice = v; u.rate = 0.9; u.volume = 1;
+        let started = false, handled = false;
+        const t0 = Date.now();
+        const next = (code) => { if (handled) return; handled = true; if (n < 2) attempt(n + 1); else fail(code); };
+        u.onstart = () => { started = true; if (ring) { ring.spoke = true; ring.speakErr = ''; } };   // a browser that is not allowed to speak yet never starts: the card then asks for a tap
+        u.onend = () => { if (!started && Date.now() - t0 < 600) next('silent'); };   // «ended» at once without ever starting = nothing was said (a real sentence takes seconds)
+        u.onerror = (e) => {
+          const c = e && e.error;
+          if (c === 'canceled' || c === 'interrupted') return;   // our own cancel of the one before
+          if (c === 'not-allowed') { if (ring && !ring.spoke) askTap(); return; }   // Chrome says so out loud: no tap yet on this page
+          next(c);
+        };
+        s.speak(u);
+      } catch (e) { if (n < 2) attempt(n + 1); else fail('exception'); }
+    };
     try {
-      s.cancel();
-      const u = new root.SpeechSynthesisUtterance(text), v = arabicVoice();
-      u.lang = v ? v.lang : 'ar-EG'; if (v) u.voice = v; u.rate = 0.9; u.volume = 1;
-      u.onstart = () => { if (ring) ring.spoke = true; };   // a browser that is not allowed to speak yet never starts: the card then asks for a tap
-      u.onerror = (e) => { if (ring && !ring.spoke && e && e.error === 'not-allowed') askTap(); };   // Chrome says so out loud: no tap yet on this page
-      s.speak(u); return true;
+      if (ring) ring.speakErr = '';
+      if (typeof s.resume === 'function') s.resume();   // Chrome on Android can leave the queue paused after the page was in the background
+      // a speech still running or waiting is cancelled first, and the new one starts a moment later (cancel + speak in one breath is dropped on some phones)
+      if (s.speaking || s.pending) { s.cancel(); setTimeout(() => attempt(0), 90); } else attempt(0);
+      return true;
     } catch (e) { return false; }
   }
   if (synth()) { try { root.speechSynthesis.addEventListener('voiceschanged', () => { voiceOk = !!arabicVoice(); if (view) draw(); }); voiceOk = !!arabicVoice(); } catch (e) { /* no voices event */ } }
@@ -280,6 +310,7 @@
     el.innerHTML = `<div class="al-ring-card"><div class="al-ring-ico" aria-hidden="true">⏰</div><h2>${esc(TEXTS.ringTitle)}</h2>` +
       ring.due.map((d) => `<div class="al-ring-med notr" dir="auto">${esc(d.name)}<small>${esc(timeText(d.time))}</small></div>`).join('') +
       (ring.needTap ? `<p class="al-ring-hint">${esc(TEXTS.tapHint)}</p>` : '') +
+      (ring.speakErr ? `<p class="al-warn">${esc(TEXTS.speakFail)} <small dir="ltr" translate="no">(${esc(ring.speakErr)})</small></p>` : '') +
       // the page has not been touched yet: the «اسمع الاسم» button comes first and big (a tap on it is the tap the browser wants)
       `${ring.needTap && data.speak && synth() ? `<button type="button" class="al-btn" data-al-hear>${esc(TEXTS.hear)}</button>` : ''}<button type="button" class="al-btn${ring.needTap && data.speak && synth() ? ' ghost' : ''}" data-al-took>${esc(TEXTS.took)}</button>${data.speak && synth() && !ring.needTap ? `<button type="button" class="al-btn ghost" data-al-hear>${esc(TEXTS.hear)}</button>` : ''}<button type="button" class="al-btn ghost" data-al-snooze>${esc(TEXTS.snooze)}</button></div>`;
   }
