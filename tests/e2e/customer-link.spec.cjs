@@ -161,6 +161,7 @@ run('Customer link: he opens it, sees only his account with the items, orders on
 
 run('Customer link on the pharmacy\'s phone (the bot signed in): a look only, back to the bot, nothing kept (owner: «طلعني من البوت»)',async({page,base})=>{
  const tok='c'.repeat(64);
+ await page.addInitScript(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_store_pay_info:()=>({vodafone:'01012345678',instapay:'asker@instapay',whatsapp:'01003032931'})})});
  await page.evaluate(([c,m,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[]}));
   localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"access_token":"x"}');
   localStorage.setItem('asker_store_customer',t)},[CUSTOMERS,MOVES,tok]);
@@ -171,6 +172,13 @@ run('Customer link on the pharmacy\'s phone (the bot signed in): a look only, ba
  assert.equal(await page.getAttribute('#acctBox .ac-back','href'),'asker-nawaqes-arabic.html');
  assert.equal(await page.$('[data-acct-install]'),null);
  assert.equal(await page.getAttribute('link[rel="manifest"]','href'),'manifest-store.json');
+ // the owner's look shows the customer's «ادفع حسابك» too (he owes 7,174.50 and the pharmacy has its numbers): what the customer sees
+ await page.waitForSelector('[data-acct-paysheet]');
+ await page.click('[data-acct-paysheet]');
+ await page.waitForSelector('.pay-sheet #payAmount');
+ assert.equal(await page.inputValue('#payAmount'),'7175');
+ assert.equal(await text(page,'.pay-sheet .pay-num'),'01012345678');
+ await page.click('[data-pay-close]');
  // nothing kept on the phone (the one kept before is gone); this tab only
  assert.deepEqual(await page.evaluate(()=>[localStorage.getItem('asker_store_customer'),sessionStorage.getItem('asker_store_customer')]),[null,tok]);
  // the store opened from the bot later (a new tab) is the store, not that customer's account
