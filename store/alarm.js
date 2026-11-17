@@ -18,6 +18,7 @@
   const KEY = 'asker_dose_alarms', FIRED = 'asker_dose_fired';
   const CHECK_MS = 15000;     // how often the page looks at the clock
   const LATE_MIN = 10;        // a time that passed while the page was closed still rings for 10 minutes
+  const OPEN_LATE_MIN = 90;   // he came from the dose notification: the time that notification was for rings even if he is an hour late
   const SNOOZE_MIN = 10;
   const SAY_EVERY_MS = 22000, MAX_SAYS = 3;
   const PRESETS = { once: ['08:00'], twice: ['08:00', '20:00'], thrice: ['08:00', '14:00', '20:00'], eight: ['06:00', '14:00', '22:00'] };
@@ -71,6 +72,7 @@
     took: '✓ خدته',
     hear: '🔊 اسمع الاسم',
     tapHint: 'دوس في أي مكان عشان تسمع اسم الدوا',
+    testName: 'تجربة المنبه',
     snooze: '⏱ ذكّرني بعد 10 دقايق',
     notifTitle: '⏰ ميعاد دواك',
     back: 'رجوع',
@@ -106,13 +108,13 @@
     return out;
   }
   // the alarms that ring now: a time of an alarm that is on, passed in the last LATE_MIN minutes today and not rung yet, or a snooze that is over; a hidden `key` stops a second ring
-  function dueNow(data, now, fired) {
-    const nowMin = now.getHours() * 60 + now.getMinutes(), day = dayKey(now), out = [];
+  function dueNow(data, now, fired, lateMin) {
+    const nowMin = now.getHours() * 60 + now.getMinutes(), day = dayKey(now), out = [], lim = lateMin == null ? LATE_MIN : lateMin;
     for (const it of data.items) {
       if (!it.on) continue;
       for (const t of it.times) {
         const key = `${day}|${it.id}|${t}`, m = minutesOf(t), late = nowMin - m;
-        if (late >= 0 && late <= LATE_MIN && !(fired && fired[key])) out.push({ id: it.id, name: it.name, say: it.say || it.name, time: t, key });
+        if (late >= 0 && late <= lim && !(fired && fired[key])) out.push({ id: it.id, name: it.name, say: it.say || it.name, time: t, key });
       }
     }
     for (const s of data.snoozes) {
@@ -141,7 +143,7 @@
       const c = f('Africa/Cairo', new Date(t));
       return `${c.hour}:${c.minute}`;
     } catch (e) { return hhmm; }
-  }  const api = { cairoTime, TEXTS, KEY, PRESETS, LATE_MIN, SNOOZE_MIN, minutesOf, hhmmOf, timeText, normTimes, clean, dueNow, sayText, sayDue, countText, onCount, dayKey, newId };
+  }  const api = { cairoTime, TEXTS, KEY, PRESETS, LATE_MIN, OPEN_LATE_MIN, SNOOZE_MIN, minutesOf, hhmmOf, timeText, normTimes, clean, dueNow, sayText, sayDue, countText, onCount, dayKey, newId };
   root.AskerStoreAlarmLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -177,6 +179,7 @@
       const u = new root.SpeechSynthesisUtterance(text), v = arabicVoice();
       u.lang = v ? v.lang : 'ar-EG'; if (v) u.voice = v; u.rate = 0.9; u.volume = 1;
       u.onstart = () => { if (ring) ring.spoke = true; };   // a browser that is not allowed to speak yet never starts: the card then asks for a tap
+      u.onerror = (e) => { if (ring && !ring.spoke && e && e.error === 'not-allowed') askTap(); };   // Chrome says so out loud: no tap yet on this page
       s.speak(u); return true;
     } catch (e) { return false; }
   }
@@ -209,12 +212,21 @@
     sayCount = 0;
     const once = () => { if (!ring || sayCount >= MAX_SAYS) return; sayCount++; say(sayDue(ring.due)); };
     once(); clearInterval(sayTimer); sayTimer = setInterval(once, SAY_EVERY_MS);
-    // opened from a notification the page may not be allowed to speak before a tap: the card says so, and the first tap speaks
-    if (data.speak && synth()) setTimeout(() => {
-      if (!ring || ring.spoke) return;
-      ring.needTap = true; drawRing();
-      document.addEventListener('pointerdown', () => { if (ring) say(sayDue(ring.due)); }, { capture: true, once: true });
-    }, 1500);
+    // opened from a notification the page has had no tap, and the browser does not let a page speak before one: the card says so at once (a page nobody touched) or when the engine stays silent,
+    // and the first tap speaks. A tap on a phone is a CLICK (touchend / pointerup): «pointerdown» is not a tap for the browser's speech rule, which is why 11-18's first try stayed silent on his phone.
+    if (data.speak && synth()) {
+      const ua = root.navigator && root.navigator.userActivation;
+      if (ua && ua.hasBeenActive === false) askTap();
+      setTimeout(() => { if (ring && !ring.spoke) askTap(); }, 1500);
+    }
+  }
+  let tapOnce = null;   // the one waiting «first tap» (a ring the customer ignored must not leave a second one behind)
+  function askTap() {
+    if (!ring || ring.needTap) return;
+    ring.needTap = true; drawRing();
+    if (tapOnce) document.removeEventListener('click', tapOnce, true);
+    tapOnce = () => { tapOnce = null; if (ring && !ring.spoke) say(sayDue(ring.due)); };
+    document.addEventListener('click', tapOnce, { capture: true, once: true });
   }
   function stopRing() {
     clearInterval(sayTimer); sayTimer = null;
@@ -225,15 +237,25 @@
   function snooze() {
     if (!ring) return;
     const at = ring.at0 + (Date.now() - ring.wall0) + SNOOZE_MIN * 60000;   // 10 minutes from the tap (the clock the ring started on, so a test clock works too)
-    for (const s of ring.snoozeTimes) data.snoozes.push({ id: s.id, at, time: s.time });
+    for (const s of ring.snoozeTimes) if (s.id !== 'test') data.snoozes.push({ id: s.id, at, time: s.time });
     data.snoozes = data.snoozes.slice(-40); save(); stopRing();
   }
-  function tick(now) {
+  // the page is hidden (another app on top, the screen off): nobody sees the card, so the alarm is NOT used up. Only a notification (once), and the ring waits for the page to be seen
+  // (before 11-18 the hidden page «rang» into the void and marked it done: the customer who then tapped the notification found no card and heard nothing)
+  const notified = new Set();
+  // forced = he came from the dose notification (a worker message or ?dose=1): the alarms that notification was for ring now, even if they already «rang» in a hidden page, up to OPEN_LATE_MIN late
+  function tick(now, forced) {
     if (pharmacy) return [];
     const n = now || new Date();
     data = clean(read(KEY) || data);   // another tab may have changed it
-    const due = dueNow(all(), n, firedMap());
+    const due = dueNow(all(), n, forced === true ? {} : firedMap(), forced === true ? OPEN_LATE_MIN : LATE_MIN);
     if (!due.length) return [];
+    if (document.hidden && forced !== true) {
+      const fresh = due.filter((d) => !notified.has(d.key));
+      fresh.forEach((d) => notified.add(d.key));
+      if (fresh.length) notify(fresh);
+      return due;
+    }
     if (ring) {   // already ringing: the new ones join it
       const keys = new Set(ring.due.map((d) => d.key)); const add = due.filter((d) => !keys.has(d.key));
       if (add.length) { ring.due.push(...add); ring.snoozeTimes.push(...add.map((d) => ({ id: d.id, time: d.time }))); markFired(add.map((d) => d.key)); drawRing(); }
@@ -258,7 +280,8 @@
     el.innerHTML = `<div class="al-ring-card"><div class="al-ring-ico" aria-hidden="true">⏰</div><h2>${esc(TEXTS.ringTitle)}</h2>` +
       ring.due.map((d) => `<div class="al-ring-med notr" dir="auto">${esc(d.name)}<small>${esc(timeText(d.time))}</small></div>`).join('') +
       (ring.needTap ? `<p class="al-ring-hint">${esc(TEXTS.tapHint)}</p>` : '') +
-      `<button type="button" class="al-btn" data-al-took>${esc(TEXTS.took)}</button>${data.speak && synth() ? `<button type="button" class="al-btn ghost" data-al-hear>${esc(TEXTS.hear)}</button>` : ''}<button type="button" class="al-btn ghost" data-al-snooze>${esc(TEXTS.snooze)}</button></div>`;
+      // the page has not been touched yet: the «اسمع الاسم» button comes first and big (a tap on it is the tap the browser wants)
+      `${ring.needTap && data.speak && synth() ? `<button type="button" class="al-btn" data-al-hear>${esc(TEXTS.hear)}</button>` : ''}<button type="button" class="al-btn${ring.needTap && data.speak && synth() ? ' ghost' : ''}" data-al-took>${esc(TEXTS.took)}</button>${data.speak && synth() && !ring.needTap ? `<button type="button" class="al-btn ghost" data-al-hear>${esc(TEXTS.hear)}</button>` : ''}<button type="button" class="al-btn ghost" data-al-snooze>${esc(TEXTS.snooze)}</button></div>`;
   }
 
   // ---------- stage 2: a push at each dose time, with the browser closed ----------
@@ -323,14 +346,33 @@
   async function testNotification() {
     try {
       const reg = await activeRegistration();
-      await reg.showNotification(TEXTS.notifTestTitle, { body: TEXTS.notifTestBody, tag: 'asker-dose-test', lang: 'ar', dir: 'rtl', vibrate: [300, 150, 300], icon: 'icons/arabic-192.png?v=logo2', data: { url: root.location.href } });
+      await reg.showNotification(TEXTS.notifTestTitle, { body: TEXTS.notifTestBody, tag: 'asker-dose-test', lang: 'ar', dir: 'rtl', vibrate: [300, 150, 300], icon: 'icons/arabic-192.png?v=logo2', data: { url: root.location.href, kind: 'test' } });
     } catch (e) { /* no notifications on this phone */ }
   }
-  // a dose push reached the phone's worker while the app is alive in the background: ring and speak at once (no tap needed)
+  // a demo ring (the tap on «جرّب الإشعار»'s notification): the same card, the same voice, a made-up medicine called «تجربة المنبه», so he hears exactly what a dose time does
+  function testRing() {
+    if (pharmacy) return;
+    const n = new Date();
+    if (ring) stopRing();
+    startRing([{ id: 'test', name: TEXTS.testName, say: TEXTS.testName, time: hhmmOf(n.getHours() * 60 + n.getMinutes()), key: 'test|' + n.getTime() }], n);
+  }
+  // he tapped a dose notification: the page rings for what it was about (forced: even if a hidden page already used the alarm up), or runs the demo for the test notification
+  function doseOpened(kind) { if (kind === 'test') testRing(); else tick(null, true); }
+  // a dose push reached the phone's worker while the app is alive in the background: ring and speak at once (no tap needed); a tap on the notification of an open page: the worker says so (dose-open)
   try {
     const sw = root.navigator && root.navigator.serviceWorker;
-    if (sw && sw.addEventListener) { sw.addEventListener('message', (e) => { if (e.data && e.data.type === 'dose-due') tick(); }); if (sw.startMessages) sw.startMessages(); }
+    if (sw && sw.addEventListener) { sw.addEventListener('message', (e) => { const t = e.data && e.data.type; if (t === 'dose-due') tick(); else if (t === 'dose-open') doseOpened(e.data.kind); }); if (sw.startMessages) sw.startMessages(); }
   } catch (e) { /* no worker messages */ }
+  // the page was opened (a new window) by a tap on a dose notification: store/dose/sw.js adds ?dose=1 (?dose=test for the test one); it goes out of the address at once
+  let openedBy = null;
+  try {
+    const m = /[?&]dose=(test|1)(?:&|$)/.exec(root.location.search);
+    if (m) {
+      openedBy = m[1] === 'test' ? 'test' : 'dose';
+      const rest = root.location.search.replace(/^\?/, '').split('&').filter((p) => p && !/^dose=/.test(p));
+      try { root.history.replaceState(null, '', root.location.pathname + (rest.length ? '?' + rest.join('&') : '') + root.location.hash); } catch (e) { /* the address keeps ?dose=: harmless */ }
+    }
+  } catch (e) { /* no address to read */ }
   // ---------- the tile (store/account.js) and the sheet ----------
   function tileHtml() {
     const n = onCount(all());
@@ -441,6 +483,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
   window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
 
-  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); } };
+  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); } };
   schedule();
+  if (openedBy) doseOpened(openedBy);
 })(typeof window === 'undefined' ? globalThis : window);

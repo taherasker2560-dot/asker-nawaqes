@@ -26,6 +26,11 @@ let due = A.dueNow(d1, at(8, 0), {});
 assert.equal(due.length, 1);assert.equal(due[0].time, '08:00');assert.equal(due[0].key, '2026-11-17|a1|08:00');assert.equal(due[0].name, 'زانبرازان ٢٠ قرص');
 assert.equal(A.dueNow(d1, at(8, 10), {}).length, 1, 'still rings 10 minutes late (the page was closed)');
 assert.equal(A.dueNow(d1, at(8, 11), {}).length, 0, 'after that it is missed');
+// he came from the dose notification (11-18): that time rings even an hour late, and even if a hidden page had already used it up (the caller passes no fired map), but not at ninety-one minutes or the day after
+assert.equal(A.dueNow(d1, at(9, 20), {}, A.OPEN_LATE_MIN).length, 1, 'an hour and twenty late: still the notification\'s alarm');
+assert.equal(A.dueNow(d1, at(9, 31), {}, A.OPEN_LATE_MIN).length, 0, 'past ninety minutes: missed');
+assert.equal(A.dueNow(d1, at(8, 11), {}, null).length, 0, 'no window given = the usual ten minutes');
+assert.equal(A.OPEN_LATE_MIN, 90);
 assert.equal(A.dueNow(d1, at(20, 3), {}).length, 1, 'the second time of the day');
 assert.deepEqual(A.dueNow(d1, at(8, 2), { '2026-11-17|a1|08:00': 1 }), [], 'rung already: never twice');
 assert.equal(A.dueNow(d1, at(8, 2, 18), { '2026-11-17|a1|08:00': 1 }).length, 1, 'the next day is a new day: it rings again');
