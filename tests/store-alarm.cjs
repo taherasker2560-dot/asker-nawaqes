@@ -51,7 +51,15 @@ assert.equal(A.sayDue([{ say: 'أ' }, { say: 'ب' }, { say: 'ج' }]), 'ميعا�
 assert.equal(A.dueNow(data([item({ say: 'اسم للنطق' })]), at(8, 0), {})[0].say, 'اسم للنطق');
 assert.equal(A.dueNow(data([item()]), at(8, 0), {})[0].say, 'زانبرازان ٢٠ قرص', 'no special name: the name itself');
 
-// the tile's words
+// the server reads Cairo's clock: a phone in another zone is converted (winter UTC+2, summer UTC+3), a phone in Cairo is left as it is
+const winter = new Date('2026-11-17T12:00:00Z'), summer = new Date('2026-07-17T12:00:00Z');
+assert.equal(A.cairoTime('08:00', winter, 'Africa/Cairo'), '08:00');
+assert.equal(A.cairoTime('08:00', winter, 'UTC'), '10:00', 'a phone on UTC in winter: Cairo is 2 hours ahead');
+assert.equal(A.cairoTime('08:00', summer, 'UTC'), '11:00', 'in summer Cairo is 3 hours ahead of UTC');
+assert.equal(A.cairoTime('23:30', winter, 'UTC'), '01:30', 'past midnight');
+assert.equal(A.cairoTime('08:00', winter, 'Asia/Riyadh'), '07:00', 'Riyadh is 1 hour ahead of Cairo in winter');
+assert.equal(A.cairoTime('20:00', winter, 'America/New_York'), '03:00', 'New York evening = Cairo small hours (UTC-5 in November)');
+assert.equal(A.cairoTime('bad', winter, 'UTC'), null);// the tile's words
 assert.deepEqual([1, 2, 3, 10, 11].map(A.countText), ['منبه واحد شغال', 'منبهين شغالين', '3 منبهات شغالة', '10 منبهات شغالة', '11 منبه شغال']);
 assert.equal(A.onCount(data([item(), item({ id: 'b', on: false })])), 1);
 // the presets are the ones in the picture

@@ -120,7 +120,21 @@
   const onCount = (data) => data.items.filter((x) => x.on).length;
   const countText = (n) => (n === 1 ? TEXTS.oneOn : n === 2 ? TEXTS.twoOn : fill(n >= 3 && n <= 10 ? TEXTS.someOn : TEXTS.manyOn, { n }));
   const newId = () => 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const api = { TEXTS, KEY, PRESETS, LATE_MIN, SNOOZE_MIN, minutesOf, hhmmOf, timeText, normTimes, clean, dueNow, sayText, sayDue, countText, onCount, dayKey, newId };
+  // a time on a phone's clock as Cairo reads it (the pharmacy's clock the server uses: summer time included); the same when the phone is in Cairo. `phoneTz` is for tests.
+  function cairoTime(hhmm, now, phoneTz) {
+    const m = minutesOf(hhmm); if (m == null) return null;
+    try {
+      const phone = phoneTz || new Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!phone || phone === 'Africa/Cairo') return hhmm;
+      const f = (tz, d) => Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+      // the instant when the phone's clock shows hh:mm today: start from the same wall time read as UTC and correct it by what the phone's zone says
+      const base = new Date(now || Date.now()), day = f(phone, base);
+      let t = Date.UTC(+day.year, +day.month - 1, +day.day, Math.floor(m / 60), m % 60);
+      for (let k = 0; k < 2; k++) { const w = f(phone, new Date(t)); t += Date.UTC(+day.year, +day.month - 1, +day.day, Math.floor(m / 60), m % 60) - Date.UTC(+w.year, +w.month - 1, +w.day, +w.hour, +w.minute); }
+      const c = f('Africa/Cairo', new Date(t));
+      return `${c.hour}:${c.minute}`;
+    } catch (e) { return hhmm; }
+  }  const api = { cairoTime, TEXTS, KEY, PRESETS, LATE_MIN, SNOOZE_MIN, minutesOf, hhmmOf, timeText, normTimes, clean, dueNow, sayText, sayDue, countText, onCount, dayKey, newId };
   root.AskerStoreAlarmLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -239,17 +253,6 @@
   const VAPID = 'BEz67xiIZZubLNtifD1Ryqxc6p2j509IsWF6o-YUe5M1BvyWIlUm4NwaRKUP-potwMmyN9_qxqNC2qfn1s5ozwg';   // the public half of the web-push key (the same one store/chat.js uses)
   const keyBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
   const canPush = () => !pharmacy && !!root.navigator && 'serviceWorker' in root.navigator && 'PushManager' in root && !!root.Notification;
-  // a time on this phone's clock as Cairo reads it (the pharmacy's clock the server uses); the same when the phone is in Cairo
-  function cairoTime(hhmm, now) {
-    const m = minutesOf(hhmm); if (m == null) return null;
-    try {
-      const phone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (!phone || phone === 'Africa/Cairo') return hhmm;
-      const d = new Date(now || Date.now()); d.setHours(Math.floor(m / 60), m % 60, 0, 0);
-      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
-      return `${p.hour}:${p.minute}`;
-    } catch (e) { return hhmm; }
-  }
   const serverTimes = () => normTimes([].concat(...data.items.filter((x) => x.on).map((x) => x.times)).map((t) => cairoTime(t)));
   async function activeRegistration() {
     const reg = await root.navigator.serviceWorker.register('store/dose/sw.js', { scope: 'store/dose/' });

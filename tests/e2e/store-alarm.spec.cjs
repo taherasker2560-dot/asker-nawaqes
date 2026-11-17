@@ -11,6 +11,7 @@ const ROWS=[
  {i:12,n:'XANPRAZAN 20 TAB',ar:'زانبرازان ٢٠ قرص',gap:28,times:5,q:1,last:day(36),avail:true},
 ];
 const FAKE=([rows,perm])=>{
+ {const ro=Intl.DateTimeFormat.prototype.resolvedOptions;Intl.DateTimeFormat.prototype.resolvedOptions=function(){return {...ro.call(this),timeZone:localStorage.getItem('__tz')||'Africa/Cairo'}}}
  window.__say=[];window.__cancel=0;window.__vib=[];window.__notes=[];window.__voices=localStorage.getItem('__novoice')?0:1;
  window.SpeechSynthesisUtterance=class{constructor(t){this.text=t}};
  window.__subs=0;window.__swReg=null;window.__sub=null;
