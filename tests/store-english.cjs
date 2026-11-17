@@ -69,6 +69,8 @@ for(const d of [0,1,2,5,36])check(RG.sinceText(d));
 for(const q of [0.3,1,2,2.5])check(RG.tookText(q));
 for(const [state,due] of [['late',-13],['late',-8],['late',-1],['soon',0],['soon',1],['soon',2],['soon',5],['ok',6],['ok',9],['ok',22]])check(RG.dueText({state,due}).text);
 check(RG.TEXTS.every.replace('{n}','33'));
+// the stock limit in the cart (store/store.js, 2026-11-17): what the page says when he asks for more boxes than the pharmacy has
+for(const n of [1,2,3,10,11,20])check(S.maxText(n));check('خليها 3');check('ده آخر المتاح عندنا');
 // «⏰ منبه الدوا» (store/alarm.js, 2026-11-17): its fixed texts (the sentence the phone SAYS and the am / pm letters are not shown as text) and the ones it builds
 const AL=require('../store/alarm.js');
 for(const [k,v] of Object.entries(AL.TEXTS)){if(/\{\w+\}/.test(v)||['tryPhrase','sayName','am','pm'].includes(k))continue;check(v)}

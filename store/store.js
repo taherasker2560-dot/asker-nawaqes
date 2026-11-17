@@ -54,6 +54,8 @@
     stopped: 'حسابك اتوقف، فالطلب ده كاش عند الاستلام. دوس «إرسال الطلب» تاني',
     link: 'الرابط ده مبقاش شغال. اطلب رابط جديد من الصيدلية، أو اكتب اسمك وابعت الطلب عادي',
     bad_pay: 'اختار طريقة الدفع',
+    // more than the pharmacy has (2026-11-17, owner: «لو طلب أزيد من الكمية المتاحة يطلع له تنبيه»)
+    qty: 'في صنف طلبت منه أكتر من المتاح عندنا. عدّل الكمية وابعت تاني',
   };
   const MAX_LINES = 30, MAX_QTY = 20;
 
@@ -162,6 +164,11 @@
   function cartTotal(cart) {
     return Math.round(cart.reduce((s, x) => s + x.qty * Number(x.price || 0), 0) * 100) / 100;
   }
+  // the boxes the pharmacy has (ar_store_item_qty, for the items in the cart): the lines that ask for more, and how the page says it (2026-11-17, owner: «لو طلب أزيد من الكمية المتاحة يطلع له تنبيه عشان ما يطلبش وبعد كده يلاقي الكمية ما جاتلوش مظبوطة»)
+  function overLimit(cart, limits) {
+    return (cart || []).filter((x) => !x.free_text && !x.on_order && limits && limits[x.id] != null && x.qty > limits[x.id]).map((x) => ({ id: x.id, name: x.name, qty: x.qty, max: Number(limits[x.id]) }));
+  }
+  const maxText = (n) => (n === 1 ? 'المتاح عندنا علبة واحدة بس' : n === 2 ? 'المتاح عندنا علبتين بس' : n >= 3 && n <= 10 ? `المتاح عندنا ${n} علب بس` : `المتاح عندنا ${n} علبة بس`);
   function errorText(code) {
     return ERRORS[code] || 'الطلب ماتبعتش. جرب تاني بعد شوية';
   }
@@ -293,7 +300,7 @@
   }
   // صورة كل قسم في الرئيسية: صنف معروف من القسم وعنده صورة (لو الصورة مش موجودة يرجع الرسم)
   const SEC_PICS = { meds: 68432, vit: 4468, care: 27245, baby: 25723, supplies: 3614 };
-  const api = { dataAgeText, arabicPattern, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { overLimit, maxText, dataAgeText, arabicPattern, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -888,6 +895,19 @@
     }
     return paths;
   }
+  // what the pharmacy has of the items in the cart (asked from the server, not kept long: the stock moves)
+  let limits = {}, limitsKey = '', limitsAt = 0;
+  async function loadLimits(force) {
+    const ids = cart.filter((x) => !x.free_text && !x.on_order && x.id != null).map((x) => x.id);
+    if (!ids.length || !client) return;
+    const key = ids.slice().sort((a, b) => a - b).join(',');
+    if (!force && key === limitsKey && Date.now() - limitsAt < 30000) return;
+    limitsKey = key; limitsAt = Date.now();
+    try {
+      const { data } = await client.rpc('ar_store_item_qty', { p_ids: ids.slice(0, 50) });
+      if (data && data.ok) { limits = {}; for (const [k, v] of Object.entries(data.max || {})) limits[k] = Number(v); drawCart(); }
+    } catch (e) { /* no limits shown: the server still refuses an order above the stock */ }
+  }
   function drawCart() {
     const box = $('cartItems');
     $('checkout').hidden = !cart.length && !rxFiles.length;
@@ -896,14 +916,24 @@
       box.innerHTML = rxFiles.length ? '' : '<p class="empty">السلة فاضية. دوّر على اللي محتاجه وضيفه، أو ابعت صورة الروشتة.</p>';
       return;
     }
-    box.innerHTML = cart.map((x) => `<article class="item cart-line">
+    box.innerHTML = cart.map((x) => {
+      const max = !x.free_text && !x.on_order && limits[x.id] != null ? Number(limits[x.id]) : null, over = max != null && x.qty > max, atMax = max != null && x.qty >= max;
+      // the pharmacy has fewer boxes than he asks for: it says so HERE, before he sends (2026-11-17)
+      const warn = over ? `<span class="hint-sm cart-over"><span>${esc(maxText(max))}</span> <button type="button" class="linklike" data-capq="${esc(x.id)}" data-max="${max}">${esc('خليها ' + max)}</button></span>` : atMax && max < MAX_QTY ? `<span class="hint-sm">${esc('ده آخر المتاح عندنا')}</span>` : '';
+      return `<article class="item cart-line">
       <div class="item-text"><h3 dir="ltr">${esc(x.name)}</h3>${x.arabic_name ? `<p class="ar">${esc(x.arabic_name)}</p>` : ''}
-        <span class="hint-sm">${x.free_text ? 'كتبته بنفسك · هنجيبه ونكلمك بسعره' : x.on_order ? 'بالطلب · السعر يتأكد معاك على واتساب' : money(x.price) + ' ج للواحدة'}</span></div>
+        <span class="hint-sm">${x.free_text ? 'كتبته بنفسك · هنجيبه ونكلمك بسعره' : x.on_order ? 'بالطلب · السعر يتأكد معاك على واتساب' : money(x.price) + ' ج للواحدة'}</span>${warn}</div>
       <div class="qty">
-        <button type="button" data-qty="${esc(x.id)}" data-d="1" aria-label="زوّد واحدة">+</button>
+        <button type="button" data-qty="${esc(x.id)}" data-d="1" aria-label="زوّد واحدة"${atMax ? ' disabled' : ''}>+</button>
         <span>${x.qty}</span>
         <button type="button" data-qty="${esc(x.id)}" data-d="-1" aria-label="${x.qty > 1 ? 'قلّل واحدة' : 'شيله من السلة'}">−</button>
-      </div></article>`).join('');
+      </div></article>`;
+    }).join('');
+    // more than the pharmacy has: the order is not sent until it is fixed (the server refuses it too)
+    const over = overLimit(cart, limits);
+    if (over.length) say(ERRORS.qty, true); else if ($('formMsg').textContent === ERRORS.qty) say('');
+    $('sendBtn').disabled = over.length > 0 || settings.is_open === false;
+    loadLimits();
     const later = cartLater(cart);
     const sum = later && later === cart.length ? '—' : money(cartTotal(cart)) + ' ج';
     $('sumItems').textContent = sum;
@@ -930,6 +960,7 @@
     if (!cart.length && !rxFiles.length) return say(ERRORS.bad_items, true);
     if (!link && name.length < 2) return say(ERRORS.bad_name, true);
     if (!phone) return say(ERRORS.bad_phone, true);
+    if (overLimit(cart, limits).length) { drawCart(); return say(ERRORS.qty, true); }
     store.set('asker_store_me', { name: typed, phone });
     sending = true; $('sendBtn').disabled = true; say(rxFiles.length ? 'بيرفع صورة الروشتة…' : 'بيبعت الطلب…');
     try {
@@ -947,6 +978,8 @@
       if (!data || !data.ok) {
         if (link && data && data.error === 'stopped') acct.stoppedNow();
         if (link && data && data.error === 'link') acct.linkGone();
+        // the server says how many boxes there are: the cart shows it at once
+        if (data && data.error === 'qty' && Array.isArray(data.items)) { for (const x of data.items) limits[x.id] = Number(x.max); drawCart(); }
         return say(errorText(data && data.error), true);
       }
       const changed = Math.abs(Number(data.total) - cartTotal(cart)) > 0.009;
@@ -978,7 +1011,7 @@
     } catch (err) {
       say(errorText(), true);
     } finally {
-      sending = false; $('sendBtn').disabled = settings.is_open === false;
+      sending = false; $('sendBtn').disabled = settings.is_open === false || overLimit(cart, limits).length > 0;
     }
   }
 
@@ -1077,6 +1110,8 @@
       if (it) openItem(it);
       return;
     }
+    const cap = e.target.closest('[data-capq]');
+    if (cap) { cart = cartSet(cart, cap.dataset.capq === '' ? null : (cart.find((x) => String(x.id) === cap.dataset.capq) || {}).id, Number(cap.dataset.max)); saveCart(); drawCart(); return; }
     const q = e.target.closest('[data-qty]');
     if (q) {
       const line = cart.find((x) => String(x.id) === q.dataset.qty), id = line && line.id;
