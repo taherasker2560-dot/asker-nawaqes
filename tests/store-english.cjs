@@ -57,6 +57,9 @@ for(const [k,v] of Object.entries(SC.TEXTS)){
   check(v);
 }
 for(const s of ['الكاميرا قرت 4006381333931: ده مش رقم ملصق الصيدلية. اكتب الرقم اللي فوق الباركود في «رقم الكود».','«PANADOL EXTRA» بالروشتة: ابعت صورة الروشتة من السلة.','«PANADOL EXTRA» مش متاح للطلب من الموقع دلوقتي. اكتب اسمه في «الاسم» وشوف البديل.','اتضاف: PANADOL EXTRA 24 TAB','66.7 ج للواحدة','كمّل الطلب · 3 صنف · 283.4 ج','كمّل الطلب · 2 صنف','📷 كرّر دواك بالباركود','📷 ضيف أصناف بالباركود'])check(s);
+// the calm music's small button (store/music.js, 2026-11-17): its two labels
+const MU=require('../store/music.js');
+for(const v of Object.values(MU.TEXTS))check(v);
 // «الرسايل» (store/chat.js, 2026-11-13)
 const CH=require('../store/chat.js');
 for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);

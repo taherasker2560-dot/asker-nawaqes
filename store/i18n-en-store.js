@@ -8,6 +8,8 @@ window.AskerEN = {
   "✏️ عدّل": "✏️ Edit",
   "صيدلية عسكر، تأسست سنة 1981": "Asker Pharmacy, founded in 1981",
   "اللهم صل على النبي ﷺ": "Peace and blessings be upon the Prophet ﷺ",
+  "وقّف الموسيقى الهادية": "Turn the calm music off",
+  "شغّل الموسيقى الهادية": "Turn the calm music on",
   "صحتك أولوية": "Your health is our priority",
   "مفيش حاجة فيها كل كلماتك، دي أقرب نتايج لـ «{0}»": "Nothing has all your words; these are the closest results for «{0}»",
   "الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:": "Availability is as of the pharmacy's last recorded sale:",
