@@ -165,7 +165,9 @@ class Ear(
             }
             if (!speaking) echo = -70.0
             val bar = if (speaking) max(floorDb + 12, echo + 9) else floorDb + 10
-            val loud = !muted && db > bar && db > -58
+            // his voice through the call microphone is VERY quiet on this phone (about -55 dBFS, its noise handling leaves digital silence
+            // around it): a bar of -58 cut every sentence into pieces of 0.3 s (11-17); anything above -80 and above the room's noise counts
+            val loud = !muted && db > bar && db > -80
             loudHistory[hi] = loud; hi = (hi + 1) % loudHistory.size
             val s = seg
             if (s == null) {
