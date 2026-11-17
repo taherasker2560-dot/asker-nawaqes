@@ -28,9 +28,8 @@ assert.equal(S.arabicPattern('دوا'), null);
 // the word people use is not the name (diapers are sold by brand): حفاضات also finds بامبرز / مولفيكس
 assert.match(S.termFilter('حفاضات'), /arabic_name\.imatch\.[^,]*,.*/);
 assert.ok(S.termFilter('حفاضات').split(',').length >= 8, 'several names for one word');
-assert.doesNotMatch(S.termFilter('حفاضات'), /ilike\.\*ف_ين\*/, 'a bare «فاين» would find caffeine and epinephrine; the brand is searched as «فاين بيبى»');
-assert.match('فاين بيبى 3', new RegExp(S.arabicPattern('فاين بيبى')));
-assert.doesNotMatch('كافيين', new RegExp(S.arabicPattern('فاين بيبى')));
+assert.doesNotMatch(S.termFilter('حفاضات'), /ilike\.\*ف_ين\*/, 'a bare «فاين» would find caffeine and epinephrine');
+assert.doesNotMatch(S.termFilter('حفاضات'), /فاين/, 'only brands that cannot be mistaken for a drug name («فين بيبي» sits inside a baby nose-drops name)');
 assert.match('بامبرز رقم 3', new RegExp(S.termFilter('حفاضات').match(/arabic_name\.imatch\."([^"]+)"/g).map((x) => x.slice(20, -1)).join('|')), 'a brand name matches');
 // numbers: 500 in an English name, ٥٠٠ in an Arabic one
 assert.equal(S.termFilter('500'), 'name.ilike.*500*,arabic_name.ilike.*500*,name.ilike.*٥٠٠*,arabic_name.ilike.*٥٠٠*');
