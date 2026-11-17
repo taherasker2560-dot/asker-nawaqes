@@ -40,6 +40,18 @@ jobs:
             curl -fL --retry 4 --retry-delay 5 -o adam-android/app/src/main/assets/vosk-model.zip https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
           fi
           ls -l adam-android/app/src/main/assets/vosk-model.zip
+      # «آدم 3»: the small speaker model (Vosk, Apache 2.0) that makes his voiceprint on the phone; cached after the first build
+      - name: Speaker model (cached)
+        uses: actions/cache@v4
+        with:
+          path: adam-android/app/src/main/assets/vosk-spk.zip
+          key: vosk-model-spk-0.4
+      - name: Download the speaker model
+        run: |
+          if [ ! -s adam-android/app/src/main/assets/vosk-spk.zip ]; then
+            curl -fL --retry 4 --retry-delay 5 -o adam-android/app/src/main/assets/vosk-spk.zip https://alphacephei.com/vosk/models/vosk-model-spk-0.4.zip
+          fi
+          ls -l adam-android/app/src/main/assets/vosk-spk.zip
       # one signing key for every build (made the first time, kept in the cache), so a new build updates the app in place
       - name: Signing key (cached)
         id: ks

@@ -89,6 +89,9 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
 
     @Volatile private var seq = 0
     private var player: MediaPlayer? = null
+    /** Adam is speaking now («آدم 3»: the ear then knows his own voice comes back into the microphone, and that he may be cut). */
+    @Volatile var talking = false
+        private set
 
     /**
      * Says [text]; [then] runs when it is finished (also when no voice is available, so the conversation goes on).
@@ -103,11 +106,13 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
         // [after] runs once, and ALWAYS: if the voice never says it is finished (the server, the net or the phone's engine stuck),
         // the conversation goes on after a generous time instead of Adam staying deaf («بنادي عليه ما بيردش», 2026-11-15)
         var ran = false
-        val then: () -> Unit = { if (!ran) { ran = true; after() } }
+        talking = true
+        val then: () -> Unit = { if (!ran) { ran = true; if (my == seq) talking = false; after() } }
         handler.postDelayed({
             if (my == seq && !ran) {
                 log("voice did not finish in time, going on")
                 seq++
+                talking = false
                 stopPlayer()
                 try { tts?.stop() } catch (e: Throwable) { }
                 then()
@@ -251,12 +256,14 @@ class Speaker(ctx: Context, private val handler: Handler, private val log: (Stri
 
     fun stop() {
         seq++
+        talking = false
         stopPlayer()
         try { tts?.stop() } catch (e: Throwable) { }
     }
 
     fun shutdown() {
         seq++
+        talking = false
         stopPlayer()
         try { tts?.stop(); tts?.shutdown() } catch (e: Throwable) { }
         tts = null

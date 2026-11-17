@@ -24,7 +24,8 @@ import java.text.Normalizer
 import java.util.Locale
 
 /**
- * «آدم» on the phone: a foreground service with the fixed notification «● آدم صاحي». It listens for the word offline (WakeWord),
+ * «آدم 3» (2026-11-17): ONE ear always on (Ear), his voiceprint (Voiceprint), his sentences heard by the server (Api.hear); see the
+ * «آدم 3» part below. Before that (still true): a foreground service with the fixed notification «● آدم صاحي». It listens for the word offline,
  * hears the request (Listener), puts it in the bot's queue (Api), speaks the laptop's answer (Speaker), does the phone's part of it
  * (Actions) and keeps the conversation (a follow-up within 10 minutes is the same conversation on the laptop).
  * A reply that sends or calls asks first: it is read out and only his spoken «أيوه» goes back to the server (the laptop cannot do it
@@ -39,6 +40,8 @@ class AdamService : Service() {
         const val ACTION_VOICES = "com.askerpharmacy.adam.VOICES"    // write the Arabic voices of the phone to files/voices.txt
         const val ACTION_SAY = "com.askerpharmacy.adam.SAY"          // say a sentence in the current voice (to try a voice)
         const val ACTION_STOP_WALK = "com.askerpharmacy.adam.STOP_WALK" // «وقّف» on the notification while a list is read
+        const val ACTION_ENROLL = "com.askerpharmacy.adam.ENROLL"    // «آدم 3»: record his voiceprint (8 sentences he repeats)
+        const val ACTION_FEED = "com.askerpharmacy.adam.FEED"        // a test over adb: a WAV file handled as if he had just said it
         const val CH_LISTEN = "adam_listen"
         const val CH_RESULT = "adam_result"
         const val ID_LISTEN = 1
@@ -68,6 +71,7 @@ class AdamService : Service() {
         fun isDictation(said: String): Boolean = DICTATION.containsMatchIn(fold(said).trim())
 
         private val DONE = Regex("\\s*(خلاص|بس كده|بس كدا|كده تمام|كدا تمام|خلصت|انتهيت)\\s*$")
+        private val ENROLL_WORDS = Regex("(سجل\\S*\\s+(بصمتي|بصمه صوتي|البصمه|بصمه)|بصمه صوتي|بصمتي)")
         /** The words without a «خلاص» at their end, and whether it was there. */
         fun stripDone(said: String): Pair<String, Boolean> {
             val t = said.trim()
@@ -92,7 +96,8 @@ class AdamService : Service() {
     }
 
     private val main = Handler(Looper.getMainLooper())
-    private lateinit var wake: WakeWord
+    private lateinit var ear: Ear
+    private var modelsReady = false
     private lateinit var listener: Listener
     private lateinit var speaker: Speaker
     private var wl: PowerManager.WakeLock? = null
@@ -121,9 +126,12 @@ class AdamService : Service() {
     private fun writeStatus() {
         try {
             val o = JSONObject()
-                .put("state", state).put("wake_ready", wake.ready).put("voice_ready", speaker.isReady)
+                .put("state", state).put("wake_ready", modelsReady).put("voice_ready", speaker.isReady)
                 .put("recognizer", listener.available()).put("wakes", wakes).put("heard", lastHeard).put("reply", lastReply)
                 .put("convo", convo).put("config", Config.ready(this)).put("at", System.currentTimeMillis())
+                .put("ear", JSONObject().put("on", ear.running).put("floor_db", Math.round(ear.floorDb)).put("echo_canceller", ear.echoOn)
+                    .put("speaker_model", Models.speaker != null))
+                .put("voiceprint", Voiceprint.describe())
             File(filesDir, "status.json").writeText(o.toString())
         } catch (e: Throwable) { }
     }
@@ -148,10 +156,11 @@ class AdamService : Service() {
             val now = System.currentTimeMillis()
             val age = now - stateAt
             when (state) {
-                // only the word's listening is started again here (not goIdle, whose own 5-s retry would pile up)
-                "idle" -> if (wake.ready && (wake.dead || now - wake.startedAt > WAKE_RENEW_MS)) {
-                    if (wake.dead) log("guard: listening for the word had stopped, starting it again")
-                    if (!wake.start()) log("guard: the word's listening did not start, again in 15 s")
+                // «آدم 3»: the ear stopped, hears nothing but zeros (another app took the microphone) or is old: started again
+                "idle" -> if (modelsReady && !ear.inSentence && (!ear.running || now - ear.lastFrameAt > 5000 || ear.silencedMs > 20_000 || now - ear.startedAt > WAKE_RENEW_MS)) {
+                    if (!ear.running || now - ear.lastFrameAt > 5000) log("guard: the ear had stopped, starting it again")
+                    else if (ear.silencedMs > 20_000) log("guard: the microphone gives only silence (another app?), starting the ear again")
+                    if (!ear.start()) log("guard: the ear did not start, again in 15 s")
                 }
                 // the laptop is slow: he is told, and the answer is still spoken when it comes (poll goes on, as when the laptop is off)
                 "thinking" -> if (age > THINK_MS) {
@@ -163,7 +172,8 @@ class AdamService : Service() {
                     log("guard: stuck in $state for ${age / 1000} s, back to waiting")
                     walk = null; current = 0; pendingConfirm = 0
                     try { speaker.stop() } catch (e: Throwable) { }
-                    try { listener.cancel() } catch (e: Throwable) { }
+                    try { cancelHear() } catch (e: Throwable) { }
+                    enrolling = null
                     goIdle()
                 }
             }
@@ -190,42 +200,53 @@ class AdamService : Service() {
         wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "adam:listen").apply { setReferenceCounted(false); acquire() }
         speaker = Speaker(this, main) { log(it) }
         listener = Listener(this, main) { log(it) }
-        wake = WakeWord(this, { main.post { onWake() } }) { log(it) }
-        wake.prepare { ok ->
+        Voiceprint.load(this)
+        ear = Ear(main, { log(it) }, { speaker.talking }, { onSegment(it) }, { id, v -> onBargeIn(id, v) })
+        Thread {
+            val ok = Models.prepare(this) { log(it) }
             main.post {
                 if (!alive) return@post
                 if (ok) {
+                    modelsReady = true
+                    if (!ear.start()) log("the ear did not start; the guard tries again")
                     goIdle()
-                    // started by the side key / the tile before the word's model was ready: the conversation starts now
-                    if (askWhenReady) { askWhenReady = false; wake.stop(); startConvo() }
+                    // started by the side key / the tile before the models were ready: the conversation starts now
+                    if (askWhenReady) { askWhenReady = false; startConvo() }
                 } else setState("no-model", "نموذج الكلمة ما اشتغلش")
             }
-        }
+        }.start()
         main.postDelayed({ guard() }, 15_000)
         log("service created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!::wake.isInitialized) return START_NOT_STICKY
+        if (!::ear.isInitialized) return START_NOT_STICKY
         when (intent?.action) {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACTION_VOICE -> speaker.apply()
             ACTION_VOICES -> try { File(filesDir, "voices.txt").writeText(speaker.describeVoices()) } catch (e: Throwable) { log("voices: " + e.message) }
             ACTION_SAY -> {
                 val t = intent.getStringExtra("text")?.trim() ?: ""
-                if (t.isNotEmpty() && wake.ready) {
-                    wake.stop(); speaker.stop(); listener.cancel()
+                if (t.isNotEmpty() && modelsReady) {
+                    speaker.stop(); cancelHear()
                     setState("speaking")
                     speaker.say(t) { goIdle() }
                 }
             }
-            // «اسأل» on the notification: also cuts a list that is being read (he cannot be heard while Adam speaks)
+            // «اسأل» on the notification: also cuts a list that is being read
             // also the side key («اسأل آدم», ListenActivity) and the tile: a conversation starts at once, without the word
-            ACTION_ASK_AGAIN -> if (wake.ready) { walk = null; speaker.stop(); listener.cancel(); wake.stop(); startConvo() } else askWhenReady = true
-            ACTION_STOP_WALK -> { walk = null; speaker.stop(); listener.cancel(); log("walk stopped from the notification"); goIdle() }
+            ACTION_ASK_AGAIN -> if (modelsReady) { walk = null; enrolling = null; speaker.stop(); cancelHear(); startConvo() } else askWhenReady = true
+            ACTION_STOP_WALK -> { walk = null; speaker.stop(); cancelHear(); log("walk stopped from the notification"); goIdle() }
             ACTION_TEXT -> {
                 val t = intent.getStringExtra("text")?.trim() ?: ""
-                if (t.isNotEmpty() && wake.ready) { wake.stop(); speaker.stop(); listener.cancel(); handleText(t) }
+                // idle=1 over adb: as if he had said a «لي» command without the name
+                if (t.isNotEmpty() && modelsReady) { speaker.stop(); cancelHear(); handleText(t, intent.getStringExtra("idle") == "1") }
+            }
+            ACTION_ENROLL -> if (modelsReady) startEnroll()
+            ACTION_FEED -> {
+                val f = File(filesDir, intent.getStringExtra("file")?.replace(Regex("[^A-Za-z0-9_.\\-]"), "") ?: "test.wav")
+                val pcm = try { Audio.readWav(f.readBytes()) } catch (e: Throwable) { null }
+                if (pcm == null) log("feed: no 16-bit WAV at " + f.name) else { log("feed: " + f.name + " " + (pcm.size * 1000 / Ear.RATE) + " ms"); ear.inject(pcm) }
             }
         }
         return START_STICKY
@@ -236,7 +257,7 @@ class AdamService : Service() {
     override fun onDestroy() {
         alive = false
         running = false
-        try { wake.stop() } catch (e: Throwable) { }
+        try { ear.shutdown() } catch (e: Throwable) { }
         try { listener.drop() } catch (e: Throwable) { }
         try { speaker.shutdown() } catch (e: Throwable) { }
         try { wl?.release() } catch (e: Throwable) { }
@@ -256,19 +277,194 @@ class AdamService : Service() {
         walk = null
         if (inConvo) log("conversation ended after $replyCount answer(s)")
         inConvo = false; talkHistory.clear(); talkCtx = null; silentTurns = 0; replyCount = 0
+        want = null; bargeSeg = 0
+        ear.endMs = 800
         setState("idle")
-        if (!wake.start()) {
-            log("wake word did not start, again in 5 s")
-            main.postDelayed({ if (alive && state == "idle") goIdle() }, 5000)
+        if (modelsReady && !ear.running && !ear.start()) log("the ear did not start; the guard tries again in 15 s")
+    }
+
+    // ---------- «آدم 3»: one ear, his voice only (owner 2026-11-17) ----------
+    // «عايز يشتغل على بصمة صوتي انا بس … اكلمه يرد عليا، اكلمه يرد عليا، لو قطعته يسكت … فإما يبقى مربوط بـ«لي»، أو اقول له آدم».
+    // The ear (Ear.kt) is always on and gives whole sentences with their voiceprint. While Adam waits:
+    //   - «آدم» alone, heard on the phone: the conversation starts at once (as before);
+    //   - with a voiceprint, any of HIS sentences goes to the server (hear, idle): «آدم + request» starts the conversation with it,
+    //     a «… لي» command is done without a conversation, anything else (him talking to customers / staff) is ignored.
+    // In a conversation / a «أيوه» question: hearNext waits for HIS next sentence (others' voices are skipped). While Adam speaks:
+    // if HE talks over him, Adam stops at once and listens (onBargeIn). No voiceprint yet: only «آدم» works, and everyone is heard
+    // in a conversation (as before) — nothing of the room goes to the server.
+    private class Want(val seq: Int, val mode: String, val onText: (String) -> Unit, val onFail: (Int) -> Unit) { var busy = false }
+    private var want: Want? = null
+    private var wantSeq = 0
+    private var bargeSeg = 0          // the sentence that cut Adam's speech: it is his next request
+    private var idleBusy = false
+
+    /** Waits for HIS next sentence: [onText] gets the words, [onFail] 6 = nothing said in [timeoutMs], 7 = nothing clear, 2 = no net. */
+    private fun hearNext(mode: String, timeoutMs: Long, onText: (String) -> Unit, onFail: (Int) -> Unit, onReady: (() -> Unit)? = null) {
+        if (!ear.running) {
+            // the ear could not take the microphone: the phone's own speech engine, as before «آدم 3» (no voiceprint there)
+            listener.listen(onText, onFail, onReady)
+            return
+        }
+        val w = Want(++wantSeq, mode, onText, onFail)
+        want = w
+        onReady?.invoke()
+        fun check() {
+            if (want !== w || w.busy) return
+            if (ear.inSentence) { main.postDelayed({ check() }, 500); return }   // he is still talking
+            want = null
+            w.onFail(SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+        }
+        main.postDelayed({ check() }, timeoutMs)
+    }
+
+    private fun cancelHear() {
+        want = null
+        try { listener.cancel() } catch (e: Throwable) { }
+    }
+
+    private fun onSegment(s: Ear.Segment) {
+        if (!alive) return
+        val sc = Voiceprint.score(s.vector)
+        // a sentence that began while Adam spoke is his own voice coming back, unless it cut him (then it is the next request)
+        if (s.duringSpeech && s.id != bargeSeg) { log("echo of Adam's voice skipped (" + s.ms + " ms)"); return }
+        if (enrolling != null) { enrollSegment(s); return }
+        if (state == "idle") { idleSegment(s, sc); return }
+        val w = want
+        if (w == null || w.busy) { log("a sentence while $state, skipped"); return }
+        val ok = Voiceprint.accepts(sc, s.ms)
+        Voiceprint.note(sc, s.ms, ok, w.mode)
+        if (!ok) { log("not his voice (%.2f under %.2f), still waiting".format(sc, Voiceprint.barFor(s.ms))); return }
+        w.busy = true
+        if (inConvo) Voiceprint.learn(this, s.vector, sc, s.ms)?.let { log(it) }
+        val t0 = System.currentTimeMillis()
+        Thread {
+            val r = Api.hear(this, s.pcm, "convo", sc)
+            main.post {
+                if (want !== w) return@post
+                want = null
+                if (r == null || !r.optBoolean("ok")) { log("hear failed"); w.onFail(SpeechRecognizer.ERROR_NETWORK); return@post }
+                val t = r.optString("text").trim()
+                log("heard in " + (System.currentTimeMillis() - t0) + " ms (" + s.ms + " ms of voice, print %.2f)".format(sc))
+                if (t.isEmpty()) w.onFail(SpeechRecognizer.ERROR_NO_MATCH) else w.onText(t)
+            }
+        }.start()
+    }
+
+    private fun idleSegment(s: Ear.Segment, sc: Float) {
+        val ok = Voiceprint.accepts(sc, s.ms)
+        // «آدم» alone, heard on the phone itself: at once, without the server
+        if (s.wake && s.ms < 1800 && s.wakeConf >= Config.wakeConf(this)) {
+            Voiceprint.note(sc, s.ms, ok, "adam")
+            if (ok) { wakes++; log("wake (on the phone) conf %.2f, print %.2f".format(s.wakeConf, sc)); startConvo(); return }
+            log("«آدم» in another voice (%.2f), ignored".format(sc)); return
+        }
+        if (!Voiceprint.enrolled) return       // no voiceprint yet: nothing of the room goes out
+        Voiceprint.note(sc, s.ms, ok, "idle")
+        if (!ok) return
+        if (idleBusy) { log("a sentence skipped: the last one is still being heard"); return }
+        idleBusy = true
+        Thread {
+            val r = Api.hear(this, s.pcm, "idle", sc)
+            main.post {
+                idleBusy = false
+                if (!alive || state != "idle") return@post
+                if (r == null || !r.optBoolean("ok")) { log("hear (idle) failed"); return@post }
+                when (r.optString("to")) {
+                    "name" -> { wakes++; log("called by name, print %.2f".format(sc)); startConvo(r.optString("rest").trim()) }
+                    "command" -> {
+                        log("«" + r.optString("verb") + " لي» command, print %.2f".format(sc))
+                        val t = r.optString("text").trim()
+                        if (t.isNotEmpty()) { beepShort(); handleText(t, true) }
+                    }
+                    else -> { }   // he was talking to someone else
+                }
+            }
+        }.start()
+    }
+
+    /** He talked over Adam: if it is his voice, Adam stops at once and his sentence is the next request (or the answer Adam waits for). */
+    private fun onBargeIn(id: Int, v: FloatArray?) {
+        if (!alive || !speaker.talking || enrolling != null || state == "idle") return
+        val sc = Voiceprint.score(v)
+        // his voice is mixed with Adam's here, so the bar is a little lower than for a sentence alone
+        val ok = !Voiceprint.enrolled || (sc > -2f && sc >= Voiceprint.barFor(800) - 0.05f)
+        Voiceprint.note(sc, 800, ok, "cut")
+        if (!ok) { log("a voice over Adam's (%.2f), not his".format(sc)); return }
+        log("he cut Adam's speech (print %.2f)".format(sc))
+        bargeSeg = id
+        speaker.stop()
+        buzz()
+        val w = walk
+        when {
+            w != null && w.optString("mode") == "pick" -> walkListen()
+            w != null -> { walk = null; inConvo = true; beginRequestListening(quiet = true) }
+            pendingConfirm != 0L -> listenConfirm()
+            else -> { inConvo = true; beginRequestListening(quiet = true) }
         }
     }
 
-    private fun onWake() {
-        if (state != "idle") return
-        wakes++
-        log("heard the word")
-        wake.stop()
-        startConvo()
+    // ---------- his voiceprint (8 sentences he repeats after Adam) ----------
+    // Started by «آدم، سجّل بصمتي», the notification's «سجّل بصمتي», or adb (ENROLL). Kept only on the phone (Voiceprint.kt).
+    private val ENROLL_LINES = listOf(
+        "آدم، بانادول اكسترا بكام؟", "اقرالي النواقص العامة", "بيع لي علبة كونجستال", "رصيد الدكتور كام؟",
+        "افتحلي الطلبيات", "عندنا كام علبة أوجمنتين؟", "سجّل دفعة لفارما ألف جنيه", "خلاص يا آدم، شكرا",
+    )
+    private var enrolling: ArrayList<FloatArray>? = null
+    private var enrollIdx = 0
+    private var enrollTries = 0
+    private var enrollSeq = 0
+
+    private fun startEnroll() {
+        if (Models.speaker == null) { saySimple("بصمة الصوت مش شغالة على الموبايل ده"); return }
+        if (!ear.running) { saySimple("الميكروفون مش متاح دلوقتي، جرّب تاني"); return }
+        speaker.stop(); cancelHear(); walk = null; inConvo = false; pendingConfirm = 0
+        enrolling = ArrayList(); enrollIdx = 0; enrollTries = 0
+        log("voiceprint: enrollment started")
+        setState("speaking", "بصمة الصوت")
+        speaker.say("هسجّل بصمة صوتك. هقول جملة، وبعد الصفارة قولها ورايا بصوتك العادي. ٨ جمل.") { enrollNext() }
+    }
+
+    private fun enrollNext() {
+        val list = enrolling ?: return goIdle()
+        if (enrollIdx >= ENROLL_LINES.size) return enrollFinish(list)
+        setState("speaking", "بصمة الصوت " + (enrollIdx + 1) + " من " + ENROLL_LINES.size)
+        speaker.say("قول: " + ENROLL_LINES[enrollIdx]) {
+            if (enrolling == null || !alive) return@say
+            setState("listening", "قول الجملة… " + (enrollIdx + 1) + " من " + ENROLL_LINES.size)
+            ear.endMs = 1000
+            readyCue(true)
+            val my = ++enrollSeq
+            main.postDelayed({ if (enrolling != null && my == enrollSeq && state == "listening") enrollMissed() }, 9000)
+        }
+    }
+
+    private fun enrollSegment(s: Ear.Segment) {
+        if (state != "listening") return
+        val v = s.vector
+        if (v == null || s.voicedMs < 600) { log("voiceprint: a sentence too short (" + s.voicedMs + " ms of voice), waiting"); return }
+        enrollSeq++
+        enrolling?.add(v)
+        log("voiceprint: sentence " + (enrollIdx + 1) + " (" + s.ms + " ms)")
+        enrollIdx++; enrollTries = 0
+        enrollNext()
+    }
+
+    private fun enrollMissed() {
+        enrollTries++
+        if (enrollTries >= 2) { enrollIdx++; enrollTries = 0 }
+        enrollNext()
+    }
+
+    private fun enrollFinish(list: List<FloatArray>) {
+        enrolling = null
+        val r = Voiceprint.enroll(this, list)
+        if (r == null) {
+            log("voiceprint: not enough clear sentences (" + list.size + ")")
+            saySimple("الصوت ماكانش واضح كفاية. قول «آدم، سجّل بصمتي» تاني في مكان هادي شوية")
+            return
+        }
+        log("voiceprint: $r")
+        saySimple("تمام، بصمتك اتسجلت. من دلوقتي هسمع صوتك انت بس، وتقدر تقول «آدم» أو أي أمر بـ«لي» زي «بيع لي» و«افتحلي». أول يومين بتعلّم صوتك أكتر.")
     }
 
     // ---------- «آدم 2»: a conversation (owner 2026-11-17: «ياخد ويدي معايا … مش صنم») ----------
@@ -288,11 +484,11 @@ class AdamService : Service() {
     private val UNFINISHED = Regex("(^|\\s)(و|او|أو|يعني|بس|عشان|علشان|اللي|ان|إن|في|من|على|علي|لما|لو|ولا|مع|بتاع|بتاعت)$")
     private var continuing = false
 
-    private fun startConvo() {
+    /** [first] = what he already asked with the name («آدم، بانادول بكام»): answered at once. */
+    private fun startConvo(first: String = "") {
         inConvo = true; talkHistory.clear(); talkCtx = null; silentTurns = 0; replyCount = 0; errorTurns = 0
-        // not «idle» any more from this moment: the guard must not start the word's listening again under the request (11-17)
         setState("listening", "سامعك…")
-        // no beep here: the beep comes when the speech engine is really listening (beginRequestListening → onReady)
+        if (first.isNotBlank()) { beep(); onHeard(first); return }
         beginRequestListening()
     }
 
@@ -314,6 +510,7 @@ class AdamService : Service() {
      * short buzz, so he feels it with the phone in his pocket too.
      */
     private fun readyCue(first: Boolean) {
+        ear.mute(250)   // the beep itself is not a sentence
         if (first) beep() else beepShort()
         if (!first) buzz()
     }
@@ -352,29 +549,31 @@ class AdamService : Service() {
     private val dictation = StringBuilder()
     private var pieces = 0
 
-    private fun beginRequestListening() {
+    /** [quiet] = he is already talking (he cut Adam): no beep. */
+    private fun beginRequestListening(quiet: Boolean = false) {
         if (!Config.ready(this)) { speaker.say("لسه ماتظبطتش الإعدادات") { goIdle() }; return }
         val note = if (collecting) "كمّل… وقول «خلاص» لما تخلص" else if (inConvo && replyCount > 0) "في محادثة… قول «خلاص» للخروج" else "سامعك…"
         val first = !collecting && replyCount == 0 && silentTurns == 0 && errorTurns == 0 && !notHeardOnce
-        // «لحظة…» until the engine really listens; then the beep and «سامعك» together
+        // «لحظة…» until it really listens; then the beep and «سامعك» together (with the ear: at once)
         setState("listening", "لحظة…")
-        listener.listen(
+        ear.endMs = if (collecting) 1500 else 1000
+        hearNext("convo", if (collecting) 6000L else 8000L,
             { text -> onHeard(text) },
             { code ->
                 log("request not heard ($code)")
-                if (collecting) { finishDictation(); return@listen }
+                if (collecting) { finishDictation(); return@hearNext }
                 val nothingSaid = code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                 // the phone's speech engine failed for a moment (busy / disconnected, e.g. right after the previous listen): try again
                 // after a short pause instead of ending the conversation (11-17: «listen error 11» ended it after one answer)
                 if (!nothingSaid && errorTurns < 3) {
                     errorTurns++
                     main.postDelayed({ if (alive && state == "listening") beginRequestListening() }, 700)
-                    return@listen
+                    return@hearNext
                 }
                 // in a conversation, after an answer: one more quiet try, then the conversation ends (he walked away)
                 if (inConvo && replyCount > 0) {
                     if (nothingSaid && silentTurns == 0) { silentTurns = 1; main.postDelayed({ if (alive && state == "listening") beginRequestListening() }, 300) } else goIdle()
-                    return@listen
+                    return@hearNext
                 }
                 if (nothingSaid && !notHeardOnce) {
                     notHeardOnce = true
@@ -382,7 +581,7 @@ class AdamService : Service() {
                     speaker.say("مسمعتكش، قول تاني") { if (alive) beginRequestListening() }
                 } else goIdle()
             },
-            { if (alive && state == "listening") { readyCue(first); setState("listening", note) } }
+            { if (alive && state == "listening") { if (!quiet) readyCue(first); setState("listening", note) } }
         )
     }
 
@@ -396,6 +595,8 @@ class AdamService : Service() {
             saySimple("تمام")
             return
         }
+        // «سجّل بصمتي» / «بصمة صوتي»: his voiceprint (in a conversation his voice already passed the old one, if there is one)
+        if (!collecting && ENROLL_WORDS.containsMatchIn(fold(text))) { startEnroll(); return }
         val (piece, done) = stripDone(text)
         if (collecting) {
             if (piece.isNotBlank()) { dictation.append(' ').append(piece); pieces++ }
@@ -430,20 +631,28 @@ class AdamService : Service() {
         if (t.isEmpty()) goIdle() else handleText(t)
     }
 
-    private fun handleText(text: String) {
+    /** [idle] = a «لي» command heard without his name («آدم 3»): the server stays quiet ({ignore}) unless there is a real answer. */
+    private fun handleText(text: String, idle: Boolean = false) {
         val now = System.currentTimeMillis()
         if (now - lastUse > CONVO_MS) convo = newConvo()
         lastUse = now
         lastHeard = text
         setState("thinking", "«" + text.take(60) + "» بيدوّر…")
-        log("asking: " + text.take(80))
+        log("asking" + (if (idle) " (لي)" else "") + ": " + text.take(80))
         val c = convo
         val hist = org.json.JSONArray(); for (t in talkHistory) hist.put(t)
-        val tc = talkCtx
+        val tc = if (idle) null else talkCtx
         Thread {
             // the fast brain first (one call, ~2 s); handed over / no answer: the laptop's queue, as before
             val t0 = System.currentTimeMillis()
-            val t = Api.talk(this, text, hist, tc)
+            val t = Api.talk(this, text, if (idle) org.json.JSONArray() else hist, tc, idle)
+            if (t != null && t.optBoolean("ok") && t.optBoolean("ignore")) {
+                log("not for Adam after all (" + t.optString("tool") + "), quiet")
+                main.post { if (alive && state == "thinking") goIdle() }
+                return@Thread
+            }
+            // a «لي» command and no server: quiet (it may not have been for Adam)
+            if (idle && t == null) { main.post { if (alive && state == "thinking") goIdle() }; return@Thread }
             if (t != null && t.optBoolean("ok") && !t.optBoolean("handoff")) {
                 log("fast brain: " + t.optString("tool") + " in " + (System.currentTimeMillis() - t0) + " ms (server " + t.optLong("ms") + ")")
                 main.post { if (alive) onTalk(text, t) }
@@ -576,7 +785,7 @@ class AdamService : Service() {
     private fun walkAskMore() {
         speaker.say("أكمّل؟") {
             setState("confirm", "أكمّل؟")
-            listener.listen({ said -> if (classify(said) == 1) walkNext() else walkEnd() }, { _ -> walkEnd() })
+            hearNext("confirm", 8000L, { said -> if (classify(said) == 1) walkNext() else walkEnd() }, { _ -> walkEnd() }, { readyCue(false) })
         }
     }
 
@@ -590,7 +799,7 @@ class AdamService : Service() {
 
     private fun walkListen() {
         setState("confirm", "أيوه / لا / خلاص")
-        listener.listen(
+        hearNext("confirm", 8000L,
             { said ->
                 lastHeard = said
                 when (walkAnswer(said)) {
@@ -601,7 +810,7 @@ class AdamService : Service() {
                     else -> walkUnclear()
                 }
             },
-            { _ -> walkUnclear() }
+            { _ -> walkUnclear() }, { readyCue(false) }
         )
     }
 
@@ -621,7 +830,7 @@ class AdamService : Service() {
 
     private fun walkConfirm() {
         setState("confirm", "قول أيوه أو لا")
-        listener.listen(
+        hearNext("confirm", 8000L,
             { said ->
                 lastHeard = said
                 when (classify(said)) {
@@ -630,7 +839,7 @@ class AdamService : Service() {
                     else -> walkConfirmAgain()
                 }
             },
-            { _ -> walkConfirmAgain() }
+            { _ -> walkConfirmAgain() }, { readyCue(false) }
         )
     }
 
@@ -642,7 +851,7 @@ class AdamService : Service() {
     // ---------- «أيوه» / «لا» ----------
     private fun listenConfirm() {
         setState("confirm", "قول أيوه أو لا")
-        listener.listen(
+        hearNext("confirm", 8000L,
             { said ->
                 lastHeard = said
                 when (classify(said)) {
@@ -651,7 +860,7 @@ class AdamService : Service() {
                     else -> reAsk()
                 }
             },
-            { _ -> reAsk() }
+            { _ -> reAsk() }, { readyCue(false) }
         )
     }
 
@@ -692,12 +901,17 @@ class AdamService : Service() {
         val b = Notification.Builder(this, CH_LISTEN)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("● آدم صاحي")
-            .setContentText(note ?: "قول «آدم» وبعدها طلبك")
+            .setContentText(note ?: if (Voiceprint.enrolled) "قول «آدم» أو أمر بـ«لي» (بيع لي، افتحلي…)" else "قول «آدم» وبعدها طلبك")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now), "اسأل", ask).build())
-        // while a list is being read he cannot be heard: «وقّف» stops it at once
+        // «آدم 3»: no voiceprint yet: one tap records it (8 sentences he repeats after Adam)
+        if (!Voiceprint.enrolled && Models.speaker != null && enrolling == null) {
+            val enroll = PendingIntent.getService(this, 5, Intent(this, AdamService::class.java).setAction(ACTION_ENROLL), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            b.addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now), "سجّل بصمتي", enroll).build())
+        }
+        // while a list is being read: «وقّف» stops it at once (he can also just talk over Adam now)
         if (walk != null) {
             val stop = PendingIntent.getService(this, 4, Intent(this, AdamService::class.java).setAction(ACTION_STOP_WALK), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             b.addAction(Notification.Action.Builder(Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel), "وقّف", stop).build())
