@@ -65,7 +65,6 @@ class Ear(
     private var aec: AcousticEchoCanceler? = null
     private var thread: Thread? = null
     private val worker = Executors.newSingleThreadExecutor()
-    private var recognizer: Recognizer? = null     // worker thread only
     private var segSeq = 0
 
     /** Ignore the microphone for [ms] (Adam's own beep). */
@@ -117,10 +116,6 @@ class Ear(
 
     fun shutdown() {
         stop()
-        worker.execute {
-            try { recognizer?.close() } catch (e: Throwable) { }; recognizer = null
-            try { spkRec?.close() } catch (e: Throwable) { }; spkRec = null
-        }
         worker.shutdown()
     }
 
@@ -218,14 +213,14 @@ class Ear(
             // 1) «آدم»: the small recognizer limited to the word (cheap). It gives NO voiceprint: with that list everything else is
             //    «[unk]», which the model counts as silence, so the speaker model has no speech frames to use (11-17 first test on the phone:
             //    a clear 1.8 s sentence gave no vector).
-            val r = recognizer ?: Recognizer(m, RATE.toFloat(), "[\"adam\", \"a dam\", \"[unk]\"]").also { nr ->
-                nr.setWords(true)
-                recognizer = nr
-            }
+            // a NEW recognizer for every sentence: in the diagnosis run (adb FEED diag=1) a new one always gave a voiceprint (135-160
+            // frames from 2 s); the one kept between sentences (before this change) never did
+            val r = Recognizer(m, RATE.toFloat(), "[\"adam\", \"a dam\", \"[unk]\"]").also { it.setWords(true) }
             val texts = ArrayList<String>()
             var firstWord = ""
             var conf = 0.0
-            for (j in run(r, pcm)) {
+            val results = try { run(r, pcm) } finally { try { r.close() } catch (x: Throwable) { } }
+            for (j in results) {
                 val t = j.optString("text").trim()
                 if (t.isNotEmpty()) texts.add(t)
                 val res = j.optJSONArray("result")
@@ -239,8 +234,6 @@ class Ear(
             Heard(voiceprint(m, pcm), wake, conf, words)
         } catch (e: Throwable) {
             log("ear: analysis failed: " + e.message)
-            try { recognizer?.close() } catch (x: Throwable) { }
-            recognizer = null
             Heard(null, false, 0.0, "")
         }
     }
@@ -257,8 +250,6 @@ class Ear(
         out.add(JSONObject(r.finalResult))
         return out
     }
-
-    private var spkRec: Recognizer? = null     // worker thread only
 
     /**
      * Debug (adb FEED with diag=1): runs the voiceprint over [pcm] in several ways and logs what each gives (the JSON's size, whether it
@@ -314,8 +305,9 @@ class Ear(
     private fun voiceprint(m: org.vosk.Model, pcm: ShortArray): FloatArray? {
         val sm = Models.speaker ?: return null
         if (pcm.size < RATE * 6 / 10) return null
+        var r: Recognizer? = null
         return try {
-            val r = spkRec ?: Recognizer(m, RATE.toFloat()).also { it.setSpeakerModel(sm); spkRec = it }
+            r = Recognizer(m, RATE.toFloat()).also { it.setSpeakerModel(sm) }
             var acc: FloatArray? = null
             var frames = 0
             var parts = 0
@@ -334,9 +326,9 @@ class Ear(
             else FloatArray(a.size) { a[it] / frames }
         } catch (e: Throwable) {
             log("ear: voiceprint failed: " + e.message)
-            try { spkRec?.close() } catch (x: Throwable) { }
-            spkRec = null
             null
+        } finally {
+            try { r?.close() } catch (x: Throwable) { }
         }
     }
 
