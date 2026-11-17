@@ -337,6 +337,7 @@
       if (!older) {
         Object.assign(st, { c: data.customer, stopped: !!data.stopped, month: data.month, data_at: data.data_at, phone: data.phone, moves: [] });
         if (st.stopped) st.pay = 'cash';
+        if (root.AskerStoreRegular) root.AskerStoreRegular.load(client, token, { moves: () => st.moves, redraw: draw });   // his regular items (store/regular.js); the buttons appear when they arrive
         const ph = $('cPhone');
         if (ph && !ph.value && data.phone) ph.value = /^20\d{10}$/.test(data.phone) ? '0' + data.phone.slice(2) : data.phone;
         drawPay();
@@ -435,6 +436,8 @@
     html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
     // «كرّر دواك بالباركود» (2026-11-17, store/scan.js): the camera / the code / the name put his usual items in the order
     html += `<a href="#scan" class="ac-btn ac-scan">${esc(TEXTS.scan)}</a>`;
+    // «اللي باخده دايمًا» + «أدويتي المزمنة» (2026-11-17, store/regular.js): his regular items and their refill dates (nothing when he has none)
+    html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
     // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number. Also in the owner's look on the pharmacy's own phone
     // (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
     const P = PAY();
@@ -573,7 +576,7 @@
   // this phone forgets the customer's link (it was someone else's): the store is a plain store again
   // (the installed app then asks for a site account like anyone: store/siteuser.js listens)
   const changed = () => { try { window.dispatchEvent(new Event('asker-customer-changed')); } catch (e) { /* old browser */ } };
-  function forget() { keep.set(null); token = null; st.c = null; st.moves = []; showLinked(false); useManifest(false); drawPay(); draw(); changed(); }
+  function forget() { keep.set(null); token = null; st.c = null; st.moves = []; if (root.AskerStoreRegular) root.AskerStoreRegular.forget(); showLinked(false); useManifest(false); drawPay(); draw(); changed(); }
   root.AskerStoreAccount = {
     forget,
     // store/siteuser.js: where this page is running (the installed app? the pharmacy's own phone?) and whose link it has
@@ -600,7 +603,7 @@
     // the server said he is stopped (the owner stopped him meanwhile): cash from now on
     stoppedNow() { st.stopped = true; st.pay = 'cash'; drawPay(); load(false); },
     // the server said the link is no longer valid
-    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; showLinked(false); useManifest(false); drawPay(); draw(); changed(); },
+    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; if (root.AskerStoreRegular) root.AskerStoreRegular.forget(); showLinked(false); useManifest(false); drawPay(); draw(); changed(); },
     // after an order: the account may have changed
     refresh() { if (token) load(false); },
   };
