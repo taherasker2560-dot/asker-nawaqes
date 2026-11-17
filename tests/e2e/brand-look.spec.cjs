@@ -30,7 +30,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
    accent:cs(document.documentElement).getPropertyValue('--accent').trim(),orderBg:cs(order).backgroundColor,orderRadius:cs(order).borderTopLeftRadius,payBg:pay?cs(pay).backgroundColor:'',meta:document.querySelector('meta[name="theme-color"]').content}});
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,'اللهم صل على النبي ﷺ');
- assert.equal(look.topBg,'rgb(255, 255, 255)','a white header');
+ assert.equal(look.topBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.topRadius,'0px');
  assert.equal(look.wave,'none','no wave');
  assert.equal(look.balBg,'rgb(246, 244, 239)','a quiet balance card (no dark surface)');

@@ -17,7 +17,7 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
    qaBg:cs(qa).backgroundColor,qaRadius:cs(qa).borderTopLeftRadius,qaColor:cs(qa).color,card:cs(document.querySelector('.card')).borderTopLeftRadius,accent:cs(document.documentElement).getPropertyValue('--crimson').trim(),meta:document.querySelector('meta[name="theme-color"]').content}});
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,'اللهم صل على النبي ﷺ');
- assert.equal(look.barBg,'rgb(255, 255, 255)','a white header');
+ assert.equal(look.barBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
  assert.equal(look.hero,'rgb(47, 125, 104)','the greeting in the soft green');
  assert.equal(look.heroRadius,'2px');
