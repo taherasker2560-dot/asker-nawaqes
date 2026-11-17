@@ -46,6 +46,10 @@ for(const m of ['فودافون كاش','إنستا باي']){
   check(PY.TEXTS.orderNote.replace('{m}',m));
   check(`الدفع بتحويل ${m}. بعد التحويل ابعت صورته على واتساب.`);
 }
+// the site account inside the installed app (store/siteuser.js, 2026-11-17): its fixed texts and the errors it shows
+const SU=require('../store/siteuser.js');
+for(const [k,v] of Object.entries(SU.TEXTS)){if(k==='signedAs'){check('👤 Ahmed');continue}check(v)}
+for(const v of Object.values(SU.ERRORS))check(v);
 // «الرسايل» (store/chat.js, 2026-11-13)
 const CH=require('../store/chat.js');
 for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);

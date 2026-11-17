@@ -565,9 +565,15 @@
   });
 
   // this phone forgets the customer's link (it was someone else's): the store is a plain store again
-  function forget() { keep.set(null); token = null; st.c = null; st.moves = []; showLinked(false); useManifest(false); drawPay(); draw(); }
+  // (the installed app then asks for a site account like anyone: store/siteuser.js listens)
+  const changed = () => { try { window.dispatchEvent(new Event('asker-customer-changed')); } catch (e) { /* old browser */ } };
+  function forget() { keep.set(null); token = null; st.c = null; st.moves = []; showLinked(false); useManifest(false); drawPay(); draw(); changed(); }
   root.AskerStoreAccount = {
     forget,
+    // store/siteuser.js: where this page is running (the installed app? the pharmacy's own phone?) and whose link it has
+    standalone,
+    pharmacyPhone: () => pharmacyPhone,
+    token: () => token,
     // store.js: the client, once it is made (the first load starts here)
     attach(c) { client = c; if (token) { showLinked(true); drawPay(); load(false); } },
     // store.js view('account')
@@ -588,7 +594,7 @@
     // the server said he is stopped (the owner stopped him meanwhile): cash from now on
     stoppedNow() { st.stopped = true; st.pay = 'cash'; drawPay(); load(false); },
     // the server said the link is no longer valid
-    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; showLinked(false); useManifest(false); drawPay(); draw(); },
+    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; showLinked(false); useManifest(false); drawPay(); draw(); changed(); },
     // after an order: the account may have changed
     refresh() { if (token) load(false); },
   };

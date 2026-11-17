@@ -282,7 +282,7 @@
     $('stockPanel')?.classList.toggle('hidden', tab !== 'stock');
     if (tab === 'stock') window.AskerStock?.open();
     $('storeOrdersPanel')?.classList.toggle('hidden', tab !== 'storeorders');
-    if (tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); }
+    if (tab === 'storeorders') { window.AskerStoreOrders?.open(); window.AskerStoreSettings?.open(); window.AskerSiteUsers?.open(); }
     $('customersPanel')?.classList.toggle('hidden', tab !== 'customers');
     $('vendorsPanel')?.classList.toggle('hidden', tab !== 'vendors');
     // «الموردين» (ar/vendors.js, owner 2026-11-14): balances, statements, an item's purchases

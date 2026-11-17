@@ -190,3 +190,25 @@ html.night .pay-proof { color: #86efac; }
 .pay-opt.on { border-color: var(--accent); background: var(--accent-soft, #ebf1f9); }
 .pay-opt input { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
 .pay-close { flex: none; width: 100%; margin-top: 12px; background: var(--dark); color: #fff; }
+
+/* ---------- حساب الموقع جوه التطبيق المتثبّت (2026-11-17): store/siteuser.js ---------- */
+html.site-gate-open, html.site-gate-open body { overflow: hidden; }
+.site-gate { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, 0.6); }
+.site-gate-card { width: 100%; max-width: 560px; max-height: 94vh; margin: 0 auto; padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 0px)); overflow: auto; border-radius: 30px 30px 0 0; background: var(--card); color: var(--ink); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3); }
+.site-gate-card h2 { margin: 0 0 4px; font-size: 20px; }
+.sg-sub { margin: 0 0 6px; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.site-gate-card label { display: block; margin: 10px 0 4px; font-size: 12.5px; color: var(--muted); }
+.site-gate-card input { width: 100%; min-height: 48px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
+.sg-pw { position: relative; }
+.sg-pw input { padding-right: 84px; padding-left: 14px; text-align: left; }
+.sg-pw button { position: absolute; right: 10px; left: auto; top: 50%; transform: translateY(-50%); font-size: 12.5px; font-weight: 700; color: var(--accent); }
+.sg-err { margin: 10px 0 0; padding: 8px 12px; border-radius: 14px; background: #fdecea; color: #b42318; font-size: 13px; font-weight: 700; line-height: 1.7; }
+html.night .sg-err { background: rgba(255, 90, 70, 0.14); color: #ffb4a8; }
+.sg-main { width: 100%; min-height: 52px; margin-top: 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 17px; font-weight: 800; box-shadow: var(--sh-2); cursor: pointer; }
+.sg-main[disabled] { opacity: 0.7; }
+.sg-switch { display: block; width: 100%; margin-top: 10px; text-align: center; font-size: 13.5px; font-weight: 700; color: var(--accent); }
+.sg-fine { margin: 8px 0 0; text-align: center; font-size: 12px; line-height: 1.9; color: var(--muted); }
+.sg-fine a { color: var(--accent); font-weight: 700; }
+.site-gate-card button.linklike { min-height: 0; height: auto; padding: 6px 8px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+.site-gate-card .sg-pw button.linklike { font-size: 12.5px; }
+.site-gate-card .sg-switch { display: block; width: 100%; margin-top: 8px; font-size: 14px; }

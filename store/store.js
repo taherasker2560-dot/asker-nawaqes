@@ -1057,6 +1057,8 @@
   if (acct) acct.attach(client);
   // the pharmacy's Vodafone Cash / InstaPay numbers (public function ar_store_pay_info); no number = no option
   if (root.AskerStorePay) root.AskerStorePay.load(client);
+  // inside the installed app a person with no customer link makes an account once (store/siteuser.js, migration 202611170300)
+  if (root.AskerSiteUser) root.AskerSiteUser.attach(client);
   if (chat) chat.attach(client);
   saveCart();
   route();
