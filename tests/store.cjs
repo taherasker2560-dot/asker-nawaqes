@@ -13,7 +13,28 @@ assert.deepEqual(S.searchTerms('a b c d e f g h ii jj kk ll mm nn'),['ii','jj','
 assert.deepEqual(S.searchTerms('vit vit'),['vit'],'no repeats');
 assert.deepEqual(S.searchTerms(''),[]);
 assert.equal(S.termFilter('panadol'),'name.ilike.*panadol*,arabic_name.ilike.*panadol*');
-assert.equal(S.termFilter('اوجمنتين'),'name.ilike.*_وجمنتين*,arabic_name.ilike.*_وجمنتين*','ا matches أ / إ / ا');
+assert.equal(S.termFilter('دوا'),'name.ilike.*دو_*,arabic_name.ilike.*دو_*','a short word (too few consonants) is searched as it is; ا matches أ / إ / ا');
+// an Arabic word is searched by its consonants with up to two long-vowel letters between them (owner 2026-11-17: «بنادول» found nothing, the name is «بانادول»)
+const arx = (w) => new RegExp(S.arabicPattern(w));
+for (const [typed, name] of [['بنادول', 'بانادول اكسترا ٤٨ قرص'], ['بانادول', 'بنادول'], ['اوجمنتين', 'أوجمنتين ١ جم ١٤ قرص'], ['اوجمنتين', 'اوجمنتين'], ['سرنجه', 'سرنجة ٥ سم'], ['كونجستال', 'كونجيستال ٢٠ قرص'], ['فولتارين', 'فولتارين ٧٥ مجم'], ['بروفين', 'بروفين ٤٠٠ مجم']]) {
+  assert.match(name, arx(typed), typed + ' must find ' + name);
+}
+assert.doesNotMatch('بيبي كريم', arx('بنادول'));
+assert.doesNotMatch('بانادول', arx('بنادولين'), 'a longer word is not found in a shorter one');
+assert.equal(S.termFilter('بنادول'), 'name.imatch."' + S.arabicPattern('بنادول') + '",arabic_name.imatch."' + S.arabicPattern('بنادول') + '"');
+assert.match(S.arabicPattern('بنادول'), /^ب.*ن.*د.*ل$/);
+assert.doesNotMatch(S.arabicPattern('بنادول'), /[,()"\s]/, 'nothing PostgREST would read as a separator');
+assert.equal(S.arabicPattern('دوا'), null);
+// the word people use is not the name (diapers are sold by brand): حفاضات also finds بامبرز / مولفيكس
+assert.match(S.termFilter('حفاضات'), /arabic_name\.imatch\.[^,]*,.*/);
+assert.ok(S.termFilter('حفاضات').split(',').length >= 8, 'several names for one word');
+assert.match('بامبرز رقم 3', new RegExp(S.termFilter('حفاضات').match(/arabic_name\.imatch\."([^"]+)"/g).map((x) => x.slice(20, -1)).join('|')), 'a brand name matches');
+// numbers: 500 in an English name, ٥٠٠ in an Arabic one
+assert.equal(S.termFilter('500'), 'name.ilike.*500*,arabic_name.ilike.*500*,name.ilike.*٥٠٠*,arabic_name.ilike.*٥٠٠*');
+assert.equal(S.termFilter('٥٠٠'), 'name.ilike.*500*,arabic_name.ilike.*500*,name.ilike.*٥٠٠*,arabic_name.ilike.*٥٠٠*');
+// the sections hold the catalog's unclassified drugs and non-drug goods too (they were in no section)
+assert.ok(S.SECTIONS.find((s) => s.key === 'meds').cats.includes('unknown'));
+assert.ok(S.SECTIONS.find((s) => s.key === 'care').cats.includes('other_non_drug'));
 
 // phone
 assert.equal(S.normPhone('01012345678'),'01012345678');

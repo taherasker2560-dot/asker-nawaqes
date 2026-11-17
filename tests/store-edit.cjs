@@ -4,8 +4,8 @@ const S = require('../store/store.js');
 const E = require('../store/edit.js');
 // the description: hook, then the three sections, then the «not a replacement for the pharmacist» note
 let h = S.descHtml({ h: 'صداع؟ <b>ده</b> بيسكّن', u: ['صداع', ''], f: [], w: ['متزودش عن 8'] });
-assert.match(h, /^<p class="ds-hook" translate="no">صداع؟ &lt;b&gt;ده&lt;\/b&gt; بيسكّن<\/p>/, 'escaped, never translated');
-assert.match(h, /<details class="ds-sec" open><summary>بيستخدم في<\/summary><ul><li translate="no">صداع<\/li><\/ul><\/details>/, 'the first part is open');
+assert.match(h, /^<p class="ds-lang">الوصف بالعربي بس<\/p><p class="ds-hook" translate="no" dir="auto">صداع؟ &lt;b&gt;ده&lt;\/b&gt; بيسكّن<\/p>/, 'escaped, never translated');
+assert.match(h, /<details class="ds-sec" open><summary>بيستخدم في<\/summary><ul><li translate="no" dir="auto">صداع<\/li><\/ul><\/details>/, 'the first part is open');
 assert.doesNotMatch(h, /مميزاته/, 'an empty section is not drawn');
 assert.match(h, /<details class="ds-sec warn"><summary>تنبيهات وأضرار/, 'the others start closed');
 assert.match(h, /مش بديل عن استشارة الصيدلي/);

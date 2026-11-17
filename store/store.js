@@ -14,9 +14,9 @@
   };
   // أقسام الرئيسية: أنواع التصنيف (Store\rx\classified.txt) متجمعة
   const SECTIONS = [
-    { key: 'meds', name: 'أدوية', mark: 'د', cats: ['antibiotic', 'blood_pressure_heart', 'diabetes', 'neuro_psych', 'hormones', 'controlled_pain', 'anticoagulant', 'cholesterol', 'antiviral_antifungal', 'respiratory_rx', 'urology', 'gi_rx', 'injection_other', 'oncology_immuno', 'other_rx', 'pain_fever', 'cold_allergy', 'stomach_simple', 'skin_drug', 'eye_ear_nose_simple', 'other_otc'] },
+    { key: 'meds', name: 'أدوية', mark: 'د', cats: ['antibiotic', 'blood_pressure_heart', 'diabetes', 'neuro_psych', 'hormones', 'controlled_pain', 'anticoagulant', 'cholesterol', 'antiviral_antifungal', 'respiratory_rx', 'urology', 'gi_rx', 'injection_other', 'oncology_immuno', 'other_rx', 'pain_fever', 'cold_allergy', 'stomach_simple', 'skin_drug', 'eye_ear_nose_simple', 'other_otc', 'unknown'] },
     { key: 'vit', name: 'فيتامينات ومكملات', mark: 'ف', cats: ['vitamins_supplements'] },
-    { key: 'care', name: 'تجميل وعناية', mark: 'ت', cats: ['cosmetic'] },
+    { key: 'care', name: 'تجميل وعناية', mark: 'ت', cats: ['cosmetic', 'other_non_drug'] },
     { key: 'baby', name: 'الأم والطفل', mark: 'ط', cats: ['baby'] },
     { key: 'supplies', name: 'مستلزمات طبية', mark: 'م', cats: ['supplies_devices'] },
   ];
@@ -68,9 +68,36 @@
     return [...new Set(words)].slice(0, 5);
   }
   // فلتر PostgREST لكلمة واحدة: في الاسم أو الاسم العربي (الكلمة متنضفة من الفواصل والأقواس في searchTerms)
+  // الاسم العربي بيكتب حروف المد غير ما الناس بتكتب («بنادول» و«بانادول»، «اوجمنتين» و«أوجمنتين»)، فالكلمة العربية بتتدوّر بحروفها الصحيحة
+  // وبينها لحد حرفين مد (ا و ي ى ء…): regex في الداتابيز (imatch). الكلمة اتنضفت في searchTerms: حروف وأرقام بس، فمفيش حاجة تتحقن.
+  const VOWEL_LETTERS = 'اأإآويىءئؤ';
+  function arabicPattern(w) {
+    const same = { 'ا': '[اأإآ]', 'ى': '[يى]', 'ي': '[يى]', 'ه': '[هة]', 'ة': '[هة]' };
+    const keep = [...w].filter((c, i) => i === 0 || !VOWEL_LETTERS.includes(c)); // أول حرف + الحروف الصحيحة
+    if (keep.length < 3) return null; // «دوا» مثلًا: مفيش حروف تكفي، يتدوّر عليها زي ما هي
+    const gap = '[' + VOWEL_LETTERS + ']?[' + VOWEL_LETTERS + ']?';
+    return keep.map((c) => same[c] || c).join(gap);
+  }
+  // الأرقام: 500 في الاسم الإنجليزي و٥٠٠ في الاسم العربي، فالرقم بيتدوّر عليه بالشكلين
+  const INDIC = '٠١٢٣٤٥٦٧٨٩';
+  // كلمة الناس مش هي اللي في الاسم: الحفاضات أسماؤها ماركات (بامبرز، مولفيكس، فاين بيبي)
+  const SYNONYMS = [[/^(حفاض|حفاظ|دايبر)/, ['حفاضات', 'بامبرز', 'مولفيكس', 'فاين']]];
   function termFilter(w) {
-    const v = /[ء-ي]/.test(w) ? w.replace(/ا/g, '_') : w; // ا ممكن تبقى أ أو إ في الاسم العربي
-    return `name.ilike.*${v}*,arabic_name.ilike.*${v}*`;
+    const syn = SYNONYMS.find(([re]) => re.test(w));
+    return syn ? syn[1].map(oneFilter).join(',') : oneFilter(w);
+  }
+  function oneFilter(w) {
+    if (/^[0-9٠-٩]+$/.test(w)) {
+      const a = w.replace(/[٠-٩]/g, (d) => String(INDIC.indexOf(d))), b = a.replace(/[0-9]/g, (d) => INDIC[d]);
+      return `name.ilike.*${a}*,arabic_name.ilike.*${a}*,name.ilike.*${b}*,arabic_name.ilike.*${b}*`;
+    }
+    if (/[ء-ي]/.test(w)) {
+      const p = arabicPattern(w);
+      if (p) return `name.imatch."${p}",arabic_name.imatch."${p}"`;
+      const v = w.replace(/ا/g, '_'); // ا ممكن تبقى أ أو إ في الاسم العربي
+      return `name.ilike.*${v}*,arabic_name.ilike.*${v}*`;
+    }
+    return `name.ilike.*${w}*,arabic_name.ilike.*${w}*`;
   }
   function normPhone(p) {
     let d = String(p || '').replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/\D/g, '');
@@ -231,11 +258,11 @@
       const l = list(d[k]);
       if (!l.length) return '';
       const open = first ? ' open' : ''; first = false;
-      return `<details class="ds-sec${cls}"${open}><summary>${title}</summary><ul>${l.map((x) => `<li translate="no">${e(x)}</li>`).join('')}</ul></details>`;
+      return `<details class="ds-sec${cls}"${open}><summary>${title}</summary><ul>${l.map((x) => `<li translate="no" dir="auto">${e(x)}</li>`).join('')}</ul></details>`;
     }).join('');
     const h = String(d.h || '').trim();
     if (!h && !parts) return '';
-    return `${h ? `<p class="ds-hook" translate="no">${e(h)}</p>` : ''}${parts}<p class="ds-note">المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.</p>`;
+    return `${h ? `<p class="ds-lang">الوصف بالعربي بس</p><p class="ds-hook" translate="no" dir="auto">${e(h)}</p>` : ''}${parts}<p class="ds-note">المعلومات دي للتعريف بس ومش بديل عن استشارة الصيدلي أو الطبيب.</p>`;
   }
   // مواعيد الصيدلية (صاحب الصيدلية 2026-11-15): كل يوم من 9 الصبح لحد 12 بالليل في الشتا ولحد 2 بالليل في الصيف،
   // والجمعة من 3 العصر لحد 11 بالليل. الصيف = التوقيت الصيفي في مصر (ساعة القاهرة +3)، فالموقع بيعرفه لوحده.
@@ -266,7 +293,7 @@
   }
   // صورة كل قسم في الرئيسية: صنف معروف من القسم وعنده صورة (لو الصورة مش موجودة يرجع الرسم)
   const SEC_PICS = { meds: 68432, vit: 4468, care: 27245, baby: 25723, supplies: 3614 };
-  const api = { dataAgeText, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { dataAgeText, arabicPattern, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -472,7 +499,7 @@
     return `<article class="pcard">
       <div class="pc-pic" data-open="${it.id}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<div class="thumb card c-${cardInfo(it).sec}" aria-hidden="true">${cardHtml(it)}</div>`}</div>
       ${ctl}
-      <div class="pc-nm" data-open="${it.id}" role="button" tabindex="0">${esc(it.arabic_name || it.name)}</div>
+      <div class="pc-nm" data-open="${it.id}" role="button" tabindex="0">${esc(label(it))}</div>
       <div class="pc-pr${onOrder(it) ? ' later' : ''}">${price}</div>
     </article>`;
   }
@@ -508,6 +535,7 @@
   // الإجمالي تحت أيقونة «السلة» في المنيو (owner 2026-11-16: «ا»؛ مفيش شريط عايم): العدد على الأيقونة والإجمالي تحتها
   function drawCartBar() {
     const n = cartCount(cart), t = cartTotal(cart), later = cart.filter((x) => x.on_order).length;
+    document.querySelectorAll('.tabbar a[data-go="cart"]').forEach((a) => a.classList.toggle('has-items', n > 0));
     document.querySelectorAll('.cart-tot').forEach((el) => {
       el.hidden = !n;
       el.textContent = n ? (t > 0 ? money(t) + ' ج' : 'بالطلب') + (t > 0 && later ? ' +' : '') : '';
@@ -581,7 +609,7 @@
   }
   setInterval(drawOpenNow, 60000);
   // آخر تحديث لبيانات التوفر (صاحب الصيدلية 2026-11-17): سطر صغير في صفحة الصنف وفي السلة وتحت، عشان العميل يعرف إن الصنف ممكن يكون خلص بعد الميعاد ده.
-  // data_at = وقت نسخة بيانات الصيدلية (بتوقيت القاهرة) على كل صنف في ar_store_items.
+  // data_at = وقت آخر بيع اتسجل في نسخة بيانات الصيدلية (بتوقيت القاهرة، MAX(posTickets.ztime))، على كل صنف في ar_store_items: ده آخر وقت مضمون إن الأرصدة حسبه.
   function dataAgeText(dataAt, now) {
     const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/.exec(String(dataAt || ''));
     if (!m) return '';
@@ -596,12 +624,15 @@
       const txt = dataAgeText(data && data[0] && data[0].data_at);
       document.querySelectorAll('.data-age').forEach((el) => {
         if (!txt) { el.hidden = true; return; }
-        el.innerHTML = '<span>الأصناف المتاحة محدّثة آخر مرة</span> <bdi></bdi><span>، فالصنف ممكن يكون خلص بعد كده.</span>';
+        el.innerHTML = '<span>الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:</span> <bdi></bdi><span>. ممكن يكون صنف خلص بعده.</span>';
         el.querySelector('bdi').textContent = txt;
         el.hidden = false;
       });
+      // the footer's old «every few hours» line gives way to the real time
+      document.querySelectorAll('.ft-note:not(.data-age)').forEach((el) => { el.hidden = !!txt; });
     } catch (e) { /* the line just stays hidden */ }
-  }  loadDataAge();
+  }
+  loadDataAge();
   setInterval(loadDataAge, 600000);
   function applySettings(s) {
     settings = s;
@@ -641,17 +672,26 @@
     const my = ++seq;
     let req = client.from('ar_store_items').select(COLS);
     if (q.terms) for (const w of q.terms) req = req.or(termFilter(w));
-    if (q.cats) req = req.in('cat', q.cats).eq('status', 'available');
-    req = req.order('status').order('name').range(offset, offset + PAGE - 1);
+    // القسم: الأكثر طلبًا الأول (ترتيب مبيعات الصيدلية)، وبعدهم بالاسم؛ البحث: المتوفر الأول
+    if (q.cats) req = req.in('cat', q.cats).eq('status', 'available').order('popular_rank', { ascending: true, nullsFirst: false }).order('name').order('id');
+    else req = req.order('status').order('popular_rank', { ascending: true, nullsFirst: false }).order('name').order('id');
+    req = req.range(offset, offset + PAGE - 1);
     $('resNote').textContent = 'بيدوّر…';
     if (!append) { $('results').innerHTML = skel(4); $('more').hidden = true; }
-    const { data, error } = await req;
+    let { data, error } = await req;
     if (my !== seq) return;
     if (error) { $('resNote').textContent = 'مقدرتش أجيب الأصناف. اتأكد من النت وجرب تاني.'; return; }
+    // nothing has all the words («لبن اطفال»): the closest are the items that have any of them, the most requested first
+    let loose = false;
+    if (!append && !(data || []).length && q.terms && q.terms.length > 1) {
+      const r2 = await client.from('ar_store_items').select(COLS).or(q.terms.map(termFilter).join(',')).order('status').order('popular_rank', { ascending: true, nullsFirst: false }).order('name').order('id').limit(PAGE);
+      if (my !== seq) return;
+      if (!r2.error && (r2.data || []).length) { data = r2.data; loose = true; }
+    }
     shown = append ? shown.concat(data || []) : data || [];
     loadAlts((data || []).filter((x) => x.status !== 'available').map((x) => x.id));
-    $('resNote').textContent = shown.length ? (q.title || `نتايج «${q.text}»`) : (q.text ? `مفيش حاجة باسم «${q.text}». جرب جزء من الاسم أو اكتبه إنجليزي.` : 'مفيش أصناف هنا دلوقتي.');
-    drawList((data || []).length === PAGE);
+    $('resNote').textContent = shown.length ? (q.title || (loose ? `مفيش حاجة فيها كل كلماتك، دي أقرب نتايج لـ «${q.text}»` : `نتايج «${q.text}»`)) : (q.text ? `مفيش حاجة باسم «${q.text}». جرب جزء من الاسم أو اكتبه إنجليزي.` : 'مفيش أصناف هنا دلوقتي.');
+    drawList(!loose && (data || []).length === PAGE);
   }
   // البدايل للأصناف اللي مش متوفرة في الصفحة دي (طلب واحد للصفحة كلها)
   async function loadAlts(ids) {

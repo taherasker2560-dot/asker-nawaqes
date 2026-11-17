@@ -143,7 +143,7 @@ html.night .ac-bal { background: var(--dark); box-shadow: 0 0 0 1px rgba(255, 25
 .ac-stop { border-radius: 22px; }
 
 /* ---------- motion: a page comes in, the cards rise one after another ---------- */
-[data-view]:not([hidden]) { animation: cap-in 0.4s var(--ease) both; }
+[data-view]:not([hidden]) { animation: cap-in 0.4s var(--ease) backwards; } /* backwards, not both: a view that keeps its end transform becomes the box its fixed children (the chat bar) are placed in */
 [data-view="home"]:not([hidden]) { animation: none; }
 @keyframes cap-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @keyframes cap-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
