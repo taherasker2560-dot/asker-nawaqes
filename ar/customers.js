@@ -818,6 +818,30 @@
       if (st === me) drawStatement();
     }
   }
+  // «👁 شوف صفحته» (owner 2026-11-17: «فتحي رابطه بيبعت رسالة على الواتس بتاعه … اعملها زرار احسن … يفتح لي صفحة العميل زي ما هو بيشوفها»): his page, as he sees it,
+  // opens in a new tab here on the owner's phone: nothing is sent to him, and the look is not counted as him opening his link (store.js tells the server it is a look).
+  // The tab is opened inside the tap (a phone's pop-up blocker lets it) and gets its address a moment later; a customer with no link yet gets one made (not sent).
+  async function viewPage() {
+    const me = st;
+    if (!me || me.linkBusy) return;
+    const go = (w, token) => { const url = linkUrl(location.href, token); if (w && !w.closed) w.location.href = url; else root.open(url, '_blank'); };
+    const w = root.open('', '_blank');
+    if (me.link && me.link.token) { go(w, me.link.token); return; }
+    me.linkBusy = true; me.linkMsg = ''; drawStatement();
+    try {
+      const { data, error } = await db().rpc('ar_customer_link', { p_customer: me.c.id, p_new: false });
+      if (error) throw new Error(error.message || String(error));
+      if (!data || !data.ok || !data.token) throw new Error((data && data.error) || 'مفيش رابط');
+      me.link = { token: data.token, created_at: new Date().toISOString(), last_seen_at: null, seen_count: 0 };
+      go(w, data.token);
+    } catch (e) {
+      if (w && !w.closed) w.close();
+      Object.assign(me, { linkMsg: 'الصفحة ما اتفتحتش: ' + errText(e), linkBad: true });
+    } finally {
+      me.linkBusy = false;
+      if (st === me) drawStatement();
+    }
+  }
   async function setStop(on) {
     const me = st;
     if (!me || me.stopBusy || !stops) return;
@@ -844,6 +868,7 @@
     return '<div class="cu-link">' +
       (stop ? `<p class="cu-stopped">⛔ موقوف من ${esc(whenText(localIso(stop.stopped_at), new Date()))}: رابطه بيقوله «حسابك موقوف»، وطلباته كاش بس</p>` : '') +
       `<button type="button" class="cu-send" data-cu-link-send${st.linkBusy ? ' disabled' : ''}>🔗 ابعتله رابط حسابه على الواتس</button>` +
+      `<button type="button" class="secondary cu-view" data-cu-link-view${st.linkBusy ? ' disabled' : ''}>👁 شوف صفحته</button>` +
       (stop
         ? `<button type="button" class="secondary cu-unstop" data-cu-unstop${st.stopBusy ? ' disabled' : ''}>✅ رجّع الآجل</button>`
         : `<button type="button" class="cu-stop" data-cu-stop${st.stopBusy ? ' disabled' : ''}>⛔ وقّف الآجل</button>`) +
@@ -978,6 +1003,7 @@
       if (e.target.closest('[data-cu-wa]')) { openWa(); return; }
       // his personal link and «وقّف الآجل»
       if (e.target.closest('[data-cu-link-send]')) { sendLink(false); return; }
+      if (e.target.closest('[data-cu-link-view]')) { viewPage(); return; }
       if (e.target.closest('[data-cu-link-new]')) { sendLink(true); return; }
       if (e.target.closest('[data-cu-stop]')) { setStop(true); return; }
       if (e.target.closest('[data-cu-unstop]')) { setStop(false); return; }

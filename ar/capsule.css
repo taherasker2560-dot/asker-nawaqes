@@ -252,3 +252,5 @@ html.night .su-note, html.night .su-pw { background: rgba(255, 255, 255, 0.08); 
 html.night .su-chip { background: rgba(80, 200, 130, 0.18); color: #9be3b8; }
 html.night .su-chip.gone { background: rgba(255, 255, 255, 0.1); color: #cbd0d8; }
 .su-meta span + span::before { content: ' · '; }
+/* «👁 شوف صفحته» in a customer's statement (2026-11-17, ar/customers.js viewPage) */
+button.cu-view { width: 100%; margin: 8px 0 0; font-weight: 700; }
