@@ -13,10 +13,12 @@ const ROWS=[
 const FAKE=([rows,perm])=>{
  window.__say=[];window.__cancel=0;window.__vib=[];window.__notes=[];window.__voices=localStorage.getItem('__novoice')?0:1;
  window.SpeechSynthesisUtterance=class{constructor(t){this.text=t}};
- Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak(u){window.__say.push(u.text)},cancel(){window.__cancel++},getVoices(){return window.__voices?[{lang:'ar-EG',name:'Arabic (Egypt)'}]:[]},addEventListener(){}}});
+ window.__subs=0;window.__swReg=null;window.__sub=null;
+ Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak(u){window.__say.push(u.text);setTimeout(()=>u.onstart&&u.onstart(),0)},cancel(){window.__cancel++},getVoices(){return window.__voices?[{lang:'ar-EG',name:'Arabic (Egypt)'}]:[]},addEventListener(){}}});
  Object.defineProperty(navigator,'vibrate',{configurable:true,value:(p)=>{window.__vib.push(p);return true}});
- window.Notification=class{constructor(t,o){window.__notes.push([t,o&&o.body])}};window.Notification.permission=perm;window.Notification.requestPermission=()=>{window.Notification.permission='granted';return Promise.resolve('granted')};
- window.__fakeRpcs={ar_store_pay_info:()=>null,ar_customer_regular_view:()=>({ok:true,rows,at:new Date().toISOString()})};
+ window.Notification=class{constructor(t,o){window.__notes.push([t,o&&o.body])}};window.Notification.permission=localStorage.getItem('__perm')||perm;window.Notification.requestPermission=()=>{window.Notification.permission='granted';localStorage.setItem('__perm','granted');return Promise.resolve('granted')};
+ Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{register:async(url,o)=>{window.__swReg=[url,o&&o.scope];return {active:{},pushManager:{getSubscription:async()=>window.__sub,subscribe:async(opt)=>{window.__subs++;window.__subOpt=[opt.userVisibleOnly,opt.applicationServerKey&&opt.applicationServerKey.length];window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)};return window.__sub}}}}}});
+ window.__fakeRpcs={ar_store_pay_info:()=>null,ar_customer_regular_view:()=>({ok:true,rows,at:new Date().toISOString()}),ar_dose_save:()=>({ok:true})};
 };
 const setup=(page,perm='default')=>page.addInitScript(FAKE,[ROWS,perm]);
 const seed=(page)=>page.evaluate(([c,m,t])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[]})),[CUSTOMERS,MOVES,tok]);
@@ -173,4 +175,73 @@ run('Dose alarm: the pharmacy\'s own phone is a look only (kept for the tab, nev
  assert.equal(await tick(page,8,0),1);await page.waitForSelector('#alarmRing');
  assert.equal(await text(page,'#alarmRing h2'),'⏰ Time for your medicine');assert.equal(await text(page,'[data-al-took]'),'✓ Taken');
  assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد دواء زانبرازان ٢٠ قرص'],'the phone says the Arabic name of the medicine');
+},{home:true});
+
+run('Dose alarm stage 2: turning the notifications on subscribes this phone and sends ONLY the clock times of the alarms that are on (never a name); it follows every change; the pharmacy phone sends nothing',async({page,base})=>{
+ await setup(page,'default');
+ await seed(page);
+ await page.setViewportSize({width:375,height:812});
+ await page.evaluate(()=>localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'زانبرازان ٢٠ قرص',say:'',times:['20:00','08:00'],on:true},{id:'a2',name:'لاكتيفينور ٣٥ قرص',say:'',times:['14:00'],on:false}],snoozes:[]})));
+ await page.goto(base+'store.html#me='+tok);await page.waitForSelector('.ac-al-tile');
+ const saves=()=>page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').map(w=>w.args));
+ assert.deepEqual(await saves(),[],'notifications not allowed yet: nothing is sent, not even the times');
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-notif]');
+ assert.match(await text(page,'#alarmSheet .rg-body'),/مواعيد الجرعات بس \(من غير اسم الدوا\) بتتبعت لسيرفر الصيدلية/,'it says what is sent before he agrees');
+ await page.click('[data-al-notif]');
+ await page.waitForFunction(()=>window.__fakeWrites.some(w=>w.rpc==='ar_dose_save'));
+ assert.deepEqual(await page.evaluate(()=>window.__swReg),['store/dose/sw.js','store/dose/'],'the dose worker has its own scope (the messages keep theirs)');
+ assert.deepEqual(await page.evaluate(()=>window.__subOpt),[true,65],'a visible-notification subscription with the server public key');
+ let s=await saves();
+ assert.deepEqual(s,[{p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_times:['08:00','20:00']}],'the address and the clock times of the alarms that are ON');
+ assert.doesNotMatch(JSON.stringify(s),/[؀-ۿ]|زانبرازان|لاكتيفينور/,'no medicine name leaves the phone');
+ assert.match(await text(page,'#alarmSheet .rg-body'),/الإشعارات شغالة/);
+ // every change follows: the second alarm on, the first off, all off
+ await page.click('#alarmSheet .al-card:nth-of-type(2) [data-al-toggle]');
+ await page.waitForFunction(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length>=2);
+ assert.deepEqual((await saves()).pop().p_times,['08:00','14:00','20:00']);
+ await page.click('#alarmSheet .al-card:nth-of-type(1) [data-al-toggle]');
+ await page.waitForFunction(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length>=3);
+ assert.deepEqual((await saves()).pop().p_times,['14:00']);
+ await page.click('#alarmSheet .al-card:nth-of-type(2) [data-al-toggle]');
+ await page.waitForFunction(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length>=4);
+ assert.deepEqual((await saves()).pop().p_times,[],'nothing on: the server forgets this phone');
+ assert.equal(await page.evaluate(()=>window.__subs),1,'one subscription, reused');
+ // a new alarm by hand is sent too
+ await page.click('[data-al-new]');await page.click('[data-al-pick="other"]');await page.fill('[data-al-name]','دوا تاني');await page.click('[data-al-preset="once"]');await page.click('[data-al-save]');
+ await page.waitForFunction(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length>=5);
+ assert.deepEqual((await saves()).pop().p_times,['08:00']);
+ // the next visit (permission already given): the times are sent again by themselves (the server's copy stays fresh)
+ const n=(await saves()).length;await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.waitForFunction(()=>window.__fakeWrites.some(w=>w.rpc==='ar_dose_save'));
+ assert.deepEqual((await saves()).pop().p_times,['08:00']);void n;
+},{home:true});
+
+run('Dose alarm stage 2: the pharmacy\'s own phone sends nothing; a ring opened from a notification asks for a tap and speaks on it',async({page,base})=>{
+ await setup(page,'granted');
+ await seed(page);
+ await page.evaluate(()=>{localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}')});
+ await page.setViewportSize({width:375,height:812});
+ await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.click('[data-al-open]');await page.click('[data-al-new]');await page.click('[data-al-pick="0"]');await page.click('[data-al-save]');await page.waitForSelector('.al-card');
+ await page.waitForTimeout(500);
+ assert.equal(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length+window.__subs),0,'the look sends nothing and subscribes nothing');
+ await page.evaluate(()=>{localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token');sessionStorage.clear()});
+ // the page was opened by a tap on the notification: the browser does not allow speech before a tap, so the card asks for one, and the first tap speaks
+ await page.addInitScript(()=>{window.__quiet=true});
+ await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.evaluate(()=>{localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'زانبرازان ٢٠ قرص',say:'',times:['08:00'],on:true}],snoozes:[]}));
+  // an engine that stays silent until a tap, like Chrome on a page nobody touched yet
+  let touched=false;addEventListener('pointerdown',()=>{touched=true},true);
+  speechSynthesis.speak=(u)=>{window.__say.push(u.text);if(touched)setTimeout(()=>u.onstart&&u.onstart(),0)};window.__say.length=0});
+ assert.equal(await page.evaluate(`window.AskerStoreAlarm.tick(new Date(2026,10,17,8,0,20)).length`),1);
+ await page.waitForSelector('#alarmRing');
+ await page.waitForSelector('.al-ring-hint',{timeout:5000});
+ assert.equal(await text(page,'.al-ring-hint'),'دوس في أي مكان عشان تسمع اسم الدوا');
+ const before=(await page.evaluate(()=>window.__say)).length;
+ await page.mouse.click(30,30);   // a tap anywhere: the name is said
+ await page.waitForFunction(b=>window.__say.length>b,before);
+ assert.equal((await page.evaluate(()=>window.__say)).slice(-1)[0],'ميعاد دواء زانبرازان ٢٠ قرص');
+ // and the button says it again
+ const b2=(await page.evaluate(()=>window.__say)).length;await page.click('[data-al-hear]');
+ assert.equal((await page.evaluate(()=>window.__say)).length,b2+1);
 },{home:true});

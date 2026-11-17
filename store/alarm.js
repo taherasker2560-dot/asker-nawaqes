@@ -3,9 +3,12 @@
    - The customer picks a medicine (one of the items he usually takes, or any name he types), how many times a day and the times. At the time the phone rings: a full-screen card with the
      medicine's name, a vibration, and the phone SAYS «ميعاد دواء <the name>» with its own voice (the browser's speech engine: on Android it is Google's, free, no server, no cost to the pharmacy).
      «خدته ✓» closes it; «ذكّرني بعد 10 دقايق» comes back. If the page is hidden when the time comes, a phone notification shows too (when he allowed notifications).
-   - The times are kept ON HIS PHONE ONLY (localStorage): the pharmacy's server never sees which medicines he takes or when. Nothing is sent from here.
-   - Honest limit (stage 1): it rings while the pharmacy's page is open on his phone (a tab or the installed app, even in the background while the browser is alive); a closed browser cannot ring
-     by itself. Ringing with the phone locked needs a push from a server: stage 2, separate (a server timer and the owner's OK). A missed time still shows for 10 minutes when he opens the page.
+   - The alarms (names and times) are kept ON HIS PHONE (localStorage). Without the notifications nothing is sent anywhere.
+   - Stage 1: it rings while the pharmacy's page is open on his phone (a tab or the installed app, even in the background while the browser is alive). A missed time still shows for 10 minutes
+     when he opens the page.
+   - Stage 2 (the same night, owner: «انجز»): when he turns the notifications on, a push at each dose time reaches the phone even with the browser closed (store/dose/sw.js shows «ميعاد دواك», a tap
+     opens the page, which rings and says the name). For that the server keeps ONLY the clock times of his alarms next to his push address (table ar_dose_push, function asker-dose, migration
+     202611172300): never a medicine name, never who he is. The names stay on his phone.
    - On the pharmacy's own phone (the owner's look at a customer's page, the bot signed in there) the card is a look only: kept for this tab, never rings.
    Loaded before store/account.js, which draws the tile and nothing else here. */
 (function (root) {
@@ -33,9 +36,10 @@
     tryVoice: '▶ جرّب الصوت',
     tryPhrase: 'ميعاد دواء، تجربة الصوت',
     notifOn: '🔔 فعّل الإشعارات',
-    notifDone: 'الإشعارات شغالة',
+    notifWhy: 'مواعيد الجرعات بس (من غير اسم الدوا) بتتبعت لسيرفر الصيدلية عشان الإشعار يوصلك والمتصفح مقفول. اسم الدوا بيفضل على موبايلك.',
+    notifDone: 'الإشعارات شغالة: هيجيلك إشعار وقت الجرعة حتى والمتصفح مقفول، ودوسة عليه تفتح الصفحة وتنطق اسم الدوا.',
     notifNo: 'الإشعارات مقفولة من إعدادات المتصفح',
-    open: 'المنبه بيرن طول ما صفحة الصيدلية مفتوحة على موبايلك، فسيبها مفتوحة.',
+    open: 'المنبه بيرن لما صفحة الصيدلية تكون مفتوحة على موبايلك. فعّل الإشعارات عشان يوصلك وقت الجرعة حتى والمتصفح مقفول.',
     noVoice: 'موبايلك مفيهوش صوت عربي: هيرن من غير نطق. نزّل صوت عربي من إعدادات الموبايل ← اللغة ← تحويل النص إلى كلام.',
     lookOnly: 'ده شكل المنبه عند العميل. على موبايل الصيدلية مبيرنش.',
     which: 'أي دوا؟',
@@ -58,6 +62,8 @@
     needTime: 'ضيف ميعاد واحد على الأقل',
     ringTitle: '⏰ ميعاد الدوا',
     took: '✓ خدته',
+    hear: '🔊 اسمع الاسم',
+    tapHint: 'دوس في أي مكان عشان تسمع اسم الدوا',
     snooze: '⏱ ذكّرني بعد 10 دقايق',
     notifTitle: '⏰ ميعاد دواك',
     back: 'رجوع',
@@ -127,8 +133,8 @@
   const read = (k) => { try { return JSON.parse(box().getItem(k) || 'null'); } catch (e) { return null; } };
   const write = (k, v) => { try { box().setItem(k, JSON.stringify(v)); } catch (e) { /* private window: it stays until the page is closed */ } };
   let data = clean(read(KEY));
-  const save = () => { write(KEY, data); };
-  let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null;
+  const save = () => { write(KEY, data); syncServer(); };
+  let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
   const synth = () => (root.speechSynthesis && root.SpeechSynthesisUtterance ? root.speechSynthesis : null);
@@ -143,6 +149,7 @@
       s.cancel();
       const u = new root.SpeechSynthesisUtterance(text), v = arabicVoice();
       u.lang = v ? v.lang : 'ar-EG'; if (v) u.voice = v; u.rate = 0.9; u.volume = 1;
+      u.onstart = () => { if (ring) ring.spoke = true; };   // a browser that is not allowed to speak yet never starts: the card then asks for a tap
       s.speak(u); return true;
     } catch (e) { return false; }
   }
@@ -166,7 +173,7 @@
     } catch (e) { /* no notification */ }
   }
   function startRing(due, n) {
-    ring = { due, snoozeTimes: due.map((d) => ({ id: d.id, time: d.time })), at0: (n || new Date()).getTime(), wall0: Date.now() };
+    ring = { due, snoozeTimes: due.map((d) => ({ id: d.id, time: d.time })), at0: (n || new Date()).getTime(), wall0: Date.now(), spoke: false, needTap: false };
     markFired(due.map((d) => d.key));
     if (root.AskerStoreMusic && root.AskerStoreMusic.hold) root.AskerStoreMusic.hold('alarm');   // the music steps aside while it rings
     try { root.navigator.vibrate && root.navigator.vibrate([400, 200, 400, 200, 400]); } catch (e) { /* no vibration */ }
@@ -175,6 +182,12 @@
     sayCount = 0;
     const once = () => { if (!ring || sayCount >= MAX_SAYS) return; sayCount++; say(sayDue(ring.due)); };
     once(); clearInterval(sayTimer); sayTimer = setInterval(once, SAY_EVERY_MS);
+    // opened from a notification the page may not be allowed to speak before a tap: the card says so, and the first tap speaks
+    if (data.speak && synth()) setTimeout(() => {
+      if (!ring || ring.spoke) return;
+      ring.needTap = true; drawRing();
+      document.addEventListener('pointerdown', () => { if (ring) say(sayDue(ring.due)); }, { capture: true, once: true });
+    }, 1500);
   }
   function stopRing() {
     clearInterval(sayTimer); sayTimer = null;
@@ -217,9 +230,50 @@
     if (!el) { el = document.createElement('div'); el.id = 'alarmRing'; el.className = 'al-ring'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true'); document.body.appendChild(el); }
     el.innerHTML = `<div class="al-ring-card"><div class="al-ring-ico" aria-hidden="true">⏰</div><h2>${esc(TEXTS.ringTitle)}</h2>` +
       ring.due.map((d) => `<div class="al-ring-med notr" dir="auto">${esc(d.name)}<small>${esc(timeText(d.time))}</small></div>`).join('') +
-      `<button type="button" class="al-btn" data-al-took>${esc(TEXTS.took)}</button><button type="button" class="al-btn ghost" data-al-snooze>${esc(TEXTS.snooze)}</button></div>`;
+      (ring.needTap ? `<p class="al-ring-hint">${esc(TEXTS.tapHint)}</p>` : '') +
+      `<button type="button" class="al-btn" data-al-took>${esc(TEXTS.took)}</button>${data.speak && synth() ? `<button type="button" class="al-btn ghost" data-al-hear>${esc(TEXTS.hear)}</button>` : ''}<button type="button" class="al-btn ghost" data-al-snooze>${esc(TEXTS.snooze)}</button></div>`;
   }
 
+  // ---------- stage 2: a push at each dose time, with the browser closed ----------
+  // The server gets ONLY: this phone's push address and the clock times of the alarms that are on (Cairo time). No name, no customer (migration 202611172300, function asker-dose).
+  const VAPID = 'BEz67xiIZZubLNtifD1Ryqxc6p2j509IsWF6o-YUe5M1BvyWIlUm4NwaRKUP-potwMmyN9_qxqNC2qfn1s5ozwg';   // the public half of the web-push key (the same one store/chat.js uses)
+  const keyBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
+  const canPush = () => !pharmacy && !!root.navigator && 'serviceWorker' in root.navigator && 'PushManager' in root && !!root.Notification;
+  // a time on this phone's clock as Cairo reads it (the pharmacy's clock the server uses); the same when the phone is in Cairo
+  function cairoTime(hhmm, now) {
+    const m = minutesOf(hhmm); if (m == null) return null;
+    try {
+      const phone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!phone || phone === 'Africa/Cairo') return hhmm;
+      const d = new Date(now || Date.now()); d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+      return `${p.hour}:${p.minute}`;
+    } catch (e) { return hhmm; }
+  }
+  const serverTimes = () => normTimes([].concat(...data.items.filter((x) => x.on).map((x) => x.times)).map((t) => cairoTime(t)));
+  async function activeRegistration() {
+    const reg = await root.navigator.serviceWorker.register('store/dose/sw.js', { scope: 'store/dose/' });
+    if (reg.active) return reg;
+    const w = reg.installing || reg.waiting;
+    await new Promise((ok) => { if (!w) return ok(); w.addEventListener('statechange', () => { if (w.state === 'activated') ok(); }); setTimeout(ok, 10000); });
+    return reg;
+  }
+  let syncing = false, syncAgain = false;
+  async function syncServer() {
+    if (!client || !canPush() || root.Notification.permission !== 'granted') return;
+    if (syncing) { syncAgain = true; return; }
+    syncing = true;
+    try {
+      do {
+        syncAgain = false;
+        const times = serverTimes(), reg = await activeRegistration();
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub && times.length) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID) });
+        if (sub) await client.rpc('ar_dose_save', { p_endpoint: sub.endpoint, p_times: times });
+      } while (syncAgain);
+    } catch (e) { /* no push on this phone: the alarm still rings while the page is open */ }
+    syncing = false;
+  }
   // ---------- the tile (store/account.js) and the sheet ----------
   function tileHtml() {
     const n = onCount(data);
@@ -230,9 +284,9 @@
     const cards = data.items.map((it) => `<div class="al-card${it.on ? '' : ' off'}"><button type="button" class="al-card-main" data-al-edit="${esc(it.id)}"><b class="notr" dir="auto">${esc(it.name)}</b><span class="al-times">${it.times.map(chip).join('')}</span></button>` +
       `<button type="button" class="al-tg${it.on ? ' on' : ''}" role="switch" aria-checked="${it.on}" aria-label="${esc(it.on ? TEXTS.on : TEXTS.off)}" data-al-toggle="${esc(it.id)}"></button></div>`).join('');
     const notif = root.Notification
-      ? (root.Notification.permission === 'granted' ? `<p class="rg-hint">${esc(TEXTS.notifDone)}</p>`
+      ? (root.Notification.permission === 'granted' ? `<p class="rg-hint">${esc(canPush() ? TEXTS.notifDone : TEXTS.notifDone)}</p>`
         : root.Notification.permission === 'denied' ? `<p class="rg-hint">${esc(TEXTS.notifNo)}</p>`
-          : `<button type="button" class="al-line" data-al-notif><span>${esc(TEXTS.notifOn)}</span></button>`) : '';
+          : `<button type="button" class="al-line" data-al-notif><span>${esc(TEXTS.notifOn)}</span></button><p class="rg-hint">${esc(TEXTS.notifWhy)}</p>`) : '';
     const voice = synth() ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
       `<div class="al-line"><span>${esc(TEXTS.tryVoice.replace(/^▶\s*/, ''))}</span><button type="button" class="al-try" data-al-try>${esc(TEXTS.tryVoice)}</button></div>` +
       (voiceOk === false ? `<p class="al-warn">${esc(TEXTS.noVoice)}</p>` : '') : '';
@@ -300,6 +354,7 @@
     const t = e.target;
     if (t.closest('[data-al-open]')) { open(); return; }
     if (t.closest('[data-al-took]')) { stopRing(); return; }
+    if (t.closest('[data-al-hear]')) { if (ring) say(sayDue(ring.due)); return; }
     if (t.closest('[data-al-snooze]')) { snooze(); return; }
     if (!view) return;
     if (t.closest('[data-al-close]')) { if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); } else close(); return; }
@@ -308,7 +363,7 @@
     const tg = t.closest('[data-al-toggle]'); if (tg) { const it = data.items.find((x) => x.id === tg.dataset.alToggle); if (it) { it.on = !it.on; save(); draw(); schedule(); } return; }
     if (t.closest('[data-al-speak]')) { data.speak = !data.speak; save(); draw(); return; }
     if (t.closest('[data-al-try]')) { const ok = say(TEXTS.tryPhrase); if (!ok && synth() == null) { /* no speech engine: the warning in the list says so */ } return; }
-    if (t.closest('[data-al-notif]')) { try { root.Notification.requestPermission().then(() => draw()); } catch (err) { draw(); } return; }
+    if (t.closest('[data-al-notif]')) { try { root.Notification.requestPermission().then(() => { draw(); syncServer(); }); } catch (err) { draw(); } return; }
     if (!draft) return;
     const pk = t.closest('[data-al-pick]');
     if (pk) { const v = pk.dataset.alPick; if (v === 'other') { draft.pick = 'other'; draft.name = ''; draft.say = ''; } else { const u = usual()[+v]; if (u) { draft.pick = +v; draft.name = shown(u); draft.say = u.ar || u.n; } } error = ''; draw(); return; }
@@ -328,6 +383,6 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
   window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
 
-  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, count: () => onCount(data), data: () => data, pharmacy: () => pharmacy };
+  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, count: () => onCount(data), data: () => data, pharmacy: () => pharmacy, serverTimes, attach(c) { client = c; syncServer(); } };
   schedule();
 })(typeof window === 'undefined' ? globalThis : window);

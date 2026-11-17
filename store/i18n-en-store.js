@@ -508,9 +508,7 @@ window.AskerEN = {
   "▶ جرّب الصوت": "▶ Try the voice",
   "جرّب الصوت": "Try the voice",
   "🔔 فعّل الإشعارات": "🔔 Turn on notifications",
-  "الإشعارات شغالة": "Notifications are on",
   "الإشعارات مقفولة من إعدادات المتصفح": "Notifications are blocked in the browser settings",
-  "المنبه بيرن طول ما صفحة الصيدلية مفتوحة على موبايلك، فسيبها مفتوحة.": "The alarm rings as long as the pharmacy's page is open on your phone, so leave it open.",
   "موبايلك مفيهوش صوت عربي: هيرن من غير نطق. نزّل صوت عربي من إعدادات الموبايل ← اللغة ← تحويل النص إلى كلام.": "Your phone has no Arabic voice: it will ring without speaking. Install an Arabic voice in the phone's settings → Language → Text-to-speech.",
   "ده شكل المنبه عند العميل. على موبايل الصيدلية مبيرنش.": "This is how the alarm looks for the customer. It never rings on the pharmacy's phone.",
   "أي دوا؟": "Which medicine?",
@@ -534,7 +532,12 @@ window.AskerEN = {
   "⏱ ذكّرني بعد 10 دقايق": "⏱ Remind me in 10 minutes",
   "⏰ ميعاد دواك": "⏰ Time for your medicine",
   "شغال": "On",
-  "واقف": "Off"
+  "واقف": "Off",
+  "مواعيد الجرعات بس (من غير اسم الدوا) بتتبعت لسيرفر الصيدلية عشان الإشعار يوصلك والمتصفح مقفول. اسم الدوا بيفضل على موبايلك.": "Only the dose times (never the medicine's name) are sent to the pharmacy's server so the notification reaches you even when the browser is closed. The medicine's name stays on your phone.",
+  "الإشعارات شغالة: هيجيلك إشعار وقت الجرعة حتى والمتصفح مقفول، ودوسة عليه تفتح الصفحة وتنطق اسم الدوا.": "Notifications are on: you get a notification at each dose time even when the browser is closed, and a tap opens the page and says the medicine's name.",
+  "المنبه بيرن لما صفحة الصيدلية تكون مفتوحة على موبايلك. فعّل الإشعارات عشان يوصلك وقت الجرعة حتى والمتصفح مقفول.": "The alarm rings when the pharmacy's page is open on your phone. Turn on notifications so it reaches you at each dose time even when the browser is closed.",
+  "🔊 اسمع الاسم": "🔊 Hear the name",
+  "دوس في أي مكان عشان تسمع اسم الدوا": "Tap anywhere to hear the medicine's name"
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",

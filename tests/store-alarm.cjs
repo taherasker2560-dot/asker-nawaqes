@@ -57,7 +57,11 @@ assert.equal(A.onCount(data([item(), item({ id: 'b', on: false })])), 1);
 // the presets are the ones in the picture
 assert.deepEqual(A.PRESETS, { once: ['08:00'], twice: ['08:00', '20:00'], thrice: ['08:00', '14:00', '20:00'], eight: ['06:00', '14:00', '22:00'] });
 assert.ok(A.newId() !== A.newId());
-// nothing leaves the phone: no network call in the code
+// what leaves the phone: no fetch / XHR / beacon at all; the ONLY server call is ar_dose_save(push address, clock times) when he turned the notifications on, and its arguments carry no name
 const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'store', 'alarm.js'), 'utf8');
-assert.doesNotMatch(src.replace(/\/\*[\s\S]*?\*\//, '').replace(/\/\/.*$/gm, ''), /\bfetch\(|XMLHttpRequest|\.rpc\(|sendBeacon|supabase/, 'the times stay on his phone');
-console.log('PASS: dose alarm: rings from the time to 10 minutes after, once; snooze; off never rings; the phone says the medicine\'s name; nothing is sent anywhere');
+const code = src.replace(/\/\*[\s\S]*?\*\//, '').replace(/\/\/.*$/gm, '');
+assert.doesNotMatch(code, /\bfetch\(|XMLHttpRequest|sendBeacon/, 'no network call but the one rpc');
+assert.deepEqual([...code.matchAll(/\.rpc\('([a-z_]+)'/g)].map((m) => m[1]), ['ar_dose_save'], 'the only server call');
+assert.match(code, /client\.rpc\('ar_dose_save', \{ p_endpoint: sub\.endpoint, p_times: times \}\)/, 'its arguments: the address and the clock times, nothing else');
+assert.match(code, /const serverTimes = \(\) => normTimes\(\[\]\.concat\(\.\.\.data\.items\.filter\(\(x\) => x\.on\)\.map\(\(x\) => x\.times\)\)/, 'the times come from the alarms\' times only, never their names');
+console.log('PASS: dose alarm: rings from the time to 10 minutes after, once; snooze; off never rings; the phone says the medicine\'s name; only clock times can leave the phone');

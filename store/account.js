@@ -338,6 +338,7 @@
         Object.assign(st, { c: data.customer, stopped: !!data.stopped, month: data.month, data_at: data.data_at, phone: data.phone, moves: [] });
         if (st.stopped) st.pay = 'cash';
         if (root.AskerStoreRegular) root.AskerStoreRegular.load(client, token, { moves: () => st.moves, redraw: draw });   // his regular items (store/regular.js); the buttons appear when they arrive
+        if (root.AskerStoreAlarm && root.AskerStoreAlarm.attach) root.AskerStoreAlarm.attach(client);   // the dose alarm's push (store/alarm.js, stage 2)
         const ph = $('cPhone');
         if (ph && !ph.value && data.phone) ph.value = /^20\d{10}$/.test(data.phone) ? '0' + data.phone.slice(2) : data.phone;
         drawPay();
