@@ -3,6 +3,12 @@
 //   POST {text, history?: [{who: 'me'|'adam', text}], ctx?}   header x-adam-key: Adam's 64-hex device key (phone or laptop)
 //   -> {speak, show, do_now?, open?, walk?, ctx?, end?, handoff?, ms, tool?}
 //   POST {action: 'models'}   -> the text models this Gemini key can use
+//   POST {action: 'hear', audio: base64, mime, mode: 'idle'|'convo', vp?}   («آدم 3», 2026-11-17) -> {text, to, rest, verb}: what he said
+//        (Gemini listens to the sound); in 'idle' also whether it is meant for Adam: his name first (to 'name') or a «… لي» command
+//        (to 'command', «بيع لي / افتح لي / ادفع لي»); anything else (him talking to customers and staff) is to null = ignored.
+//   {text, idle: true}: a «لي» command heard without the name: only a real answer is given; small talk, «not found» and handovers
+//        that do not record anything come back {ignore: true} (he was not talking to Adam).
+//   The ONE thing written: the «لي» words he adds by voice («زوّد أمر اطبع لي»), in storage asker-private/adam/commands.json.
 // One HTTP call, no queue: a fast Gemini text model picks ONE tool, this code reads the bot's own tables (synced from PharmaFly every
 // ~10 minutes) and writes the Egyptian answer itself. Questions it cannot answer with its tools, and EVERYTHING that records or sends
 // (payments, sales, transfers, messages, calls, purchase orders) come back as {handoff: true}: the phone then asks the laptop through
@@ -54,9 +60,83 @@ export function pageOf(text: string): string | null {
   return null;
 }
 export const MAX_TEXT = 400;
+// the sound of one sentence (base64): 20 s of AAC is ~110 000 characters, of 16 kHz WAV ~860 000
+export const MAX_AUDIO = 1_400_000;
+const AUDIO_TYPES = new Set(['audio/aac', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/mp3', 'audio/mpeg']);
 const KEY_RE = /^[0-9a-f]{64}$/;
 const MODEL_RE = /^gemini-[a-z0-9.\-]{1,60}$/;
-const TIMEOUT_MS = 10000, GEMINI_TIMEOUT_MS = 12000, PER_MINUTE = 40, BAGS_TTL_MS = 5 * 60 * 1000;
+// «آدم 3»: every sentence HE says goes through «hear» (others' voices are stopped on the phone by his voiceprint), so more calls a minute
+const TIMEOUT_MS = 10000, GEMINI_TIMEOUT_MS = 12000, PER_MINUTE = 120, BAGS_TTL_MS = 5 * 60 * 1000;
+
+// ---------- «آدم 3»: is this sentence meant for Adam? ----------
+// Owner 2026-11-17: «كلمة بيع لي، كلمة افتح لي، كلمة ادفع لي … ممكن اقول بيع للشباب اللي عندي … فإما يبقى مربوط بـ«لي»، أو اقول له
+// آدم يرد عليا ينتبه لكلامي». A «… لي» command (an order to HIM: «بيع لي»، «افتحلي»، «بيعهولي») is for Adam; «بيع للشباب» is not.
+export const COMMAND_VERBS = ['بيع', 'افتح', 'ادفع', 'اقرا', 'قول', 'شوف', 'دور', 'سجل', 'اكتب', 'ابعت', 'اطلب', 'حول', 'احسب', 'طلع',
+  'اعرض', 'هات', 'جيب', 'اعمل', 'نزل', 'ضيف', 'زود', 'شيل', 'كلم', 'رن', 'اتصل', 'حضر', 'جهز', 'راجع', 'عد', 'اجرد', 'دخل', 'حط', 'ذكر', 'اطبع'];
+// the ones that record or send: such a command goes to the laptop (where the spoken «أيوه» gate is) even when no fast tool fits
+export const WRITE_VERBS = new Set(['بيع', 'ادفع', 'سجل', 'اكتب', 'ابعت', 'اطلب', 'حول', 'نزل', 'ضيف', 'زود', 'شيل', 'كلم', 'رن', 'اتصل', 'عد', 'اجرد', 'دخل', 'حط', 'ذكر', 'اعمل', 'اطبع']);
+const SPECIAL_COMMANDS = new Map([['وريني', 'وري'], ['اديني', 'ادي'], ['قوليلي', 'قول'], ['ذكرني', 'ذكر'], ['فكرني', 'ذكر']]);
+/** The command verb of a «… لي» order in the sentence («بيع لي»، «بيعلي»، «بيعهولي»، «قولي»), or null. [extra] = the words he added. */
+export function commandVerb(text: string, extra: string[] = []): string | null {
+  const toks = norm(text).split(' ').filter(Boolean);
+  const verbs = [...COMMAND_VERBS, ...extra.map((v) => norm(v))].filter((v) => v.length >= 2);
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (SPECIAL_COMMANDS.has(t)) return SPECIAL_COMMANDS.get(t) as string;
+    for (const v of verbs) {
+      if (t === v && (toks[i + 1] === 'لي' || toks[i + 1] === 'ليا')) return v;
+      if (t.length <= v.length || !t.startsWith(v)) continue;
+      const rest = t.slice(v.length);
+      if (/^(ه|ها|هو|هم)?(لي|ليا)$/.test(rest)) return v;
+      if (v.endsWith('ل') && /^(ي|يا)$/.test(rest)) return v;   // «قولي» = قول + لي، «سجلي»
+    }
+  }
+  return null;
+}
+const isName = (w?: string) => !!w && /^(ادم|adam|ادام|يادم)$/.test(w);
+/** He called Adam: what he asked after the name («آدم، بانادول بكام» → «بانادول بكام»; «آدم» / «بقولك يا آدم» → ''), or null. */
+export function nameCall(text: string): string | null {
+  const ws = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const n = ws.map((w) => norm(w));
+  const k = n[0] === 'يا' && isName(n[1]) ? 2 : isName(n[0]) ? 1 : 0;
+  if (k) return ws.slice(k).join(' ').replace(/^[،,.\s]+/, '').trim();
+  if (ws.length <= 3 && isName(n[n.length - 1])) return '';
+  return null;
+}
+/** Who the sentence is for: Adam by name, Adam by a «لي» command, or nobody (null: he was talking to someone else). */
+export function addressed(text: string, extra: string[] = []): { to: 'name' | 'command' | null; text: string; verb?: string } {
+  const nc = nameCall(text);
+  if (nc !== null) return { to: 'name', text: nc };
+  const v = commandVerb(text, extra);
+  return v ? { to: 'command', text, verb: v } : { to: null, text };
+}
+
+// the «لي» words he adds by voice: one small file in storage (read every 5 minutes)
+const CMD_PATH = '/storage/v1/object/asker-private/adam/commands.json';
+let cmdCache: { at: number; verbs: string[] } | null = null;
+export function _resetCommands() { cmdCache = null; }
+async function extraVerbs(c: Ctx, now: number): Promise<string[]> {
+  if (cmdCache && now - cmdCache.at < 5 * 60 * 1000) return cmdCache.verbs;
+  const r = await c.fetch(c.base + CMD_PATH, { headers: serviceHeaders(c.key), signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+  const j = r && r.ok ? await r.json().catch(() => null) as { verbs?: unknown } | null : null;
+  const verbs = j && Array.isArray(j.verbs) ? j.verbs.map((v) => norm(String(v))).filter((v) => v.length >= 2).slice(0, 100) : [];
+  cmdCache = { at: now, verbs };
+  return verbs;
+}
+async function addVerb(c: Ctx, verb: string, now: number): Promise<boolean> {
+  const list = [...await extraVerbs(c, now)];
+  if (list.includes(verb) || COMMAND_VERBS.includes(verb)) return true;
+  list.push(verb);
+  const r = await c.fetch(c.base + CMD_PATH, {
+    method: 'POST', headers: { ...serviceHeaders(c.key), 'Content-Type': 'application/json', 'x-upsert': 'true' },
+    body: JSON.stringify({ verbs: list, updated_at: new Date(now).toISOString() }), signal: AbortSignal.timeout(TIMEOUT_MS),
+  }).catch(() => null);
+  if (!r || !r.ok) return false;
+  cmdCache = { at: now, verbs: list };
+  return true;
+}
+// «زوّد أمر اطبع لي» / «ضيف كلمة اطبعلي»
+const ADD_COMMAND = /^(?:يا ادم )?(?:زود|ضيف|زودلي|ضيفلي)\s+(?:امر|الامر|كلمه|الكلمه)\s+(\S+)/;
 
 const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -425,6 +505,29 @@ async function understand(env: Env, f: typeof fetch, model: string, text: string
   return t ? { pick: { text: t }, why: '' } : { pick: null, why: 'empty' };
 }
 
+// ---------- «آدم 3»: Gemini listens to the sentence (the phone sends only HIS sentences: his voiceprint is checked there) ----------
+const HEAR = [
+  'Write down, word for word, what is said in this recording.',
+  'A pharmacist in Egypt is talking: Egyptian Arabic, often with medicine names in English. Write the Arabic in Arabic letters exactly as said (Egyptian, not formal Arabic); write medicine and product names as they sound, in Arabic or Latin letters.',
+  'Output ONLY the words said: no quotes, no translation, no notes. If there is no clear speech, output nothing.',
+].join('\n');
+export async function transcribe(env: Env, f: typeof fetch, model: string, data: string, mime: string): Promise<{ text: string | null; why: string }> {
+  const body = (thinking: boolean) => JSON.stringify({
+    systemInstruction: { parts: [{ text: HEAR }] },
+    contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data } }, { text: 'اكتب الكلام ده.' }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 300, ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+  });
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+  const headers = { 'Content-Type': 'application/json', 'x-goog-api-key': String(env.GEMINI_API_KEY) };
+  let g = await f(url, { method: 'POST', headers, body: body(true), signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) }).catch(() => null);
+  if (g && g.status === 400) g = await f(url, { method: 'POST', headers, body: body(false), signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) }).catch(() => null);
+  if (!g || !g.ok) return { text: null, why: 'gemini ' + (g ? g.status : 'down') };
+  const j = await g.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null;
+  const parts = j?.candidates?.[0]?.content?.parts || [];
+  const t = parts.map((p) => p.text || '').join(' ').replace(/["«»“”]/g, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return { text: t.slice(0, MAX_TEXT), why: '' };
+}
+
 // best effort, per running copy of the function
 const seen = new Map<string, number[]>();
 function tooMany(key: string, now: number): boolean {
@@ -453,8 +556,28 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   const role = rr && rr.ok ? await rr.json().catch(() => null) : null;
   if (role !== 'phone' && role !== 'laptop') return reply(401, { error: 'key' });
   if (tooMany(key, now)) return reply(429, { error: 'rate' });
-  let body: { action?: unknown; text?: unknown; history?: unknown; ctx?: unknown };
+  let body: { action?: unknown; text?: unknown; history?: unknown; ctx?: unknown; audio?: unknown; mime?: unknown; mode?: unknown; vp?: unknown; idle?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body' }); }
+  const c: Ctx = { base, key: env.SUPABASE_SERVICE_ROLE_KEY, fetch: fetchImpl };
+  const model = (env.GEMINI_TEXT_MODEL || TEXT_MODEL).trim();
+  if (!MODEL_RE.test(model)) return reply(500, { error: 'model' });
+
+  if (body.action === 'hear') {
+    const audio = typeof body.audio === 'string' ? body.audio.replace(/\s+/g, '') : '';
+    const mime = String(body.mime || 'audio/aac');
+    if (!audio || !/^[A-Za-z0-9+/]+=*$/.test(audio)) return reply(400, { error: 'audio' });
+    if (audio.length > MAX_AUDIO) return reply(413, { error: 'long', max: MAX_AUDIO });
+    if (!AUDIO_TYPES.has(mime)) return reply(400, { error: 'mime' });
+    const h = await transcribe(env, fetchImpl, model, audio, mime);
+    if (h.text === null) return reply(502, { error: 'gemini', why: h.why });
+    const mode = body.mode === 'idle' ? 'idle' : 'convo';
+    const vp = Number(body.vp);
+    // for tuning his voiceprint from the logs: never the words themselves
+    console.log(JSON.stringify({ hear: mode, vp: Number.isFinite(vp) ? Math.round(vp * 100) / 100 : null, chars: h.text.length, ms: Date.now() - t0 }));
+    if (mode !== 'idle') return reply(200, { ok: true, text: h.text, to: 'convo', ms: Date.now() - t0 });
+    const a = h.text ? addressed(h.text, await extraVerbs(c, now)) : { to: null, text: '' };
+    return reply(200, { ok: true, text: h.text, to: a.to, rest: a.text, verb: (a as { verb?: string }).verb || null, ms: Date.now() - t0 });
+  }
 
   if (body.action === 'models') {
     const m = await fetchImpl('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
@@ -469,12 +592,30 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   const history = (Array.isArray(body.history) ? body.history as Turn[] : []).slice(-8)
     .map((h) => ({ who: h?.who === 'adam' ? 'adam' : 'me', text: String(h?.text || '').slice(0, MAX_TEXT) })).filter((h) => h.text);
   const ctx = body.ctx && typeof body.ctx === 'object' && !Array.isArray(body.ctx) ? body.ctx as Json : null;
-  const done = (a: Answer, tool: string) => reply(200, { ok: true, ...a, show: a.show || a.speak, tool, ms: Date.now() - t0 });
+  // a «لي» command heard without his name: answered only when there is a real answer (or it records something: the laptop and its
+  // «أيوه»); small talk, «not found» and handovers that record nothing mean he was talking to someone else: Adam stays quiet
+  const idle = body.idle === true;
+  const idleVerb = idle ? commandVerb(text, await extraVerbs(c, now)) : null;
+  const done = (a: Answer, tool: string) => {
+    if (idle) {
+      const records = !!a.handoff && !!idleVerb && WRITE_VERBS.has(idleVerb);
+      const empty = tool === 'chat' || tool === 'end' || /^مش لاقي/.test(a.speak || '') || (!!a.handoff && !records) || !idleVerb;
+      if (empty) return reply(200, { ok: true, ignore: true, tool, ms: Date.now() - t0 });
+    }
+    return reply(200, { ok: true, ...a, show: a.show || a.speak, tool, ms: Date.now() - t0 });
+  };
 
   if (ENDS.test(norm(text))) return done({ speak: 'تمام', end: true }, 'end');
+  // «زوّد أمر اطبع لي»: a new «لي» word (written in storage; the only thing this function writes)
+  const add = ADD_COMMAND.exec(norm(text));
+  if (add) {
+    const v = add[1].replace(/(لي|ليا)$/, '');
+    if (v.length < 2) return done({ speak: 'قول الكلمة تاني' }, 'add_command');
+    const ok = await addVerb(c, v, now);
+    return done({ speak: ok ? 'تمام، من دلوقتي «' + v + ' لي» أمر ليا، من غير ما تقول آدم.' : 'مقدرتش أحفظها دلوقتي، جرّب تاني' }, 'add_command');
+  }
   const page = pageOf(text);
   if (page) return done({ speak: 'فتحتلك ' + PAGES[page], do_now: [{ type: 'open_tab', tab: page }] }, 'open_page');
-  const c: Ctx = { base, key: env.SUPABASE_SERVICE_ROLE_KEY, fetch: fetchImpl };
   // «تقصد X؟» → his «أيوه» / «التاني» / «لا» is answered at once, without Gemini
   const sug = ctx && ctx.suggest && typeof ctx.suggest === 'object' ? ctx.suggest as Json : null;
   if (sug) {
@@ -484,8 +625,6 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
     if (s2 && (/التاني|الثاني|التانيه|التانى/.test(n) || norm(String(s2.name)).split(' ').some((w) => w.length > 2 && n.includes(w)))) return done(await itemAnswer(c, Number(s2.id), wantOf(s2), now), 'item_info');
     if (NO.test(n)) return done({ speak: 'طيب، قول اسم الصنف تاني' }, 'item_info');
   }
-  const model = (env.GEMINI_TEXT_MODEL || TEXT_MODEL).trim();
-  if (!MODEL_RE.test(model)) return reply(500, { error: 'model' });
   const { pick, why } = await understand(env, fetchImpl, model, text, history, ctx);
   // Gemini not there: the laptop still answers (the old way)
   if (!pick) return done({ speak: '', handoff: true }, 'handoff:' + why);

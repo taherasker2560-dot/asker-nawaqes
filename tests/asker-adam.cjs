@@ -10,6 +10,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
     { id: '2434', name: 'محمد احمد سرحان', items: [{ id: 503, name: 'TISSUE 700', have: 0, sold30: 34, need: 17 }] },
     { id: 'pv', name: 'نواقص كل الشركات', items: [] },
   ] } };
+  const COMMANDS = { saved: null };
   // what Gemini answers: a function call, plain text, an error
   function fake({ gemini = { call: null, text: null, status: 200 }, thinking400 = false, rows = {} } = {}) {
     const calls = [];
@@ -18,6 +19,12 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
       const u = new URL(url);
       if (u.pathname === '/rest/v1/rpc/ar_adam_role') return new Response(JSON.stringify(JSON.parse(o.body).p_key === KEY ? 'phone' : null));
       if (u.pathname === '/storage/v1/object/asker-private/alerts/alerts.json') { assert.equal(o.headers.Authorization, 'Bearer service'); return new Response(JSON.stringify(BAGS)); }
+      // «آدم 3»: the «لي» words he added by voice
+      if (u.pathname === '/storage/v1/object/asker-private/adam/commands.json') {
+        assert.equal(o.headers.Authorization, 'Bearer service');
+        if (o.method === 'POST') { assert.equal(o.headers['x-upsert'], 'true'); COMMANDS.saved = JSON.parse(o.body); return new Response('{}'); }
+        return COMMANDS.saved ? new Response(JSON.stringify(COMMANDS.saved)) : new Response('{"error":"not_found"}', { status: 400 });
+      }
       if (u.pathname.startsWith('/rest/v1/')) {
         assert.equal(o.headers.Authorization, 'Bearer service', 'the bot is read with the service key');
         const t = u.pathname.slice(9);
@@ -167,6 +174,75 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.equal(x.j.handoff, true, 'Gemini down: the laptop answers');
   x = await ask({ text: 'عايز اشوف الطلبيات' }, { gemini: { call: { name: 'open_page', args: { page: 'drafts' } }, status: 200 }, thinking400: true });
   assert.equal(x.j.tool, 'open_page'); assert.equal(gem(x.f).length, 2);
+
+  // «آدم 3» (owner 2026-11-17): his name first, or a «… لي» command, is for Adam; «بيع للشباب» and talk with customers is not
+  assert.equal(F.commandVerb('بيع لي علبة بانادول'), 'بيع');
+  assert.equal(F.commandVerb('بيعلي علبتين كونجستال'), 'بيع');
+  assert.equal(F.commandVerb('طب بيعهولي'), 'بيع');
+  assert.equal(F.commandVerb('افتحلي الطلبيات'), 'افتح');
+  assert.equal(F.commandVerb('ادفع لي لفارما الف جنيه'), 'ادفع');
+  assert.equal(F.commandVerb('اقرألي النواقص'), 'اقرا');
+  assert.equal(F.commandVerb('قولي سعر البانادول'), 'قول');
+  assert.equal(F.commandVerb('سجللي دفعة'), 'سجل');
+  assert.equal(F.commandVerb('بيع للشباب علبة بانادول'), null, '«بيع للشباب» is not for Adam');
+  assert.equal(F.commandVerb('ازيك يا حاج عامل ايه'), null);
+  assert.equal(F.commandVerb('البيع النهارده كويس'), null);
+  assert.equal(F.commandVerb('اطبعلي الفاتورة'), 'اطبع');
+  assert.equal(F.commandVerb('صورلي الفاتورة'), null);
+  assert.equal(F.commandVerb('صورلي الفاتورة', ['صور']), 'صور', 'a word he added by voice');
+  assert.equal(F.nameCall('يا آدم بانادول بكام'), 'بانادول بكام');
+  assert.equal(F.nameCall('آدم، اقرالي النواقص'), 'اقرالي النواقص');
+  assert.equal(F.nameCall('آدم'), '');
+  assert.equal(F.nameCall('بقولك يا آدم'), '');
+  assert.equal(F.nameCall('ادي آدم الكيس ده وروح'), null, '«آدم» inside a longer sentence is not a call');
+  assert.deepEqual(F.addressed('بيعلي علبة بانادول'), { to: 'command', text: 'بيعلي علبة بانادول', verb: 'بيع' });
+  assert.deepEqual(F.addressed('اتفضل يا حاج'), { to: null, text: 'اتفضل يا حاج' });
+
+  // «hear»: Gemini listens to the sound the phone sends (only his sentences) and says whether it is for Adam
+  F._resetCommands();
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac', mode: 'idle', vp: 0.71 }, { gemini: { text: '"بيع لي علبة بانادول"', status: 200 } });
+  assert.equal(x.r.status, 200); assert.equal(x.j.text, 'بيع لي علبة بانادول', 'quotes around the words are dropped');
+  assert.equal(x.j.to, 'command'); assert.equal(x.j.verb, 'بيع');
+  let gh = JSON.parse(gem(x.f)[0].o.body);
+  assert.deepEqual(gh.contents[0].parts[0], { inlineData: { mimeType: 'audio/aac', data: 'AAAAQUJD' } }, 'the sound goes to Gemini as it is');
+  assert.equal(gh.generationConfig.temperature, 0); assert.ok(!gh.tools, 'hearing is only writing down the words');
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac', mode: 'idle' }, { gemini: { text: 'يا آدم الفازول بكام', status: 200 } });
+  assert.equal(x.j.to, 'name'); assert.equal(x.j.rest, 'الفازول بكام');
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac', mode: 'idle' }, { gemini: { text: 'بيع للشباب علبة بانادول', status: 200 } });
+  assert.equal(x.j.to, null, 'talking to the staff: ignored');
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/wav', mode: 'convo' }, { gemini: { text: 'وعندنا كام منه', status: 200 } });
+  assert.equal(x.j.to, 'convo'); assert.equal(x.j.text, 'وعندنا كام منه');
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac', mode: 'idle' }, { gemini: { text: '', status: 200 } });
+  assert.equal(x.j.text, ''); assert.equal(x.j.to, null, 'nothing said');
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac' }, { gemini: { status: 503 } });
+  assert.equal(x.r.status, 502);
+  x = await ask({ action: 'hear', audio: 'not base64!', mime: 'audio/aac' }); assert.equal(x.r.status, 400);
+  x = await ask({ action: 'hear', audio: 'AAAA', mime: 'video/mp4' }); assert.equal(x.r.status, 400);
+  x = await ask({ action: 'hear', audio: 'A'.repeat(F.MAX_AUDIO + 4), mime: 'audio/aac' }); assert.equal(x.r.status, 413);
+
+  // a «لي» command without the name: answered only when there is a real answer
+  x = await ask({ text: 'افتحلي الطلبيات', idle: true });
+  assert.equal(x.j.ignore, undefined); assert.deepEqual(x.j.do_now, [{ type: 'open_tab', tab: 'drafts' }]);
+  x = await ask({ text: 'بيعلي علبة بانادول', idle: true }, { gemini: { call: { name: 'laptop', args: {} }, status: 200 } });
+  assert.equal(x.j.handoff, true, 'a sale goes to the laptop (its «أيوه» gate)');
+  x = await ask({ text: 'هاتلي الكرتونة اللي هناك', idle: true }, { gemini: { call: { name: 'laptop', args: {} }, status: 200 } });
+  assert.equal(x.j.ignore, true, '«هاتلي الكرتونة» was for the staff: nothing to record, nothing said');
+  x = await ask({ text: 'قولي يا حاج عايز ايه', idle: true }, { gemini: { text: 'أؤمرني', status: 200 } });
+  assert.equal(x.j.ignore, true, 'small talk without the name: quiet');
+  x = await ask({ text: 'شوفلي الولد ده', idle: true }, { gemini: { call: { name: 'item_info', args: { name: 'الولد' } }, status: 200 } });
+  assert.equal(x.j.ignore, true, '«not found» without the name: quiet');
+  x = await ask({ text: 'قولي سعر الفازول 40', idle: true }, item('الفازول 40'));
+  assert.equal(x.j.speak, 'الفازول ٤٠ مجم: 95.5 جنيه.');
+  x = await ask({ text: 'سجل دفعة', idle: true }, { gemini: { call: { name: 'laptop', args: {} }, status: 200 } });
+  assert.equal(x.j.ignore, true, 'no «لي»: not a command');
+
+  // «زوّد أمر صور لي»: a new «لي» word, kept in storage
+  x = await ask({ text: 'زود امر صور لي' });
+  assert.equal(x.j.tool, 'add_command'); assert.equal(x.j.speak, 'تمام، من دلوقتي «صور لي» أمر ليا، من غير ما تقول آدم.');
+  assert.deepEqual(COMMANDS.saved.verbs, ['صور']); assert.equal(gem(x.f).length, 0);
+  F._resetCommands();
+  x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac', mode: 'idle' }, { gemini: { text: 'صورلي الفاتورة دي', status: 200 } });
+  assert.equal(x.j.to, 'command'); assert.equal(x.j.verb, 'صور');
 
   // the Arabic helpers
   assert.equal(F.norm('أحمد  إبراهيم يوميّة مستشفى'), 'احمد ابراهيم يوميه مستشفي');

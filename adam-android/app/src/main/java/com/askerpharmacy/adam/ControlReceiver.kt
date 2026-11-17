@@ -25,9 +25,29 @@ class ControlReceiver : BroadcastReceiver() {
                     try { t = String(Base64.decode(b, Base64.DEFAULT), Charsets.UTF_8).trim() } catch (e: Exception) { }
                 }
                 if (t.isNotEmpty() && AdamService.running) {
-                    context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_TEXT).putExtra("text", t))
+                    context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_TEXT).putExtra("text", t)
+                        .putExtra("idle", intent.getStringExtra("idle") ?: ""))
                     resultData = "asked"
                 } else resultData = "adam is not running"
+            }
+            // «آدم 3»: ENROLL = record his voiceprint now (Adam says 8 sentences, he repeats them); FEED file = a WAV in files/
+            // (pushed with run-as) handled as if he had just said it; VP = the voiceprint's state, bar=0.45 a new bar, learn=off ends
+            // the 2 learning days, forget=1 deletes it
+            "com.askerpharmacy.adam.ENROLL" -> {
+                if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_ENROLL))
+                resultData = if (AdamService.running) "enrolling" else "adam is not running"
+            }
+            "com.askerpharmacy.adam.FEED" -> {
+                if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_FEED)
+                    .putExtra("file", intent.getStringExtra("file") ?: "test.wav"))
+                resultData = if (AdamService.running) "fed" else "adam is not running"
+            }
+            "com.askerpharmacy.adam.VP" -> {
+                Voiceprint.load(context)
+                intent.getStringExtra("bar")?.toFloatOrNull()?.let { Voiceprint.setBar(context, it) }
+                if (intent.getStringExtra("learn") == "off") Voiceprint.endLearning(context)
+                if (intent.getStringExtra("forget") == "1") Voiceprint.forget(context)
+                resultData = Voiceprint.describe().toString()
             }
             // the voice: SET_VOICE voice (a name from VOICES, or "" for the default), pitch (1.0 normal, lower = deeper), rate; then
             // VOICES writes files/voices.txt (readable with run-as); SAY says a sentence (text | b64) in the current voice
