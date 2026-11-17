@@ -9,7 +9,7 @@ const t=I.translate;
 assert.equal(t('الطلبيات'),'Orders');assert.equal(t('  الطلبيات '),' Orders ','spaces around are kept');
 assert.equal(t('2 من 3 صنف في الطلب، حوالي 1,846 ج بعد الخصم'),'2 of 3 items in the order, about 1,846 EGP after discount');
 assert.equal(t('اتعلّم 4 صنف «اتطلب» من نيو سيتي'),'4 items marked «ordered» from New City','a known name inside a template is translated');
-assert.equal(t('اتعلّم 1 صنف «اتطلب» من صيدلية جديدة'),'1 items marked «ordered» from صيدلية جديدة','an unknown name inside stays');
+assert.equal(t('اتعلّم 1 صنف «اتطلب» من صيدلية جديدة'),'1 item marked «ordered» from صيدلية جديدة','an unknown name inside stays, and a count of one is singular');
 assert.equal(t('آخر خصم 30% · قايمة 08/11 · فيه بونص'),'last discount 30% · list 08/11 · has bonus','joined pieces');
 assert.equal(t('داتا الصيدلية: النهارده 4:30 م'),'Pharmacy data: today 4:30 PM','the clock');
 // the safety rule: one unknown Arabic word = the text is left as it is
