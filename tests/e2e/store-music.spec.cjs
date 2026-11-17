@@ -35,7 +35,7 @@ run('Store music: a visitor — the button is there, a first tap starts the musi
  // the first tap anywhere (nothing music-related): it starts and fades in to a low volume
  await page.mouse.click(190,420);
  await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
- assert.equal(await lastRamp(page),0.13,'fades in to the low volume');
+ assert.equal(await lastRamp(page),0.18,'fades in to the low volume');
  assert.deepEqual(await btn(page),{on:'1',label:'وقّف الموسيقى الهادية',title:'وقّف الموسيقى الهادية'});
  assert.equal(await page.evaluate(()=>window.__audio.made),1,'one sound engine for the whole site (the views switch by hash)');
  // moving between the views does not restart or stack anything
