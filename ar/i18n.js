@@ -15,6 +15,10 @@
   const read = () => { try { return localStorage.getItem(KEY) === 'en' ? 'en' : 'ar'; } catch (e) { return 'ar'; } };
   const norm = (s) => String(s).replace(/\s+/g, ' ').trim();
   const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // the dictionaries write the plural («{0} items», «{0} days»): a count of one is singular («1 item»). Only the nouns the dictionaries put after a number;
+  // «21 items» and «1,200 items» are left alone (a digit, a dot or a comma before the 1)
+  const ONE = /(^|[^\d.,])1 (items|packs|units|days|lines|customers|hours|pages|months|returns|names|invoices|movements|orders|sections|files|photos|kinds|numbers|discounts|strips|things|times)\b/g;
+  const sing = (s) => s.replace(ONE, (m, a, w) => a + '1 ' + w.slice(0, -1));
 
   // ---------- the dictionary, ready to use ----------
   function compile(src) {
@@ -50,7 +54,7 @@
       .replace(/(\d{1,2}:\d\d)\s*ص(?![؀-ۿ])/g, '$1 AM').replace(/(\d{1,2}:\d\d)\s*م(?![؀-ۿ])/g, '$1 PM')
       .replace(/(\d[\d,.]*)\s*ج(?![؀-ۿ])/g, '$1 EGP');
     const r = k.replace(D.phRe, (a) => D.phMap.get(a));
-    return AR.test(r) ? null : r.replace(/\s+([،,.:])/g, '$1').replace(/،/g, ',').replace(/؟/g, '?').replace(/؛/g, ';');
+    return AR.test(r) ? null : sing(r.replace(/\s+([،,.:])/g, '$1').replace(/،/g, ',').replace(/؟/g, '?').replace(/؛/g, ';'));
   }
   // a value inside a template: a known word is translated, anything else (a name, a number) stays
   function piece(v) {
@@ -67,7 +71,7 @@
       if (out == null) {
         for (const p of D.pats) {
           const m = p.re.exec(k);
-          if (m) { out = p.en.replace(/\{(\d+)\}/g, (_, n) => { const i = p.order.indexOf(+n); return i >= 0 ? piece(m[i + 1]) : ''; }); break; }
+          if (m) { out = sing(p.en.replace(/\{(\d+)\}/g, (_, n) => { const i = p.order.indexOf(+n); return i >= 0 ? piece(m[i + 1]) : ''; })); break; }
         }
       }
       if (out == null) out = pieces(k);

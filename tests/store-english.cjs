@@ -66,4 +66,20 @@ for(const s of ['نتايج «PANADOL»','مفيش حاجة فيها كل كلم
 assert.deepEqual(bad,[],'Arabic texts without English in store/i18n-en-store.js:\n'+bad.join('\n'));
 // the colors use the bot's names
 assert.equal(T.translate('أزرق عسكر'),'Asker blue');
+// the review of 2026-11-17 (owner: «راجع الترجمات»)
+// one Arabic text = one English text: a second line with the same key silently replaces the first («المشتريات» was «Purchases» in the account's filter and «Purchasing» for a warehouse, and the later won)
+const src=fs.readFileSync('store/i18n-en-store.js','utf8').split('"phrases"')[0];
+const keys=[...src.matchAll(/^\s*"((?:[^"\\]|\\.)*)":\s*"/gm)].map(m=>m[1]),dup=keys.filter((k,i)=>keys.indexOf(k)!==i);
+assert.deepEqual(dup,[],'duplicate keys in the dictionary: '+dup.join(' | '));
+// no delivery wording (the pharmacy has no delivery yet) and no blessing (taken off the site) in the English the store can show
+const all=Object.entries(global.AskerEN.exact);
+assert.deepEqual(all.filter(([,v])=>/deliver/i.test(v)).map(([k])=>k),[],'no delivery wording in the English');
+assert.ok(!all.some(([k])=>/اللهم صل|ﷺ/.test(k)),'the blessing is not in the store dictionary');
+// the words that were wrong: the order arrived (it was «received»), picked up (not «delivered»), a special order (not «on order»), out of stock
+const E=(a,b,m)=>assert.equal(T.translate(a),b,m||a);
+E('طلبك وصل','Order received');E('اتسلّم','Picked up');E('بالطلب','Special order');E('غير متوفر','Out of stock');E('المشتريات','Purchases');E('المشتريات · Reda','Purchasing · Reda');
+E('كمّل الطلب · 3 صنف · 283.4 ج','Checkout · 3 items · 283.4 EGP');E('حسابك موقوف دلوقتي','Your account is on hold right now');
+// a count of one is singular («1 item»), 21 and 1,200 are not
+E('1 صنف','1 item');E('3 صنف','3 items');E('21 صنف','21 items');E('طلب رقم 12 · 1 صنف','Order no. 12 · 1 item');E('اتضاف 1 صنف للسلة','1 item added to the cart');E('1 صنف في السلة · 66.7 ج','1 item in your cart · 66.7 EGP');
+E('1 علبة · 66.7 ج','1 pack · 66.7 EGP');E('2 علبة · 66.7 ج','2 packs · 66.7 EGP');
 console.log('store-english ok');

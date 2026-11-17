@@ -24,8 +24,7 @@ html:not(.night) { --bg: #ffffff !important; --card: #ffffff !important; }
 html.night { --soft-bg: var(--card); --green: var(--accent-text); --green-soft: rgba(var(--glow), 0.16); }
 body { background: var(--bg); padding-bottom: calc(78px + var(--safe-b, 0px)); }
 
-/* ---------- the blessing strip + the header ---------- */
-.bless { margin: 0; padding: 6px 12px; text-align: center; font-size: 11.5px; font-weight: 500; letter-spacing: 0.2px; color: var(--green); background: var(--card); border-bottom: 1px solid var(--line); }
+/* ---------- the header (the blessing strip that sat above it is gone: owner 2026-11-17) ---------- */
 html body .top, html body .bar { background: var(--accent) !important; color: #fff; border-radius: 0; border-bottom: 0; box-shadow: none; }
 html body .top { padding: 10px 16px; }
 html body .bar { padding: 10px 16px; }
