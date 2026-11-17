@@ -15,11 +15,11 @@ run('quantity boxes: ready on the first, type to replace, Enter for the next, bl
  await page.click('#odEdit');
  assert.equal(await active(page),'11');
  assert.equal(await page.getAttribute('#odItems [data-k="11"] [data-qty]','enterkeyhint'),'next');
- assert.ok(!(await page.$eval('#odItems [data-k="11"] .od-qty',e=>e.classList.contains('mine'))),'not blue until he types');
+ assert.ok(!(await page.$eval('#odItems [data-k="11"] .od-qty',e=>e.classList.contains('mine'))),'not highlighted until he types');
  // typing replaces the whole number (23 -> 5, no deleting first)
  await page.keyboard.type('5');
  assert.equal(await page.inputValue('#odItems [data-k="11"] [data-qty]'),'5');
- assert.ok(await page.$eval('#odItems [data-k="11"] .od-qty',e=>e.classList.contains('mine')),'his number is blue');
+ assert.ok(await page.$eval('#odItems [data-k="11"] .od-qty',e=>e.classList.contains('mine')),'his number is highlighted');
  // Enter: the next box, its number selected, so «10» replaces 3
  await page.keyboard.press('Enter');
  assert.equal(await active(page),'12');
@@ -73,7 +73,7 @@ run('quantity boxes in «الوارد»: ready, typed number replaces the sugges
  assert.equal(await page.evaluate(()=>document.activeElement.dataset.qty),'s3');
  await waitStatus(page,/اتحفظت الكمية/,'msgStatus');
  assert.equal((await table('ar_shortages')).find(x=>x.id==='s2').order_qty,12);
- assert.ok(await page.$eval('[data-qty="s2"]',e=>e.closest('label').classList.contains('mine')),'his number is blue');
+ assert.ok(await page.$eval('[data-qty="s2"]',e=>e.closest('label').classList.contains('mine')),'his number is highlighted');
  await page.keyboard.type('5');await page.keyboard.press('Enter');
  await page.waitForFunction(()=>/جانوفيا ٥٠ مجم — 5/.test(document.getElementById('msgText').value));
  assert.equal(await page.evaluate(()=>document.activeElement.tagName),'BODY','Enter on the last quantity closes the keyboard');
