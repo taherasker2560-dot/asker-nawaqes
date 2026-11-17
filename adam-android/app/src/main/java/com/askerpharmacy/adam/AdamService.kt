@@ -237,7 +237,7 @@ class AdamService : Service() {
         alive = false
         running = false
         try { wake.stop() } catch (e: Throwable) { }
-        try { listener.cancel() } catch (e: Throwable) { }
+        try { listener.drop() } catch (e: Throwable) { }
         try { speaker.shutdown() } catch (e: Throwable) { }
         try { wl?.release() } catch (e: Throwable) { }
         main.removeCallbacksAndMessages(null)
@@ -250,6 +250,8 @@ class AdamService : Service() {
         askedConfirmAgain = false
         notHeardOnce = false
         collecting = false
+        continuing = false
+        errorTurns = 0
         dictation.setLength(0)
         walk = null
         if (inConvo) log("conversation ended after $replyCount answer(s)")
@@ -281,10 +283,17 @@ class AdamService : Service() {
     private var askWhenReady = false
     private val ENDS = Regex("^(خلاص|شكرا|شكراً|متشكر|متشكرين|كده تمام|تمام كده|مع السلامة|مع السلامه|سلام|لا خلاص|خلاص كده)( شكرا| يا آدم| يا ادم)?[.!؟]*$")
 
+    private var errorTurns = 0
+    // a sentence that stops on «و / يعني / بس / عشان / اللي …» is not finished: he paused to think («… اعرف فيه كم و», 2026-11-17)
+    private val UNFINISHED = Regex("(^|\\s)(و|او|أو|يعني|بس|عشان|علشان|اللي|ان|إن|في|من|على|علي|لما|لو|ولا|مع|بتاع|بتاعت)$")
+    private var continuing = false
+
     private fun startConvo() {
-        inConvo = true; talkHistory.clear(); talkCtx = null; silentTurns = 0; replyCount = 0
-        beep()
-        main.postDelayed({ if (alive) beginRequestListening() }, 250)
+        inConvo = true; talkHistory.clear(); talkCtx = null; silentTurns = 0; replyCount = 0; errorTurns = 0
+        // not «idle» any more from this moment: the guard must not start the word's listening again under the request (11-17)
+        setState("listening", "سامعك…")
+        // no beep here: the beep comes when the speech engine is really listening (beginRequestListening → onReady)
+        beginRequestListening()
     }
 
     private fun addTurn(who: String, text: String) {
@@ -293,10 +302,28 @@ class AdamService : Service() {
         while (talkHistory.size > 8) talkHistory.removeAt(0)
     }
 
-    /** After an answer: in a conversation, listen again (a short beep says so); otherwise back to waiting for the word. */
+    /** After an answer: in a conversation, listen again at once (the short beep + buzz come when it really listens); otherwise back to waiting for the word. */
     private fun afterTurn() {
         if (!alive) return
-        if (inConvo) { beepShort(); main.postDelayed({ if (alive && inConvo) beginRequestListening() }, 200) } else goIdle()
+        if (inConvo) beginRequestListening() else goIdle()
+    }
+
+    /**
+     * «سامعك»: said the moment the speech engine really listens (owner 2026-11-17: «لو جيت كلمته وراها على طول بيفضل ساكت فترة، ما بيبعتش
+     * رسالة ان هو فتح»). The first listen gets the full beep; every next one (in a conversation, a dictation piece) a short beep and a
+     * short buzz, so he feels it with the phone in his pocket too.
+     */
+    private fun readyCue(first: Boolean) {
+        if (first) beep() else beepShort()
+        if (!first) buzz()
+    }
+
+    private fun buzz() {
+        try {
+            val v = if (Build.VERSION.SDK_INT >= 31) (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator
+                    else @Suppress("DEPRECATION") (getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator)
+            v.vibrate(android.os.VibrationEffect.createOneShot(40, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        } catch (e: Throwable) { }
     }
 
     private fun beep() {
@@ -327,16 +354,26 @@ class AdamService : Service() {
 
     private fun beginRequestListening() {
         if (!Config.ready(this)) { speaker.say("لسه ماتظبطتش الإعدادات") { goIdle() }; return }
-        setState("listening", if (collecting) "كمّل… وقول «خلاص» لما تخلص" else if (inConvo && replyCount > 0) "في محادثة… قول «خلاص» للخروج" else "سامعك…")
+        val note = if (collecting) "كمّل… وقول «خلاص» لما تخلص" else if (inConvo && replyCount > 0) "في محادثة… قول «خلاص» للخروج" else "سامعك…"
+        val first = !collecting && replyCount == 0 && silentTurns == 0 && errorTurns == 0 && !notHeardOnce
+        // «لحظة…» until the engine really listens; then the beep and «سامعك» together
+        setState("listening", "لحظة…")
         listener.listen(
             { text -> onHeard(text) },
             { code ->
                 log("request not heard ($code)")
                 if (collecting) { finishDictation(); return@listen }
                 val nothingSaid = code == SpeechRecognizer.ERROR_NO_MATCH || code == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                // the phone's speech engine failed for a moment (busy / disconnected, e.g. right after the previous listen): try again
+                // after a short pause instead of ending the conversation (11-17: «listen error 11» ended it after one answer)
+                if (!nothingSaid && errorTurns < 3) {
+                    errorTurns++
+                    main.postDelayed({ if (alive && state == "listening") beginRequestListening() }, 700)
+                    return@listen
+                }
                 // in a conversation, after an answer: one more quiet try, then the conversation ends (he walked away)
                 if (inConvo && replyCount > 0) {
-                    if (nothingSaid && silentTurns == 0) { silentTurns = 1; beginRequestListening() } else goIdle()
+                    if (nothingSaid && silentTurns == 0) { silentTurns = 1; main.postDelayed({ if (alive && state == "listening") beginRequestListening() }, 300) } else goIdle()
                     return@listen
                 }
                 if (nothingSaid && !notHeardOnce) {
@@ -344,13 +381,15 @@ class AdamService : Service() {
                     setState("speaking")
                     speaker.say("مسمعتكش، قول تاني") { if (alive) beginRequestListening() }
                 } else goIdle()
-            }
+            },
+            { if (alive && state == "listening") { readyCue(first); setState("listening", note) } }
         )
     }
 
     private fun onHeard(text: String) {
         notHeardOnce = false
         silentTurns = 0
+        errorTurns = 0
         // «خلاص / شكرا / كده تمام» ends the conversation (in a dictation «خلاص» ends the dictation instead, below)
         if (!collecting && ENDS.matches(text.trim().replace(Regex("\\s+"), " "))) {
             inConvo = false
@@ -361,14 +400,22 @@ class AdamService : Service() {
         if (collecting) {
             if (piece.isNotBlank()) { dictation.append(' ').append(piece); pieces++ }
             log("dictation piece $pieces: " + piece.take(60))
-            if (done || pieces >= 10 || dictation.length > 1200) finishDictation() else { beepShort(); beginRequestListening() }
+            // a paused sentence ends with the piece that is itself finished
+            val finished = continuing && !UNFINISHED.containsMatchIn(piece.trim())
+            if (done || finished || pieces >= 10 || dictation.length > 1200) { continuing = false; finishDictation() } else beginRequestListening()
+            return
+        }
+        if (!done && UNFINISHED.containsMatchIn(piece.trim())) {
+            collecting = true; continuing = true
+            dictation.setLength(0); dictation.append(piece.trim()); pieces = 1
+            log("sentence not finished, listening on: " + piece.take(60))
+            beginRequestListening()
             return
         }
         if (isDictation(piece) && !done) {
             collecting = true
             dictation.setLength(0); dictation.append(piece); pieces = 1
             log("dictation started: " + piece.take(60))
-            beepShort()
             beginRequestListening()
             return
         }
@@ -377,6 +424,7 @@ class AdamService : Service() {
 
     private fun finishDictation() {
         collecting = false
+        continuing = false
         val t = dictation.toString().trim()
         dictation.setLength(0)
         if (t.isEmpty()) goIdle() else handleText(t)

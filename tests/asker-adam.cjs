@@ -54,17 +54,28 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   x = await ask({ text: 'خلاص شكرا' });
   assert.equal(x.j.end, true); assert.equal(x.j.speak, 'تمام'); assert.equal(gem(x.f).length, 0);
 
-  // item_info: price, stock, its bag, the last purchase; the strength he said comes first; the context remembers the item
-  const stock = () => [
-    { item_id: 777, name: 'ALFAZOL 20MG 14 TAB', arabic_name: 'الفازول ٢٠ مجم ١٤ قرص', price: 60, packs: 3, units: 0, parts: 14, exp_near: '2028-03-28' },
-    { item_id: 501, name: 'ALFAZOL 40MG 14 TAB', arabic_name: 'الفازول ٤٠ مجم ١٤ قرص', price: 95.5, packs: 1, units: 7, parts: 14, exp_near: '2026-12-28' },
-  ];
-  x = await ask({ text: 'الفازول 40 عندنا كام', history: [{ who: 'me', text: 'آدم' }, { who: 'adam', text: 'أيوه' }] },
-    { gemini: { call: { name: 'item_info', args: { name: 'الفازول 40' } }, status: 200 }, rows: { ar_stock: stock, ar_item_buys: () => [{ supplier: 'المخزن الأول', last_date: '2026-11-10', discount_pct: 24 }] } });
+  // item_info. The product names are searched in a catalog kept in the function (here: set by the test), scored against what was heard.
+  F._setCatalog([
+    F._cat(777, 'ALFAZOL 20MG 14 TAB', 'الفازول ٢٠ مجم ١٤ قرص', 50, true), F._cat(501, 'ALFAZOL 40MG 14 TAB', 'الفازول ٤٠ مجم ١٤ قرص', 20, true),
+    F._cat(63228, 'ZURCAL VIAL', 'زوركال فيال', 51, true), F._cat(62386, 'ZURCAL 40MG 14 TAB', 'زوركال ٤٠ مجم ١٤ قرص', 12, true),
+    F._cat(68432, 'PANADOL EXTRA 48 TAB', 'بانادول اكسترا ٤٨ قرص', 28, true), F._cat(4001, 'GAST-REG 125ML SUSP', 'جاست ريج ١٢٥ مل معلق', 40, true),
+    F._cat(4002, 'GLYCERIN ROTEX SOAP', 'جليسرين روتكس صابون', 300, true), F._cat(4003, 'ARGININE CITRULLINE', 'ارجينين + سيترولين', 200, true),
+    F._cat(9, 'ALFAZOL SYRUP', 'الفازول شراب', 1e9, false),
+  ], NOW);
+  const STOCK = {
+    777: { name: 'ALFAZOL 20MG 14 TAB', arabic_name: 'الفازول ٢٠ مجم ١٤ قرص', price: 60, packs: 3, units: 0, parts: 14, exp_near: '2028-03-28' },
+    501: { name: 'ALFAZOL 40MG 14 TAB', arabic_name: 'الفازول ٤٠ مجم ١٤ قرص', price: 95.5, packs: 1, units: 7, parts: 14, exp_near: '2026-12-28' },
+    62386: { name: 'ZURCAL 40MG 14 TAB', arabic_name: 'زوركال ٤٠ مجم ١٤ قرص', price: 120, packs: 1, units: 0, parts: 14 },
+    68432: { name: 'PANADOL EXTRA 48 TAB', arabic_name: 'بانادول اكسترا ٤٨ قرص', price: 116, packs: 64, units: 0, parts: 4 },
+    4001: { name: 'GAST-REG 125ML SUSP', arabic_name: 'جاست ريج ١٢٥ مل معلق', price: 45, packs: 3, units: 0, parts: 1 },
+  };
+  const stockRow = (u) => { const id = Number((/item_id=eq\.(\d+)/.exec(u.search) || [])[1]); return STOCK[id] ? [{ item_id: id, ...STOCK[id] }] : []; };
+  const storeRow = (u) => /id=eq\.9\b/.test(u.search) ? [{ id: 9, name: 'ALFAZOL SYRUP', arabic_name: 'الفازول شراب', price: 40 }] : [];
+  const item = (name, want, more = {}) => ({ gemini: { call: { name: 'item_info', args: { name, ...(want ? { want } : {}) } }, status: 200 }, rows: { ar_stock: stockRow, ar_store_items: storeRow, ...more } });
+  // by default only the name and the public price (he asks in front of customers: no stock, no purchase, no discount)
+  x = await ask({ text: 'سعر الفازول 40', history: [{ who: 'me', text: 'آدم' }, { who: 'adam', text: 'أيوه' }] }, item('الفازول 40'));
   assert.equal(x.j.tool, 'item_info');
-  assert.match(x.j.speak, /^الفازول ٤٠ مجم: 95\.5 جنيه، عندنا 1\.5، وفيه منه صلاحيته قربت، شهر 12، وهو ناقص في حقيبة نواقص يوميه، بيتباع 33 في الشهر، آخر شرا من المخزن الأول يوم 10\/11 بخصم 24٪\./);
-  // an expiry far away is not said (exp_near is the nearest expiry DATE, not a flag)
-  assert.doesNotMatch((await ask({ text: 'الفازول 20' }, { gemini: { call: { name: 'item_info', args: { name: 'الفازول 20' } }, status: 200 }, rows: { ar_stock: stock } })).j.speak, /صلاحيته/);
+  assert.equal(x.j.speak, 'الفازول ٤٠ مجم: 95.5 جنيه.', 'the strength he said comes first; only the price');
   assert.deepEqual(x.j.ctx, { item: { id: 501, name: 'الفازول ٤٠ مجم' } });
   assert.deepEqual(x.j.open, { q: 'ALFAZOL 40MG 14 TAB' });
   const g0 = JSON.parse(gem(x.f)[0].o.body);
@@ -72,25 +83,36 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.equal(g0.contents[1].role, 'model');
   assert.equal(g0.generationConfig.thinkingConfig.thinkingBudget, 0, 'no thinking: fast');
   assert.ok(g0.tools[0].functionDeclarations.some((d) => d.name === 'laptop'));
-  // the search is by Arabic name, letters written several ways match each other, numbers are left out of it
-  const q = decodeURIComponent(x.f.calls.find((c) => c.url.includes('/rest/v1/ar_stock')).url);
-  assert.match(q, /and=\(arabic_name\.ilike\.\*\*لف_ز_ل\*\)/, 'a vowel at the start may be missing');
-  // the name as he says it is shorter than the written one («بنادول» / «بانادول»): only the consonants, in order
-  x = await ask({ text: 'سعر بنادول اكسترا' }, { gemini: { call: { name: 'item_info', args: { name: 'بنادول اكسترا' } }, status: 200 },
-    rows: { ar_stock: (u) => decodeURIComponent(u.search).includes('ب*ن*د*ل') ? [{ item_id: 68432, name: 'PANADOL EXTRA 48 TAB', arabic_name: 'بانادول اكسترا ٤٨ قرص', price: 116, packs: 64, units: 0, parts: 4 }] : [] } });
-  assert.match(x.j.speak, /^بانادول اكسترا: 116 جنيه، عندنا 64\./, 'the pack size is not said');
+  assert.ok(g0.systemInstruction.parts[0].text.includes('customers may be listening'));
+  // only what he asks for on top: the stock / everything (bag, expiry, last purchase with the warehouse by its name)
+  x = await ask({ text: 'الفازول 40 عندنا كام' }, item('الفازول 40', 'stock'));
+  assert.equal(x.j.speak, 'الفازول ٤٠ مجم: 95.5 جنيه، عندنا 1.5.');
+  x = await ask({ text: 'كل حاجة عن الفازول 40' }, item('الفازول 40', 'all', { ar_item_buys: () => [{ supplier: 'ELFATH', last_date: '2026-11-10', discount_pct: 24 }] }));
+  assert.equal(x.j.speak, 'الفازول ٤٠ مجم: 95.5 جنيه، عندنا 1.5، أقرب صلاحية شهر 12 سنة 2026، وهو ناقص في حقيبة نواقص يوميه، بيتباع 33 في الشهر، آخر شرا من الفتح يوم 10/11 بخصم 24٪.');
+  // «وآخر شرا كان منين» about the product talked about last
+  x = await ask({ text: 'وآخر شرا كان منين', ctx: { item: { id: 501, name: 'الفازول ٤٠ مجم' } } }, item('', 'last_buy', { ar_item_buys: () => [{ supplier: 'REDA', last_date: '2026-11-01', discount_pct: 0 }] }));
+  assert.equal(x.j.speak, 'الفازول ٤٠ مجم: 95.5 جنيه، آخر شرا من رضا يوم 1/11.');
+  // no strength said: the best seller (the tablets, not the vial); the name as heard is shorter than the written one
+  x = await ask({ text: 'زوركال بكام' }, item('زوركال'));
+  assert.equal(x.j.speak, 'زوركال ٤٠ مجم: 120 جنيه.');
+  x = await ask({ text: 'سعر بنادول اكسترا' }, item('بنادول اكسترا'));
+  assert.equal(x.j.speak, 'بانادول اكسترا: 116 جنيه.', '«بنادول» = «بانادول»; the pack size is not said');
+  // misheard («جيست رنين» for «جاست ريج»): not sure → it ASKS, never says a wrong product; «أيوه» / «لا» answer it without Gemini
+  x = await ask({ text: 'عايز رصيد جيست رنين الاقراص' }, item('جيست رنين', 'stock'));
+  assert.match(x.j.speak, /^تقصد جاست ريج ١٢٥ مل معلق/);
+  assert.equal(x.j.ctx.suggest.id, 4001); assert.equal(x.j.ctx.suggest.want, 'stock');
+  x = await ask({ text: 'أيوه', ctx: x.j.ctx }, item('x'));
+  assert.equal(x.j.speak, 'جاست ريج ١٢٥ مل معلق: 45 جنيه، عندنا 3.'); assert.equal(gem(x.f).length, 0);
+  x = await ask({ text: 'لأ', ctx: { suggest: { id: 4001, name: 'جاست ريج', want: 'price' } } }, item('x'));
+  assert.equal(x.j.speak, 'طيب، قول اسم الصنف تاني');
+  // not in stock: the store list; nothing close: says so
+  x = await ask({ text: 'الفازول شراب موجود' }, item('الفازول شراب', 'stock'));
+  assert.equal(x.j.speak, 'الفازول شراب: 40 جنيه، مش موجود عندنا دلوقتي.');
+  x = await ask({ text: 'سعر زفت' }, item('زفت'));
+  assert.equal(x.j.speak, 'مش لاقي صنف بالاسم ده. قوله تاني');
+  assert.ok(F.wordSim('جيست', 'جاست') >= 0.9 && F.wordSim('بنادول', 'بانادول') >= 0.9 && F.wordSim('جيست', 'جليسرين') < 0.6);
   assert.deepEqual(F.skeleton('بنادول اكسترا'), ['ب*ن*د*ل', 'ك*س*ت*ر']);
   assert.deepEqual(F.words('وبيديا شور'), ['*ب_د*', 'ش_ر'], 'the «و» of «and» in front of a name does not stop the search');
-  // no strength said: the one that sells most comes first (the tablets, not the vial); the warehouse code is said by its name
-  x = await ask({ text: 'زوركال عندنا كام' }, { gemini: { call: { name: 'item_info', args: { name: 'زوركال' } }, status: 200 },
-    rows: { ar_stock: () => [{ item_id: 63228, name: 'ZURCAL VIAL', arabic_name: 'زوركال فيال', price: 84, packs: 20, units: 0, parts: 1 }, { item_id: 62386, name: 'ZURCAL 40MG 14 TAB', arabic_name: 'زوركال ٤٠ مجم ١٤ قرص', price: 120, packs: 1, units: 0, parts: 14 }],
-      ar_store_items: () => [{ id: 62386, popular_rank: 12 }, { id: 63228, popular_rank: 51 }], ar_item_buys: () => [{ supplier: 'ELFATH', last_date: '2026-09-23', discount_pct: 0 }] } });
-  assert.match(x.j.speak, /^زوركال ٤٠ مجم: 120 جنيه، عندنا 1، آخر شرا من الفتح يوم 23\/9\./);
-  // not in stock: the store list says so
-  x = await ask({ text: 'سعر الفازول' }, { gemini: { call: { name: 'item_info', args: { name: 'الفازول' } }, status: 200 }, rows: { ar_store_items: () => [{ id: 9, name: 'ALFAZOL SYRUP', arabic_name: 'الفازول شراب', price: 40 }] } });
-  assert.match(x.j.speak, /^الفازول شراب: 40 جنيه، مش موجود عندنا دلوقتي\./);
-  x = await ask({ text: 'سعر زفت' }, { gemini: { call: { name: 'item_info', args: { name: 'زفت' } }, status: 200 } });
-  assert.equal(x.j.speak, 'مش لاقي صنف بالاسم ده');
 
   // shortages: the general list (count from the server) and a bag; «اقرالي» = a walk read item by item
   x = await ask({ text: 'النواقص العامة فيها كام' }, { gemini: { call: { name: 'shortages', args: { which: 'general' } }, status: 200 },
