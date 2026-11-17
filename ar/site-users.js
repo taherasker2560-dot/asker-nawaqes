@@ -24,8 +24,10 @@
   const probablyGone = (u, now) => !!u.installed_at && (!u.last_seen_at || now - new Date(u.last_seen_at) > GONE_DAYS * DAY);
   const PLATFORM = { android: 'أندرويد', ios: 'آيفون', desktop: 'كمبيوتر', other: 'غير معروف' };
   function view(stats, now) {
-    const u = (stats && stats.users) || {}, c = (stats && stats.customers) || {};
+    const u = (stats && stats.users) || {}, c = (stats && stats.customers) || {}, h = (stats && stats.members) || null;
     return {
+      // the people of the customers' houses (store/family.js, 2026-11-18): they count as customers; null = the server has no household yet (the lines stay away)
+      members: h ? num(h.members) : null, membersOpened: h ? num(h.opened) : 0,
       total: num(u.total), today: num(u.today), last7: num(u.last7), openedToday: num(u.opened_today), opened7: num(u.opened7),
       installed: num(u.installed), removed: num(u.removed), android: num(u.android), ios: num(u.ios),
       customersOpened: num(c.opened), customersInstalled: num(c.installed),
@@ -68,7 +70,8 @@
       `<div class="su-dark"><span class="su-lbl">عملوا حساب في الموقع</span><b class="su-big">${v.total}</b><span class="su-sub">النهارده ${v.today} · آخر 7 أيام ${v.last7}</span>` +
       `<div class="su-grid"><div>فتحوا آخر 7 أيام<b>${v.opened7}</b></div><div>فتحوا النهارده<b>${v.openedToday}</b></div><div>نزّلوا التطبيق<b>${v.installed}</b></div><div>غالبًا شالوه<b>${v.removed}</b></div></div></div>` +
       `<div class="su-card"><h3>عملاء بالرابط <small>من غير باسورد</small></h3><div class="su-line"><span>فتحوا رابط حسابهم</span><b>${v.customersOpened}</b></div>` +
-      `<div class="su-line"><span>منهم نزّلوا التطبيق</span><b>${v.customersInstalled}</b></div></div>` +
+      `<div class="su-line"><span>منهم نزّلوا التطبيق</span><b>${v.customersInstalled}</b></div>` +
+      (v.members == null ? '' : `<div class="su-line"><span>أهل بيت العملاء</span><b>${v.members}</b></div><div class="su-line"><span>منهم فتحوا رابطهم</span><b>${v.membersOpened}</b></div>`) + '</div>' +
       `<div class="su-card"><h3>آخر المستخدمين <small>آخر فتح</small></h3>${v.rows.length ? v.rows.map(row).join('') : '<p class="hint">لسه محدش عمل حساب.</p>'}</div>` +
       `<p class="su-note">المتصفح ما بيقولش لما حد يمسح التطبيق، فـ«غالبًا شالوه» = نزّلوه وما فتحوهوش من 30 يوم. الأرقام بتبدأ من يوم التشغيل، وأرقام الموبايل مش متأكد منها بكود (مفيش SMS).</p>`;
     const sum = $('suSummary');
@@ -80,7 +83,10 @@
     const { data, error } = await db().rpc('ar_site_users_stats');
     // not the owner (staff), or the functions are not on the server yet: the card stays away
     if (error || !data || !data.ok) { d.hidden = true; return; }
-    d.hidden = false; last = data; draw();
+    // the people of the customers' houses (owner only; not on the server yet = no lines)
+    let members = null;
+    try { const r = await db().rpc('ar_members_count'); if (r && !r.error && r.data && r.data.ok) members = r.data; } catch (e) { /* later */ }
+    d.hidden = false; last = Object.assign({}, data, { members }); draw();
   }
   async function reset(id, btn) {
     if (!root.confirm('هتعمل باسورد جديد للمستخدم ده؟ الباسورد القديم بيبطل وموبايله بيخرج من الحساب.')) return;
