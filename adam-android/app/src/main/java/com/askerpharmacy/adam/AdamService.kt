@@ -202,6 +202,7 @@ class AdamService : Service() {
         listener = Listener(this, main) { log(it) }
         Voiceprint.load(this)
         ear = Ear(main, { log(it) }, { speaker.talking }, { onSegment(it) }, { id, v -> onBargeIn(id, v) })
+        ear.ctxDir = filesDir
         Thread {
             val ok = Models.prepare(this) { log(it) }
             main.post {

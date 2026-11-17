@@ -67,6 +67,9 @@ class Ear(
     private val worker = Executors.newSingleThreadExecutor()
     private var segSeq = 0
 
+    /** Where the debug sentences are kept (set by AdamService). */
+    @Volatile var ctxDir: java.io.File? = null
+
     /** Ignore the microphone for [ms] (Adam's own beep). */
     fun mute(ms: Long) { muteUntil = System.currentTimeMillis() + ms }
 
@@ -190,7 +193,7 @@ class Ear(
                     // the pause at the end is not sent (only 0.2 s of it)
                     val keep = s.size - max(0, (silent - 200) * RATE / 1000)
                     // «over Adam» only when most of it was while he spoke (his echo); he answering right as Adam ends is HIS sentence
-                    val pcm = s.copy(keep); val v = voiced; val id = segId; val d = during && voicedOver * 10 >= voiced * 6
+                    val pcm = normalize(s.copy(keep)); val v = voiced; val id = segId; val d = during && voicedOver * 10 >= voiced * 6
                     seg = null; inSentence = false
                     java.util.Arrays.fill(loudHistory, false)
                     if (v >= MIN_VOICED_MS) worker.execute {
@@ -322,14 +325,43 @@ class Ear(
                 frames += f
             }
             val a = acc
-            if (a == null || frames <= 0) { log("ear: no voiceprint from " + (pcm.size * 1000 / RATE) + " ms (" + parts + " parts)"); null }
-            else FloatArray(a.size) { a[it] / frames }
+            if (a == null || frames <= 0) {
+                // the last two sentences that gave none are kept for a look (files/novec_1.wav, novec_2.wav; adb pull via run-as)
+                val rms = sqrt(pcm.fold(0.0) { s, x -> s + x.toDouble() * x } / pcm.size)
+                log("ear: no voiceprint from " + (pcm.size * 1000 / RATE) + " ms (" + parts + " parts, rms " + rms.toInt() + ")")
+                try {
+                    val d = ctxDir
+                    if (d != null) { java.io.File(d, "novec_2.wav").delete(); java.io.File(d, "novec_1.wav").renameTo(java.io.File(d, "novec_2.wav")); java.io.File(d, "novec_1.wav").writeBytes(Audio.wav(pcm)) }
+                } catch (e: Throwable) { }
+                null
+            }
+            else { log("ear: voiceprint from " + (pcm.size * 1000 / RATE) + " ms, " + frames + " speech frames"); FloatArray(a.size) { a[it] / frames } }
         } catch (e: Throwable) {
             log("ear: voiceprint failed: " + e.message)
             null
         } finally {
             try { r?.close() } catch (x: Throwable) { }
         }
+    }
+
+    /**
+     * The sentence brought to a normal loudness (about -20 dBFS over its speaking parts). The phone's noise handling leaves his voice
+     * quiet (11-17: the speaker model and the speech model gave NOTHING on real microphone sentences, while the same models gave a
+     * voiceprint from a clearly louder recording): a quiet sentence is only made louder, never quieter, at most 40 times.
+     */
+    private fun normalize(pcm: ShortArray): ShortArray {
+        val frames = pcm.size / FRAME
+        if (frames < 3) return pcm
+        val e = DoubleArray(frames) { f -> var s = 0.0; for (i in 0 until FRAME) { val x = pcm[f * FRAME + i].toDouble(); s += x * x }; s / FRAME }
+        val sorted = e.sortedArray()
+        // the louder half of the frames = the speaking part
+        var sum = 0.0; var n = 0
+        for (k in sorted.size / 2 until sorted.size) { sum += sorted[k]; n++ }
+        val rms = sqrt(sum / n)
+        if (rms < 3.0) return pcm            // digital silence: nothing to raise
+        val gain = (3277.0 / rms).coerceIn(1.0, 40.0)
+        if (gain < 1.15) return pcm
+        return ShortArray(pcm.size) { (pcm[it] * gain).toInt().coerceIn(-32000, 32000).toShort() }
     }
 
     private fun dbfs(f: ShortArray, n: Int): Double {
