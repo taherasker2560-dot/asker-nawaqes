@@ -836,6 +836,8 @@ window.AskerEN = {
   "باسورد جديد": "New password",
   "الباسورد الجديد:": "The new password:",
   "ابعته على واتساب": "Send it on WhatsApp",
+  "👁 شوف صفحته": "👁 See his page",
+  "الصفحة ما اتفتحتش: {0}": "The page did not open: {0}",
   "ما فتحش": "Never opened",
   "من {0} يوم": "{0} days ago",
   "من {0} يوم · غالبًا شاله": "{0} days ago · probably removed it",
