@@ -28,7 +28,7 @@ assert.equal(M.wanted({mode:'none',hidden:false,holds:0}),false);
 // the texts
 assert.ok(M.TEXTS.stop&&M.TEXTS.start&&M.TEXTS.stop!==M.TEXTS.start);
 assert.equal(M.KEY,'asker_store_music_off');
-assert.ok(M.VOLUME>=0.08&&M.VOLUME<=0.15,'a quiet background («موجودة ومش موجودة»), not a racket: '+M.VOLUME);
+assert.ok(M.VOLUME>=0.12&&M.VOLUME<=0.22,'a quiet background («موجودة ومش موجودة»), not a racket: '+M.VOLUME);
 
 // ---- the pieces ----
 const S=M.STYLES;
@@ -101,4 +101,9 @@ const lead=run(5,4000,{first:1}).all.filter(e=>e.ch==='lead');assert.ok(lead.len
 const aBlock=M.composer(5,{first:1,fromBar:8}).until(17); // 8 bars of 108 bpm = 17.8 s: only block Aassert.ok(!aBlock.some(e=>e.ch==='lead'),'block A (groove) has no melody');
 // the very first piece and the first seconds: a soft start (the first bar is quieter)
 const start=M.composer(9,{first:2}).until(1);assert.ok(Math.max(...start.map(e=>e.vel))<=0.56,'the first bar is soft');
+// a visit starts in the groove, not in 20 quiet seconds of intro (the page asks for START_BAR): the first seconds already have a kick, a bass and keys
+assert.equal(M.START_BAR,8);
+const live=M.composer(123,{fromBar:M.START_BAR}).until(6);
+for(const t of ['kick','bass'])assert.ok(live.some(e=>e.type===t),'the first seconds of a visit have a '+t);
+assert.ok(live.some(e=>e.ch==='keys'));
 console.log('store-music ok');

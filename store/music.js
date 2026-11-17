@@ -17,8 +17,9 @@
   'use strict';
 
   const KEY = 'asker_store_music_off';
-  const VOLUME = 0.13; // of full scale: «موجودة ومش موجودة» (owner 2026-11-17, after the first mall-style sample: lower, so it never makes a racket around the browser); the first sample was 0.25
+  const VOLUME = 0.18; // of full scale: «موجودة ومش موجودة» (owner 2026-11-17: lower than the first sample (0.25), so it never makes a racket around the browser). 0.13 was heard as nothing on a phone speaker (measured: peaks -20 dBFS), so 0.18
   const FADE_IN = 3, FADE_OUT = 0.8; // seconds
+  const START_BAR = 8; // a visit starts in the groove (after the 8-bar intro): a customer who just opened the page hears the music at once, not 20 quiet seconds
   const TEXTS = {
     stop: 'وقّف الموسيقى الهادية',
     start: 'شغّل الموسيقى الهادية',
@@ -243,7 +244,7 @@
   }
 
   // ---------- the player ----------
-  const api = { isPharmacyPhone, modeOf, wanted, composer, renderBuffer, TEXTS, KEY, STYLES, barsOf, VOLUME, FADE_IN };
+  const api = { isPharmacyPhone, modeOf, wanted, composer, renderBuffer, TEXTS, KEY, STYLES, barsOf, VOLUME, FADE_IN, START_BAR };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -269,7 +270,7 @@
   function ensure() {
     if (ctx) return true;
     try { ctx = new AC(); } catch (e) { mode = 'none'; return false; }
-    g = buildGraph(ctx); comp = composer((Math.random() * 4294967296) >>> 0); t0 = ctx.currentTime + 0.1;
+    g = buildGraph(ctx); comp = composer((Math.random() * 4294967296) >>> 0, { fromBar: START_BAR }); t0 = ctx.currentTime + 0.1;
     ctx.onstatechange = () => { sync(); };
     return true;
   }
