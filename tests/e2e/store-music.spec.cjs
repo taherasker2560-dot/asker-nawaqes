@@ -35,7 +35,7 @@ run('Store music: a visitor — the button is there, a first tap starts the musi
  // the first tap anywhere (nothing music-related): it starts and fades in to a low volume
  await page.mouse.click(190,420);
  await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
- assert.equal(await lastRamp(page),0.25,'fades in to the low volume');
+ assert.equal(await lastRamp(page),0.13,'fades in to the low volume');
  assert.deepEqual(await btn(page),{on:'1',label:'وقّف الموسيقى الهادية',title:'وقّف الموسيقى الهادية'});
  assert.equal(await page.evaluate(()=>window.__audio.made),1,'one sound engine for the whole site (the views switch by hash)');
  // moving between the views does not restart or stack anything
@@ -133,5 +133,5 @@ run('Store music: the real sound graph renders (a real browser): not silent, not
   const buf=await window.AskerStoreMusic.renderBuffer(8,3,22050,{first,fromBar:8}),d=buf.getChannelData(0);let peak=0;for(let i=0;i<d.length;i++){const v=Math.abs(d[i]);if(v>peak)peak=v}
   let late=0,n=0;for(let i=Math.floor(d.length*0.5);i<d.length;i++){late+=d[i]*d[i];n++}
   out.push({first,sec:buf.duration,peak,lateRms:Math.sqrt(late/n)})}return out});
- for(const x of r){assert.equal(Math.round(x.sec),8);assert.ok(x.peak>0.05,'piece '+x.first+' is not silent: '+x.peak);assert.ok(x.peak<0.8,'piece '+x.first+' does not clip: '+x.peak);assert.ok(x.lateRms>0.01,'piece '+x.first+' is heard: '+x.lateRms)}
+ for(const x of r){assert.equal(Math.round(x.sec),8);assert.ok(x.peak>0.05,'piece '+x.first+' is not silent: '+x.peak);assert.ok(x.peak<0.8,'piece '+x.first+' does not clip: '+x.peak);assert.ok(x.lateRms>0.005,'piece '+x.first+' is heard: '+x.lateRms)}
 });

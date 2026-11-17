@@ -17,7 +17,7 @@
   'use strict';
 
   const KEY = 'asker_store_music_off';
-  const VOLUME = 0.25; // of full scale
+  const VOLUME = 0.13; // of full scale: «موجودة ومش موجودة» (owner 2026-11-17, after the first mall-style sample: lower, so it never makes a racket around the browser); the first sample was 0.25
   const FADE_IN = 3, FADE_OUT = 0.8; // seconds
   const TEXTS = {
     stop: 'وقّف الموسيقى الهادية',

@@ -28,7 +28,7 @@ assert.equal(M.wanted({mode:'none',hidden:false,holds:0}),false);
 // the texts
 assert.ok(M.TEXTS.stop&&M.TEXTS.start&&M.TEXTS.stop!==M.TEXTS.start);
 assert.equal(M.KEY,'asker_store_music_off');
-assert.ok(M.VOLUME<=0.3,'low volume');
+assert.ok(M.VOLUME>=0.08&&M.VOLUME<=0.15,'a quiet background («موجودة ومش موجودة»), not a racket: '+M.VOLUME);
 
 // ---- the pieces ----
 const S=M.STYLES;
