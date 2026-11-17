@@ -597,6 +597,8 @@
     standalone,
     pharmacyPhone: () => pharmacyPhone,
     token: () => token,
+    // store/alarm.js: whose alarms the pharmacy is setting (the owner's look)
+    name: () => (st.c ? st.c.name : ''),
     // store.js: the client, once it is made (the first load starts here)
     attach(c) { client = c; if (token) { showLinked(true); drawPay(); load(false); } },
     // store.js view('account')

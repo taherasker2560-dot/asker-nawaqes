@@ -510,7 +510,6 @@ window.AskerEN = {
   "🔔 فعّل الإشعارات": "🔔 Turn on notifications",
   "الإشعارات مقفولة من إعدادات المتصفح": "Notifications are blocked in the browser settings",
   "موبايلك مفيهوش صوت عربي: هيرن من غير نطق. نزّل صوت عربي من إعدادات الموبايل ← اللغة ← تحويل النص إلى كلام.": "Your phone has no Arabic voice: it will ring without speaking. Install an Arabic voice in the phone's settings → Language → Text-to-speech.",
-  "ده شكل المنبه عند العميل. على موبايل الصيدلية مبيرنش.": "This is how the alarm looks for the customer. It never rings on the pharmacy's phone.",
   "أي دوا؟": "Which medicine?",
   "(من اللي بتاخده دايمًا)": "(from what you usually take)",
   "＋ دوا تاني (اكتب اسمه)": "＋ Another medicine (type its name)",
@@ -544,7 +543,13 @@ window.AskerEN = {
   "المتاح عندنا {0} علب بس": "We have only {0} packs",
   "المتاح عندنا {0} علبة بس": "We have only {0} packs",
   "خليها {0}": "Make it {0}",
-  "ده آخر المتاح عندنا": "That's all we have"
+  "ده آخر المتاح عندنا": "That's all we have",
+  "بتظبط منبهات {0} من عندك. هتظهر في صفحته بعلامة «من الصيدلية» ويرنّ عند الميعاد على موبايله، وهو يقدر يقفلها بس مايعدّلهاش.": "You are setting {0}'s alarms yourself. They show on his page marked “From the pharmacy” and ring at the time on his phone; he can switch them off but not change them.",
+  "من الصيدلية": "From the pharmacy",
+  "🔔 جرّب الإشعار": "🔔 Try the notification",
+  "🔔 تجربة منبه الدوا": "🔔 Medicine alarm test",
+  "لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.": "If you heard a sound and see this notification, the alarm will reach you like this at dose time. Tap it.",
+  "لو الإشعار جه من غير صوت: اتأكد إن الموبايل مش على الصامت، وافتح إعدادات الموبايل ← التطبيقات ← المتصفح ← الإشعارات ← صيدلية عسكر وشغّل الصوت.": "If the notification came without a sound: make sure the phone is not on silent, and open the phone's settings → Apps → the browser → Notifications → Asker Pharmacy and turn the sound on."
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",
