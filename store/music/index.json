@@ -1,0 +1,90 @@
+[
+ {
+  "piece": 0,
+  "id": "bossa",
+  "name": "bossa",
+  "file": "01-bossa.mp3",
+  "secs": 243,
+  "intro": 20,
+  "bytes": 2430360,
+  "peakDb": -0.2,
+  "rmsDb": -16.4
+ },
+ {
+  "piece": 1,
+  "id": "soft-house",
+  "name": "soft house",
+  "file": "02-soft-house.mp3",
+  "secs": 251.9,
+  "intro": 17.8,
+  "bytes": 2519280,
+  "peakDb": -0.2,
+  "rmsDb": -16.3
+ },
+ {
+  "piece": 2,
+  "id": "chill-pop",
+  "name": "chill pop",
+  "file": "03-chill-pop.mp3",
+  "secs": 253.4,
+  "intro": 20.9,
+  "bytes": 2534760,
+  "peakDb": -0.2,
+  "rmsDb": -15.9
+ },
+ {
+  "piece": 3,
+  "id": "marimba",
+  "name": "marimba",
+  "file": "04-marimba.mp3",
+  "secs": 252.6,
+  "intro": 19.2,
+  "bytes": 2526480,
+  "peakDb": -0.2,
+  "rmsDb": -17.3
+ },
+ {
+  "piece": 4,
+  "id": "smooth",
+  "name": "smooth",
+  "file": "05-smooth.mp3",
+  "secs": 243,
+  "intro": 21.8,
+  "bytes": 2430360,
+  "peakDb": -0.2,
+  "rmsDb": -17.5
+ },
+ {
+  "piece": 5,
+  "id": "bright",
+  "name": "bright",
+  "file": "06-bright.mp3",
+  "secs": 243,
+  "intro": 17.1,
+  "bytes": 2430360,
+  "peakDb": -0.2,
+  "rmsDb": -16.7
+ },
+ {
+  "piece": 6,
+  "id": "dreamy",
+  "name": "dreamy",
+  "file": "07-dreamy.mp3",
+  "secs": 254.4,
+  "intro": 22.9,
+  "bytes": 2544840,
+  "peakDb": -0.2,
+  "rmsDb": -18.8
+ },
+ {
+  "piece": 7,
+  "id": "sunny",
+  "name": "sunny",
+  "file": "08-sunny.mp3",
+  "secs": 243,
+  "intro": 18.5,
+  "bytes": 2430360,
+  "peakDb": -0.2,
+  "rmsDb": -17.8
+ }
+]
