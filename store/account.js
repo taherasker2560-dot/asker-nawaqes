@@ -124,6 +124,11 @@
     payAccount: 'على حسابي',
     payCash: 'كاش عند الاستلام',
     payStopped: 'حسابك موقوف، فالطلب كاش عند الاستلام بس.',
+    // a person of the owner's house (store/family.js): the account is not his to control
+    payMemberCash: 'الدفع كاش عند الاستلام. الآجل لصاحب الحساب.',
+    memberName: 'أهلاً يا {n} · حساب {o}',
+    memberHi: 'أهلاً يا {n}',
+    memberHint: 'ده حساب {o}. تقدر تطلب، وتشوف مشترياتك وأدويتك، وتظبط منبهك.',
     month: 'اشتريت الشهر ده',
     monthPaid: 'دفعت الشهر ده',
     home: 'الرئيسية',
@@ -285,14 +290,19 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   let client = null;
   // st: { c: {id, name, balance}, stopped, month, data_at, phone, moves, more, busy, error, filter, open:Set, pay, pdf }
-  const st = { c: null, stopped: false, month: null, data_at: null, phone: null, moves: [], more: false, busy: false, error: '', tab: 'home', open: new Set(), pay: 'account', pdf: '', cartTotal: null };
+  // me: who opens this page: the owner of the account, or a person of his house (store/family.js, 2026-11-18) with what the owner allowed him:
+  // no total (the server sends none: balance null) and / or cash only (memberCash)
+  const st = { c: null, me: { role: 'owner' }, memberCash: false, stopped: false, month: null, data_at: null, phone: null, moves: [], more: false, busy: false, error: '', tab: 'home', open: new Set(), pay: 'account', pdf: '', cartTotal: null };
+  const hideBal = () => !!st.c && st.me.role === 'member' && st.c.balance == null;
+  const noCredit = () => st.stopped || st.memberCash;
+  const fillT = (s, v) => String(s).replace(/\{(\w+)\}/g, (m, k) => (v && v[k] != null ? String(v[k]) : m));
   const PAY = () => root.AskerStorePay || null;
   // how this order is paid: a customer with his link: account / cash / a transfer; a visitor: cash or a transfer. A transfer that is
   // not set up (the owner removed the number) falls back to cash.
   function effectivePay() {
     const P = PAY();
     const want = st.pay === 'vodafone' || st.pay === 'instapay' ? (P && P.methods().includes(st.pay) ? st.pay : 'cash') : st.pay;
-    return token ? payOf(st.stopped, want) : want === 'vodafone' || want === 'instapay' ? want : 'cash';
+    return token ? payOf(noCredit(), want) : want === 'vodafone' || want === 'instapay' ? want : 'cash';
   }
   const isTransfer = (m) => m === 'vodafone' || m === 'instapay';
   // the box on the home page («نزّل الصيدلية»): for anyone who opens the site's link, a customer or not (owner 2026-11-17: «لما أبعت رابط
@@ -338,8 +348,11 @@
         throw new Error('bad');
       }
       if (!older) {
-        Object.assign(st, { c: data.customer, stopped: !!data.stopped, month: data.month, data_at: data.data_at, phone: data.phone, moves: [] });
-        if (st.stopped) st.pay = 'cash';
+        Object.assign(st, { c: data.customer, me: data.me && data.me.role === 'member' ? data.me : { role: 'owner' }, stopped: !!data.stopped, month: data.month, data_at: data.data_at, phone: data.phone, moves: [] });
+        st.memberCash = st.me.role === 'member' && st.me.on_account === false;
+        if (noCredit()) st.pay = 'cash';
+        // «👨‍👩‍👧 أهل البيت» (store/family.js): only the owner of the account has it; the people of his house never do
+        if (root.AskerStoreFamily) root.AskerStoreFamily.attach(client, token, st.me.role !== 'member', draw);
         if (root.AskerStoreRegular) root.AskerStoreRegular.load(client, token, { moves: () => st.moves, redraw: draw });   // his regular items (store/regular.js); the buttons appear when they arrive
         if (root.AskerStoreAlarm && root.AskerStoreAlarm.attach) root.AskerStoreAlarm.attach(client);   // the dose alarm's push (store/alarm.js, stage 2)
         const ph = $('cPhone');
@@ -387,7 +400,7 @@
     const lines = open && items.length
       ? '<div class="ac-items">' + items.map(lineHtml).join('') + '</div>'
       : '';
-    return `<div class="ac-mv k-${t.cls}"><div class="ac-mv-l"><span class="ac-k">${esc(t.text)}</span><span class="ac-after">${esc(afterText(m.balance))}</span></div>` +
+    return `<div class="ac-mv k-${t.cls}"><div class="ac-mv-l"><span class="ac-k">${esc(t.text)}</span>${m.balance == null ? '' : `<span class="ac-after">${esc(afterText(m.balance))}</span>`}</div>` +
       `<div class="ac-mv-d">${bits.filter(Boolean).join(' · ')}</div>${lines}</div>`;
   }
   function waHref() {
@@ -411,9 +424,10 @@
     const box = $('acctBox');
     if (!box) return;
     const name = $('acctName');
-    if (name) name.textContent = st.c ? `حسابك يا ${st.c.name} · كود ${st.c.id}` : '';
+    const member = !!st.c && st.me.role === 'member', hide = hideBal();
+    if (name) name.textContent = st.c ? (member ? fillT(TEXTS.memberName, { n: st.me.name, o: st.c.name }) : `حسابك يا ${st.c.name} · كود ${st.c.id}`) : '';
     const card = $('acctCardText');
-    if (card) card.textContent = st.c ? balanceWords(st.c.balance).text : '';
+    if (card) card.textContent = st.c && !hide ? balanceWords(st.c.balance).text : '';
     if (!st.c) {
       box.innerHTML = st.error ? `<p class="note bad">${esc(st.error)}</p>` : st.busy ? `<p class="note">${esc(TEXTS.loading)}</p>` : '';
       return;
@@ -433,11 +447,13 @@
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
     }
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
-    html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` +
+    // a person of the house whose owner keeps the total to himself: a greeting in place of the balance (the server sent no number)
+    if (hide) html += `<section class="ac-bal ac-hi"><div class="ac-big zero">${esc(fillT(TEXTS.memberHi, { n: st.me.name }))}</div><div class="hint-sm">${esc(fillT(TEXTS.memberHint, { o: st.c.name }))}</div></section>`;
+    else html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` +
       (upd ? `<div class="hint-sm">${esc(upd)} · ${esc(TEXTS.every10)}</div>` : '') +
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
-    html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
+    html += `<a href="#search" class="ac-btn ac-order">${esc(noCredit() ? TEXTS.orderCash : TEXTS.order)}</a>`;
     // «كرّر دواك بالباركود» (2026-11-17, store/scan.js): the camera / the code / the name put his usual items in the order
     html += `<a href="#scan" class="ac-btn ac-scan">${esc(TEXTS.scan)}</a>`;
     // «اللي باخده دايمًا» + «أدويتي المزمنة» (2026-11-17, store/regular.js): his regular items and their refill dates (nothing when he has none)
@@ -446,12 +462,15 @@
     html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
     // «📝 شكوى أو اقتراح» (2026-11-18, owner: «رابط يوصل لرسائل الصفحة بالشكاوى والمقترحات … فويس أو مكتوبة»): the messages page, opened as a complaint / suggestion
     html += root.AskerStoreChat ? `<div class="ac-al-wrap"><a href="#chat" class="ac-reg-btn ac-fb-tile" data-ac-feedback><b>${esc(TEXTS.feedback)}</b><small>${esc(TEXTS.feedbackHint)}</small></a></div>` : '';
+    // «👨‍👩‍👧 أهل البيت» (2026-11-18, store/family.js): the owner of the account sends the app to his house and controls it (nothing for a person of the house)
+    const fam = root.AskerStoreFamily ? root.AskerStoreFamily.tileHtml() : '';
+    html += fam ? `<div class="ac-al-wrap">${fam}</div>` : '';
     // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number. Also in the owner's look on the pharmacy's own phone
     // (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
     const P = PAY();
     if (P && P.methods().length && num(st.c.balance) > CRUMB) html += `<button type="button" class="ac-btn ac-paybtn" data-acct-paysheet>${esc(P.TEXTS.payBtn)}</button>`;
     const wa = waHref();
-    html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
+    html += `<div class="ac-row">${hide ? '' : `<button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>`}` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
       (root.AskerStoreChat ? `<a class="share" href="#chat">${esc(TEXTS.chat)}</a>` : wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>' +
       installHtml +
@@ -460,9 +479,11 @@
     // the account is an APP now (owner 2026-11-17: «تبقى صفحة قصيرة، وكل صفحة من جوه طولها على قد اللي ياخدها … زي ابلكيشن بالفعل مش رابط وخلاص»): four tabs pinned at the top, «الرئيسية»
     // (the balance and the buttons: short) and a page of its own for «الكل» / «المشتريات» / «المدفوعات» that opens from its top, however long his history is
     const tab = (f, label) => `<button type="button" role="tab" aria-selected="${st.tab === f}" class="ac-tab${st.tab === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
-    const tabs = `<div class="ac-tabs" role="tablist">${tab('home', TEXTS.home)}${tab('all', TEXTS.all)}${tab('sales', TEXTS.sales)}${tab('payments', TEXTS.payments)}</div>`;
+    // with the total kept from him (a person of the house): only the purchases, never the all-movements or payments pages
+    if (hide && (st.tab === 'all' || st.tab === 'payments')) st.tab = 'sales';
+    const tabs = `<div class="ac-tabs" role="tablist">${tab('home', TEXTS.home)}${hide ? '' : tab('all', TEXTS.all)}${tab('sales', TEXTS.sales)}${hide ? '' : tab('payments', TEXTS.payments)}</div>`;
     if (st.tab !== 'home') {
-      let list = `<div class="ac-mini ${b.cls}"><b>${esc(b.text)}</b>${upd ? `<small>${esc(upd)}</small>` : ''}</div>`;
+      let list = hide ? '' : `<div class="ac-mini ${b.cls}"><b>${esc(b.text)}</b>${upd ? `<small>${esc(upd)}</small>` : ''}</div>`;
       const shown = movesFor(st.moves, st.tab);
       let body = '', lastDay = '';
       for (const m of shown) {
@@ -497,10 +518,11 @@
     if (box.hidden) { box.innerHTML = ''; return; }
     const opt = (v, label, off) => `<label class="ac-pay${off ? ' off' : ''}"><input type="radio" name="acctPay" value="${v}"${pay === v ? ' checked' : ''}${off ? ' disabled' : ''} /> ${esc(label)}</label>`;
     let html = `<h2>${esc(token ? TEXTS.payH : P.TEXTS.h)}</h2>` +
-      (token ? opt('account', TEXTS.payAccount, st.stopped) + opt('cash', TEXTS.payCash, false) : opt('cash', P.TEXTS.cash, false));
+      (token ? opt('account', TEXTS.payAccount, noCredit()) + opt('cash', TEXTS.payCash, false) : opt('cash', P.TEXTS.cash, false));
     xfer.forEach((m) => { html += opt(m, P.TEXTS[m], false); });
     if (isTransfer(pay)) html += P.detailsHtml(pay, st.cartTotal, st.c ? `${st.c.name} · كود ${st.c.id}` : '');
     if (st.stopped) html += `<p class="hint-sm">${esc(TEXTS.payStopped)}</p>`;
+    else if (st.memberCash) html += `<p class="hint-sm">${esc(TEXTS.payMemberCash)}</p>`;
     box.innerHTML = html;
   }
   // the PDF: from his last payment (or this month) to now, the same statement the pharmacy sends
@@ -595,7 +617,7 @@
   // this phone forgets the customer's link (it was someone else's): the store is a plain store again
   // (the installed app then asks for a site account like anyone: store/siteuser.js listens)
   const changed = () => { try { window.dispatchEvent(new Event('asker-customer-changed')); } catch (e) { /* old browser */ } };
-  function forget() { keep.set(null); token = null; st.c = null; st.moves = []; if (root.AskerStoreRegular) root.AskerStoreRegular.forget(); showLinked(false); useManifest(false); drawPay(); draw(); changed(); }
+  function forget() { keep.set(null); token = null; st.c = null; st.me = { role: 'owner' }; st.memberCash = false; st.moves = []; if (root.AskerStoreFamily) root.AskerStoreFamily.forget(); if (root.AskerStoreRegular) root.AskerStoreRegular.forget(); showLinked(false); useManifest(false); drawPay(); draw(); changed(); }
   root.AskerStoreAccount = {
     forget,
     // store/siteuser.js: where this page is running (the installed app? the pharmacy's own phone?) and whose link it has
@@ -623,8 +645,12 @@
     redrawPay: drawPay,
     // the server said he is stopped (the owner stopped him meanwhile): cash from now on
     stoppedNow() { st.stopped = true; st.pay = 'cash'; drawPay(); load(false); },
+    // the server said the owner of the account switched «يطلب على حسابك» off for this person of his house: cash from now on
+    memberCashNow() { st.memberCash = true; st.pay = 'cash'; drawPay(); load(false); },
+    // 'owner' (the owner of the account, also on an older server) or 'member' (a person of his house)
+    role: () => st.me.role,
     // the server said the link is no longer valid
-    linkGone() { keep.set(null); token = null; st.c = null; st.error = TEXTS.link; if (root.AskerStoreRegular) root.AskerStoreRegular.forget(); showLinked(false); useManifest(false); drawPay(); draw(); changed(); },
+    linkGone() { keep.set(null); token = null; st.c = null; st.me = { role: 'owner' }; st.memberCash = false; st.error = TEXTS.link; if (root.AskerStoreFamily) root.AskerStoreFamily.forget(); if (root.AskerStoreRegular) root.AskerStoreRegular.forget(); showLinked(false); useManifest(false); drawPay(); draw(); changed(); },
     // after an order: the account may have changed
     refresh() { if (token) load(false); },
   };

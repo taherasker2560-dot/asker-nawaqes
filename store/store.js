@@ -52,6 +52,8 @@
     too_many_text: 'تقدر تكتب 10 أصناف بالكتير في الطلب الواحد',
     // a customer ordering from his personal link (store/account.js)
     stopped: 'حسابك اتوقف، فالطلب ده كاش عند الاستلام. دوس «إرسال الطلب» تاني',
+    // a person of the customer's house whose owner switched «يطلب على حسابك» off (store/family.js, 2026-11-18)
+    member_cash: 'الطلب على الحساب مش متاح ليك، فالطلب ده كاش عند الاستلام. دوس «إرسال الطلب» تاني',
     link: 'الرابط ده مبقاش شغال. اطلب رابط جديد من الصيدلية، أو اكتب اسمك وابعت الطلب عادي',
     bad_pay: 'اختار طريقة الدفع',
     // more than the pharmacy has (2026-11-17, owner: «لو طلب أزيد من الكمية المتاحة يطلع له تنبيه»)
@@ -977,6 +979,7 @@
       if (error) throw error;
       if (!data || !data.ok) {
         if (link && data && data.error === 'stopped') acct.stoppedNow();
+        if (link && data && data.error === 'member_cash') acct.memberCashNow();
         if (link && data && data.error === 'link') acct.linkGone();
         // the server says how many boxes there are: the cart shows it at once
         if (data && data.error === 'qty' && Array.isArray(data.items)) { for (const x of data.items) limits[x.id] = Number(x.max); drawCart(); }

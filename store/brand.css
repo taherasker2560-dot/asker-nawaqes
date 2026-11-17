@@ -323,3 +323,18 @@ body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(s
 /* ---- «📝 شكوى أو اقتراح» (owner 2026-11-18): the account's tile and the banner on the messages page ---- */
 .ac-fb-tile { text-decoration: none; }
 .ch-topic { margin: 6px 12px 0; padding: 8px 10px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent-text); font-size: 12.5px; line-height: 1.7; }
+
+/* ---- «👨‍👩‍👧 أهل البيت» (owner 2026-11-18; store/family.js): the owner's list of the people of his house, a card each with two switches, and the greeting a person of the house sees in place of the total ---- */
+.fm-card { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 2px; background: var(--card); }
+.fm-card.fresh { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.fm-card > b { display: block; font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.fm-card > small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+.fm-sw { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13.5px; line-height: 1.5; }
+.fm-sw small { display: block; margin-top: 1px; font-size: 11.5px; color: var(--muted); }
+.fm-btns { display: flex; gap: 8px; margin-top: 14px; }
+.fm-btn { flex: 1; min-height: 42px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 999px; background: var(--card); color: var(--accent-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.fm-btn:active { transform: scale(0.97); }
+.fm-card .al-del { min-height: 38px; margin-top: 8px; }
+.fm-add { margin-top: 18px; padding-top: 6px; border-top: 1px solid var(--line); }
+.ac-hi .ac-big { font-size: 22px; }
+.ac-hi .hint-sm { margin-top: 6px; line-height: 1.7; }

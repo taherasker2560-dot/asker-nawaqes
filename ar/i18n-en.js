@@ -829,6 +829,8 @@ window.AskerEN = {
   "من غير باسورد": "no password",
   "فتحوا رابط حسابهم": "Opened their account link",
   "منهم نزّلوا التطبيق": "of them installed the app",
+  "أهل بيت العملاء": "Customers' household members",
+  "منهم فتحوا رابطهم": "of them opened their link",
   "آخر المستخدمين": "Latest users",
   "آخر فتح": "Last opened",
   "لسه محدش عمل حساب.": "No one has made an account yet.",

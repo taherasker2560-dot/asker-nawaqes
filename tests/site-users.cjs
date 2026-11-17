@@ -23,6 +23,9 @@ const v=S.view({users:{total:23,today:2,last7:9,opened_today:5,opened7:14,instal
 assert.deepEqual([v.total,v.today,v.last7,v.openedToday,v.opened7,v.installed,v.removed,v.customersOpened,v.customersInstalled],[23,2,9,5,14,19,3,14,9]);
 assert.deepEqual(v.rows.map(r=>[r.name,r.platform,r.seen,r.gone,r.installed]),[['منى إبراهيم','أندرويد','دلوقتي',false,true],['هالة سمير','آيفون','من 38 يوم',true,true],['كريم','','ما فتحش',false,false]]);
 assert.deepEqual(S.view(null,now).rows,[],'an empty answer is an empty card');
+// the people of the customers' houses (2026-11-18): counted as customers; no answer = no lines
+assert.equal(v.members,null,'a server without the household has no lines');
+const hv=S.view({users:{},customers:{},members:{members:12,opened:7,customers:5}},now);assert.deepEqual([hv.members,hv.membersOpened],[12,7]);
 assert.equal(S.view({},now).total,0);
 // the message he sends with a temporary password: the 6 digits only, no link
 assert.equal(S.resetText('منى','483920'),'أهلًا منى 🌿\nباسورد موقع صيدلية عسكر الجديد: 483920\nادخل بيه برقمك، ولو عايز تغيّره ابعتلنا.');
