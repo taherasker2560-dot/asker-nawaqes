@@ -78,7 +78,9 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.equal(await text(page,'.ac-big'),'عليك 7,174.50 ج');
  assert.equal(await page.$('.ac-stop'),null,'not stopped');
  assert.match(await text(page,'.ac-order'),/اطلب من الصيدلية/);
- // his movements only, newest first, the items open on a tap
+ // his movements only, newest first, the items open on a tap (they are on the «الكل» page now: the home is short)
+ assert.equal(await page.$('.ac-moves'),null,'the home page has no movements');
+ await page.click('[data-acct-filter="all"]');
  const titles=await page.$$eval('.ac-k',e=>e.map(x=>x.textContent));
  assert.deepEqual(titles,['فاتورة 207.80 ج','فاتورة 166.70 ج','دفعة 500 ج']);
  assert.doesNotMatch(await text(page,'#acctBox'),/SECRET ITEM|سامية/);
@@ -86,6 +88,7 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.deepEqual(await page.$$eval('.ac-items > div',r=>r.map(d=>[...d.children].map(s=>s.textContent).join(' | '))),['PANADOL EXTRA 24 TAB | 1 علبة · 66.70','VITACID C 1000 | 2 وحدة · 100']);
  await page.click('[data-acct-filter="payments"]');
  assert.deepEqual(await page.$$eval('.ac-k',e=>e.map(x=>x.textContent)),['دفعة 500 ج']);
+ await page.click('[data-acct-filter="home"]');
  // «حسابي» in the tabs and on the home
  assert.ok(await page.isVisible('.tabbar a[data-go="account"]'));
  // day by default; the customer chooses night, colors and language himself from «حسابي» too (owner: «براحته»)
@@ -266,12 +269,14 @@ run('Customer link: the items\' pictures show in his account when he opens an in
    ar_store_items:[{id:10,name:'PANADOL EXTRA 24 TAB',status:'in_stock',price:66.7,cat:'meds',needs_rx:false,is_listed:true}],ar_store_edits:[]}))},[CUSTOMERS,MOVES,PHONES,tok]);
  await page.goto(base+'store.html#me='+tok);
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ await page.click('[data-acct-filter="all"]');
  await page.click('[data-acct-items="11"]');
  await page.waitForSelector('.ac-items .has-pic a.ac-pic');
  const pics=await page.$$eval('.ac-items > div',r=>r.map(d=>({pic:!!d.querySelector('a.ac-pic'),href:d.querySelector('a.ac-pic')?d.querySelector('a.ac-pic').getAttribute('href'):null,loaded:d.querySelector('img')?d.querySelector('img').naturalWidth>0:null,text:d.textContent.replace(/\s+/g,' ').trim()})));
  assert.deepEqual(pics.map(x=>[x.pic,x.href,x.loaded]),[[true,'#item=10',true],[false,null,null]],'a picture only for the item the store has');
  assert.match(pics[0].text,/PANADOL EXTRA 24 TAB.*66.70/);assert.match(pics[1].text,/VITACID C 1000.*100/,'the other line as before');
  // the PDF he downloads: the picture and a link to the item in the store
+ await page.click('[data-acct-filter="home"]');
  const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.click('[data-acct-pdf]')]);
  const fs=require('node:fs');const pdf=fs.readFileSync(await dl.path()).toString('latin1');
  assert.ok(pdf.startsWith('%PDF-1.4'));
@@ -286,10 +291,11 @@ run('Customer link: he lands on his account (the balance first), the install but
  await page.goto(base+'store.html#me='+tok);
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
  // the order of the page: the balance, the order button, the PDF/chat row, then the install button; nothing big about installing above the balance
- const order=await page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-order')?'order':e.matches('.ac-row')?'row':e.matches('[data-acct-install]')?'install':e.matches('.ac-install-why')?'why':e.matches('.ac-chips')?'chips':e.className||e.tagName));
- assert.equal(order[0],'balance','the account is the first thing');
+ const order=await page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-order')?'order':e.matches('.ac-row')?'row':e.matches('[data-acct-install]')?'install':e.matches('.ac-install-why')?'why':e.matches('.ac-tabs')?'tabs':e.className||e.tagName));
+ assert.equal(order[0],'tabs','the four tabs are pinned at the top');
+ assert.equal(order[1],'balance','and the account is the first thing under them');
  assert.ok(order.indexOf('install')>order.indexOf('row'),'the install button comes after the account\'s own buttons: '+order.join(','));
- assert.ok(order.indexOf('install')<order.indexOf('chips'),'but before his movements');
+ assert.equal(await page.$('.ac-moves'),null,'his movements are on their own pages, not under the buttons');
  // not the big button any more
  const h=await page.$eval('[data-acct-install]',b=>b.getBoundingClientRect().height);
  assert.ok(h<=57,'a plain button, not the 64 px one (the capsule look makes it 56, with a hair of rounding): '+h);

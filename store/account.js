@@ -126,6 +126,7 @@
     payStopped: 'حسابك موقوف، فالطلب كاش عند الاستلام بس.',
     month: 'اشتريت الشهر ده',
     monthPaid: 'دفعت الشهر ده',
+    home: 'الرئيسية',
     all: 'الكل',
     sales: 'المشتريات',
     payments: 'المدفوعات',
@@ -282,7 +283,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   let client = null;
   // st: { c: {id, name, balance}, stopped, month, data_at, phone, moves, more, busy, error, filter, open:Set, pay, pdf }
-  const st = { c: null, stopped: false, month: null, data_at: null, phone: null, moves: [], more: false, busy: false, error: '', filter: 'all', open: new Set(), pay: 'account', pdf: '', cartTotal: null };
+  const st = { c: null, stopped: false, month: null, data_at: null, phone: null, moves: [], more: false, busy: false, error: '', tab: 'home', open: new Set(), pay: 'account', pdf: '', cartTotal: null };
   const PAY = () => root.AskerStorePay || null;
   // how this order is paid: a customer with his link: account / cash / a transfer; a visitor: cash or a transfer. A transfer that is
   // not set up (the owner removed the number) falls back to cash.
@@ -452,22 +453,32 @@
       installHtml +
       (pharmacyPhone ? '' : `<p class="center"><button type="button" class="linklike ac-notmine" data-acct-forget>${esc(TEXTS.notMine)}</button></p>`);
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
-    const chip = (f, label) => `<button type="button" class="chip${st.filter === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
-    html += `<div class="ac-chips" role="group">${chip('all', TEXTS.all)}${chip('sales', TEXTS.sales)}${chip('payments', TEXTS.payments)}</div>`;
-    const shown = movesFor(st.moves, st.filter);
-    let body = '', lastDay = '';
-    for (const m of shown) {
-      const t = parseAt(m.at), k = t ? dayKey(t) : '';
-      if (k !== lastDay) { body += `<h3 class="ac-day">${esc(dayLabel(t, now))}</h3>`; lastDay = k; }
-      body += moveHtml(m);
+    // the account is an APP now (owner 2026-11-17: «تبقى صفحة قصيرة، وكل صفحة من جوه طولها على قد اللي ياخدها … زي ابلكيشن بالفعل مش رابط وخلاص»): four tabs pinned at the top, «الرئيسية»
+    // (the balance and the buttons: short) and a page of its own for «الكل» / «المشتريات» / «المدفوعات» that opens from its top, however long his history is
+    const tab = (f, label) => `<button type="button" role="tab" aria-selected="${st.tab === f}" class="ac-tab${st.tab === f ? ' on' : ''}" data-acct-filter="${f}">${esc(label)}</button>`;
+    const tabs = `<div class="ac-tabs" role="tablist">${tab('home', TEXTS.home)}${tab('all', TEXTS.all)}${tab('sales', TEXTS.sales)}${tab('payments', TEXTS.payments)}</div>`;
+    if (st.tab !== 'home') {
+      let list = `<div class="ac-mini ${b.cls}"><b>${esc(b.text)}</b>${upd ? `<small>${esc(upd)}</small>` : ''}</div>`;
+      const shown = movesFor(st.moves, st.tab);
+      let body = '', lastDay = '';
+      for (const m of shown) {
+        const t = parseAt(m.at), k = t ? dayKey(t) : '';
+        if (k !== lastDay) { body += `<h3 class="ac-day">${esc(dayLabel(t, now))}</h3>`; lastDay = k; }
+        body += moveHtml(m);
+      }
+      if (!shown.length && !st.busy) body = `<p class="note">${esc(st.moves.length ? TEXTS.noneKind : TEXTS.none)}</p>`;
+      list += `<div class="ac-moves">${body}</div>`;
+      if (st.error) list += `<p class="note bad">${esc(st.error)}</p>`;
+      if (st.busy) list += `<p class="note">${esc(TEXTS.loading)}</p>`;
+      else if (st.more) list += `<button type="button" class="more" data-acct-older>${esc(TEXTS.older)}</button>`;
+      box.innerHTML = tabs + list;
+      return;
     }
-    if (!shown.length && !st.busy) body = `<p class="note">${esc(st.moves.length ? TEXTS.noneKind : TEXTS.none)}</p>`;
-    html += `<div class="ac-moves">${body}</div>`;
     if (st.error) html += `<p class="note bad">${esc(st.error)}</p>`;
-    if (st.busy) html += `<p class="note">${esc(TEXTS.loading)}</p>`;
-    else if (st.more) html += `<button type="button" class="more" data-acct-older>${esc(TEXTS.older)}</button>`;
-    box.innerHTML = html;
+    box.innerHTML = tabs + html;
   }
+  // a tab opens its page from the top (a long list is never left scrolled halfway)
+  const toTop = () => { try { root.scrollTo(0, 0); } catch (e) { /* no scrolling */ } };
   // the checkout's «الدفع»: on account or cash; cash only when stopped
   // 2026-11-17: also for a visitor with no link when the pharmacy set a transfer number (cash, or Vodafone Cash / InstaPay); the card of the chosen
   // transfer (number, copy, open, the WhatsApp proof) opens under the options with the cart's total
@@ -555,7 +566,7 @@
     }
     if (e.target.closest('[data-acct-guide-close]') || (e.target.id === 'acctGuide')) { guide = false; draw(); return; }
     const f = e.target.closest('[data-acct-filter]');
-    if (f) { st.filter = f.dataset.acctFilter; draw(); return; }
+    if (f) { st.tab = f.dataset.acctFilter; draw(); toTop(); return; }
     const it = e.target.closest('[data-acct-items]');
     if (it) {
       const mv = st.moves.find((m) => String(m.id) === it.dataset.acctItems), id = (mv || {}).id;
