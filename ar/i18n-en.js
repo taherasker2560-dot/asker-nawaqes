@@ -3,7 +3,6 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
- "اللهم صل على النبي ﷺ": "Peace and blessings be upon the Prophet ﷺ",
  "أصناف جديدة في أمر الشراء": "New products in the purchase order",
  "أصناف جديدة في أمر الشراء ({0})": "New products in the purchase order ({0})",
  "طلب الجهاز × طلب البوت": "Machine order × bot order",
