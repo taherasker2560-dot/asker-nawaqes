@@ -180,3 +180,49 @@ html.night .thumb.card, html.night .sh-pic.card { background: var(--card); }
 .data-age { margin: 6px 16px; font-size: 11px; line-height: 1.6; color: var(--muted); }
 .ft .data-age { margin: 4px 0 0; color: #e6f1ed; opacity: .85; }
 .sheet-card .data-age { margin: 4px 0 8px; }
+
+/* ================= the polish pass (owner 2026-11-17: «فيه اخطاء فى التقسيمات … حسّن التصاميم بشكل بسيط وخلاب») ================= */
+
+/* fields: a warm neutral, not the old blue tint */
+html:not(.night) { --field: #f6f4ef; }
+.panel input, .panel textarea, .panel select, .rx-pick { background-color: var(--field); }
+textarea { resize: none; }
+
+/* the header and the footer reach the screen's edges also on a tablet or a computer, where the page itself is centered (max 1200 px) */
+html body .top, html body .bar { box-shadow: 0 0 0 100vmax var(--accent); clip-path: inset(0 -100vmax); }
+.ft { --ft-bg: var(--green); background: var(--ft-bg); box-shadow: 0 0 0 100vmax var(--ft-bg); clip-path: inset(0 -100vmax); }
+html.night .ft { --ft-bg: var(--dark-deep, #03292c); background: var(--ft-bg); }
+
+/* the search stays on a solid bar while the page scrolls under it */
+.top-search { margin: 0; max-width: none; padding: 10px max(16px, calc((100% - 760px) / 2)); background: var(--card); }
+
+/* the price line of an item to order: a note, not a headline */
+#shPrice.later, .sh-row .price.later { font-size: 14px; font-weight: 600; line-height: 1.6; color: var(--order); white-space: normal; text-align: start; }
+
+/* the minus and the plus keep their places in English too (− 1 +) */
+html[dir="ltr"] .stepper, html[dir="ltr"] .qty { flex-direction: row-reverse; }
+
+/* the bottom bar: one row of the same height; the cart shows its count on the icon and its total in place of the word */
+html body .tabbar a { position: relative; }
+.tabbar .cart-row { position: static; display: block; min-height: 0; }
+.tabbar .cart-n { position: absolute; top: 0; left: calc(50% + 4px); min-width: 17px; height: 17px; padding: 0 4px; margin: 0; font-size: 10.5px; line-height: 17px; background: var(--accent); color: #fff; box-shadow: 0 0 0 2px var(--card); }
+.tabbar a.has-items .tl { display: none; }
+.tabbar a.has-items .cart-tot { display: block; font-size: 11.5px; font-weight: 700; line-height: inherit; color: var(--accent-text, var(--accent)); }
+
+/* an item without a photo: the card carries the icon and the strength; its name is right next to it */
+html body .thumb.card .cd-nm, html body .sh-pic.card .cd-nm { display: none !important; }
+
+/* the customer's page: the header holds one line of the name, the balance starts clear of it */
+.acct-top .brand { flex: 1; min-width: 0; }
+.acct-top .brand > div { min-width: 0; }
+.acct-top .brand strong { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-top .brand span { font-size: 12px; line-height: 1.4; white-space: normal; }
+.top .acct-site { min-height: 36px; padding: 0 12px; font-size: 13px; }
+#acctBox > .ac-bal:first-child { margin-top: 16px; }
+
+/* English: the Arabic description keeps its own direction, with a note above it */
+.ds-lang { display: none; margin: 0 0 4px; font-size: 11px; color: var(--muted); }
+html[dir="ltr"] .ds-lang { display: block; }
+
+/* the sections: five departments and «كل الأصناف» = six tiles, so six columns on a wide screen (five left one alone on a second row) */
+@media (min-width: 760px) { .sections { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
