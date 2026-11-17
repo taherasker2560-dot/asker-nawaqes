@@ -39,7 +39,7 @@ class ControlReceiver : BroadcastReceiver() {
             }
             "com.askerpharmacy.adam.FEED" -> {
                 if (AdamService.running) context.startService(Intent(context, AdamService::class.java).setAction(AdamService.ACTION_FEED)
-                    .putExtra("file", intent.getStringExtra("file") ?: "test.wav"))
+                    .putExtra("file", intent.getStringExtra("file") ?: "test.wav").putExtra("diag", intent.getStringExtra("diag") ?: ""))
                 resultData = if (AdamService.running) "fed" else "adam is not running"
             }
             "com.askerpharmacy.adam.VP" -> {
