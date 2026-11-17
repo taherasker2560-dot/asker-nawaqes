@@ -470,7 +470,14 @@
     }));
     bagMsg = ''; poOk = ''; lastMoved = null;
     if (rows.length) {
-      const r = await db().from('ar_po_items').insert(rows).select('id');
+      let r = await db().from('ar_po_items').insert(rows).select('id');
+      // one open line per item (ar_po_items_one_open): the laptop's automatic order may have put some of the ticked items in after this page was read, and one clash fails the
+      // whole insert. Read the order again and add only the rest: an item that is already in the order is where he wanted it (owner 2026-11-17: «الأصناف ما بتروحش أمر الشرا»)
+      if (r.error && (r.error.code === '23505' || /duplicate key|ar_po_items_one_open/i.test(String(r.error.message || '')))) {
+        await loadPo();
+        const rest = rows.filter((x) => !po.some((p) => String(p.item_id) === String(x.item_id)));
+        r = rest.length ? await db().from('ar_po_items').insert(rest).select('id') : { error: null };
+      }
       if (r.error) bagMsg = 'أمر الشرا ما اتسجلش: ' + (r.error.message || r.error);
       else poOk = `✅ اتضاف ${rows.length} صنف لأمر الشرا`;
     }

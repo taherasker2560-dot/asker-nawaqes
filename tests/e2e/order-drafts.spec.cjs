@@ -17,7 +17,7 @@ const put=(page,o,saved=SAVED)=>page.evaluate(([o,saved])=>{window.__storage['or
 const msgOf=(page)=>page.inputValue('#odMsg');
 run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table})=>{
  await put(page,drafts());
- await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odChips [data-sup]');
  assert.ok(await page.isVisible('#draftsPanel'));assert.ok(!(await page.isVisible('#docsPanel')));assert.ok(!(await page.isVisible('#shortPanel')));
  assert.deepEqual(await page.$$eval('#odChips [data-sup]',b=>b.map(x=>x.textContent.trim())),['نيو سيتي · 2','AMG · 1','رضا عطية · 150'],'a supplier with no items has no chip');
@@ -97,7 +97,7 @@ run('orders tab: another supplier is priced with its own discounts',async({page}
  o.suppliers[0].items[0].offers={NEWCITY:off(30),AMG:off(25,{name_supplier:'ملح ٠.٩ AMG'}),REDA:off(35,{source:'buy',date:'2025-09-19',stale:true})};
  o.suppliers[0].items[1].offers={NEWCITY:off(21.2,{source:'buy',date:'2026-10-19',bonus:3})};
  await put(page,o);
- await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odChips [data-sup]');
  // at New City: 23×70 + 3×78.8 = 1,846. AMG: 23×75 + 3×100 (no known discount) = 2,025. Rida: 23×65 + 300 = 1,795. El-Fath: 2,600.
  const opts=()=>page.$$eval('#odSendTo option',x=>x.map(o=>o.textContent.trim()));
@@ -120,16 +120,16 @@ run('orders tab: another supplier is priced with its own discounts',async({page}
 });
 run('orders tab: a supplier with no saved number, no file yet, an old file, a broken file',async({page})=>{
  await page.evaluate(()=>{window.__opened=[]});
- await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));await waitStatus(page,/لسه مفيش طلبيات مقترحة/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')),'nothing to show');
  await put(page,drafts(new Date(Date.now()-3*864e5).toISOString()),[]);
- await page.click('[data-tab="drafts"]');await page.waitForSelector('#odChips [data-sup]');
+ await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));await page.waitForSelector('#odChips [data-sup]');
  assert.match(await text(page,'#odInfo'),/قديمة، اللاب لسه ما حدّثهاش/);assert.ok(await page.$eval('#odInfo',e=>e.classList.contains('bad')));
  assert.match(await text(page,'#odTo'),/مفيش رقم محفوظ للمورد ده، فالواتس هيتفتح من غير محادثة/);
  await page.click('#odCopy');await waitStatus(page,/الواتس اتفتح من غير محادثة/,'odStatus');
  assert.match(await page.evaluate(()=>window.__opened[0]),/^https:\/\/wa\.me\/\?text=/);
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({hello:1})});
- await page.click('[data-tab="drafts"]');await waitStatus(page,/ملف الطلبيات شكله مش مظبوط/,'odStatus');
+ await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));await waitStatus(page,/ملف الطلبيات شكله مش مظبوط/,'odStatus');
  assert.ok(!(await page.isVisible('#odBody')));
 });
 
@@ -138,7 +138,7 @@ run('orders tab: two doors, medicines and cosmetics (owner 2026-11-15 «ده ف�
  d.suppliers.push({id:'COS_DOCTOR',label:'الدكتور',count:1,items:[item(63625,'BABY DIAPERS L',16,{source:'buy',source_date:'2026-05-12',discount:19.4,name_supplier:null,list:null,buy:{discount:19.4,date:'2026-05-12',bonus:0},fallback:null})]});
  d.no_offer.push({item_id:63718,name_pf:'TISSUES 700',qty:17,kind:'cos'});
  await put(page,d);
- await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odDoors [data-door]');
  // medicines first: 2 + 1 + 150 items and one without an offer; cosmetics: one item and one without an offer
  assert.deepEqual(await page.$$eval('#odDoors [data-door]',b=>b.map(x=>[x.textContent.replace(/\s+/g,' ').trim(),x.classList.contains('secondary')])),[['💊 طلبيات الأدوية 154',false],['🧴 طلبيات المستحضرات 2',true]]);
@@ -151,7 +151,7 @@ run('orders tab: two doors, medicines and cosmetics (owner 2026-11-15 «ده ف�
  assert.match(await page.textContent('#odNo'),/TISSUES 700/);assert.doesNotMatch(await page.textContent('#odNo'),/LONELY/);
  // an empty door says so
  const only=drafts();await put(page,only);
- await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odDoors [data-door]');
  await page.click('#odDoors [data-door="cos"]');
  assert.ok(await page.isVisible('#odDoorEmpty'));assert.match(await text(page,'#odDoorEmpty'),/مفيش أصناف مستحضرات في أمر الشرا دلوقتي/);

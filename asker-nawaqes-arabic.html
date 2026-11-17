@@ -15,7 +15,7 @@
     <title>بوت نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=orange-20261115a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=money-20261116a" />
+    <link rel="stylesheet" href="ar/look.css?v=fold-20261117a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the two above (ar/capsule.css, ar/motion.js); remove this line for the previous look -->
     <link rel="stylesheet" href="ar/capsule.css?v=view-20261117a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
@@ -536,53 +536,6 @@
             وتبعت لمحادثة المورد بإيدك: مفيش حاجة بتتبعت لوحدها. الخصم من آخر شرا فعلي أو آخر قايمة نزلتها (الأحدث).
           </p>
           <p id="odInfo" class="status"></p>
-          <!-- «فواتير المندوبين» (owner 2026-11-16): the invoice picture a warehouse's rep sends on WhatsApp, read and checked by the laptop; ar/rep-invoices.js, file repinv/invoices.json -->
-          <div id="repBox" class="repbox hidden">
-            <h3>📄 فواتير المندوبين <b id="repCount"></b></h3>
-            <p id="repOld" class="status bad hidden">الملف قديم: اللاب لسه ما حدّثهوش.</p>
-            <div id="repList"></div>
-          </div>
-          <!-- «محتاج قرارك قبل أمر الشرا» (owner 2026-11-16): the new / «بالطلب» items the laptop did not put in the purchase order by itself; ar/po-statement.js, file orders/statement.json -->
-          <div id="stBox" class="stmt hidden">
-            <h3>محتاج قرارك قبل أمر الشرا <b id="stCount"></b></h3>
-            <p class="hint">أصناف ما دخلتش أمر الشرا لوحدها: جديدة، أو «بالطلب» (بتتباع وما بتتشاريش تاني يوم). دوس «ضيفه» لو عايزه، أو «مش دلوقتي».</p>
-            <p id="stMsg" class="status bad hidden"></p>
-            <div id="stList"></div>
-          </div>
-          <!-- «طلب الجهاز × طلب البوت» (owner 2026-11-16): the night's order on PharmaFly against the bot's purchase order; ar/order-compare.js, file orders/compare2.json -->
-          <div id="cmpBox" class="cmp hidden">
-            <h3>طلب الجهاز × طلب البوت <small id="cmpNight"></small></h3>
-            <p id="cmpOld" class="status bad hidden">الملف قديم: اللاب لسه ما حدّثهوش.</p>
-            <p id="cmpEmpty" class="hint">لسه مفيش مقارنة: أول مقارنة بتظهر بعد طلب الليلة على الجهاز بدقايق.</p>
-            <div id="cmpMain" class="hidden">
-              <p id="cmpSub" class="hint"></p>
-              <div id="cmpThree" class="cmp-three"></div>
-              <p id="cmpBig" class="cmp-big"></p>
-              <p id="cmpPrec" class="hint"></p>
-              <p id="cmpFinal" class="hint"></p>
-              <p id="cmpQty" class="hint hidden"></p>
-              <p id="cmpQtyNote" class="hint hidden">الكمية اللي وصلت ممكن تقل لو المخزن ما كانش عنده كلها، لأن فارمافلاي مش بيحفظ الكمية اللي طلبتها.</p>
-              <div id="cmpMoney" class="cmp-money hidden">
-                <p id="cmpCap" class="cmp-cap hidden"></p>
-                <p id="cmpBuy" class="hint"></p>
-                <p id="cmpSplit" class="hint"></p>
-                <p id="cmpMisc" class="hint hidden"></p>
-                <p class="hint">الحساب بسعر التكلفة في أول 24 ساعة بعد أمر البوت، والسقف نسبة من مبيعات اليوم للأصناف المعروفة. المستحضرات بتتشرى على دفعات، فالأسبوع أدق من الليلة.</p>
-              </div>
-              <div id="cmpBars" class="cmp-bars" role="group" aria-label="آخر 7 ليالي"></div>
-              <p id="cmpWeek" class="cmp-week"></p>
-              <p id="cmpWeekMoney" class="cmp-week hidden"></p>
-              <p id="cmpOutside" class="hint hidden"></p>
-              <p id="cmpLate" class="hint hidden">الليلة دي اتحسبت متأخر، فأسباب «وصل ومش في أمر البوت» ممكن تبقى مش دقيقة.</p>
-              <div id="cmpGroups"></div>
-            </div>
-          </div>
-          <!-- the new products he approved («النواقص ← أصناف جديدة ← موافق»): in the purchase order, no supplier offer to compare -->
-          <div id="odNewBox" class="od-new hidden">
-            <h3 id="odNewTitle">أصناف جديدة في أمر الشراء</h3>
-            <p class="hint">مش في فارمافلاي لسه. اللاب بيدوّر عليها في قوايم المخازن بالاسم والسعر اللي كتبته، وبيقترح المخزن اللي خصمه أحسن. كل مخزن ليه رسالته: انسخها وابعتها بإيدك، ومفيش حاجة بتتبعت لوحدها. اللي مالقيناهوش في أي قايمة، ابعته للمورد اللي تختاره.</p>
-            <div id="odNewList"></div>
-          </div>
           <div id="odBody" class="hidden">
             <!-- two doors (owner 2026-11-15: «طلبات المستحضرات … طلبات الدواء … ده في باب وده في باب») -->
             <div id="odDoors" class="tabs seg sub" role="group" aria-label="نوع الطلبيات"></div>
@@ -626,6 +579,54 @@
             </details>
           </div>
           <p id="odStatus" class="status"></p>
+          <!-- the windows under the orders (owner 2026-11-17: «النوافذ الجديدة بسهم يفتحها ويقفلها … والوضع التلقائي مقفول»): each one folds with an arrow and starts closed; the count stays in its title -->
+          <!-- «محتاج قرارك قبل أمر الشرا» (owner 2026-11-16): the new / «بالطلب» items the laptop did not put in the purchase order by itself; ar/po-statement.js, file orders/statement.json -->
+          <details id="stBox" class="stmt od-fold hidden">
+            <summary><h3>محتاج قرارك قبل أمر الشرا <b id="stCount"></b></h3></summary>
+            <p class="hint">أصناف ما دخلتش أمر الشرا لوحدها: جديدة، أو «بالطلب» (بتتباع وما بتتشاريش تاني يوم). دوس «ضيفه» لو عايزه، أو «مش دلوقتي».</p>
+            <p id="stMsg" class="status bad hidden"></p>
+            <div id="stList"></div>
+          </details>
+          <!-- the new products he approved («النواقص ← أصناف جديدة ← موافق»): in the purchase order, no supplier offer to compare -->
+          <details id="odNewBox" class="od-new od-fold hidden">
+            <summary><h3 id="odNewTitle">أصناف جديدة في أمر الشراء</h3></summary>
+            <p class="hint">مش في فارمافلاي لسه. اللاب بيدوّر عليها في قوايم المخازن بالاسم والسعر اللي كتبته، وبيقترح المخزن اللي خصمه أحسن. كل مخزن ليه رسالته: انسخها وابعتها بإيدك، ومفيش حاجة بتتبعت لوحدها. اللي مالقيناهوش في أي قايمة، ابعته للمورد اللي تختاره.</p>
+            <div id="odNewList"></div>
+          </details>
+          <!-- «فواتير المندوبين» (owner 2026-11-16): the invoice picture a warehouse's rep sends on WhatsApp, read and checked by the laptop; ar/rep-invoices.js, file repinv/invoices.json -->
+          <details id="repBox" class="repbox od-fold hidden">
+            <summary><h3>📄 فواتير المندوبين <b id="repCount"></b></h3></summary>
+            <p id="repOld" class="status bad hidden">الملف قديم: اللاب لسه ما حدّثهوش.</p>
+            <div id="repList"></div>
+          </details>
+          <!-- «طلب الجهاز × طلب البوت» (owner 2026-11-16): the night's order on PharmaFly against the bot's purchase order; ar/order-compare.js, file orders/compare2.json -->
+          <details id="cmpBox" class="cmp od-fold hidden">
+            <summary><h3>طلب الجهاز × طلب البوت <small id="cmpNight"></small></h3></summary>
+            <p id="cmpOld" class="status bad hidden">الملف قديم: اللاب لسه ما حدّثهوش.</p>
+            <p id="cmpEmpty" class="hint">لسه مفيش مقارنة: أول مقارنة بتظهر بعد طلب الليلة على الجهاز بدقايق.</p>
+            <div id="cmpMain" class="hidden">
+              <p id="cmpSub" class="hint"></p>
+              <div id="cmpThree" class="cmp-three"></div>
+              <p id="cmpBig" class="cmp-big"></p>
+              <p id="cmpPrec" class="hint"></p>
+              <p id="cmpFinal" class="hint"></p>
+              <p id="cmpQty" class="hint hidden"></p>
+              <p id="cmpQtyNote" class="hint hidden">الكمية اللي وصلت ممكن تقل لو المخزن ما كانش عنده كلها، لأن فارمافلاي مش بيحفظ الكمية اللي طلبتها.</p>
+              <div id="cmpMoney" class="cmp-money hidden">
+                <p id="cmpCap" class="cmp-cap hidden"></p>
+                <p id="cmpBuy" class="hint"></p>
+                <p id="cmpSplit" class="hint"></p>
+                <p id="cmpMisc" class="hint hidden"></p>
+                <p class="hint">الحساب بسعر التكلفة في أول 24 ساعة بعد أمر البوت، والسقف نسبة من مبيعات اليوم للأصناف المعروفة. المستحضرات بتتشرى على دفعات، فالأسبوع أدق من الليلة.</p>
+              </div>
+              <div id="cmpBars" class="cmp-bars" role="group" aria-label="آخر 7 ليالي"></div>
+              <p id="cmpWeek" class="cmp-week"></p>
+              <p id="cmpWeekMoney" class="cmp-week hidden"></p>
+              <p id="cmpOutside" class="hint hidden"></p>
+              <p id="cmpLate" class="hint hidden">الليلة دي اتحسبت متأخر، فأسباب «وصل ومش في أمر البوت» ممكن تبقى مش دقيقة.</p>
+              <div id="cmpGroups"></div>
+            </div>
+          </details>
         </section>
 
         <!-- new parts, designed with the owner one question at a time before they get data -->
@@ -990,7 +991,7 @@
     <script src="ar/order-compare.js?v=money-20261116a"></script>
 <script src="ar/rep-invoices.js?v=rep-20261116a"></script>
 <script src="ar/returns.js?v=returns-20261116a"></script>
-    <script src="ar/po-statement.js?v=stmt-20261116a"></script>
+    <script src="ar/po-statement.js?v=stmt-20261117a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=brand-20261117a"></script>
     <script src="ar/store-settings.js?v=pay-20261117a"></script>
@@ -1003,7 +1004,7 @@
     <script src="ar/look.js?v=cash-20261115a"></script>
     <script src="ar/shortcuts.js?v=cash-20261115a"></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
-    <script src="ar/alerts.js?v=shortdated-20261115a"></script>
+    <script src="ar/alerts.js?v=po-20261117a"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>
     <script src="ar/statement-pdf.js?v=dark-20261116a"></script>
     <script src="ar/customers.js?v=view-20261117a"></script>

@@ -16,7 +16,7 @@ const FILE=(over={})=>({generated_at:new Date().toISOString(),invoices:[
   totals:{retail:100,previous:0,net:80,total:80,paid:0,balance:80},math:{lines_bad:[],sum_ok:true,chain_ok:true,balance_ok:true},orders_known:false,missing:[],account:null},
 ],...over});
 const put=(page,f)=>page.evaluate(f=>{window.__storage['repinv/invoices.json']=JSON.stringify(f)},f);
-const openOrders=async(page)=>{await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]')};
+const openOrders=async(page)=>{await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}))};
 run('Rep invoices: the home row, the card with its invoices, lines, arithmetic and account; a stale or missing file',async({page})=>{
  await put(page,FILE());
  // the home: one invoice of the last two days needs a look (the newest); the clean one and the 20-day-old one do not count

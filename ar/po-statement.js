@@ -43,7 +43,32 @@
   // the row that «مش دلوقتي» writes into ar_po_items: a cancelled line that says «no» (decision), which the laptop reads for 7 days; «رجّعه للبيان» rewrites it as 'undone'
   const noItem = (r, decision) => ({ have: r.have, sold30: r.sold30, min: r.min, need: r.need, last_buy: r.lastBuy || null, decision });
   const noRow = (r) => ({ item_id: r.id, item_name: r.name.slice(0, 200), bag: r.bag || 'pv', qty: r.qty, status: 'cancelled', item: noItem(r, 'no') });
-  const api = { PATH, OLD_HOURS, parseStatement, isOld, chips, poRow, noRow, noItem, numText };
+  // what ar_po_items already says about the items of a file (owner 2026-11-17: «بدوس الزرار … ومجرد ما بحدّث الصنف بيرجع تاني»): the laptop rewrites the file a minute or two
+  // after a tap and every 30 minutes, so a file read in between still lists what he already decided. Rule (the same one the laptop uses): an OPEN line that is his own (not the
+  // laptop's automatic one) = «added»; a cancelled line that says «no», made in the last 7 days = «skipped»; an «undone» or a plainly cancelled line decides nothing; «added» wins
+  // over «skipped», and the newest line of a kind wins. rows = [{id, item_id, status, item, created_at, updated_at}] → Map(item id → { kind, rid })
+  const NO_DAYS = 7;
+  function knownDecisions(rows, now = new Date()) {
+    const out = new Map();
+    const since = now.getTime() - NO_DAYS * 864e5;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!r || !(num(r.item_id) > 0)) continue;
+      const id = num(r.item_id), item = r.item && typeof r.item === 'object' ? r.item : {};
+      let kind = '';
+      if (r.status === 'open' && item.auto !== true) kind = 'added';
+      else if (r.status === 'cancelled' && item.decision === 'no') {
+        const t = new Date(r.created_at || r.updated_at).getTime();
+        if (Number.isFinite(t) && t >= since) kind = 'skipped';
+      }
+      if (!kind) continue;
+      const cur = out.get(id), rid = r.id == null ? null : r.id;
+      if (!cur || (kind === 'added' && cur.kind === 'skipped') || (kind === cur.kind && num(rid) > num(cur.rid))) out.set(id, { kind, rid });
+    }
+    return out;
+  }
+  // «ar_po_items_one_open»: one open line per item. The item is already in the order (the laptop put it in, or he did in another tap): that is not a failure
+  const isDuplicate = (e) => !!e && (e.code === '23505' || /duplicate key|ar_po_items_one_open/i.test(String(e.message || '')));
+  const api = { PATH, OLD_HOURS, NO_DAYS, parseStatement, isOld, chips, poRow, noRow, noItem, numText, knownDecisions, isDuplicate };
   root.AskerPoStatementLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -81,9 +106,24 @@
     } catch (e) {
       data = null;
     }
-    decided = new Map(); // a fresh file already knows what he decided (the lines and moves are in it as «not asked again»)
+    decided = new Map(); // a fresh file already knows what he decided (the lines and moves are in it as «not asked again»); an older one is checked against the table below
     say('');
+    if (data && data.items.length) await syncDecided();
     draw();
+  }
+  // the items of the file he already answered (see knownDecisions): they show as done, with their undo, instead of asking again
+  async function syncDecided() {
+    try {
+      const ids = data.items.map((r) => r.id);
+      const since = new Date(Date.now() - NO_DAYS * 864e5).toISOString();
+      const cols = 'id,item_id,status,item,created_at,updated_at';
+      const [a, b] = await Promise.all([
+        db().from('ar_po_items').select(cols).in('item_id', ids).eq('status', 'open'),
+        db().from('ar_po_items').select(cols).in('item_id', ids).eq('status', 'cancelled').gte('created_at', since),
+      ]);
+      const rows = [...((a && !a.error && a.data) || []), ...((b && !b.error && b.data) || [])];
+      for (const [id, d] of knownDecisions(rows)) decided.set(id, d);
+    } catch (e) { /* the table is not readable now: the file alone decides, as before */ }
   }
   async function add(id) {
     const r = data && data.items.find((x) => x.id === id);
@@ -94,7 +134,15 @@
       if (res.error) throw res.error;
       decided.set(id, { kind: 'added', rid: (res.data && res.data[0] && res.data[0].id) || null });
       say('');
-    } catch (e) { say('ما اتضافش لأمر الشرا: ' + ((e && e.message) || e)); }
+    } catch (e) {
+      if (isDuplicate(e)) {
+        // already an open line for it: the item IS in the order, so show it as added (and keep the line's id for «رجّعه»)
+        let rid = null;
+        try { const o = await db().from('ar_po_items').select('id').eq('item_id', id).eq('status', 'open').limit(1); rid = (o && !o.error && o.data && o.data[0] && o.data[0].id) || null; } catch (e2) { /* no id: the card still says added */ }
+        decided.set(id, { kind: 'added', rid });
+        say('');
+      } else say('ما اتضافش لأمر الشرا: ' + ((e && e.message) || e));
+    }
     busy = false; draw();
   }
   async function skip(id) {
