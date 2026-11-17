@@ -1,0 +1,86 @@
+/* The bot in the brand look (owner 2026-11-17: «اللي هتعمله هتطبقه على البوت … بساطة وبراندنج جامد»; same as store/brand.css).
+   A layer over app.css + look.css + capsule.css (loaded last): white page, thin lines, 2 px corners, no shadows or waves;
+   the accent (the calm orange by default, ar/settings.js) only on the main buttons, the page you are on and the counts;
+   the dark surfaces (the greeting, the net card…) become the soft green so their white text stays readable. */
+
+:root {
+  --green: #2f7d68;
+  --soft-bg: #f6f4ef;
+  --line: #e5e1da;
+  --muted: #5f5b56;
+  --ink: #1d1b19;
+  --sh-1: none;
+  --sh-2: none;
+}
+html:not(.night) {
+  --bg: #ffffff !important;
+  --card: #ffffff !important;
+  --tint: #ffffff !important;
+  --tint-2: #f6f4ef !important;
+  --dark: #2f7d68 !important;
+  --dark-2: #3a8a74 !important;
+  --dark-deep: #1f5e4d !important;
+  --dark-rgb: 47, 125, 104 !important;
+}
+html.night { --soft-bg: var(--tint-2, var(--card)); --green: #5fb59b; }
+body { background: var(--bg); }
+
+/* ---------- the blessing strip + the header ---------- */
+.bless { margin: 0; padding: 6px 12px; text-align: center; font-size: 11.5px; font-weight: 500; letter-spacing: 0.2px; color: var(--green); background: var(--card); border-bottom: 1px solid var(--line); }
+html body .appbar { background: var(--card); color: var(--ink); border-radius: 0; border-bottom: 1px solid var(--line); box-shadow: none; padding-top: 8px; padding-bottom: 8px; }
+.appbar::after { display: none !important; }
+.appbar .mark { box-shadow: none; border: 1px solid var(--line); }
+.appbar h1 { color: var(--ink); font-weight: 600; }
+.appbar p, .appbar .brand p { color: var(--muted); }
+.appbar .icon-btn { background: transparent; color: var(--ink); border: 0; box-shadow: none; }
+.dataage { box-shadow: none; }
+
+/* ---------- cards, buttons, search ---------- */
+html body .card { border: 1px solid var(--line); border-radius: 2px; box-shadow: none; background: var(--card); }
+html body button, html body button:not([class]), html body #loginBtn, html body .pgroups button, html body .chips .chip { border-radius: 2px; box-shadow: none; }
+html body button.secondary { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+html body .chips .chip { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+html body .chips .chip.on, html body .chip.on { background: var(--accent-soft, var(--rose)); color: var(--accent-text, var(--crimson)); border: 1px solid var(--crimson); font-weight: 700; }
+.topsearch .search input[type='search'], .home .search.home-q input[type='search'] { border: 1px solid #8a8680; border-radius: 4px; box-shadow: none; background: var(--card); }
+input[type='text'], input[type='search'], input[type='number'], input[type='tel'], input[type='password'], input[type='email'], select, textarea { border-radius: 2px; }
+
+/* ---------- the home: the greeting in the soft green, the sections as white tiles ---------- */
+html body .hero { border-radius: 2px; background: var(--green); box-shadow: none; }
+.hero::before, .hero::after { display: none !important; }
+html body .card.home .qa button { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 2px; box-shadow: none; font-weight: 600; }
+.card.home .qa button svg { color: var(--green); stroke: var(--green); }
+html body button.stat, html body .stat { border-radius: 2px; box-shadow: none; }
+
+/* ---------- the bottom bar: flat and docked ---------- */
+html body .bottomnav { inset-inline: 0; bottom: 0; max-width: none; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--card); box-shadow: none; }
+html body .bottomnav::before { display: none; }
+html body .bottomnav button, html body .bottomnav button.secondary { background: none; border: 0; border-radius: 0; color: var(--muted); font-weight: 500; }
+html body .bottomnav button:not(.secondary) { color: var(--accent-text, var(--crimson)); font-weight: 700; background: none; }
+html body .bottomnav button svg { padding: 0; background: none; box-shadow: none; color: inherit; stroke: currentColor; }
+html.night .bottomnav { background: var(--dark-deep); }
+
+/* ---------- the dark surfaces are the soft green now ---------- */
+.cu-net, .su-dark { border-radius: 2px; box-shadow: none; }
+html.night .cu-net, html.night .su-dark { background: var(--dark); }
+
+/* the notes box and the search: flat, thin lines */
+.notes { border: 1px solid var(--line); border-radius: 2px; box-shadow: none; background: var(--card); }
+html body .topsearch .search input, html body .search input[type='search'], html body input[type='search'] { border: 1px solid #8a8680; border-radius: 4px; box-shadow: none; background: var(--card); }
+.notes input, .notes textarea { border-radius: 2px; }
+html:not(.cap-ind) body .bottomnav button:not(.secondary), html body .bottomnav button:not(.secondary):active { background: none; box-shadow: none; }
+
+/* the greeting: the soft green by day; at night the dark surface (white text reads) */
+html body .card .hero, html body .hero { border-radius: 2px !important; }
+html.night body .hero { background: var(--dark); }
+
+/* one corner for everything: square-ish (the old capsules are gone) */
+html body button, html body #dcPickLabel, html body label.btn, html body .icon-btn, html body a.btn { border-radius: 2px !important; }
+html body input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), html body select, html body textarea { border-radius: 2px !important; }
+html body input[type='search'] { border-radius: 4px !important; }
+
+/* the main buttons of the item editor and the like: the accent, never black */
+.im-edit-btn { background: var(--crimson); color: #fff; }
+
+/* the header a little slimmer; the sale screen keeps its bill high on the page (owner 2026-11-13), so the strip rests there */
+.appbar .mark { width: 40px; height: 40px; }
+body.ts-page .bless { display: none; }

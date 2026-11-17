@@ -3,6 +3,7 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
+ "اللهم صل على النبي ﷺ": "Peace and blessings be upon the Prophet ﷺ",
  "أصناف جديدة في أمر الشراء": "New products in the purchase order",
  "أصناف جديدة في أمر الشراء ({0})": "New products in the purchase order ({0})",
  "طلب الجهاز × طلب البوت": "Machine order × bot order",
@@ -1243,6 +1244,7 @@ window.AskerEN = {
   "ليموني غامق": "dark lime",
   "دهبي": "gold",
   "برتقالي": "orange",
+  "برتقالي هادي": "Calm orange",
   "برتقالي فاقع": "bright orange",
   "نحاسي": "copper",
   "بني": "brown",
@@ -1283,6 +1285,8 @@ window.AskerEN = {
   "ومعاه روشتة:": "With a prescription:",
   "طلب بالروشتة: اقراها واكتب الأسعار في رسالة الواتساب": "Prescription order: read it and write the prices in the WhatsApp message",
   "والروشتة": "and the prescription",
+  "من غير الروشتة": "without the prescription",
+  "{0} صنف بالطلب لسه من غير سعر": "{0} items priced on request have no price yet",
   "، و{0} صنف بالطلب لسه من غير سعر": ", and {0} items priced on request have no price yet",
   "واتساب": "WhatsApp",
   "مفتوحة ({0})": "Open ({0})",

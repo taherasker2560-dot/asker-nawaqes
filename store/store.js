@@ -467,7 +467,7 @@
   // كارت صغير بالصورة (صف «الأكثر طلبًا» و«شفته قريب» و«ممكن يعجبك كمان»)
   function pcard(it) {
     const src = picSrc(it), line = cart.find((x) => x.id === it.id);
-    const ctl = !canAdd(it) ? '' : line ? stepper(it, line) : `<button type="button" class="plus" data-add="${it.id}" aria-label="ضيف ${esc(label(it))} للسلة">+</button>`;
+    const ctl = !canAdd(it) ? '' : line ? stepper(it, line) : `<button type="button" class="plus" data-add="${it.id}" aria-label="ضيف ${esc(label(it))} للسلة">ضيف للسلة</button>`;
     const price = onOrder(it) ? 'بالطلب' : canAdd(it) ? money(it.price) + ' ج' : (STATUS[it.status] || STATUS.on_order).label;
     return `<article class="pcard">
       <div class="pc-pic" data-open="${it.id}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<div class="thumb card c-${cardInfo(it).sec}" aria-hidden="true">${cardHtml(it)}</div>`}</div>

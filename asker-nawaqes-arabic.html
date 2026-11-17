@@ -6,7 +6,7 @@
          color and follows it (Chrome 135+, owner 2026-11-12: «الشريط … شوفلك حل تخليه يتغير مع الالوان») -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="manifest" href="manifest-arabic.json" />
-    <meta name="theme-color" content="#cf4014" />
+    <meta name="theme-color" content="#ffffff" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -18,12 +18,15 @@
     <link rel="stylesheet" href="ar/look.css?v=money-20261116a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the two above (ar/capsule.css, ar/motion.js); remove this line for the previous look -->
     <link rel="stylesheet" href="ar/capsule.css?v=view-20261117a" />
+    <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
+    <link rel="stylesheet" href="ar/brand.css?v=brand-20261117a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=view-20261117a"></script>
+    <script src="ar/i18n-en.js?v=brand-20261117a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
   </head>
   <body>
+    <p class="bless">اللهم صل على النبي ﷺ</p>
     <header class="appbar">
       <img class="mark" src="icons/arabic-192.png?v=logo2" alt="" width="46" height="46" />
       <div class="brand">
@@ -62,14 +65,7 @@
           <input id="accentCustom" type="color" value="#0a4aa6" />
         </div>
         <label class="check night-row"><input id="nightMode" type="checkbox" /> الوضع الليلي (البوت كله غامق، مع أي لون)</label>
-        <!-- 2026-11-16: the dark surfaces of the new look (the bottom bar, the greeting): four sets that suit the orange, ar/settings.js -->
-        <h3>اللون الغامق</h3>
-        <div id="darkPick" class="accents" role="radiogroup" aria-label="اللون الغامق"></div>
-        <div id="darkCustomRow" class="accent-custom">
-          <label for="darkCustom">لون غامق من اختيارك</label>
-          <input id="darkCustom" type="color" value="#066f74" />
-        </div>
-        <p class="hint">بيغيّر لون الشريط اللي تحت وكارت الترحيب.</p>
+        
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
         <!-- notifications (owner 2026-11-12: «لما يكون قسم محتاج شغل يظهر إشعار ونخصصله صوت»), ar/notify.js -->
         <h3>الإشعارات</h3>
@@ -981,7 +977,7 @@
       </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="ar/settings.js?v=dark-20261116a"></script>
+    <script src="ar/settings.js?v=brand-20261117a"></script>
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
     <script src="ar/cache.js?v=wait-20261113a"></script>
@@ -996,7 +992,7 @@
 <script src="ar/returns.js?v=returns-20261116a"></script>
     <script src="ar/po-statement.js?v=stmt-20261116a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
-    <script src="ar/store-orders.js?v=link-20261113a"></script>
+    <script src="ar/store-orders.js?v=brand-20261117a"></script>
     <script src="ar/store-settings.js?v=pay-20261117a"></script>
     <script src="ar/site-users.js?v=users-20261117a"></script>
     <script src="ar/store-link.js?v=screens-20261116a"></script>
