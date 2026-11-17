@@ -9,6 +9,8 @@ window.AskerEN = {
   "صيدلية عسكر، تأسست سنة 1981": "Asker Pharmacy, founded in 1981",
   "اللهم صل على النبي ﷺ": "Peace and blessings be upon the Prophet ﷺ",
   "صحتك أولوية": "Your health is our priority",
+  "الأصناف المتاحة محدّثة آخر مرة": "Availability was last updated",
+  "، فالصنف ممكن يكون خلص بعد كده.": ", so an item may have sold out since.",
   "صيدلية عسكر من سنة 1981. اطلب اللي محتاجه واستلمه جاهز من الصيدلية.": "Asker Pharmacy, since 1981. Order what you need and pick it up ready at the pharmacy.",
   "ابدأ الطلب": "Start your order",
   "صوّرها وابعتها": "Take a photo and send it",

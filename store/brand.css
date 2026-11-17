@@ -8,13 +8,13 @@
    - square-ish corners (2 px), thin lines, no shadows, no waves; the product photos carry the colors */
 
 :root {
-  --green: #2f7d68;
-  --green-soft: #e7f1ed;
+  --green: var(--dark, #066f74);
+  --green-soft: color-mix(in srgb, var(--dark, #066f74) 10%, #fff);
   --soft-bg: #f6f4ef;
   --line: #e5e1da;
   --muted: #5f5b56;
   --ink: #1d1b19;
-  --ok: #2f7d68;
+  --ok: var(--dark, #066f74);
   --ok-bg: #e7f1ed;
   --sh-1: none;
   --sh-2: none;
@@ -25,20 +25,20 @@ body { background: var(--bg); padding-bottom: calc(78px + var(--safe-b, 0px)); }
 
 /* ---------- the blessing strip + the header ---------- */
 .bless { margin: 0; padding: 6px 12px; text-align: center; font-size: 11.5px; font-weight: 500; letter-spacing: 0.2px; color: var(--green); background: var(--card); border-bottom: 1px solid var(--line); }
-html body .top, html body .bar { background: var(--card) !important; color: var(--ink); border-radius: 0; border-bottom: 1px solid var(--line); box-shadow: none; }
+html body .top, html body .bar { background: var(--accent) !important; color: #fff; border-radius: 0; border-bottom: 0; box-shadow: none; }
 html body .top { padding: 10px 16px; }
 html body .bar { padding: 10px 16px; }
 .top::after, .bar::after { display: none !important; }
-.brand img { width: 38px; height: 38px; border-radius: 50%; box-shadow: none; border: 1px solid var(--line); }
-.brand strong { font-size: 17px; font-weight: 600; color: var(--ink); }
-.brand span { font-size: 9px; letter-spacing: 2px; color: var(--muted); font-weight: 500; }
-.top .cart-btn, .top .cart-btn.bot-btn { background: transparent; color: var(--ink); border: 0; box-shadow: none; }
-.top .cart-btn svg { stroke: var(--ink); }
-.cart-n { background: var(--accent); color: #fff; box-shadow: 0 0 0 2px var(--card); }
-.bar h1, .bar .back { color: var(--ink); }
+.brand img { width: 38px; height: 38px; border-radius: 50%; box-shadow: none; border: 2px solid rgba(255,255,255,.85); background: #fff; }
+.brand strong { font-size: 17px; font-weight: 600; color: #fff; }
+.brand span { font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,.85); font-weight: 500; }
+.top .cart-btn, .top .cart-btn.bot-btn { background: transparent; color: #fff; border: 0; box-shadow: none; }
+.top .cart-btn svg { stroke: #fff; }
+.cart-n { background: #fff; color: var(--accent); box-shadow: none; }
+.bar h1, .bar .back { color: #fff; }
 .bar .back { background: transparent; }
-.bar .back svg { stroke: var(--ink); }
-.top .acct-site { background: var(--soft-bg); color: var(--ink); border: 0; }
+.bar .back svg { stroke: #fff; }
+.top .acct-site { background: rgba(255,255,255,.18); color: #fff; border: 0; }
 .top-search { margin: 12px 16px 0; padding: 0; }
 .top-search input, .search-form input { border: 1px solid var(--line); border-radius: 999px; box-shadow: none; background: var(--card); color: var(--ink); }
 .search-form input { background: var(--card); }
@@ -160,7 +160,7 @@ html body .ac-bal { background: var(--soft-bg) !important; color: var(--ink) !im
 .wa-tile[hidden] { display: none; }
 .wa-tile .tile { background: var(--green-soft); }
 
-html.night .ft { background: #1f5e4d; }
+html.night .ft { background: var(--dark-deep, #03292c); }
 html.night .ac-bal .hint-sm, html.night .ac-two div { color: var(--muted); }
 
 /* no black buttons: the owner's editor and the chips use the accent */
@@ -175,3 +175,8 @@ html body .thumb.card::before, html body .thumb.card::after, html body .sh-pic.c
 .cd-st { color: var(--green); background: var(--green-soft); border: 0; }
 .cd-lg { color: var(--muted); opacity: 1; }
 html.night .thumb.card, html.night .sh-pic.card { background: var(--card); }
+
+/* the data time: a small gray line (owner 2026-11-17), so the customer knows an item may have run out since */
+.data-age { margin: 6px 16px; font-size: 11px; line-height: 1.6; color: var(--muted); }
+.ft .data-age { margin: 4px 0 0; color: #e6f1ed; opacity: .85; }
+.sheet-card .data-age { margin: 4px 0 8px; }

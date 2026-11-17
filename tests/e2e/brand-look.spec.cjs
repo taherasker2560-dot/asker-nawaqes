@@ -30,7 +30,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
    accent:cs(document.documentElement).getPropertyValue('--accent').trim(),orderBg:cs(order).backgroundColor,orderRadius:cs(order).borderTopLeftRadius,payBg:pay?cs(pay).backgroundColor:'',meta:document.querySelector('meta[name="theme-color"]').content}});
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,'اللهم صل على النبي ﷺ');
- assert.equal(look.topBg,'rgb(255, 255, 255)','a white header');
+ assert.equal(look.topBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.topRadius,'0px');
  assert.equal(look.wave,'none','no wave');
  assert.equal(look.balBg,'rgb(246, 244, 239)','a quiet balance card (no dark surface)');
@@ -42,8 +42,8 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
  assert.equal(look.accent,'#c0522a','the calm orange by default (not the vivid one)');
  assert.ok(contrast(look.orderBg,'rgb(255, 255, 255)')>=4.5,'white text reads on the main button: '+look.orderBg);
  assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
- if(look.payBg){assert.equal(look.payBg,'rgb(47, 125, 104)','the soft green');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on the green');}
- assert.equal(look.meta,'#ffffff','the phone\'s top bar is white');
+ if(look.payBg){assert.equal(look.payBg,'rgb(6, 111, 116)','the green');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on the green');}
+ assert.equal(look.meta,'#c0522a','the phone\'s top bar is the orange');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours
  await page.click('.tabbar a[data-go="home"]');
  await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
@@ -52,7 +52,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
    secs:document.querySelectorAll('#sections .sec').length,ft:cs(ft).backgroundColor,hours:ft.textContent.replace(/\s+/g,' '),promo:!!document.querySelector('.promo')}});
  assert.equal(home.hero,'rgb(246, 244, 239)');assert.equal(home.dir,'row');assert.equal(home.radius,'2px');assert.ok(home.badge,'the round logo with 1981');
  assert.equal(home.tiles,2);assert.equal(home.perks,3);assert.equal(home.secs,6);assert.equal(home.promo,false);
- assert.equal(home.ft,'rgb(47, 125, 104)','the soft green closes the page');
+ assert.equal(home.ft,'rgb(6, 111, 116)','the green closes the page');
  assert.match(home.hours,/كل يوم 9 ص – 12 بالليل/);assert.match(home.hours,/الجمعة 3 – 11 بالليل/);assert.match(home.hours,/اللهم صل على النبي ﷺ/);
 },{home:true});
 run('Brand look: night — the balance card, the bar and the footer stay readable',async({page,base})=>{

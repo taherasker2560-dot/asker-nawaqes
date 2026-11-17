@@ -36,7 +36,7 @@
     el.classList.toggle('night', c.night);
     el.dataset.accent = c.id;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff'); // the header is white now (store/brand.css)
+    if (meta) meta.setAttribute('content', t.main); // the header is the accent now (store/brand.css)
     return c;
   }
   // the owner's default (from ar_store_settings, read by store.js); kept on the phone so the next visit paints right away

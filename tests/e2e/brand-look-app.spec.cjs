@@ -17,9 +17,9 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
    qaBg:cs(qa).backgroundColor,qaRadius:cs(qa).borderTopLeftRadius,qaColor:cs(qa).color,card:cs(document.querySelector('.card')).borderTopLeftRadius,accent:cs(document.documentElement).getPropertyValue('--crimson').trim(),meta:document.querySelector('meta[name="theme-color"]').content}});
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,'اللهم صل على النبي ﷺ');
- assert.equal(look.barBg,'rgb(255, 255, 255)','a white header');
+ assert.equal(look.barBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
- assert.equal(look.hero,'rgb(47, 125, 104)','the greeting in the soft green');
+ assert.equal(look.hero,'rgb(6, 111, 116)','the greeting in the soft green');
  assert.equal(look.heroRadius,'2px');
  assert.ok(contrast(look.h2,look.hero)>=4.5,'the greeting reads');
  assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);
@@ -30,7 +30,7 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
  assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'999px','and they stay oval (owner 2026-11-17)');
  assert.equal(look.card,'2px');
  assert.equal(look.accent,'#c0522a','the calm orange by default');
- assert.equal(look.meta,'#ffffff');
+ assert.equal(look.meta,'#c0522a');
  assert.match(await text(page,'.hero h2'),/صيدلية عسكر/);
  // the bar follows the section you open
  await page.click('[data-group="accounts"]');
