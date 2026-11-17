@@ -17,13 +17,13 @@
     <link rel="stylesheet" href="store/look.css?v=orange-20261115a" />
     <link rel="stylesheet" href="store/polish.css?v=brand-20261117a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the three above (store/capsule.css, store/motion.js) -->
-    <link rel="stylesheet" href="store/capsule.css?v=users-20261117a" />
+    <link rel="stylesheet" href="store/capsule.css?v=scan-20261117a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (store/brand.css), a layer over all of the above -->
     <link rel="stylesheet" href="store/brand.css?v=brand-20261117a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=brand-20261117a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=brand-20261117a"></script>
+    <script src="store/i18n-en-store.js?v=brand-20261117b"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=brand-20261117a"></script>
   </head>
@@ -98,6 +98,12 @@
         <span class="hc-text"><strong>اطلب طلبك اللي فات تاني</strong><span id="againText"></span></span>
         <button type="button" class="hc-go" id="againBtn">اطلبه</button>
       </div>
+      <!-- كرّر دواك بالباركود (store/scan.js): لأي حد، عميل أو زائر -->
+      <a href="#scan" class="home-card scan-card" id="scanCard">
+        <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" /><path d="M7 12h10M7 9v6M10 9v6M13.5 9v6M17 9v6" /></svg></span>
+        <span class="hc-text"><strong>كرّر دواك بالباركود</strong><span>عدّي باركود الصيدلية الملزوق على الصنف، أو اكتب الكود أو الاسم</span></span>
+        <span class="hc-go">افتح</span>
+      </a>
       <div id="installBox" class="install" hidden>
         <img src="icons/arabic-96.png?v=logo2" alt="" width="44" height="44" loading="lazy" />
         <div><strong>نزّل الصيدلية على موبايلك</strong><span>تفتحها من الشاشة الرئيسية زي أي تطبيق</span><span id="installNote" class="install-note" hidden></span></div>
@@ -169,6 +175,7 @@
         </a>
         <h1>السلة</h1>
       </header>
+      <a href="#scan" class="scan-link" id="cartScanLink">📷 ضيف أصناف بالباركود</a>
       <div id="cartItems" class="list"></div>
       <section class="panel rx-panel">
         <h2>روشتة (اختياري)</h2>
@@ -205,6 +212,39 @@
           </div>
         </div>
       </form>
+    </div>
+
+    <!-- كرّر دواك بالباركود (store/scan.js): باركود الصيدلية بالكاميرا، أو رقم الكود، أو الاسم -->
+    <div data-view="scan" hidden>
+      <header class="bar">
+        <a href="#" class="back" aria-label="رجوع">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+        </a>
+        <h1>كرّر دواك بالباركود</h1>
+      </header>
+      <p class="scan-intro">لو عايز تكرر أصناف: عدّي بس باركود الصيدلية الملزوق على الصنف، وهو ينزل لك في الفاتورة.</p>
+      <div class="scan-modes" role="group">
+        <button type="button" data-scan-mode="cam">📷 باركود</button>
+        <button type="button" data-scan-mode="code">🔢 رقم الكود</button>
+        <button type="button" data-scan-mode="name">🔎 الاسم</button>
+      </div>
+      <div class="scan-cam" id="scanCam" hidden>
+        <video id="scanVideo" playsinline muted></video>
+        <i class="scan-frame" aria-hidden="true"></i>
+        <span class="scan-hint" id="scanHint"></span>
+        <button type="button" class="scan-switch" id="scanSwitch" hidden>🔄 كاميرا تانية</button>
+      </div>
+      <form class="scan-code" id="scanCodeForm" hidden novalidate>
+        <input id="scanCode" type="text" inputmode="numeric" dir="ltr" autocomplete="off" maxlength="12" placeholder="الرقم اللي فوق الباركود (6 أرقام)" aria-label="رقم الكود" />
+        <button type="submit">ضيف</button>
+      </form>
+      <div class="scan-name" id="scanNameBox" hidden>
+        <input id="scanName" type="search" autocomplete="off" maxlength="60" placeholder="اسم الدوا (عربي أو إنجليزي)" aria-label="اسم الدوا" />
+        <div id="scanHits"></div>
+      </div>
+      <p class="scan-msg" id="scanMsg" role="status"></p>
+      <section class="panel scan-list" id="scanList"></section>
+      <a href="#cart" class="scan-go" id="scanGo">كمّل الطلب</a>
     </div>
 
     <!-- طلباتي -->
@@ -348,10 +388,11 @@
     <script src="ar/item-photos.js?v=photos-20261116a"></script>
     <script src="ar/statement-pdf.js?v=dark-20261116a"></script>
     <script src="store/pay.js?v=pay-20261117b"></script>
-    <script src="store/account.js?v=view-20261117c"></script>
+    <script src="store/account.js?v=scan-20261117d"></script>
     <script src="store/siteuser.js?v=users-20261117a"></script>
+    <script src="store/scan.js?v=scan-20261117a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=brand-20261117a"></script>
+    <script src="store/store.js?v=brand-20261117b"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
     <script src="store/motion.js?v=capsule-20261116a"></script>

@@ -202,6 +202,7 @@ class AdamService : Service() {
         listener = Listener(this, main) { log(it) }
         Voiceprint.load(this)
         ear = Ear(main, { log(it) }, { speaker.talking }, { onSegment(it) }, { id, v -> onBargeIn(id, v) })
+        ear.ctxDir = filesDir
         Thread {
             val ok = Models.prepare(this) { log(it) }
             main.post {
@@ -246,7 +247,9 @@ class AdamService : Service() {
             ACTION_FEED -> {
                 val f = File(filesDir, intent.getStringExtra("file")?.replace(Regex("[^A-Za-z0-9_.\\-]"), "") ?: "test.wav")
                 val pcm = try { Audio.readWav(f.readBytes()) } catch (e: Throwable) { null }
-                if (pcm == null) log("feed: no 16-bit WAV at " + f.name) else { log("feed: " + f.name + " " + (pcm.size * 1000 / Ear.RATE) + " ms"); ear.inject(pcm) }
+                if (pcm == null) log("feed: no 16-bit WAV at " + f.name)
+                else if (intent.getStringExtra("diag") == "1") ear.diagnose(pcm)
+                else { log("feed: " + f.name + " " + (pcm.size * 1000 / Ear.RATE) + " ms"); ear.inject(pcm) }
             }
         }
         return START_STICKY
@@ -441,7 +444,8 @@ class AdamService : Service() {
     private fun enrollSegment(s: Ear.Segment) {
         if (state != "listening") return
         val v = s.vector
-        if (v == null || s.voicedMs < 600) { log("voiceprint: a sentence too short (" + s.voicedMs + " ms of voice), waiting"); return }
+        if (v == null) { log("voiceprint: no voiceprint from this sentence (" + s.voicedMs + " ms of voice), waiting"); return }
+        if (s.voicedMs < 600) { log("voiceprint: a sentence too short (" + s.voicedMs + " ms of voice), waiting"); return }
         enrollSeq++
         enrolling?.add(v)
         log("voiceprint: sentence " + (enrollIdx + 1) + " (" + s.ms + " ms)")

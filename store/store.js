@@ -279,6 +279,8 @@
   const acct = root.AskerStoreAccount || null;
   // «الرسايل» (store/chat.js, owner 2026-11-13): our own messages page
   const chat = root.AskerStoreChat || null;
+  // «كرّر دواك بالباركود» (store/scan.js, owner 2026-11-17): the camera / the code / the name put items in the same cart
+  const scan = root.AskerStoreScan || null;
   const COLS = 'id,name,arabic_name,status,price,cat,needs_rx';
   // no delivery yet (owner 2026-11-15: «ما عنديش توصيل حاليا»): the customer picks the order up from the pharmacy; the server still
   // asks for an address, so the order says so in its place (the bot's «طلبات» shows it)
@@ -405,6 +407,7 @@
     if (name === 'orders') drawOrders();
     if (name === 'account' && acct) acct.draw();
     if (chat) { if (name === 'chat') chat.open(); else chat.close(); }
+    if (scan) { if (name === 'scan') scan.open(); else scan.close(); }
     drawCartBar();
     window.scrollTo(0, 0);
   }
@@ -424,6 +427,7 @@
     else if (h === 'done') view('done');
     else if (h === 'account' && acct && acct.linked()) view('account');
     else if (h === 'chat' && chat) view('chat');
+    else if (h === 'scan' && scan) view('scan');
     else view('home');
   }
 
@@ -1055,6 +1059,16 @@
   const me = store.get('asker_store_me', null);
   if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; }
   if (acct) acct.attach(client);
+  if (scan) {
+    scan.attach({
+      client, COLS, canAdd, searchTerms, termFilter,
+      money: (n) => money(n),
+      cart: () => cart,
+      total: () => cartTotal(cart),
+      add(it) { cart = cartAdd(cart, it); saveCart(); return cart.find((x) => x.id === it.id); },
+      setQty(id, qty) { cart = cartSet(cart, id, qty); saveCart(); },
+    });
+  }
   // the pharmacy's Vodafone Cash / InstaPay numbers (public function ar_store_pay_info); no number = no option
   if (root.AskerStorePay) root.AskerStorePay.load(client);
   // inside the installed app a person with no customer link makes an account once (store/siteuser.js, migration 202611170300)
