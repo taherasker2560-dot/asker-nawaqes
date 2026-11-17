@@ -268,3 +268,43 @@ body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(s
 .rg-pill.late { background: var(--accent); color: #fff; font-weight: 700; }
 .rg-pill.soon { background: var(--card); color: var(--accent-text); border: 1px solid var(--accent); font-weight: 700; }
 .rg-pill.ok { background: var(--accent-soft); color: var(--accent-text); }
+
+/* ---- «⏰ منبه الدوا» (owner 2026-11-17; store/alarm.js): a wide tile under the two, a full-page list and editor (the .rg-* sheet of the regular items), and the ringing card ---- */
+.ac-al-wrap { margin: 8px 16px 0; }
+.ac-al-wrap .ac-reg-btn { width: 100%; }
+.al-card { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 2px; background: var(--card); }
+.al-card.off { opacity: 0.6; }
+.al-card-main { flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: right; cursor: pointer; }
+.al-card-main b { display: block; font-size: 14.5px; font-weight: 700; overflow-wrap: anywhere; }
+.al-times, .al-times-edit, .al-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.al-chip { padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-size: 12px; font-weight: 700; }
+.al-tg { position: relative; flex: none; width: 44px; height: 26px; padding: 0; border: 0; border-radius: 999px; background: var(--line); cursor: pointer; }
+.al-tg::after { content: ''; position: absolute; top: 3px; inset-inline-start: 21px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: inset-inline-start 0.15s; }
+.al-tg.on { background: var(--accent); }
+.al-tg.on::after { inset-inline-start: 3px; }
+.al-add { display: block; width: 100%; margin-top: 10px; padding: 11px; border: 1.5px dashed var(--accent); border-radius: 2px; background: none; color: var(--accent-text); font: inherit; font-weight: 700; cursor: pointer; }
+.al-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 10px; padding: 10px 12px; border: 0; background: var(--soft-bg); color: var(--ink); font: inherit; font-size: 13px; text-align: right; }
+.al-try { padding: 4px 12px; border: 1px solid var(--accent); border-radius: 999px; background: var(--card); color: var(--accent-text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.al-warn { margin: 8px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--accent-text); }
+.al-lbl { margin: 14px 0 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.al-lbl small { font-weight: 500; }
+.al-pk { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer; }
+.al-pk.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.al-pk.plus { border-style: dashed; color: var(--muted); }
+.al-name { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); font: inherit; font-size: 15px; }
+.al-tm { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--accent); border-radius: 8px; background: var(--card); }
+.al-tm input { border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 15px; font-weight: 700; padding: 6px 4px 6px 8px; direction: ltr; }
+.al-x { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer; }
+.al-say { margin-top: 12px; padding: 9px 11px; border: 1px dashed var(--line); font-size: 13px; color: var(--accent-text); font-weight: 700; }
+.al-save { display: block; width: 100%; margin-top: 16px; min-height: 48px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.al-del { display: block; width: 100%; margin-top: 10px; min-height: 44px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: inherit; font-size: 13.5px; cursor: pointer; }
+.al-ring { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(29, 27, 25, 0.72); }
+.al-ring-card { width: 100%; max-width: 380px; padding: 24px 20px 20px; border-radius: 16px; background: var(--card); color: var(--ink); text-align: center; }
+.al-ring-ico { font-size: 46px; line-height: 1.2; animation: al-pulse 1.4s ease-in-out infinite; }   /* only the clock moves: the buttons under it stay still to tap */
+.al-ring-card h2 { margin: 4px 0 10px; font-size: 20px; color: var(--accent-text); }
+.al-ring-med { margin: 8px 0; font-size: 19px; font-weight: 700; overflow-wrap: anywhere; }
+.al-ring-med small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.al-btn { display: block; width: 100%; margin-top: 12px; min-height: 52px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+.al-btn.ghost { border: 1px solid var(--line); background: none; color: var(--accent-text); font-size: 14px; min-height: 46px; }
+@keyframes al-pulse { 0%, 100% { transform: rotate(0) scale(1); } 25% { transform: rotate(-8deg) scale(1.08); } 75% { transform: rotate(8deg) scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .al-ring-ico { animation: none; } }
