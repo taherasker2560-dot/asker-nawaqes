@@ -441,7 +441,8 @@ class AdamService : Service() {
     private fun enrollSegment(s: Ear.Segment) {
         if (state != "listening") return
         val v = s.vector
-        if (v == null || s.voicedMs < 600) { log("voiceprint: a sentence too short (" + s.voicedMs + " ms of voice), waiting"); return }
+        if (v == null) { log("voiceprint: no voiceprint from this sentence (" + s.voicedMs + " ms of voice), waiting"); return }
+        if (s.voicedMs < 600) { log("voiceprint: a sentence too short (" + s.voicedMs + " ms of voice), waiting"); return }
         enrollSeq++
         enrolling?.add(v)
         log("voiceprint: sentence " + (enrollIdx + 1) + " (" + s.ms + " ms)")

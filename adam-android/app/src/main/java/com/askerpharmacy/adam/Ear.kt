@@ -117,7 +117,10 @@ class Ear(
 
     fun shutdown() {
         stop()
-        worker.execute { try { recognizer?.close() } catch (e: Throwable) { }; recognizer = null }
+        worker.execute {
+            try { recognizer?.close() } catch (e: Throwable) { }; recognizer = null
+            try { spkRec?.close() } catch (e: Throwable) { }; spkRec = null
+        }
         worker.shutdown()
     }
 
@@ -212,50 +215,82 @@ class Ear(
     private fun analyze(pcm: ShortArray): Heard {
         val m = Models.speech ?: return Heard(null, false, 0.0, "")
         return try {
+            // 1) «آدم»: the small recognizer limited to the word (cheap). It gives NO voiceprint: with that list everything else is
+            //    «[unk]», which the model counts as silence, so the speaker model has no speech frames to use (11-17 first test on the phone:
+            //    a clear 1.8 s sentence gave no vector).
             val r = recognizer ?: Recognizer(m, RATE.toFloat(), "[\"adam\", \"a dam\", \"[unk]\"]").also { nr ->
                 nr.setWords(true)
-                Models.speaker?.let { nr.setSpeakerModel(it) }
                 recognizer = nr
             }
             val texts = ArrayList<String>()
             var firstWord = ""
             var conf = 0.0
-            var acc: FloatArray? = null
-            var frames = 0
-            fun take(json: String) {
-                val o = JSONObject(json)
-                val t = o.optString("text").trim()
+            for (j in run(r, pcm)) {
+                val t = j.optString("text").trim()
                 if (t.isNotEmpty()) texts.add(t)
-                val res = o.optJSONArray("result")
+                val res = j.optJSONArray("result")
                 if (firstWord.isEmpty() && res != null && res.length() > 0) {
                     val w = res.getJSONObject(0); firstWord = w.optString("word"); conf = w.optDouble("conf", 0.0)
                 }
-                val spk = o.optJSONArray("spk") ?: return
-                val f = o.optInt("spk_frames", 1).coerceAtLeast(1)
-                val v = Voiceprint.toFloats(spk)
-                val a = acc ?: FloatArray(v.size).also { acc = it }
-                if (a.size != v.size) return
-                for (i in v.indices) a[i] += v[i] * f
-                frames += f
             }
-            var pos = 0
-            while (pos < pcm.size) {
-                val n = minOf(3200, pcm.size - pos)
-                val part = pcm.copyOfRange(pos, pos + n)
-                if (r.acceptWaveForm(part, n)) take(r.result)
-                pos += n
-            }
-            take(r.finalResult)
             val words = texts.joinToString(" ").replace("a dam", "adam").trim()
             val toks = words.split(Regex("\\s+")).filter { it.isNotEmpty() }
             val wake = toks.isNotEmpty() && toks.first() == "adam" && toks.size <= 3
-            val a = acc
-            Heard(if (a != null && frames > 0) FloatArray(a.size) { a[it] / frames } else null, wake, conf, words)
+            Heard(voiceprint(m, pcm), wake, conf, words)
         } catch (e: Throwable) {
-            log("ear: voiceprint failed: " + e.message)
+            log("ear: analysis failed: " + e.message)
             try { recognizer?.close() } catch (x: Throwable) { }
             recognizer = null
             Heard(null, false, 0.0, "")
+        }
+    }
+
+    /** All the results (JSON) the recognizer gives for [pcm], the last one the final. */
+    private fun run(r: Recognizer, pcm: ShortArray): List<JSONObject> {
+        val out = ArrayList<JSONObject>()
+        var pos = 0
+        while (pos < pcm.size) {
+            val n = minOf(3200, pcm.size - pos)
+            if (r.acceptWaveForm(pcm.copyOfRange(pos, pos + n), n)) out.add(JSONObject(r.result))
+            pos += n
+        }
+        out.add(JSONObject(r.finalResult))
+        return out
+    }
+
+    private var spkRec: Recognizer? = null     // worker thread only
+
+    /**
+     * 2) His voiceprint: the speaker model on a recognizer with the WHOLE vocabulary (real words count as speech, even if the English
+     * model does not know the Arabic ones), averaged over the parts of the sentence, weighted by their speech frames. null when the
+     * sentence is too short for the model (it is logged).
+     */
+    private fun voiceprint(m: org.vosk.Model, pcm: ShortArray): FloatArray? {
+        val sm = Models.speaker ?: return null
+        if (pcm.size < RATE * 6 / 10) return null
+        return try {
+            val r = spkRec ?: Recognizer(m, RATE.toFloat()).also { it.setSpeakerModel(sm); spkRec = it }
+            var acc: FloatArray? = null
+            var frames = 0
+            var parts = 0
+            for (j in run(r, pcm)) {
+                parts++
+                val spk = j.optJSONArray("spk") ?: continue
+                val f = j.optInt("spk_frames", 1).coerceAtLeast(1)
+                val v = Voiceprint.toFloats(spk)
+                val a = acc ?: FloatArray(v.size).also { acc = it }
+                if (a.size != v.size) continue
+                for (i in v.indices) a[i] += v[i] * f
+                frames += f
+            }
+            val a = acc
+            if (a == null || frames <= 0) { log("ear: no voiceprint from " + (pcm.size * 1000 / RATE) + " ms (" + parts + " parts)"); null }
+            else FloatArray(a.size) { a[it] / frames }
+        } catch (e: Throwable) {
+            log("ear: voiceprint failed: " + e.message)
+            try { spkRec?.close() } catch (x: Throwable) { }
+            spkRec = null
+            null
         }
     }
 
