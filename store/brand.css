@@ -239,3 +239,32 @@ html[dir="ltr"] .ds-lang { display: block; }
 .mus-btn svg { position: relative; width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mus-btn:hover, .mus-btn:focus-visible { opacity: 0.95; }
 body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---- «اللي باخده دايمًا» + «أدويتي المزمنة» in the customer's account (owner 2026-11-17; store/regular.js): two quiet tiles under the account's buttons, and a full-page list that opens over the page ---- */
+.ac-reg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 16px 0; }
+.ac-reg-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 64px; padding: 10px 8px; border: 1.5px solid var(--accent); border-radius: 12px; background: var(--accent-soft); color: var(--accent-text); font: inherit; cursor: pointer; text-align: center; }
+.ac-reg-btn b { font-size: 14px; font-weight: 700; line-height: 1.4; }
+.ac-reg-btn small { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.ac-reg-btn:active { transform: scale(0.97); }
+.ac-reg-dot { position: absolute; top: -8px; inset-inline-start: -6px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.rg-sheet { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--bg, #fff); color: var(--ink); }
+.rg-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--accent); color: #fff; }
+.rg-top b { font-size: 17px; font-weight: 700; }
+.rg-back { border: 0; background: transparent; color: #fff; font: inherit; font-size: 28px; line-height: 1; padding: 0 4px; cursor: pointer; }
+.rg-body { flex: 1; overflow-y: auto; padding: 8px 16px calc(24px + env(safe-area-inset-bottom, 0px)); -webkit-overflow-scrolling: touch; }
+.rg-hint { margin: 8px 0 4px; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+.rg-warn { margin: 8px 0 4px; padding: 9px 11px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent-text); font-size: 13px; line-height: 1.7; }
+.rg-warn.good { border-color: var(--line); background: var(--soft-bg); color: var(--ink); }
+.rg-grp { margin: 14px 0 0; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.rg-it { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 2px; background: var(--card); }
+.rg-it.rg-quiet { opacity: 0.75; }
+.rg-it .ac-pic { flex: 0 0 auto; display: block; }
+.rg-it .ac-pic img { display: block; width: 46px; height: 46px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.rg-main { flex: 1; min-width: 0; }
+.rg-main > b { display: block; font-size: 14.5px; font-weight: 700; overflow-wrap: anywhere; }
+.rg-en { display: block; margin-top: 1px; font-size: 11px; color: var(--muted); text-align: right; overflow-wrap: anywhere; }
+.rg-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.rg-pill { padding: 2px 9px; border-radius: 999px; background: var(--soft-bg); color: var(--muted); font-size: 11.5px; line-height: 1.7; }
+.rg-pill.late { background: var(--accent); color: #fff; font-weight: 700; }
+.rg-pill.soon { background: var(--card); color: var(--accent-text); border: 1px solid var(--accent); font-weight: 700; }
+.rg-pill.ok { background: var(--accent-soft); color: var(--accent-text); }

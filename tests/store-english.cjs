@@ -60,6 +60,15 @@ for(const s of ['الكاميرا قرت 4006381333931: ده مش رقم ملص�
 // the calm music's small button (store/music.js, 2026-11-17): its two labels
 const MU=require('../store/music.js');
 for(const v of Object.values(MU.TEXTS))check(v);
+// «اللي باخده دايمًا» + «أدويتي المزمنة» (store/regular.js, 2026-11-17): its fixed texts and the ones it builds (days, counts and packs put in)
+const RG=require('../store/regular.js');
+for(const v of Object.values(RG.TEXTS)){if(!/\{\w+\}/.test(v))check(v)}
+for(const n of [1,2,3,10,11,30])check(RG.usualSub(n));
+for(const n of [0,1,2,3,10,11])check(RG.dueSub(n));
+for(const d of [0,1,2,5,36])check(RG.sinceText(d));
+for(const q of [0.3,1,2,2.5])check(RG.tookText(q));
+for(const [state,due] of [['late',-13],['late',-8],['late',-1],['soon',0],['soon',1],['soon',2],['soon',5],['ok',6],['ok',9],['ok',22]])check(RG.dueText({state,due}).text);
+check(RG.TEXTS.every.replace('{n}','33'));
 // «الرسايل» (store/chat.js, 2026-11-13)
 const CH=require('../store/chat.js');
 for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);
