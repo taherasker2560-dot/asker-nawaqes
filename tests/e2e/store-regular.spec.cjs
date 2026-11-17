@@ -29,11 +29,11 @@ run('Customer regular items: two buttons with the counts, the list of what he ta
  await setup(page,{ok:true,rows:ROWS,at:new Date().toISOString()});
   await openAccount(page,base);
  await page.waitForSelector('.ac-reg-two');
- assert.deepEqual(await page.$$eval('.ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 اللي باخده دايمًا','💊 أدويتي المزمنة']);
- assert.deepEqual(await page.$$eval('.ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 أصناف على حسابي','ميعادين عدّوا'],'6 items; 2 late (the OMEZ he bought today does not count)');
+ assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 اللي باخده دايمًا','💊 أدويتي المزمنة']);
+ assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 أصناف على حسابي','ميعادين عدّوا'],'6 items; 2 late (the OMEZ he bought today does not count)');
  assert.equal(await text(page,'.ac-reg-dot'),'2');
- // the buttons come right after «كرّر دواك بالباركود», before the PDF row
- assert.equal(await page.evaluate(()=>{const b=document.querySelector('.ac-reg-two');return b.previousElementSibling.classList.contains('ac-scan')&&b.nextElementSibling.classList.contains('ac-row')}),true);
+ // the buttons come right after «كرّر دواك بالباركود», then the alarm's tile
+ assert.equal(await page.evaluate(()=>{const b=document.querySelector('.ac-reg-two');return b.previousElementSibling.classList.contains('ac-scan')&&b.nextElementSibling.classList.contains('ac-al-wrap')}),true);
  // the list of what he takes: the nearest next refill first, Arabic name with the English under it, the pills
  await page.click('[data-reg-open="usual"]');
  await page.waitForSelector('#regSheet .rg-it');
@@ -97,8 +97,8 @@ run('Customer regular items: the English site, the night look, and the owner\'s 
  await seed(page);
  await openAccount(page,base);
  await page.waitForSelector('.ac-reg-two');
- assert.deepEqual(await page.$$eval('.ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 What I usually take','💊 My chronic medicines']);
- assert.deepEqual(await page.$$eval('.ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 items on my account','2 are past their date']);
+ assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 What I usually take','💊 My chronic medicines']);
+ assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 items on my account','2 are past their date']);
  await page.click('[data-reg-open="chron"]');
  await page.waitForSelector('#regSheet .rg-it');
  const t=await text(page,'#regSheet');
@@ -109,6 +109,6 @@ run('Customer regular items: the English site, the night look, and the owner\'s 
  await page.evaluate(()=>{localStorage.setItem('asker-lang','ar');localStorage.setItem('sb-abcdefgh-auth-token','{}')});
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-reg-two');
  assert.ok(await page.$('#acctBox .ac-back'),'the way back to the bot is there: this is the owner\'s look');
- assert.equal(await page.$$eval('.ac-reg-btn',e=>e.length),2);
+ assert.equal(await page.$$eval('.ac-reg-two .ac-reg-btn',e=>e.length),2);
  assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_customer_view').map(w=>w.args.p_preview===true)),[true],'the look is not counted as the customer opening his link');
 },{home:true});

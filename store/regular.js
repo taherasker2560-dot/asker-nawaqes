@@ -212,5 +212,5 @@
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && st.open) close(); });
   window.addEventListener('popstate', () => { if (st.open) { st.open = ''; draw(); } });
-  root.AskerStoreRegular = { load, forget, buttonsHtml, usable, open, close, TEXTS };
+  root.AskerStoreRegular = { load, forget, buttonsHtml, usable, open, close, TEXTS, names: () => (usable() ? st.rows.map((r) => ({ n: r.n, ar: r.ar })) : []) };
 })(typeof window === 'undefined' ? globalThis : window);

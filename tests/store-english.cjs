@@ -69,6 +69,12 @@ for(const d of [0,1,2,5,36])check(RG.sinceText(d));
 for(const q of [0.3,1,2,2.5])check(RG.tookText(q));
 for(const [state,due] of [['late',-13],['late',-8],['late',-1],['soon',0],['soon',1],['soon',2],['soon',5],['ok',6],['ok',9],['ok',22]])check(RG.dueText({state,due}).text);
 check(RG.TEXTS.every.replace('{n}','33'));
+// «⏰ منبه الدوا» (store/alarm.js, 2026-11-17): its fixed texts (the sentence the phone SAYS and the am / pm letters are not shown as text) and the ones it builds
+const AL=require('../store/alarm.js');
+for(const [k,v] of Object.entries(AL.TEXTS)){if(/\{\w+\}/.test(v)||['tryPhrase','sayName','am','pm'].includes(k))continue;check(v)}
+for(const n of [1,2,3,10,11])check(AL.countText(n));
+for(const t of ['00:00','08:00','12:30','20:00','23:59'])check(AL.timeText(t));
+check('جرّب الصوت');
 // «الرسايل» (store/chat.js, 2026-11-13)
 const CH=require('../store/chat.js');
 for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);
