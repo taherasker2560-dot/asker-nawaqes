@@ -12,6 +12,23 @@
     if (/^201\d{9}$/.test(d)) d = d.slice(1);
     return d === '' ? '' : /^01\d{9}$/.test(d) ? d : null;
   }
+  // the pharmacy's numbers for «الدفع بتحويل» (2026-11-17; the same rules as store/pay.js, tests/store-pay.cjs keeps the two in step):
+  // Vodafone Cash = a mobile number; InstaPay = an address (name@instapay), a link (https://ipn.eg/…) or a mobile number
+  function cleanWallet(v) {
+    let d = String(v || '').replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).replace(/\D/g, '');
+    if (/^0020\d{10}$/.test(d)) d = d.slice(3);
+    else if (/^20\d{10}$/.test(d)) d = d.slice(2);
+    if (/^1[0125]\d{8}$/.test(d)) d = '0' + d;
+    return /^01[0125]\d{8}$/.test(d) ? d : '';
+  }
+  function cleanInstapay(v) {
+    const s = String(v || '').trim();
+    if (!s) return null;
+    if (/^https:\/\/(www\.)?ipn\.eg\/[^\s]{3,180}$/i.test(s)) return { kind: 'link', value: s };
+    if (/^[A-Za-z0-9._-]{2,40}@[A-Za-z]{2,20}$/.test(s)) return { kind: 'ipa', value: s.toLowerCase() };
+    const w = cleanWallet(s);
+    return w ? { kind: 'phone', value: w } : null;
+  }
   // the row to save from the form values; null field = not set (the site keeps its built-in words)
   function settingsRow(v) {
     const t = (s, n) => { const x = String(s || '').trim().slice(0, n); return x || null; };
@@ -25,9 +42,20 @@
       row.theme_color = c || null;
       row.theme_night = !!v.theme_night;
     }
+    // the transfer numbers (2026-11-17): empty = the option does not show on the site; nothing sent when the columns are not there yet
+    if (v.pay_vodafone !== undefined) {
+      const raw = String(v.pay_vodafone || '').trim(), w = cleanWallet(raw);
+      if (raw && !w) return { error: 'رقم فودافون كاش لازم يكون 11 رقم ويبدأ بـ 010 أو 011 أو 012 أو 015' };
+      row.pay_vodafone = w || null;
+    }
+    if (v.pay_instapay !== undefined) {
+      const raw = String(v.pay_instapay || '').trim(), p = cleanInstapay(raw);
+      if (raw && !p) return { error: 'عنوان إنستا باي مش مظبوط: اكتبه زي name@instapay أو رابط ipn.eg أو رقم موبايل' };
+      row.pay_instapay = p ? p.value : null;
+    }
     return { row };
   }
-  const api = { cleanPhone, settingsRow };
+  const api = { cleanPhone, cleanWallet, cleanInstapay, settingsRow };
   root.AskerStoreSettingsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -38,7 +66,7 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   let found = [];
   // the site's default look: the bot's 25 colors (ar/settings.js) + any color; the customer can still change it on his phone
-  let themeReady = false, themeColor = 'flame';
+  let themeReady = false, themeColor = 'flame', payReady = false;
   function drawTheme(color, night) {
     const S = root.AskerSettings, box = $('ssThemePick');
     if (!S || !box) return;
@@ -70,11 +98,16 @@
     $('ssHeroTitle').value = s.hero_title || '';
     $('ssHeroText').value = s.hero_text || '';
     $('ssWhatsapp').value = s.whatsapp || '';
+    // the transfer numbers exist only after migration 202611170100
+    payReady = 'pay_vodafone' in s;
+    if ($('ssPayBox')) $('ssPayBox').hidden = !payReady;
+    if (payReady) { $('ssPayVodafone').value = s.pay_vodafone || ''; $('ssPayInstapay').value = s.pay_instapay || ''; }
     say('ssStatus', '');
   }
   async function save() {
     const v = { is_open: $('ssOpen').checked, closed_message: $('ssClosedMsg').value, hero_title: $('ssHeroTitle').value, hero_text: $('ssHeroText').value, whatsapp: $('ssWhatsapp').value };
     if (themeReady) { v.theme_color = themeColor; v.theme_night = $('ssThemeNight').checked; }
+    if (payReady) { v.pay_vodafone = $('ssPayVodafone').value; v.pay_instapay = $('ssPayInstapay').value; }
     const r = settingsRow(v);
     if (r.error) return say('ssStatus', r.error, 'bad');
     $('ssSave').disabled = true;

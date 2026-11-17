@@ -229,21 +229,25 @@ run('Customer link install: Samsung Internet never gets its own install (Play Pr
  await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
  await page.evaluate(()=>{sessionStorage.removeItem('__ua');localStorage.removeItem('__fakeTables')});
 },{home:true});
-// the store home's own «نزّل الصيدلية» box (not the account's): shown to Chrome when it offers, never on Samsung Internet (the same Play Protect block)
-run('Store home install box: Chrome gets it when it offers, Samsung Internet never does',async({page,base})=>{
+// the store home's own «نزّل الصيدلية» box (not the account's): since 2026-11-17 it is for anyone who opens the site (see tests/e2e/store-pay.spec.cjs for the
+// visitor on each browser); the rule from 2026-11-16 stays: Samsung Internet's OWN install offer is never used (Play Protect blocks the app it makes)
+run('Store home install box: Chrome installs on its offer; Samsung Internet shows the box but never uses its own install offer',async({page,base})=>{
  await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua})});
- const offer=()=>page.evaluate(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{};e.userChoice=Promise.resolve({outcome:'dismissed'});window.dispatchEvent(e)});
+ const offer=()=>page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'dismissed'});window.dispatchEvent(e)});
  await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36'));
  await page.goto(base+'store.html?x=3');
  await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
  await offer();
  await page.waitForTimeout(500);
- assert.equal(await page.$eval('#installBox',e=>e.hidden),true,'Samsung Internet: no install box');
+ assert.equal(await page.$eval('#installBox',e=>e.hidden),false,'Samsung Internet: the box shows (its button hands the site to Chrome)');
+ assert.equal(await page.evaluate(()=>window.__prompted),false,'its own install offer is not used');
  await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'));
  await page.goto(base+'store.html?x=4');
  await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
  await offer();
  await page.waitForFunction(()=>!document.getElementById('installBox').hidden,null,{timeout:5000});
+ await page.click('#installBtn');
+ await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
  await page.evaluate(()=>sessionStorage.removeItem('__ua'));
 },{home:true});
 // the items' pictures in his own account and in the PDF he downloads (owner 2026-11-16: «الصور تبان فى الحساب لما ابعتله رابط حسابه مش الكشف بس»)

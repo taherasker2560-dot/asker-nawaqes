@@ -945,6 +945,15 @@
             ><textarea id="ssHeroText" rows="2" maxlength="400" placeholder="فاضي = الجملة الأصلية"></textarea>
             <label for="ssWhatsapp">رقم الواتساب اللي يظهر للزبون</label
             ><input id="ssWhatsapp" type="tel" dir="ltr" maxlength="16" placeholder="01xxxxxxxxx (فاضي = مايظهرش)" />
+            <!-- الدفع بتحويل (ar/store-settings.js): رقم فيه = الاختيار يظهر للعميل في السلة وفي حسابه -->
+            <div id="ssPayBox" hidden>
+              <h3>الدفع بتحويل</h3>
+              <p class="hint">اكتب رقمك والعميل يشوف الاختيار في السلة وفي حسابه. فاضي = الاختيار مش بيظهر.</p>
+              <label for="ssPayVodafone">رقم فودافون كاش</label
+              ><input id="ssPayVodafone" type="tel" dir="ltr" maxlength="16" placeholder="01xxxxxxxxx" />
+              <label for="ssPayInstapay">عنوان إنستا باي</label
+              ><input id="ssPayInstapay" type="text" dir="ltr" maxlength="200" placeholder="name@instapay أو رابط ipn.eg أو رقم موبايل" />
+            </div>
             <!-- شكل الموقع لكل الزباين (ar/store-settings.js)؛ الزبون يقدر يغيّره لنفسه من ⚙ في الموقع -->
             <div id="ssThemeBox" class="ss-theme" hidden>
               <h3>شكل الموقع للزباين</h3>
@@ -981,7 +990,7 @@
     <script src="ar/po-statement.js?v=stmt-20261116a"></script>
     <!-- «حدّث النواقص دلوقتي» (ar/refresh.js) is off since 2026-11-12: the hub sends the list every hour -->
     <script src="ar/store-orders.js?v=link-20261113a"></script>
-    <script src="ar/store-settings.js?v=orange-20261115a"></script>
+    <script src="ar/store-settings.js?v=pay-20261117a"></script>
     <script src="ar/store-link.js?v=screens-20261116a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="ar/item-media.js?v=media-20261114a"></script>

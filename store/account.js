@@ -90,8 +90,9 @@
     if (filter === 'payments') return moves.filter((m) => m.kind === 'payment' || m.kind === 'refund' || num(m.paid) !== 0);
     return moves;
   }
-  // how he pays: a stopped customer pays cash, whatever was picked
-  const payOf = (stopped, wanted) => (stopped || wanted === 'cash' ? 'cash' : 'account');
+  // how he pays: a stopped customer pays cash, whatever was picked; a transfer (Vodafone Cash / InstaPay, 2026-11-17) is kept as picked:
+  // it is paid before he collects, so it is never «على حسابي» (the server only knows account / cash: store.js sends cash + a note)
+  const payOf = (stopped, wanted) => (wanted === 'vodafone' || wanted === 'instapay' ? wanted : stopped || wanted === 'cash' ? 'cash' : 'account');
   // where the PDF starts: his last payment, else the first movement of this month, else the oldest one on the page
   function pdfStart(moves, now) {
     const asc = [...moves].sort((a, b) => String(a.at).localeCompare(String(b.at)) || num(a.id) - num(b.id));
@@ -150,6 +151,10 @@
     // Samsung Internet's own install is blocked by Google Play Protect: open the account in Chrome (2026-11-16)
     installSamsung: 'متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن». افتح الرابط في كروم، وبعدين دوس «ثبّت التطبيق الآن».',
     installOther: 'افتح قايمة المتصفح (⋮ أو ≡)، واختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
+    // the home page's box, for anyone who opens the site's link, a customer or not (owner 2026-11-17)
+    homeInstall: '📲 ثبّته',
+    homeAgain: '📲 دوسة كمان',
+    homeBusy: '…',
     installed: 'اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.',
   };
   // installing on his phone (owner 2026-11-13 «والعميل يثبته عنده ازاى»): the app's icon opens on HIS account. The manifest
@@ -197,11 +202,13 @@
   }
   // the link that opens this page in Chrome on Android (an intent: link cannot carry the #me= part, so the secret rides in
   // ?me=, which the page takes out of the address at once); with no Chrome on the phone it opens here again
+  // token = null: the plain site (a visitor who is not a customer, owner 2026-11-17: «حتى لو هو مش عميل»)
   function chromeIntent(pageUrl, token) {
     const page = new URL('store.html', String(pageUrl || '').replace(/[?#].*$/, ''));
     // install=1: Chrome opens ready to install; with no Chrome the fallback page shows this browser's steps
-    const back = page.href + '?me=' + token + '&install=1';
-    return `intent://${page.host}${page.pathname}?me=${token}&install=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(back)};end`;
+    const q = (token ? 'me=' + token + '&' : '') + 'install=1';
+    const back = page.href + '?' + q;
+    return `intent://${page.host}${page.pathname}?${q}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(back)};end`;
   }
   function tokenFromSearch(s) {
     const m = /[?&]me=([0-9a-f]{64})(?:&|$)/.exec(String(s || ''));
@@ -235,10 +242,13 @@
   const fromLink = tokenFromHash(location.hash) || tokenFromSearch(location.search);
   // sent here by the install button from another browser (?install=1): in Chrome one more tap installs; anywhere else
   // (no Chrome on the phone) this browser's steps show at once
-  const handedOff = !!fromLink && /[?&]install=1(?:&|$)/.test(location.search);
+  // (also from the plain site, no link: its home box sends a visitor to Chrome the same way)
+  const handedOff = /[?&]install=1(?:&|$)/.test(location.search);
   if (fromLink) {
     keep.set(fromLink);
     try { history.replaceState(null, '', location.pathname + dropMe(location.search) + '#account'); } catch (e) { location.hash = 'account'; }
+  } else if (handedOff) {
+    try { history.replaceState(null, '', location.pathname + dropMe(location.search) + location.hash); } catch (e) { /* the address keeps ?install=1: harmless */ }
   }
   let token = keep.get();
   if (token && !/^[0-9a-f]{64}$/.test(token)) { keep.set(null); token = null; }
@@ -271,7 +281,34 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   let client = null;
   // st: { c: {id, name, balance}, stopped, month, data_at, phone, moves, more, busy, error, filter, open:Set, pay, pdf }
-  const st = { c: null, stopped: false, month: null, data_at: null, phone: null, moves: [], more: false, busy: false, error: '', filter: 'all', open: new Set(), pay: 'account', pdf: '' };
+  const st = { c: null, stopped: false, month: null, data_at: null, phone: null, moves: [], more: false, busy: false, error: '', filter: 'all', open: new Set(), pay: 'account', pdf: '', cartTotal: null };
+  const PAY = () => root.AskerStorePay || null;
+  // how this order is paid: a customer with his link: account / cash / a transfer; a visitor: cash or a transfer. A transfer that is
+  // not set up (the owner removed the number) falls back to cash.
+  function effectivePay() {
+    const P = PAY();
+    const want = st.pay === 'vodafone' || st.pay === 'instapay' ? (P && P.methods().includes(st.pay) ? st.pay : 'cash') : st.pay;
+    return token ? payOf(st.stopped, want) : want === 'vodafone' || want === 'instapay' ? want : 'cash';
+  }
+  const isTransfer = (m) => m === 'vodafone' || m === 'instapay';
+  // the box on the home page («نزّل الصيدلية»): for anyone who opens the site's link, a customer or not (owner 2026-11-17: «لما أبعت رابط
+  // الموقع لحد يعرف يثبته هو، حتى لو هو مش عميل»). A customer with his link has the same button first thing on his account, so he is not shown it twice;
+  // not on the pharmacy's own phone, not inside the installed app, and on a computer only when the browser offers the install.
+  const touchy = () => (navigator.maxTouchPoints > 0) || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+  function homeInstall() {
+    const box = $('installBox');
+    if (!box) return;
+    const show = !pharmacyPhone && !standalone() && !token && (touchy() || !!installEvt);
+    box.hidden = !show;
+    if (!show) return;
+    const again = handedOff && !installNote, btn = $('installBtn'), note = $('installNote');
+    if (btn) {
+      btn.disabled = installBusy;
+      btn.textContent = installBusy ? TEXTS.homeBusy : again ? TEXTS.homeAgain : TEXTS.homeInstall;
+      btn.classList.toggle('pulse', again);
+    }
+    if (note) { note.hidden = !installNote; note.textContent = installNote || ''; }
+  }
 
   function showLinked(on) {
     document.querySelectorAll('[data-acct]').forEach((el) => { el.hidden = !on; });
@@ -349,7 +386,20 @@
     const a = $('waLink');
     return a && a.getAttribute('href') && a.getAttribute('href') !== '#' ? a.getAttribute('href') : '';
   }
+  // the iPhone's guide: big, over the page, the arrow points at Safari's Share button below (also for a visitor with no account, 2026-11-17)
+  function drawGuide() {
+    let g = $('acctGuide');
+    if (guide && !g) {
+      g = document.createElement('div');
+      g.id = 'acctGuide'; g.className = 'ac-guide'; g.setAttribute('role', 'dialog');
+      g.innerHTML = `<div class="ac-guide-card"><h2>${esc(TEXTS.guideTitle)}</h2><ol><li>${esc(TEXTS.guide1)}</li><li>${esc(TEXTS.guide2)}</li><li>${esc(TEXTS.guide3)}</li></ol>` +
+        `<button type="button" class="ac-btn ac-install" data-acct-guide-close>${esc(TEXTS.guideOk)}</button></div><div class="ac-guide-arrow" aria-hidden="true">⬇️</div>`;
+      document.body.appendChild(g);
+    } else if (!guide && g) g.remove();
+  }
   function draw() {
+    homeInstall();
+    drawGuide();
     const box = $('acctBox');
     if (!box) return;
     const name = $('acctName');
@@ -374,21 +424,15 @@
       installHtml = `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
     }
-    // the iPhone's guide: big, over the page, the arrow points at Safari's Share button below
-    let g = $('acctGuide');
-    if (guide && !g) {
-      g = document.createElement('div');
-      g.id = 'acctGuide'; g.className = 'ac-guide'; g.setAttribute('role', 'dialog');
-      g.innerHTML = `<div class="ac-guide-card"><h2>${esc(TEXTS.guideTitle)}</h2><ol><li>${esc(TEXTS.guide1)}</li><li>${esc(TEXTS.guide2)}</li><li>${esc(TEXTS.guide3)}</li></ol>` +
-        `<button type="button" class="ac-btn ac-install" data-acct-guide-close>${esc(TEXTS.guideOk)}</button></div><div class="ac-guide-arrow" aria-hidden="true">⬇️</div>`;
-      document.body.appendChild(g);
-    } else if (!guide && g) g.remove();
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
     html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` +
       (upd ? `<div class="hint-sm">${esc(upd)} · ${esc(TEXTS.every10)}</div>` : '') +
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
     html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
+    // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number; not on the pharmacy's own phone
+    const P = PAY();
+    if (!pharmacyPhone && P && P.methods().length && num(st.c.balance) > CRUMB) html += `<button type="button" class="ac-btn ac-paybtn" data-acct-paysheet>${esc(P.TEXTS.payBtn)}</button>`;
     const wa = waHref();
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
@@ -413,15 +457,24 @@
     box.innerHTML = html;
   }
   // the checkout's «الدفع»: on account or cash; cash only when stopped
+  // 2026-11-17: also for a visitor with no link when the pharmacy set a transfer number (cash, or Vodafone Cash / InstaPay); the card of the chosen
+  // transfer (number, copy, open, the WhatsApp proof) opens under the options with the cart's total
   function drawPay() {
     const box = $('payBox');
     if (!box) return;
-    box.hidden = !token;
-    if (!token) { box.innerHTML = ''; return; }
-    const pay = payOf(st.stopped, st.pay);
+    const P = PAY(), xfer = P ? P.methods() : [];
+    box.hidden = !token && !xfer.length;
+    const cashNote = $('cashNote');
+    const pay = effectivePay();
+    if (cashNote && !token) cashNote.textContent = isTransfer(pay) ? P.TEXTS.orderNote.replace('{m}', P.TEXTS[pay].replace(/^\S+\s/, '')) : 'الدفع في الصيدلية لما تستلم';
+    if (box.hidden) { box.innerHTML = ''; return; }
     const opt = (v, label, off) => `<label class="ac-pay${off ? ' off' : ''}"><input type="radio" name="acctPay" value="${v}"${pay === v ? ' checked' : ''}${off ? ' disabled' : ''} /> ${esc(label)}</label>`;
-    box.innerHTML = `<h2>${esc(TEXTS.payH)}</h2>${opt('account', TEXTS.payAccount, st.stopped)}${opt('cash', TEXTS.payCash, false)}` +
-      (st.stopped ? `<p class="hint-sm">${esc(TEXTS.payStopped)}</p>` : '');
+    let html = `<h2>${esc(token ? TEXTS.payH : P.TEXTS.h)}</h2>` +
+      (token ? opt('account', TEXTS.payAccount, st.stopped) + opt('cash', TEXTS.payCash, false) : opt('cash', P.TEXTS.cash, false));
+    xfer.forEach((m) => { html += opt(m, P.TEXTS[m], false); });
+    if (isTransfer(pay)) html += P.detailsHtml(pay, st.cartTotal, st.c ? `${st.c.name} · كود ${st.c.id}` : '');
+    if (st.stopped) html += `<p class="hint-sm">${esc(TEXTS.payStopped)}</p>`;
+    box.innerHTML = html;
   }
   // the PDF: from his last payment (or this month) to now, the same statement the pharmacy sends
   async function pdf() {
@@ -473,7 +526,8 @@
     }
     if (plan === 'chrome') { location.href = chromeIntent(location.href, token); return; }
     if (ios) {
-      try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ }
+      // (a visitor with no link has nothing to keep in the address)
+      if (token) { try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ } }
       guide = true;
     }
     installNote = installSteps(ua, navigator.platform, navigator.maxTouchPoints);
@@ -481,7 +535,12 @@
   }
 
   document.addEventListener('click', (e) => {
-    if (e.target.closest('[data-acct-install]')) { install(); return; }
+    if (e.target.closest('[data-acct-install]') || e.target.closest('#installBtn')) { install(); return; }
+    if (e.target.closest('[data-acct-paysheet]')) {
+      const P = PAY();
+      if (P && st.c) P.openSheet({ amount: st.c.balance, who: `${st.c.name} · كود ${st.c.id}` });
+      return;
+    }
     if (e.target.closest('[data-acct-guide-close]') || (e.target.id === 'acctGuide')) { guide = false; draw(); return; }
     const f = e.target.closest('[data-acct-filter]');
     if (f) { st.filter = f.dataset.acctFilter; draw(); return; }
@@ -514,11 +573,18 @@
     // store.js view('account')
     draw() { if (token && !st.c && !st.busy) load(false); draw(); },
     linked: () => !!token,
-    // the order from the checkout: null when this phone has no customer's link
+    // the order from the checkout: null when this phone has no customer's link. pay = what the server knows (account / cash: a transfer is
+    // paid before he collects, so it goes as cash with a note); method = what he picked (also for a visitor, see payChoice)
     active() {
       if (!token) return null;
-      return { token, name: st.c ? st.c.name : '', pay: payOf(st.stopped, st.pay) };
+      const m = effectivePay();
+      return { token, name: st.c ? st.c.name : '', pay: isTransfer(m) ? 'cash' : m, method: m };
     },
+    // cash / account / vodafone / instapay: the way this order will be paid (a visitor: cash or a transfer)
+    payChoice: effectivePay,
+    // store.js: the cart's total in pounds (null = not known yet), the transfer card shows it
+    setCartTotal(v) { const t = v == null ? null : num(v); if (t !== st.cartTotal) { st.cartTotal = t; drawPay(); } },
+    redrawPay: drawPay,
     // the server said he is stopped (the owner stopped him meanwhile): cash from now on
     stoppedNow() { st.stopped = true; st.pay = 'cash'; drawPay(); load(false); },
     // the server said the link is no longer valid
@@ -526,4 +592,8 @@
     // after an order: the account may have changed
     refresh() { if (token) load(false); },
   };
+  // the transfer numbers arrived (or changed): the checkout's payment box and «ادفع حسابك» follow
+  if (PAY()) PAY().onChange(() => { drawPay(); draw(); });
+  homeInstall();
+  drawPay();
 })(typeof window === 'undefined' ? globalThis : window);

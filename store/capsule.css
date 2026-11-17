@@ -162,3 +162,31 @@ html.night .ac-bal { background: var(--dark); box-shadow: 0 0 0 1px rgba(255, 25
   .tabbar::before { transition: none; }
   .add, .hero-btn, .hc-go, .ac-btn, .share, .more, .chip, .need { transition: none; }
 }
+
+/* ---------- الدفع بتحويل + التثبيت لأي حد (2026-11-17): store/pay.js, the home box of store/account.js ---------- */
+#acctBox .ac-paybtn { border: 0; background: var(--dark); color: #fff; box-shadow: var(--sh-1); cursor: pointer; font-family: inherit; }
+.install-note { margin-top: 6px; padding: 8px 10px; border-radius: 14px; background: var(--accent-soft, #ebf1f9); color: var(--ink); font-size: 12.5px; font-weight: 700; line-height: 1.7; }
+html.night .install-note { background: rgba(255, 255, 255, 0.08); }
+#installBtn.pulse { animation: ac-pulse 1.4s ease-in-out infinite; }
+#installBtn[disabled] { opacity: 0.8; }
+.pay-card { margin-top: 10px; padding: 12px 14px; border-radius: 20px; background: var(--accent-soft, #ebf1f9); }
+html.night .pay-card { background: rgba(255, 255, 255, 0.07); }
+.pay-amt { text-align: center; font-size: 14px; color: var(--muted); }
+.pay-num { margin: 4px 0 8px; text-align: center; font: 700 22px var(--head); letter-spacing: 0.5px; color: var(--ink); direction: ltr; }
+.pay-row { display: flex; gap: 8px; }
+.pay-btn { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--card); color: var(--ink); box-shadow: var(--sh-1); font: inherit; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
+.pay-main { background: var(--dark); color: #fff; }
+.pay-how, .pay-pin { margin: 8px 2px 0; font-size: 12px; line-height: 1.8; color: var(--muted); }
+.pay-proof { display: flex; align-items: center; justify-content: center; min-height: 46px; margin: 10px 0 0; padding: 0 12px; border-radius: 999px; background: var(--card); color: #166534; box-shadow: var(--sh-1); font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; }
+html.night .pay-proof { color: #86efac; }
+.pay-sheet { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, 0.55); }
+.pay-sheet-card { width: 100%; max-width: 560px; max-height: 92vh; margin: 0 auto; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); overflow: auto; border-radius: 30px 30px 0 0; background: var(--card); color: var(--ink); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25); }
+.pay-grip { width: 44px; height: 5px; margin: 0 auto 10px; border-radius: 5px; background: var(--line); }
+.pay-sheet-card h2 { margin: 0 0 10px; font-size: 19px; }
+.pay-amount { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 18px; font-size: 13px; color: var(--muted); }
+.pay-amount-in { display: flex; align-items: center; gap: 6px; font: 700 20px var(--head); color: var(--ink); }
+.pay-amount-in input { width: 110px; min-height: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: end; }
+.pay-opt { display: flex; align-items: center; gap: 10px; min-height: 52px; margin: 8px 0; padding: 0 16px; border: 2px solid var(--line); border-radius: 999px; font-size: 15px; font-weight: 700; }
+.pay-opt.on { border-color: var(--accent); background: var(--accent-soft, #ebf1f9); }
+.pay-opt input { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+.pay-close { flex: none; width: 100%; margin-top: 12px; background: var(--dark); color: #fff; }
