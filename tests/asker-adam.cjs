@@ -190,6 +190,12 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.equal(F.commandVerb('اطبعلي الفاتورة'), 'اطبع');
   assert.equal(F.commandVerb('صورلي الفاتورة'), null);
   assert.equal(F.commandVerb('صورلي الفاتورة', ['صور']), 'صور', 'a word he added by voice');
+  // what Gemini really wrote from the bot's own voice (11-17): «بيع لي» as «بيعي»; «آدم» as «عدم»; «الطلبيات» as «الطلبات»
+  assert.equal(F.commandVerb('بيعي علبة باندول إكسترا.'), 'بيع');
+  assert.equal(F.commandVerb('بيعي للشباب علب كونجستال.'), null, '«… للشباب»: to the staff');
+  assert.equal(F.nameCall('عدم الفازل بكام؟'), 'الفازل بكام؟');
+  assert.equal(F.nameCall('عدم'), null);
+  assert.equal(F.pageOf('افتح لي الطلبات'), 'drafts');
   assert.equal(F.nameCall('يا آدم بانادول بكام'), 'بانادول بكام');
   assert.equal(F.nameCall('آدم، اقرالي النواقص'), 'اقرالي النواقص');
   assert.equal(F.nameCall('آدم'), '');
@@ -204,7 +210,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.equal(x.r.status, 200); assert.equal(x.j.text, 'بيع لي علبة بانادول', 'quotes around the words are dropped');
   assert.equal(x.j.to, 'command'); assert.equal(x.j.verb, 'بيع');
   let gh = JSON.parse(gem(x.f)[0].o.body);
-  assert.deepEqual(gh.contents[0].parts[0], { inlineData: { mimeType: 'audio/aac', data: 'AAAAQUJD' } }, 'the sound goes to Gemini as it is');
+  assert.deepEqual(gh.contents[0].parts, [{ inlineData: { mimeType: 'audio/aac', data: 'AAAAQUJD' } }], 'the sound alone goes to Gemini (no text that could be written down with it)');
   assert.equal(gh.generationConfig.temperature, 0); assert.ok(!gh.tools, 'hearing is only writing down the words');
   x = await ask({ action: 'hear', audio: 'AAAAQUJD', mime: 'audio/aac', mode: 'idle' }, { gemini: { text: 'يا آدم الفازول بكام', status: 200 } });
   assert.equal(x.j.to, 'name'); assert.equal(x.j.rest, 'الفازول بكام');
