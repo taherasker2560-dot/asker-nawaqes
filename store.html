@@ -19,11 +19,11 @@
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the three above (store/capsule.css, store/motion.js) -->
     <link rel="stylesheet" href="store/capsule.css?v=scan-20261117a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (store/brand.css), a layer over all of the above -->
-    <link rel="stylesheet" href="store/brand.css?v=head-20261117a" />
+    <link rel="stylesheet" href="store/brand.css?v=dataage-20261117a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=brand-20261117a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=brand-20261117b"></script>
+    <script src="store/i18n-en-store.js?v=dataage-20261117a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
     <script src="store/theme.js?v=brand-20261117a"></script>
   </head>
@@ -130,6 +130,7 @@
       <footer class="ft">
         <div class="ft-cols">
           <div><strong>الصيدلية</strong><a href="#orders">طلباتي</a><a href="#chat">الرسايل</a>
+            <span class="data-age" hidden></span><br />
             <span id="contact" hidden>واتساب: <a id="waLink" href="#" target="_blank" rel="noopener" dir="ltr"><span id="waNumber"></span></a></span></div>
           <div><strong>المواعيد</strong><span>كل يوم 9 ص – 12 بالليل</span><span>الصيف لحد 2 بالليل</span><span>الجمعة 3 – 11 بالليل</span></div>
         </div>
@@ -177,6 +178,7 @@
       </header>
       <a href="#scan" class="scan-link" id="cartScanLink">📷 ضيف أصناف بالباركود</a>
       <div id="cartItems" class="list"></div>
+      <p class="data-age" hidden></p>
       <section class="panel rx-panel">
         <h2>روشتة (اختياري)</h2>
         <p class="hint-sm">معاك روشتة؟ صوّرها وابعتها، وإحنا نقراها ونكلمك بالأسعار على واتساب. ممكن تبعتها لوحدها أو مع أصناف السلة.</p>
@@ -323,6 +325,7 @@
         <h2 id="shName" dir="ltr"></h2>
         <p id="shAr" class="sh-ar"></p>
         <div class="sh-row"><span id="shPrice" class="price"></span><span id="shBadge" class="badge"></span></div>
+        <p class="data-age" hidden></p>
         <!-- no delivery yet (owner 2026-11-15): picked up and paid at the pharmacy -->
         <ul class="sh-perks"><li>🏪 استلمه من الصيدلية</li><li>💵 ادفع في الصيدلية</li><li>👨‍⚕️ صيدلي بيراجع طلبك</li></ul>
         <div id="shAlts"></div>
@@ -371,7 +374,9 @@
         <label id="themeCustomRow" class="custom-row" for="themeCustom"><span>لون من اختيارك</span><input id="themeCustom" type="color" value="#0a4aa6" /></label>
         <!-- 2026-11-16: the dark surfaces of the new look (the bottom bar, the balance card, the first slide): four sets that suit the orange, store/theme.js -->
         
-        <button type="button" id="themeReset" class="share" hidden>رجّع لاختيار الصيدلية</button>
+                <h3 class="pick-h">اللون الغامق</h3>
+        <div id="storeDarkPick" class="accents" role="radiogroup" aria-label="اللون الغامق"></div>
+        <label id="storeDarkCustomRow" class="custom-row" for="storeDarkCustom"><span>لون غامق من اختيارك</span><input id="storeDarkCustom" type="color" value="#066f74" /></label>        <button type="button" id="themeReset" class="share" hidden>رجّع لاختيار الصيدلية</button>
       </div>
     </div>
 
@@ -392,7 +397,7 @@
     <script src="store/siteuser.js?v=users-20261117a"></script>
     <script src="store/scan.js?v=scan-20261117a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=brand-20261117b"></script>
+    <script src="store/store.js?v=dataage-20261117a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
     <script src="store/motion.js?v=capsule-20261116a"></script>

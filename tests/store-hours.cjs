@@ -29,4 +29,11 @@ assert.deepEqual(S.shopHours(new Date('2026-12-03T10:00Z'), true), { open: false
 const texts = ['مقفول دلوقتي', ...['11 بالليل', '12 بالليل', '2 بالليل'].map((t) => 'مفتوح دلوقتي · بنقفل ' + t),
   ...['9 الصبح', '3 العصر'].flatMap((t) => ['مقفول دلوقتي · بنفتح ' + t, 'مقفول دلوقتي · بنفتح بكرة ' + t])];
 for (const t of texts) assert.doesNotMatch(global.AskerI18n.translate(t), /[؀-ۿ]/, t);
-console.log('store-hours ok');
+// the data time under an item and in the cart (owner 2026-11-17): data_at is Cairo's clock; today / yesterday / a date
+const now = new Date('2026-11-17T08:40:00+02:00');
+assert.equal(S.dataAgeText('2026-11-17 08:26:10', now), 'النهارده 8:26 ص');
+assert.equal(S.dataAgeText('2026-11-16 23:51:23', now), 'امبارح 11:51 م');
+assert.equal(S.dataAgeText('2026-11-17 12:05:00', now), 'النهارده 12:05 م');
+assert.equal(S.dataAgeText('2026-11-10 09:00:00', now), '11/10 9:00 ص');
+assert.equal(S.dataAgeText(null, now), '');
+for (const t of ['الأصناف المتاحة محدّثة آخر مرة', '، فالصنف ممكن يكون خلص بعد كده.']) assert.doesNotMatch(global.AskerI18n.translate(t), /[؀-ۿ]/, t);console.log('store-hours ok');

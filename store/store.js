@@ -266,7 +266,7 @@
   }
   // صورة كل قسم في الرئيسية: صنف معروف من القسم وعنده صورة (لو الصورة مش موجودة يرجع الرسم)
   const SEC_PICS = { meds: 68432, vit: 4468, care: 27245, baby: 25723, supplies: 3614 };
-  const api = { shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { dataAgeText, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -580,6 +580,29 @@
     } catch (e) { el.hidden = true; }
   }
   setInterval(drawOpenNow, 60000);
+  // آخر تحديث لبيانات التوفر (صاحب الصيدلية 2026-11-17): سطر صغير في صفحة الصنف وفي السلة وتحت، عشان العميل يعرف إن الصنف ممكن يكون خلص بعد الميعاد ده.
+  // data_at = وقت نسخة بيانات الصيدلية (بتوقيت القاهرة) على كل صنف في ar_store_items.
+  function dataAgeText(dataAt, now) {
+    const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/.exec(String(dataAt || ''));
+    if (!m) return '';
+    const cairoDay = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+    const today = cairoDay(now || new Date()), yest = cairoDay(new Date((now || new Date()).getTime() - 864e5));
+    const h = Number(m[2]), t = `${h % 12 || 12}:${m[3]} ${h < 12 ? 'ص' : 'م'}`;
+    return (m[1] === today ? 'النهارده ' : m[1] === yest ? 'امبارح ' : m[1].slice(5).replace('-', '/') + ' ') + t;
+  }
+  async function loadDataAge() {
+    try {
+      const { data } = await client.from('ar_store_items').select('data_at').not('data_at', 'is', null).order('data_at', { ascending: false }).limit(1);
+      const txt = dataAgeText(data && data[0] && data[0].data_at);
+      document.querySelectorAll('.data-age').forEach((el) => {
+        if (!txt) { el.hidden = true; return; }
+        el.innerHTML = '<span>الأصناف المتاحة محدّثة آخر مرة</span> <bdi></bdi><span>، فالصنف ممكن يكون خلص بعد كده.</span>';
+        el.querySelector('bdi').textContent = txt;
+        el.hidden = false;
+      });
+    } catch (e) { /* the line just stays hidden */ }
+  }  loadDataAge();
+  setInterval(loadDataAge, 600000);
   function applySettings(s) {
     settings = s;
     if (root.AskerStoreTheme && 'theme_color' in settings) root.AskerStoreTheme.setDefault(settings.theme_color, settings.theme_night);

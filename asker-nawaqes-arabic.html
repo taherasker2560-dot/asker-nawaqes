@@ -19,7 +19,7 @@
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the two above (ar/capsule.css, ar/motion.js); remove this line for the previous look -->
     <link rel="stylesheet" href="ar/capsule.css?v=view-20261117a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
-    <link rel="stylesheet" href="ar/brand.css?v=head-20261117a" />
+    <link rel="stylesheet" href="ar/brand.css?v=green-20261117a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
     <script src="ar/i18n-en.js?v=brand-20261117a"></script>
@@ -65,6 +65,14 @@
           <input id="accentCustom" type="color" value="#0a4aa6" />
         </div>
         <label class="check night-row"><input id="nightMode" type="checkbox" /> الوضع الليلي (البوت كله غامق، مع أي لون)</label>
+        <!-- the dark surfaces (the bottom bar, the greeting): the green by default, four sets + any color of his own, ar/settings.js -->
+        <h3>اللون الغامق</h3>
+        <div id="darkPick" class="accents" role="radiogroup" aria-label="اللون الغامق"></div>
+        <div id="darkCustomRow" class="accent-custom">
+          <label for="darkCustom">لون غامق من اختيارك</label>
+          <input id="darkCustom" type="color" value="#066f74" />
+        </div>
+        <p class="hint">بيغيّر لون الشريط اللي تحت وكارت الترحيب.</p>
         
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
         <!-- notifications (owner 2026-11-12: «لما يكون قسم محتاج شغل يظهر إشعار ونخصصله صوت»), ar/notify.js -->
