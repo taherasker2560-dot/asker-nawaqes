@@ -164,64 +164,134 @@ const PAGES: Record<string, string> = {
   sales: 'المبيعات', tempsale: 'البيع المؤقت', care: 'خدمة العملاء', bags: 'الحقائب',
 };
 
-async function itemInfo(c: Ctx, name: string, now: number): Promise<Answer> {
-  const ws = words(name), sk = skeleton(name);
-  if (!ws.length) return { speak: 'قول اسم الصنف تاني' };
-  const STOCK = 'ar_stock?select=item_id,name,arabic_name,price,packs,units,parts,exp_near&';
-  let rows = (await rest(c, STOCK + ilikeAll('arabic_name', ws) + '&limit=8')).rows;
-  let inStock = true;
-  if (!rows.length && /[a-z]/i.test(name)) rows = (await rest(c, STOCK + ilikeAll('name', ws) + '&limit=8')).rows;
-  if (!rows.length && sk.length) rows = (await rest(c, STOCK + ilikeAll('arabic_name', sk) + '&limit=8')).rows;   // «بنادول» → «بانادول»
-  if (!rows.length) {
-    inStock = false;
-    const STORE = 'ar_store_items?select=id,name,arabic_name,price&';
-    rows = (await rest(c, STORE + ilikeAll('arabic_name', ws) + '&limit=8')).rows;
-    if (!rows.length && sk.length) rows = (await rest(c, STORE + ilikeAll('arabic_name', sk) + '&limit=8')).rows;
-    rows = rows.map((r) => ({ ...r, item_id: r.id }));
+// ---------- finding a product by a SPOKEN name (owner 2026-11-17: «جيست رنين» was heard for «جاست ريج» and a wrong product was said
+// with confidence) ----------
+// All the product names (in stock + the store list) are kept in this copy of the function for 20 minutes and scored against what was
+// heard, letter by letter and by consonants only. Sure → the answer; close → «تقصد X؟» (his «أيوه» answers it); else «مش لاقي».
+type Cat = { id: number; name: string; ar: string; toks: string[]; pop: number; inStock: boolean };
+let catCache: { at: number; items: Cat[] } = { at: 0, items: [] };
+const CAT_TTL_MS = 20 * 60 * 1000;
+const tok = (s: string) => norm(s).replace(/[\d.%]+/g, ' ').split(' ').filter((w) => w.length >= 2).map((w) => w.replace(/^(وال|ال|و)(?=\S{3})/, ''));
+const skel = (w: string) => w.replace(/[اويهءة]/g, '');
+function lev(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m || !n) return Math.max(m, n);
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
   }
-  if (!rows.length) return { speak: 'مش لاقي صنف بالاسم ده', open: { q: name } };
-  // the strength he said first («زوركال 40»), then the one that sells most (ar_store_items.popular_rank, 1 = the most sold:
-  // «زوركال» = the 40 mg tablets, not the vial), then the shortest name
-  const pop = new Map<number, number>();
-  for (const p of (await rest(c, 'ar_store_items?select=id,popular_rank&id=in.(' + rows.map((r) => Number(r.item_id)).join(',') + ')')).rows) if (p.popular_rank != null) pop.set(Number(p.id), Number(p.popular_rank));
-  const rank = (r: Json) => pop.has(Number(r.item_id)) ? pop.get(Number(r.item_id)) as number : 1e9;
-  rows.sort((a, b) => (rankByNumber(name, String(b.arabic_name || b.name)) - rankByNumber(name, String(a.arabic_name || a.name)))
-    || (rank(a) - rank(b))
-    || (String(a.arabic_name || a.name).length - String(b.arabic_name || b.name).length));
-  const it = rows[0];
-  const id = Number(it.item_id);
+  return prev[n];
+}
+/** How alike two spoken/written words are, 0..1: the letters, or the consonants only (vowels are often dropped or misheard). */
+export function wordSim(q: string, n: string): number {
+  if (!q || !n) return 0;
+  if (q === n) return 1;
+  if (q.length >= 3 && (n.startsWith(q) || q.startsWith(n) && n.length >= 3)) return 0.92;
+  const s1 = 1 - lev(q, n) / Math.max(q.length, n.length);
+  const a = skel(q), b = skel(n);
+  const s2 = a && b ? (1 - lev(a, b) / Math.max(a.length, b.length)) * 0.95 : 0;
+  return Math.max(s1, s2);
+}
+/** A name's score for what was heard: each heard word matched to its best word in the name, averaged. */
+export function nameScore(heard: string[], toks: string[]): number {
+  if (!heard.length || !toks.length) return 0;
+  let s = 0;
+  for (const h of heard) { let best = 0; for (const t of toks) { const v = wordSim(h, t); if (v > best) best = v; } s += best; }
+  return s / heard.length;
+}
+async function pages(c: Ctx, path: string, n: number): Promise<Json[]> {
+  const all = await Promise.all(Array.from({ length: n }, (_, i) => rest(c, path + '&offset=' + i * 1000 + '&limit=1000')));
+  return all.flatMap((r) => r.rows);
+}
+async function catalog(c: Ctx, now: number): Promise<Cat[]> {
+  if (catCache.items.length && now - catCache.at < CAT_TTL_MS) return catCache.items;
+  const [stock, store] = await Promise.all([
+    pages(c, 'ar_stock?select=item_id,name,arabic_name&order=item_id', 7),
+    pages(c, 'ar_store_items?select=id,name,arabic_name,popular_rank&arabic_name=not.is.null&order=id', 10),
+  ]);
+  const pop = new Map<number, number>(), byId = new Map<number, Cat>();
+  for (const r of store) if (r.popular_rank != null) pop.set(Number(r.id), Number(r.popular_rank));
+  for (const r of stock) { const id = Number(r.item_id), ar = String(r.arabic_name || ''); byId.set(id, { id, name: String(r.name || ''), ar, toks: tok(ar || String(r.name || '')), pop: pop.get(id) ?? 1e9, inStock: true }); }
+  for (const r of store) { const id = Number(r.id); if (!byId.has(id)) byId.set(id, { id, name: String(r.name || ''), ar: String(r.arabic_name || ''), toks: tok(String(r.arabic_name || '')), pop: pop.get(id) ?? 1e9, inStock: false }); }
+  const items = [...byId.values()].filter((x) => x.toks.length);
+  if (items.length) catCache = { at: now, items };
+  return items;
+}
+export function _setCatalog(items: Cat[], at: number) { catCache = { at, items }; }
+export function _cat(id: number, name: string, ar: string, pop: number, inStock: boolean): Cat { return { id, name, ar, toks: tok(ar || name), pop, inStock }; }
+export const SURE = 0.82, CLOSE = 0.6;
+/** The best products for a spoken name: [{item, score}], the strength he said and the best sellers first among equal scores. */
+export function findItems(cat: Cat[], heard: string): { it: Cat; score: number }[] {
+  const hw = tok(heard).filter((w) => !STOP.has(w));
+  if (!hw.length) return [];
+  const scored: { it: Cat; score: number }[] = [];
+  for (const it of cat) { const s = nameScore(hw, it.toks); if (s >= CLOSE) scored.push({ it, score: s }); }
+  const bucket = (s: number) => Math.floor(s / 0.04);   // scores this close count as equal
+  scored.sort((a, b) => (bucket(b.score) - bucket(a.score))
+    || (rankByNumber(heard, b.it.ar || b.it.name) - rankByNumber(heard, a.it.ar || a.it.name))
+    || (a.it.pop - b.it.pop) || (b.score - a.score) || ((a.it.ar || a.it.name).length - (b.it.ar || b.it.name).length));
+  return scored.slice(0, 6);
+}
+
+// What may be SAID about a product (owner 2026-11-17: «لما اساله على الصنف قدام الزباين … يقول لي الصنف والسعر الجمهور بس … ما ينفعش يقول لي
+// بتشتري منين ولا الخصم … قدام الناس ما ينفعش»): by default ONLY the name and the public price. The stock, the expiry and the last
+// purchase (supplier, date, discount) only when he asks for that very thing.
+type Want = 'price' | 'stock' | 'last_buy' | 'expiry' | 'all';
+const WANTS = ['price', 'stock', 'last_buy', 'expiry', 'all'];
+/** What is said about one product: the name and the public price, and only what he asked for on top. */
+async function itemAnswer(c: Ctx, id: number, want: Want, now: number, others: Cat[] = []): Promise<Answer> {
+  const st = (await rest(c, 'ar_stock?select=item_id,name,arabic_name,price,packs,units,parts,exp_near&item_id=eq.' + id)).rows[0];
+  const si = st ? null : (await rest(c, 'ar_store_items?select=id,name,arabic_name,price&id=eq.' + id)).rows[0];
+  const it = st || si;
+  if (!it) return { speak: 'مش لاقي الصنف ده' };
   const nm = spoken(it.arabic_name as string, it.name as string);
   const parts = Number(it.parts || 1) >= 1 ? Number(it.parts || 1) : 1;
-  const have = inStock ? Number(it.packs || 0) + Number(it.units || 0) / parts : 0;
+  const have = st ? Number(st.packs || 0) + Number(st.units || 0) / parts : 0;
   const bits: string[] = [];
-  bits.push(nm + (Number(it.price) > 0 ? ': ' + num(Number(it.price)) + ' جنيه' : ''));
-  bits.push(have >= 0.05 ? 'عندنا ' + num(have) : 'مش موجود عندنا دلوقتي');
-  // exp_near = the nearest expiry date of what is in stock (a date, 2026-11-17): said only when it is within 3 months
-  const exp = Date.parse(String(it.exp_near || ''));
-  if (inStock && !isNaN(exp) && exp - now < 92 * 86400000) {
-    const d = new Date(exp);
-    bits.push(exp <= now ? 'وفيه منه صلاحيته خلصت' : 'وفيه منه صلاحيته قربت، شهر ' + (d.getUTCMonth() + 1));
+  bits.push(nm + (Number(it.price) > 0 ? ': ' + num(Number(it.price)) + ' جنيه' : '، سعره مش متسجل'));
+  if (want === 'stock' || want === 'all') bits.push(have >= 0.05 ? 'عندنا ' + num(have) : 'مش موجود عندنا دلوقتي');
+  if (want === 'expiry' || want === 'all') {
+    // exp_near = the nearest expiry DATE of what is in stock
+    const exp = Date.parse(String(st?.exp_near || ''));
+    if (!isNaN(exp)) { const d = new Date(exp); bits.push((exp <= now ? 'وفيه منه صلاحيته خلصت، ' : 'أقرب صلاحية ') + 'شهر ' + (d.getUTCMonth() + 1) + ' سنة ' + d.getUTCFullYear()); }
+    else bits.push('صلاحيته مش متسجلة');
   }
-  // its bag / the general shortages, from the bags file
-  const j = await bags(c, now);
-  for (const b of bagList(j)) {
-    const x = b.items.find((y) => y.id === id);
-    if (x) { bits.push('وهو ناقص في ' + (b.id === 'pv' ? 'نواقص كل الشركات' : 'حقيبة ' + b.name) + '، بيتباع ' + num(x.sold30) + ' في الشهر'); break; }
+  if (want === 'all') {
+    const j = await bags(c, now);
+    for (const b of bagList(j)) { const x = b.items.find((y) => y.id === id); if (x) { bits.push('وهو ناقص في ' + (b.id === 'pv' ? 'نواقص كل الشركات' : 'حقيبة ' + b.name) + '، بيتباع ' + num(x.sold30) + ' في الشهر'); break; } }
+    const gs = ((j?.bags as Json | undefined)?.gs || []) as unknown[];
+    if (gs.map(Number).includes(id)) bits.push('وهو في النواقص العامة');
   }
-  const gs = ((j?.bags as Json | undefined)?.gs || []) as unknown[];
-  if (gs.map(Number).includes(id)) bits.push('وهو في النواقص العامة');
-  const buys = (await rest(c, 'ar_item_buys?select=supplier,last_date,discount_pct&item_id=eq.' + id + '&order=last_date.desc&limit=2')).rows;
-  if (buys.length) {
-    const b = buys[0];
-    const d = String(b.last_date || '').slice(0, 10).split('-');
-    bits.push('آخر شرا من ' + (SUPPLIERS[String(b.supplier).toUpperCase()] || String(b.supplier)) + (d.length === 3 ? ' يوم ' + Number(d[2]) + '/' + Number(d[1]) : '') + (Number(b.discount_pct) > 0 ? ' بخصم ' + num(Number(b.discount_pct)) + '٪' : ''));
+  if (want === 'last_buy' || want === 'all') {
+    const buys = (await rest(c, 'ar_item_buys?select=supplier,last_date,discount_pct&item_id=eq.' + id + '&order=last_date.desc&limit=1')).rows;
+    if (buys.length) {
+      const b = buys[0], d = String(b.last_date || '').slice(0, 10).split('-');
+      bits.push('آخر شرا من ' + (SUPPLIERS[String(b.supplier).toUpperCase()] || String(b.supplier)) + (d.length === 3 ? ' يوم ' + Number(d[2]) + '/' + Number(d[1]) : '') + (Number(b.discount_pct) > 0 ? ' بخصم ' + num(Number(b.discount_pct)) + '٪' : ''));
+    } else bits.push('ومفيش شرا متسجل له');
   }
-  const more = rows.length > 1 ? 'وفيه ' + (rows.length - 1) + ' أصناف تانية قريبة من الاسم على الشاشة' : '';
   return {
-    speak: bits.join('، ') + '.' + (more ? ' ' + more + '.' : ''),
-    show: rows.slice(0, 6).map((r) => String(r.arabic_name || r.name) + (Number(r.price) > 0 ? ' — ' + num(Number(r.price)) + ' ج' : '')).join('\n'),
+    speak: bits.join('، ') + '.',
+    show: [String(it.arabic_name || it.name) + (Number(it.price) > 0 ? ' — ' + num(Number(it.price)) + ' ج' : ''), ...others.map((o) => o.ar || o.name)].join('\n'),
     open: { q: String(it.name || nm) }, ctx: { item: { id, name: nm } },
   };
+}
+
+async function itemInfo(c: Ctx, name: string, want: Want, now: number, ctxItem: Json | null): Promise<Answer> {
+  // «وآخر شرا كان منين» / «صلاحيته» about the product we were talking about: Gemini may pass its name again, or nothing
+  if (ctxItem && (!name.trim() || norm(name) === norm(String(ctxItem.name || '')))) return itemAnswer(c, Number(ctxItem.id), want, now);
+  const cat = await catalog(c, now);
+  const hits = findItems(cat, name);
+  if (!hits.length) return { speak: 'مش لاقي صنف بالاسم ده. قوله تاني', open: { q: name } };
+  const top = hits[0];
+  if (top.score < SURE) {
+    // not sure: ask, never say a wrong product with confidence
+    const n1 = spoken(top.it.ar, top.it.name), n2 = hits[1] && hits[1].score >= CLOSE ? spoken(hits[1].it.ar, hits[1].it.name) : '';
+    return { speak: 'تقصد ' + n1 + (n2 && n2 !== n1 ? ' ولا ' + n2 : '') + '؟', ctx: { suggest: { id: top.it.id, name: n1, want }, ...(n2 && n2 !== n1 ? { suggest2: { id: hits[1].it.id, name: n2, want } } : {}) } };
+  }
+  return itemAnswer(c, top.it.id, want, now, hits.slice(1, 5).filter((h) => h.score >= SURE).map((h) => h.it));
 }
 
 async function shortages(c: Ctx, which: string, bagName: string, readAloud: boolean, now: number, ctxBag = ''): Promise<Answer> {
@@ -314,10 +384,15 @@ const SYSTEM = [
   'Call `laptop` for anything you cannot answer with the tools, and ALWAYS for anything that records, changes or sends: a sale, a payment, a transfer between bags, a purchase order, a stock count, a WhatsApp message, a call, cancelling something, or questions about profit, reasons or analysis.',
   'Call `end` when he ends the conversation («خلاص»، «شكرا»، «كده تمام»، «مع السلامة»).',
   'For small talk answer yourself in a few words, no tool.',
+  'Never open a page instead of answering a question: open_page only when he asks to open or see a page. If he asks for data no tool has (for example how many people visited the store site), call `laptop`.',
+  'Never say purchase prices, discounts or suppliers unless he asks for them: customers may be listening.',
 ].join('\n');
 const TOOLS = [{
   functionDeclarations: [
-    { name: 'item_info', description: 'Price, stock, expiry, its bag / shortage and the last purchase of ONE medicine or product.', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING', description: 'The product name as he said it (Arabic or English), without words like سعر/عندنا/كام.' } }, required: ['name'] } },
+    { name: 'item_info', description: 'ONE medicine or product: by default only its name and public price (he often asks in front of customers). More only when he asks for it.', parameters: { type: 'OBJECT', properties: {
+      name: { type: 'STRING', description: 'The product name as he said it (Arabic or English), without words like سعر/عندنا/كام/رصيد. Empty when he means the product talked about last.' },
+      want: { type: 'STRING', enum: WANTS, description: 'price = just the name and the public price (the default: «سعر X»، «X بكام»، or only the name); stock = how many we have («عندنا كام»، «موجود؟»، «رصيد X»); last_buy = from which warehouse / when / discount («اشترينا منين»، «آخر شرا»، «خصمه»); expiry = its expiry («صلاحيته»); all = everything («كل حاجة عن»).' },
+    }, required: ['name'] } },
     { name: 'shortages', description: 'The shortage lists: «النواقص العامة» (general) or a bag («حقيبة النواقص اليومية»، «حقيبة سرحان»، «نواقص كل الشركات»).', parameters: { type: 'OBJECT', properties: { which: { type: 'STRING', enum: ['general', 'bag'] }, bag: { type: 'STRING', description: 'The bag as he named it, when which=bag.' }, read_aloud: { type: 'BOOLEAN', description: 'true when he wants the items read one by one («اقرالي»، «قولي اللي فيها»).' } }, required: ['which'] } },
     { name: 'balance', description: 'The account balance of a customer («عميل») or a supplier / warehouse («مورد»، «مخزن»، e.g. الفتح، ابن سينا، فارما).', parameters: { type: 'OBJECT', properties: { party: { type: 'STRING', enum: ['customer', 'vendor'] }, name: { type: 'STRING' } }, required: ['party', 'name'] } },
     { name: 'sales', description: 'Sales totals for a period.', parameters: { type: 'OBJECT', properties: { period: { type: 'STRING', enum: ['today', 'yesterday', 'week', 'month'] } }, required: ['period'] } },
@@ -360,6 +435,9 @@ function tooMany(key: string, now: number): boolean {
 }
 
 const ENDS = /^(خلاص|شكرا|شكرًا|متشكر|كده تمام|تمام كده|مع السلامه|سلام|لا خلاص|خلاص كده|خلاص شكرا)[ .!]*$/;
+// answers to «تقصد X؟» (normalized text)
+const YES = /^(ايوه|ايوا|اه|ايوه هو|هو ده|هو|صح|بالظبط|نعم|ايوه بالظبط|ايوه ده|ايوه هو ده|تمام|ايوه صح)$/;
+const NO = /^(لا|لا مش ده|مش ده|لا خالص|لا مش هو|مش هو)$/;
 
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, now = Date.now()): Promise<Response> {
   const t0 = Date.now();
@@ -396,17 +474,29 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   if (ENDS.test(norm(text))) return done({ speak: 'تمام', end: true }, 'end');
   const page = pageOf(text);
   if (page) return done({ speak: 'فتحتلك ' + PAGES[page], do_now: [{ type: 'open_tab', tab: page }] }, 'open_page');
+  const c: Ctx = { base, key: env.SUPABASE_SERVICE_ROLE_KEY, fetch: fetchImpl };
+  // «تقصد X؟» → his «أيوه» / «التاني» / «لا» is answered at once, without Gemini
+  const sug = ctx && ctx.suggest && typeof ctx.suggest === 'object' ? ctx.suggest as Json : null;
+  if (sug) {
+    const n = norm(text), s2 = ctx && ctx.suggest2 && typeof ctx.suggest2 === 'object' ? ctx.suggest2 as Json : null;
+    const wantOf = (s: Json) => (WANTS.includes(String(s.want)) ? String(s.want) : 'price') as Want;
+    if (YES.test(n)) return done(await itemAnswer(c, Number(sug.id), wantOf(sug), now), 'item_info');
+    if (s2 && (/التاني|الثاني|التانيه|التانى/.test(n) || norm(String(s2.name)).split(' ').some((w) => w.length > 2 && n.includes(w)))) return done(await itemAnswer(c, Number(s2.id), wantOf(s2), now), 'item_info');
+    if (NO.test(n)) return done({ speak: 'طيب، قول اسم الصنف تاني' }, 'item_info');
+  }
   const model = (env.GEMINI_TEXT_MODEL || TEXT_MODEL).trim();
   if (!MODEL_RE.test(model)) return reply(500, { error: 'model' });
   const { pick, why } = await understand(env, fetchImpl, model, text, history, ctx);
   // Gemini not there: the laptop still answers (the old way)
   if (!pick) return done({ speak: '', handoff: true }, 'handoff:' + why);
   if ('text' in pick) return done({ speak: pick.text.slice(0, 300) }, 'chat');
-  const c: Ctx = { base, key: env.SUPABASE_SERVICE_ROLE_KEY, fetch: fetchImpl };
   const a = pick.args;
   try {
     switch (pick.tool) {
-      case 'item_info': return done(await itemInfo(c, String(a.name || ''), now), 'item_info');
+      case 'item_info': {
+        const want = (WANTS.includes(String(a.want)) ? String(a.want) : 'price') as Want;
+        return done(await itemInfo(c, String(a.name || ''), want, now, ctx && ctx.item && typeof ctx.item === 'object' ? ctx.item as Json : null), 'item_info');
+      }
       case 'shortages': {
         const ctxBag = ctx && ctx.list === 'bag' ? String(ctx.bag || '') : '';
         // «اقرالي الباقي» right after a bag means that bag, not the general list (unless he says «العامة»)
