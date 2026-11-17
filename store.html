@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#cf4014" />
+    <meta name="theme-color" content="#ffffff" />
     <title>صيدلية عسكر</title>
     <link rel="icon" href="icons/arabic-192.png?v=logo2" />
     <link rel="apple-touch-icon" href="icons/apple-touch-180.png?v=logo2" />
@@ -15,25 +15,27 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap" />
     <link rel="stylesheet" href="store/store.css?v=orange-20261115a" />
     <link rel="stylesheet" href="store/look.css?v=orange-20261115a" />
-    <link rel="stylesheet" href="store/polish.css?v=acctfirst-20261116a" />
+    <link rel="stylesheet" href="store/polish.css?v=brand-20261117a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the three above (store/capsule.css, store/motion.js) -->
     <link rel="stylesheet" href="store/capsule.css?v=users-20261117a" />
+    <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (store/brand.css), a layer over all of the above -->
+    <link rel="stylesheet" href="store/brand.css?v=brand-20261117a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
-    <script src="ar/settings.js?v=dark-20261116a"></script>
+    <script src="ar/settings.js?v=brand-20261117a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=samsung-20261116a"></script>
+    <script src="store/i18n-en-store.js?v=brand-20261117a"></script>
     <script src="ar/i18n.js?v=alt-20261112a"></script>
-    <script src="store/theme.js?v=dark-20261116a"></script>
+    <script src="store/theme.js?v=brand-20261117a"></script>
   </head>
   <body>
-    <p class="trial">نسخة تجريبية</p>
+    <p class="bless">اللهم صل على النبي ﷺ</p>
 
     <!-- الرئيسية -->
     <div data-view="home">
       <header class="top">
         <div class="brand">
           <img src="icons/arabic-96.png?v=logo2" alt="لوجو صيدلية عسكر" width="48" height="48" fetchpriority="high" />
-          <div><strong>صيدلية عسكر</strong><span dir="ltr">Asker Pharmacy</span><em id="openNow" class="open-now" hidden></em></div>
+          <div><strong>صيدلية عسكر</strong><span dir="ltr">ASKER PHARMACY</span></div>
         </div>
         <div class="top-btns">
           <a href="asker-nawaqes-arabic.html" id="botBtn" class="cart-btn bot-btn" hidden aria-label="رجوع للبوت">
@@ -58,36 +60,26 @@
            last order, «محتاج إيه النهارده؟», best sellers, what you looked at, «مش لاقي دواك؟», and WhatsApp the pharmacist -->
       <div class="slides" id="slides" aria-roledescription="carousel">
         <section class="hero slide">
-          <h1 id="heroTitle">اطلب من صيدليتك واستلمه جاهز</h1>
-          <p id="heroText">اختار اللي محتاجه، وإحنا نجهّزه ونكلمك على واتساب لما يبقى جاهز. تستلمه وتدفع في الصيدلية.</p>
-          <div class="hero-actions">
-            <a href="#search" class="hero-btn">دوّر على اللي محتاجه</a>
-            <a href="#cart" class="hero-btn ghost" id="heroRx">صوّر الروشتة وابعتها</a>
+          <div class="hero-t">
+            <em id="openNow" class="open-now" hidden></em>
+            <h1 id="heroTitle">صحتك أولوية</h1>
+            <p id="heroText">صيدلية عسكر من سنة 1981. اطلب اللي محتاجه واستلمه جاهز من الصيدلية.</p>
+            <div class="hero-actions"><a href="#search" class="hero-btn">ابدأ الطلب</a></div>
           </div>
-        </section>
-        <section class="hero slide s-rx">
-          <h2>معاك روشتة؟</h2>
-          <p>صوّرها من موبايلك وابعتها، والصيدلي يقراها ويكلمك بالأسعار والبدايل قبل ما نجهّز طلبك.</p>
-          <div class="hero-actions"><a href="#cart" class="hero-btn">صوّر الروشتة دلوقتي</a></div>
-        </section>
-        <section class="hero slide s-find">
-          <h2>مش لاقي دواك؟</h2>
-          <p>اكتب اسمه وضيفه لطلبك من غير سعر، وإحنا ندوّر عليه ونكلمك بسعره وميعاده.</p>
-          <div class="hero-actions"><a href="#search" class="hero-btn">اكتب اسم الدوا</a></div>
-        </section>
-        <section class="hero slide s-wa" id="slideWa" hidden>
-          <h2>اسأل الصيدلي</h2>
-          <p>عندك سؤال عن دوا أو جرعة أو بديل؟ ابعتلنا على واتساب ونرد عليك.</p>
-          <div class="hero-actions"><a href="#" class="hero-btn" id="slideWaBtn" target="_blank" rel="noopener">كلّم الصيدلي واتساب</a></div>
+          <img class="hero-badge" src="icons/arabic-192.png?v=logo2" alt="صيدلية عسكر، تأسست سنة 1981" width="112" height="112" fetchpriority="high" />
         </section>
       </div>
       <div class="dots" id="dots" aria-hidden="true"></div>
+      <div class="two-tiles">
+        <a href="#cart" class="tile" id="heroRx"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7z"/><path d="M10 8h4M10 12h4M10 16h2"/></svg><strong>معاك روشتة؟</strong><span>صوّرها وابعتها</span></a>
+        <a href="#search" class="tile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><strong>مش لاقي دواك؟</strong><span>اكتب اسمه وإحنا نجيبه</span></a>
+      </div>
+      <div id="slideWa" class="wa-tile" hidden><a id="slideWaBtn" href="#" class="tile" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1c-1-.4-2.1-1.5-2.5-2.5l1-1-1-2z"/></svg><strong>اسأل الصيدلي</strong><span>عندك سؤال عن دوا أو جرعة أو بديل؟ ابعتلنا على واتساب ونرد عليك</span></a></div>
 
       <ul class="trust" aria-label="ليه تطلب مننا">
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span>صيدلية من 1981</span></li>
         <li><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M15 15l2 2 3-3"/></svg><span>صيدلي بيراجع طلبك</span></li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg><span>الدفع في الصيدلية</span></li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l2-6h14l2 6M4 10v10h16V10M3 10h18M9 20v-6h6v6"/></svg><span>استلمه جاهز من الصيدلية</span></li>
+        <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l2-6h14l2 6M4 10v10h16V10M3 10h18M9 20v-6h6v6"/></svg><span>استلم وادفع في الصيدلية</span></li>
       </ul>
 
       <!-- a credit customer's own account (his personal link from the pharmacy, store/account.js) -->
@@ -111,12 +103,12 @@
         <div><strong>نزّل الصيدلية على موبايلك</strong><span>تفتحها من الشاشة الرئيسية زي أي تطبيق</span><span id="installNote" class="install-note" hidden></span></div>
         <button id="installBtn" type="button">📲 ثبّته</button>
       </div>
-      <section class="block">
+      <section class="block" hidden>
         <h2>محتاج إيه النهارده؟</h2>
         <div id="needs" class="needs"></div>
       </section>
       <section class="block">
-        <h2>الأقسام</h2>
+        <h2>تسوّق حسب القسم</h2>
         <div id="sections" class="sections"></div>
       </section>
       <section id="popularBox" class="block popular-block" hidden>
@@ -127,13 +119,17 @@
         <h2>شفته قريب</h2>
         <div id="seen" class="rail"></div>
       </section>
-      <a href="#search" class="promo">
-        <span><strong>مش لاقي اللي بتدوّر عليه؟</strong><span>اكتب اسمه وإحنا نجيبهولك ونكلمك بسعره</span></span>
-        <span class="promo-go" aria-hidden="true">←</span>
-      </a>
+
       <p id="siteUserLine" class="foot" hidden><span id="siteUserName"></span> · <button type="button" class="linklike" id="siteUserOut">خروج</button></p>
-      <p id="contact" class="foot" hidden>عندك سؤال؟ كلمنا واتساب: <a id="waLink" href="#" target="_blank" rel="noopener" dir="ltr"><span id="waNumber"></span></a></p>
-      <p class="foot">الأسعار والمتوفر بيتحدثوا من الصيدلية كل كام ساعة.</p>
+      <footer class="ft">
+        <div class="ft-cols">
+          <div><strong>الصيدلية</strong><a href="#orders">طلباتي</a><a href="#chat">الرسايل</a>
+            <span id="contact" hidden>واتساب: <a id="waLink" href="#" target="_blank" rel="noopener" dir="ltr"><span id="waNumber"></span></a></span></div>
+          <div><strong>المواعيد</strong><span>كل يوم 9 ص – 12 بالليل</span><span>الصيف لحد 2 بالليل</span><span>الجمعة 3 – 11 بالليل</span></div>
+        </div>
+        <p class="ft-low">اللهم صل على النبي ﷺ<br />© صيدلية عسكر · منذ 1981</p>
+        <p class="ft-note">الأسعار والمتوفر بيتحدثوا من الصيدلية كل كام ساعة.</p>
+      </footer>
     </div>
 
     <!-- البحث -->
@@ -334,9 +330,7 @@
         <div id="themePick" class="accents" role="radiogroup" aria-label="لون الموقع"></div>
         <label id="themeCustomRow" class="custom-row" for="themeCustom"><span>لون من اختيارك</span><input id="themeCustom" type="color" value="#0a4aa6" /></label>
         <!-- 2026-11-16: the dark surfaces of the new look (the bottom bar, the balance card, the first slide): four sets that suit the orange, store/theme.js -->
-        <h3 class="pick-h">اللون الغامق</h3>
-        <div id="storeDarkPick" class="accents" role="radiogroup" aria-label="اللون الغامق"></div>
-        <label id="storeDarkCustomRow" class="custom-row" for="storeDarkCustom"><span>لون غامق من اختيارك</span><input id="storeDarkCustom" type="color" value="#066f74" /></label>
+        
         <button type="button" id="themeReset" class="share" hidden>رجّع لاختيار الصيدلية</button>
       </div>
     </div>
@@ -357,7 +351,7 @@
     <script src="store/account.js?v=users-20261117b"></script>
     <script src="store/siteuser.js?v=users-20261117a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=users-20261117b"></script>
+    <script src="store/store.js?v=brand-20261117a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
     <script src="store/motion.js?v=capsule-20261116a"></script>

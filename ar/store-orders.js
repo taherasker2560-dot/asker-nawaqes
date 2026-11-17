@@ -24,8 +24,8 @@
         `أهلًا ${o.customer_name}، معاك صيدلية عسكر.`,
         `الروشتة (طلب رقم ${o.id}) وصلتنا، ودي الأدوية والأسعار:`,
         '- ',
-        'الإجمالي:  جنيه، والدفع كاش عند الاستلام.',
-        'مصاريف التوصيل: ',
+        'الإجمالي:  جنيه، والدفع في الصيدلية لما تستلم.',
+        'طلبك هيتجهّز وتستلمه من الصيدلية.',
         'نأكد الطلب؟',
       ].join('\n');
     }
@@ -36,8 +36,8 @@
       `أهلًا ${o.customer_name}، معاك صيدلية عسكر.`,
       `طلبك رقم ${o.id} وصلنا:`,
       ...lines,
-      later ? `الإجمالي ${money(o.total)} جنيه + الأصناف اللي بالطلب، والدفع كاش عند الاستلام.` : `الإجمالي ${money(o.total)} جنيه، والدفع كاش عند الاستلام.`,
-      'مصاريف التوصيل: ',
+      later ? `الإجمالي ${money(o.total)} جنيه + الأصناف اللي بالطلب، والدفع في الصيدلية لما تستلم.` : `الإجمالي ${money(o.total)} جنيه، والدفع في الصيدلية لما تستلم.`,
+      'طلبك هيتجهّز وتستلمه من الصيدلية.',
       'نأكد الطلب؟',
     ].join('\n');
   }
@@ -76,7 +76,7 @@
       ${o.notes ? `<span class="hint">ملاحظة: ${esc(o.notes)}</span>` : ''}
       ${rx ? `<div class="so-rxs"><span class="hint">${items ? 'ومعاه روشتة:' : 'طلب بالروشتة: اقراها واكتب الأسعار في رسالة الواتساب'}</span>${rx}</div>` : ''}
       ${items ? `<ul class="so-lines">${items}</ul>
-      <div class="so-total">الإجمالي ${esc(money(o.total))} ج (من غير التوصيل${rx ? ' والروشتة' : ''}${later ? `، و${later} صنف بالطلب لسه من غير سعر` : ''})</div>` : ''}
+      <div class="so-total">الإجمالي ${esc(money(o.total))} ج${rx || later ? ' (' + [rx ? 'من غير الروشتة' : '', later ? `${later} صنف بالطلب لسه من غير سعر` : ''].filter(Boolean).join('، ') + ')' : ''}</div>` : ''}
       <div class="so-actions">
         <a class="so-wa" href="${esc(waLink(o.phone, confirmMessage(o)))}" target="_blank" rel="noopener">واتساب</a>
         ${o.status === 'new' ? `<button type="button" class="small" data-set="confirmed">اتأكد</button>` : ''}

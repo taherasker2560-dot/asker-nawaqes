@@ -8,14 +8,14 @@
   // «برتقالي فاقع» first and the DEFAULT (owner 2026-11-15: «عايز اللون الأساسي يبقى الأورنج الفاقع ده … يبقى عندهم هم الأوبشن يغيروا»): the bot's
   // color unless someone picks another one. «أزرق عسكر» (the blue of the round logo, the default 2026-11-12 to 11-15) is the second one.
   const PRESETS = [
-    ['flame', 'برتقالي فاقع', '#d84315'], ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
+    ['terra', 'برتقالي هادي', '#c0522a'], ['flame', 'برتقالي فاقع', '#d84315'], ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
     ['purple', 'بنفسجي', '#5b3a8c'], ['violet', 'موف غامق', '#4527a0'], ['indigo', 'نيلي', '#283593'], ['blue', 'أزرق', '#1d4f91'],
     ['sky', 'لبني', '#0277bd'], ['cyan', 'سماوي', '#00838f'], ['teal', 'تركواز', '#0e6b72'], ['emerald', 'زمردي', '#00796b'],
     ['green', 'أخضر', '#1d6f48'], ['leaf', 'أخضر زرعي', '#2e7d32'], ['olive', 'زيتوني', '#556b2f'], ['lime', 'ليموني غامق', '#827717'],
     ['gold', 'دهبي', '#9a7414'], ['orange', 'برتقالي', '#a8501a'], ['copper', 'نحاسي', '#8d4e2a'],
     ['brown', 'بني', '#5d4037'], ['gray', 'رمادي', '#3f4650'], ['slate', 'رصاصي', '#455a64'], ['charcoal', 'فحمي', '#263238'],
   ].map(([id, name, hex]) => ({ id, name, hex }));
-  const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'flame';
+  const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'terra'; // the calm orange (owner 2026-11-17: «تهدي درجة الأورنج … مش فج ولا فاقع»); «برتقالي فاقع» stays in the list
   // the dark surfaces of the new look «كبسولة وموجة» (the bottom bar, the greeting, the balance card). Owner 2026-11-16: the navy was «مش حلو»;
   // «قهوة دافية و اعملها اوبشن اغيرها براحتى»; then he sent a picture and asked for «اللون الأخضر … بنفس درجته اللي في الصورة»: the green is the DEFAULT now,
   // taken from that picture (its teal #018b90 is the lighter step; the surface is the same hue deepened so white text reads, 5.9:1). Four sets that suit
@@ -90,7 +90,7 @@
   function choice() {
     if (read(LOOK, '') !== '1') {
       const was = read(KEY, '');
-      if (!was || was === 'crimson' || was === 'asker') write(KEY, DEFAULT_ID);
+      // 2026-11-17: whoever still has the old default (the vivid orange nobody picked on purpose) gets the calm one, once\n    if (!was || was === 'crimson' || was === 'asker' || (was === 'flame' && !read('asker-calm', ''))) write(KEY, DEFAULT_ID);\n    write('asker-calm', '1');
       write(LOOK, '1');
     }
     let a = read(KEY, DEFAULT_ID), night = read(NIGHT, '') === '1';
@@ -124,7 +124,7 @@
     document.documentElement.classList.toggle('night', c.night);
     // the phone's top bar = the top of the header (the main color); at night the dark page
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? t.tint : t.main);
+    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff'); // the header is white now (ar/brand.css)
     return c;
   }
   root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice, DARKS, DARK_DEFAULT, darkOf, applyDark };

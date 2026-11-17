@@ -15,7 +15,7 @@ run('Store settings reach visitors: WhatsApp slide and line (no floating button)
  assert.equal(await page.getAttribute('#slideWaBtn','href'),'https://wa.me/201003032931?text='+encodeURIComponent('عندي سؤال للصيدلي'));
  assert.equal(await page.$('#waFab'),null,'no floating WhatsApp button');
  assert.equal(await page.$('.wa-fab'),null);
- assert.equal(await text(page,'#heroTitle'),'اطلب من صيدليتك واستلمه جاهز','empty owner words = the page\'s own');
+ assert.equal(await text(page,'#heroTitle'),'صحتك أولوية','empty owner words = the page\'s own');
  // the default color from the settings is the one the site already has (flame, day)
  assert.equal(await page.evaluate(()=>document.documentElement.classList.contains('night')),false);
  // his own words when he types them in the bot

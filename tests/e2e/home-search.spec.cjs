@@ -137,13 +137,13 @@ run('search on top: ✏️ fixes the Arabic name everywhere',async({page})=>{
  await page.click('#hsItems [data-edit]');await page.fill('#hsAr','ك');await page.click('#hsItems [data-save]');
  await page.waitForFunction(()=>/ماتحفظش/.test(document.getElementById('hsItems').textContent));
 },{home:true});
-run('settings: 25 colors (the vivid orange first and the default), any color, the night look, kept after a reload',async({page})=>{
- // a new phone opens on the vivid orange (2026-11-15; the blue of the round logo before)
- assert.equal(await page.evaluate(()=>document.documentElement.dataset.accent),'flame');
- assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--crimson').trim()),'#cf4014');
+run('settings: 26 colors (the calm orange first and the default), any color, the night look, kept after a reload',async({page})=>{
+ // a new phone opens on the calm orange (2026-11-17; the vivid orange 11-15, the blue of the round logo before)
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.accent),'terra');
+ assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--crimson').trim()),'#c0522a');
  await page.click('#settingsBtn');assert.ok(await page.isVisible('#settingsPanel'));
- assert.equal(await page.$$eval('#accentPick [data-accent]',b=>b.length),25);
- assert.equal(await page.$eval('#accentPick [data-accent]',b=>b.dataset.accent),'flame');
+ assert.equal(await page.$$eval('#accentPick [data-accent]',b=>b.length),26);
+ assert.equal(await page.$eval('#accentPick [data-accent]',b=>b.dataset.accent),'terra');
  await page.click('[data-accent="blue"]');
  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--crimson').trim()),'#1d4f91');
  // any color: a very light one is darkened so white text on it stays readable
