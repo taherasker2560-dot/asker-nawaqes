@@ -87,6 +87,12 @@
     phone: 'رقم الموبايل',
     start: 'ابدأ',
     type: 'اكتب رسالتك…',
+    // «📝 شكوى أو اقتراح» from the customer's account (owner 2026-11-18: «رابط يوصل لرسائل الصفحة بالشكاوى والمقترحات … فويس أو مكتوبة»)
+    topicBanner: 'بتكتب شكوى أو اقتراح: اكتبها أو سجّلها فويس وهتوصل للصيدلية',
+    topicTag: '📝 شكوى/اقتراح:',
+    topicVoice: '📝 شكوى/اقتراح (فويس)',
+    topicPh: 'اكتب شكواك أو اقتراحك…',
+    topicOff: 'إلغاء',
     photo: '📷 صورة',
     voice: '🎤 فويس',
     recording: 'بيسجّل… دوس ➤ عشان يتبعت',
@@ -253,6 +259,10 @@
       msgs.map(bubble).join('');
     if (atEnd || !list.dataset.seen) { list.scrollTop = list.scrollHeight; list.dataset.seen = '1'; window.scrollTo(0, document.body.scrollHeight); }
   }
+  // «📝 شكوى أو اقتراح» (the account's tile sets it): the first message of this visit carries a mark so the pharmacy sees what it is, and a voice note is announced by a short text before it
+  const TOPIC = 'asker_chat_topic';
+  const topicOn = () => { try { return sessionStorage.getItem(TOPIC) === 'feedback'; } catch (e) { return false; } };
+  const topicDone = () => { try { sessionStorage.removeItem(TOPIC); } catch (e) { /* private window */ } };
   function draw() {
     const v = $('chatBox');
     if (!v) return;
@@ -279,6 +289,7 @@
         `<label class="ch-bigb p2">${esc(TEXTS.supFile)}<small>${esc(TEXTS.supFileSub)}</small><input id="chatFile" type="file" multiple accept="${esc(fileAccept)}" hidden></label></div>`
       : '') +
       `<div id="chatList" class="ch-list"></div>` +
+      (topicOn() ? `<p class="ch-topic">${esc(TEXTS.topicBanner)} <button type="button" class="linklike" data-ch-topic-off>${esc(TEXTS.topicOff)}</button></p>` : '') +
       `<p id="chatNotify" class="ch-notify"${notify ? '' : ' hidden'}>${esc(notify)}</p>` +
       `<p id="chatMsg" class="form-msg bad ch-err"${error ? '' : ' hidden'}>${esc(error)}</p>` +
       `<div class="ch-bar">` +
@@ -289,11 +300,14 @@
         ? `<button type="button" class="ch-ic" data-ch-cancel aria-label="${esc(TEXTS.cancel)}">✕</button><span class="ch-rec"><i class="ch-dot"></i><b id="chatRecT">0:00</b> ${esc(TEXTS.recording)}</span><button type="button" class="ch-ic ch-mic on" data-ch-recsend aria-label="${esc(TEXTS.voice)}">➤</button>`
         // (a warehouse's file is the big «📄 ابعت ملف» above: one more icon here pushed the mic off the screen, owner 2026-11-14)
         : `<label class="ch-ic ch-cam" aria-label="${esc(TEXTS.photo)}">📷<input id="chatPhoto" type="file" multiple accept="image/*" hidden></label>` +
-          `<textarea id="chatText" rows="1" maxlength="2000" placeholder="${esc(TEXTS.type)}"></textarea>` +
+          `<textarea id="chatText" rows="1" maxlength="2000" placeholder="${esc(topicOn() ? TEXTS.topicPh : TEXTS.type)}"></textarea>` +
           `<button type="button" class="ch-ic ch-mic" data-ch-mic aria-label="${esc(TEXTS.voice)}">🎤</button><button type="button" class="ch-ic ch-send" data-ch-send aria-label="ابعت" hidden>➤</button>`) +
       `</div>`;
     drawMsgs();
     drawNotify();
+    // the message box is not translated by the page's engine (textarea): in English its hint is translated here, on every draw
+    const ta = $('chatText');
+    if (ta && root.AskerI18n && root.AskerI18n.lang() === 'en') ta.placeholder = root.AskerI18n.translate(ta.placeholder);
   }
 
   // ---------- sending ----------
@@ -313,8 +327,10 @@
     if (!body || busy) return;
     busy = true;
     try {
-      const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'text', p_body: body });
+      const mark = topicOn();
+      const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'text', p_body: mark ? (TEXTS.topicTag + ' ' + body).slice(0, 2000) : body });
       if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
+      if (mark) { topicDone(); draw(); }
       t.value = ''; toggleSend(); say('');
       afterSend();
     } catch (e) { say(TEXTS.errors.net); } finally { busy = false; }
@@ -431,6 +447,7 @@
     busy = true; say(TEXTS.sending);
     try {
       const path = await upload(blob, 'wav', 'audio/wav');
+      if (topicOn()) { await rpc('ar_chat_send', { p_secret: secret, p_kind: 'text', p_body: TEXTS.topicVoice }); topicDone(); }   // a short text first: the pharmacy sees what the voice note is
       const d = await rpc('ar_chat_send', { p_secret: secret, p_kind: 'voice', p_media: path, p_seconds: seconds });
       if (!d.ok) { say(TEXTS.errors[d.error] || TEXTS.errors.net); return; }
       local.set(d.id, URL.createObjectURL(blob)); say('');
@@ -509,6 +526,7 @@
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#chatBox, #chatNotify')) return;
+    if (e.target.closest('[data-ch-topic-off]')) { topicDone(); draw(); return; }
     if (e.target.closest('[data-ch-send]')) { sendText(); return; }
     if (e.target.closest('[data-ch-mic]')) { startRec(); return; }
     if (e.target.closest('[data-ch-recsend]')) { stopRec(true); return; }
