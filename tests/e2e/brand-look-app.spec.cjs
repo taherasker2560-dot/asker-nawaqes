@@ -27,7 +27,7 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
  assert.equal(look.navRadius,'0px','and flat');
  assert.equal(look.onGroup,'home');assert.equal(look.onBg,'rgba(0, 0, 0, 0)','the section you are in is not a filled pill');
  assert.ok(contrast(look.onColor,'rgb(255, 255, 255)')>=4.5,'and it reads in the accent: '+look.onColor);
- assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'2px');
+ assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'999px','and they stay oval (owner 2026-11-17)');
  assert.equal(look.card,'2px');
  assert.equal(look.accent,'#c0522a','the calm orange by default');
  assert.equal(look.meta,'#ffffff');
@@ -92,11 +92,11 @@ run('Other screens: the main action buttons are the bot\'s color (the yellow inv
  await page.waitForSelector('#dcPickLabel',{state:'visible'});
  const d=await page.evaluate(()=>{const probe=document.createElement('i');probe.style.background='var(--crimson)';document.body.appendChild(probe);const want=getComputedStyle(probe).backgroundColor;probe.remove();const cs=getComputedStyle(document.getElementById('dcPickLabel'));return {want,bg:cs.backgroundColor,r:cs.borderTopLeftRadius,fg:cs.color}});
  assert.equal(d.bg,d.want,'«صوّر فاتورة جديدة» is the bot\'s color, no longer yellow: '+d.bg);
- assert.ok(parseFloat(d.r)<=4,'its corners are square now: '+d.r);
+ assert.equal(d.r,'999px','the buttons stay oval');
  assert.ok(contrast(d.fg,d.bg)>=4.5,'its text reads: '+d.fg+' on '+d.bg);
  assert.deepEqual(await page.evaluate(navyScan),[],'no navy on the invoices screen');
  await page.click('[data-group="sales"]');
  await page.evaluate(()=>document.querySelector('[data-tab="tempsale"]').click());
  await page.waitForSelector('.ts-save',{state:'visible'});
- assert.ok(parseFloat(await page.$eval('.ts-save',e=>getComputedStyle(e).borderTopLeftRadius))<=4,'the sale save has square corners');
+ assert.equal(await page.$eval('.ts-save',e=>getComputedStyle(e).borderTopLeftRadius),'999px');
 },{home:true});

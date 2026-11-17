@@ -41,7 +41,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
  assert.equal(look.barBg,'rgb(255, 255, 255)');
  assert.equal(look.accent,'#c0522a','the calm orange by default (not the vivid one)');
  assert.ok(contrast(look.orderBg,'rgb(255, 255, 255)')>=4.5,'white text reads on the main button: '+look.orderBg);
- assert.equal(look.orderRadius,'2px');
+ assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
  if(look.payBg){assert.equal(look.payBg,'rgb(47, 125, 104)','the soft green');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on the green');}
  assert.equal(look.meta,'#ffffff','the phone\'s top bar is white');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours

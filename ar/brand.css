@@ -37,19 +37,16 @@ html body .appbar { background: var(--card); color: var(--ink); border-radius: 0
 
 /* ---------- cards, buttons, search ---------- */
 html body .card { border: 1px solid var(--line); border-radius: 2px; box-shadow: none; background: var(--card); }
-html body button, html body button:not([class]), html body #loginBtn, html body .pgroups button, html body .chips .chip { border-radius: 2px; box-shadow: none; }
 html body button.secondary { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
 html body .chips .chip { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
 html body .chips .chip.on, html body .chip.on { background: var(--accent-soft, var(--rose)); color: var(--accent-text, var(--crimson)); border: 1px solid var(--crimson); font-weight: 700; }
-.topsearch .search input[type='search'], .home .search.home-q input[type='search'] { border: 1px solid #8a8680; border-radius: 4px; box-shadow: none; background: var(--card); }
-input[type='text'], input[type='search'], input[type='number'], input[type='tel'], input[type='password'], input[type='email'], select, textarea { border-radius: 2px; }
+.topsearch .search input[type='search'], .home .search.home-q input[type='search'] { border: 1px solid var(--line); border-radius: 999px; box-shadow: none; background: var(--card); }
 
 /* ---------- the home: the greeting in the soft green, the sections as white tiles ---------- */
 html body .hero { border-radius: 2px; background: var(--green); box-shadow: none; }
 .hero::before, .hero::after { display: none !important; }
-html body .card.home .qa button { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 2px; box-shadow: none; font-weight: 600; }
+html body .card.home .qa button { background: var(--card); color: var(--ink); border: 1px solid var(--line); font-weight: 600; }
 .card.home .qa button svg { color: var(--green); stroke: var(--green); }
-html body button.stat, html body .stat { border-radius: 2px; box-shadow: none; }
 
 /* ---------- the bottom bar: flat and docked ---------- */
 html body .bottomnav { inset-inline: 0; bottom: 0; max-width: none; margin: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--card); box-shadow: none; }
@@ -65,18 +62,12 @@ html.night .cu-net, html.night .su-dark { background: var(--dark); }
 
 /* the notes box and the search: flat, thin lines */
 .notes { border: 1px solid var(--line); border-radius: 2px; box-shadow: none; background: var(--card); }
-html body .topsearch .search input, html body .search input[type='search'], html body input[type='search'] { border: 1px solid #8a8680; border-radius: 4px; box-shadow: none; background: var(--card); }
-.notes input, .notes textarea { border-radius: 2px; }
+html body .topsearch .search input, html body .search input[type='search'], html body input[type='search'] { border: 1px solid var(--line); border-radius: 999px; box-shadow: none; background: var(--card); }
 html:not(.cap-ind) body .bottomnav button:not(.secondary), html body .bottomnav button:not(.secondary):active { background: none; box-shadow: none; }
 
 /* the greeting: the soft green by day; at night the dark surface (white text reads) */
 html body .card .hero, html body .hero { border-radius: 2px !important; }
 html.night body .hero { background: var(--dark); }
-
-/* one corner for everything: square-ish (the old capsules are gone) */
-html body button, html body #dcPickLabel, html body label.btn, html body .icon-btn, html body a.btn { border-radius: 2px !important; }
-html body input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), html body select, html body textarea { border-radius: 2px !important; }
-html body input[type='search'] { border-radius: 4px !important; }
 
 /* the main buttons of the item editor and the like: the accent, never black */
 .im-edit-btn { background: var(--crimson); color: #fff; }
