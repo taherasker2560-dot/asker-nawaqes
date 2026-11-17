@@ -33,7 +33,7 @@ export const VENDOR_ALIASES: Record<string, string> = {
 };
 // «افتح X»: the bot's pages by the words he uses (the same lists as the laptop's AdamFast.ps1), so it opens at once without Gemini
 const PAGE_WORDS: [string, string][] = ([
-  ['drafts', ['الطلبيات', 'طلبيات', 'الطلبيه', 'مسودات الطلبيات', 'طلبيات المخازن']],
+  ['drafts', ['الطلبيات', 'طلبيات', 'الطلبيه', 'مسودات الطلبيات', 'طلبيات المخازن', 'الطلبات']],
   ['storeorders', ['طلبات الموقع', 'طلبات المتجر', 'طلبات الاونلاين']],
   ['short', ['النواقص', 'نواقص', 'النواقص العامه', 'قايمه النواقص', 'قائمه النواقص']],
   ['bags', ['الحقائب', 'حقائب', 'الشنط', 'الحقايب']],
@@ -89,6 +89,8 @@ export function commandVerb(text: string, extra: string[] = []): string | null {
       const rest = t.slice(v.length);
       if (/^(ه|ها|هو|هم)?(لي|ليا)$/.test(rest)) return v;
       if (v.endsWith('ل') && /^(ي|يا)$/.test(rest)) return v;   // «قولي» = قول + لي، «سجلي»
+      // «بيعي علبة» (11-17: Gemini wrote «بيع لي» so): an order to Adam, unless it is to someone («بيعي للشباب»، «افتحي لمحمد»)
+      if (rest === 'ي' && toks[i + 1] && !/^ل/.test(toks[i + 1])) return v;
     }
   }
   return null;
@@ -98,7 +100,8 @@ const isName = (w?: string) => !!w && /^(ادم|adam|ادام|يادم)$/.test(w
 export function nameCall(text: string): string | null {
   const ws = String(text || '').trim().split(/\s+/).filter(Boolean);
   const n = ws.map((w) => norm(w));
-  const k = n[0] === 'يا' && isName(n[1]) ? 2 : isName(n[0]) ? 1 : 0;
+  // «عدم» first = «آدم» misheard (11-17: «عدم الفازل بكام؟»); only as the first word
+  const k = n[0] === 'يا' && isName(n[1]) ? 2 : (isName(n[0]) || (n[0] === 'عدم' && ws.length > 1)) ? 1 : 0;
   if (k) return ws.slice(k).join(' ').replace(/^[،,.\s]+/, '').trim();
   if (ws.length <= 3 && isName(n[n.length - 1])) return '';
   return null;
@@ -509,12 +512,15 @@ async function understand(env: Env, f: typeof fetch, model: string, text: string
 const HEAR = [
   'Write down, word for word, what is said in this recording.',
   'A pharmacist in Egypt is talking: Egyptian Arabic, often with medicine names in English. Write the Arabic in Arabic letters exactly as said (Egyptian, not formal Arabic); write medicine and product names as they sound, in Arabic or Latin letters.',
-  'Output ONLY the words said: no quotes, no translation, no notes. If there is no clear speech, output nothing.',
+  'He may be talking to his voice assistant, called «آدم» (Adam): a sentence often starts with «آدم» or «يا آدم»; write the name as «آدم».',
+  'He gives the assistant orders ending in «لي» («بيع لي»، «افتح لي»، «ادفع لي»، «قول لي»، «اقرا لي»): keep the «لي» as he says it (for example «بيع لي علبة», never «بيعي علبة»).',
+  'Output ONLY the words said: no quotes, no translation, no notes, nothing of these instructions. If there is no clear speech, output nothing.',
 ].join('\n');
 export async function transcribe(env: Env, f: typeof fetch, model: string, data: string, mime: string): Promise<{ text: string | null; why: string }> {
   const body = (thinking: boolean) => JSON.stringify({
     systemInstruction: { parts: [{ text: HEAR }] },
-    contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data } }, { text: 'اكتب الكلام ده.' }] }],
+    // the sound only: a text part here was written down with the words (11-17: «افتح لي الطلبات اكتب الكلام ده»)
+    contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mime, data } }] }],
     generationConfig: { temperature: 0, maxOutputTokens: 300, ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
   });
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
