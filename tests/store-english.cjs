@@ -74,6 +74,7 @@ for(const n of [1,2,3,10,11,20])check(S.maxText(n));check('خليها 3');check(
 // «⏰ منبه الدوا» (store/alarm.js, 2026-11-17): its fixed texts (the sentence the phone SAYS and the am / pm letters are not shown as text) and the ones it builds
 const AL=require('../store/alarm.js');
 for(const [k,v] of Object.entries(AL.TEXTS)){if(/\{\w+\}/.test(v)||['tryPhrase','sayName','am','pm'].includes(k))continue;check(v)}
+check(AL.TEXTS.forCustomer.replace('{n}','Ahmed'));
 for(const n of [1,2,3,10,11])check(AL.countText(n));
 for(const t of ['00:00','08:00','12:30','20:00','23:59'])check(AL.timeText(t));
 check('جرّب الصوت');

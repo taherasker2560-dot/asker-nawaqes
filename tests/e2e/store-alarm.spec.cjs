@@ -18,8 +18,10 @@ const FAKE=([rows,perm])=>{
  Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak(u){window.__say.push(u.text);setTimeout(()=>u.onstart&&u.onstart(),0)},cancel(){window.__cancel++},getVoices(){return window.__voices?[{lang:'ar-EG',name:'Arabic (Egypt)'}]:[]},addEventListener(){}}});
  Object.defineProperty(navigator,'vibrate',{configurable:true,value:(p)=>{window.__vib.push(p);return true}});
  window.Notification=class{constructor(t,o){window.__notes.push([t,o&&o.body])}};window.Notification.permission=localStorage.getItem('__perm')||perm;window.Notification.requestPermission=()=>{window.Notification.permission='granted';localStorage.setItem('__perm','granted');return Promise.resolve('granted')};
- Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{register:async(url,o)=>{window.__swReg=[url,o&&o.scope];return {active:{},pushManager:{getSubscription:async()=>window.__sub,subscribe:async(opt)=>{window.__subs++;window.__subOpt=[opt.userVisibleOnly,opt.applicationServerKey&&opt.applicationServerKey.length];window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)};return window.__sub}}}}}});
- window.__fakeRpcs={ar_store_pay_info:()=>null,ar_customer_regular_view:()=>({ok:true,rows,at:new Date().toISOString()}),ar_dose_save:()=>({ok:true})};
+ Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{addEventListener(t,f){(window.__swl=window.__swl||[]).push(f)},startMessages(){},register:async(url,o)=>{window.__swReg=[url,o&&o.scope];return {active:{},showNotification:async(t,o)=>{window.__shown=(window.__shown||[]).concat([[t,o&&o.body,o&&o.tag]])},pushManager:{getSubscription:async()=>window.__sub,subscribe:async(opt)=>{window.__subs++;window.__subOpt=[opt.userVisibleOnly,opt.applicationServerKey&&opt.applicationServerKey.length];window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)};return window.__sub}}}}}});
+ window.__fakeRpcs={ar_store_pay_info:()=>null,ar_customer_regular_view:()=>({ok:true,rows,at:new Date().toISOString()}),ar_dose_save:()=>({ok:true}),
+  ar_customer_alarms_view:()=>({ok:true,items:JSON.parse(localStorage.getItem('__ph')||'[]')}),ar_customer_alarms_admin_get:()=>({ok:true,items:JSON.parse(localStorage.getItem('__ph')||'[]')}),
+  ar_customer_alarms_admin_set:(a)=>{localStorage.setItem('__ph',JSON.stringify(a.p_items));window.__adminSets=(window.__adminSets||0)+1;return {ok:true,items:a.p_items}}};
 };
 const setup=(page,perm='default')=>page.addInitScript(FAKE,[ROWS,perm]);
 const seed=(page)=>page.evaluate(([c,m,t])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[]})),[CUSTOMERS,MOVES,tok]);
@@ -51,7 +53,7 @@ run('Dose alarm: the tile under the two buttons, a new alarm from his usual medi
  // saved on THIS phone, and nothing was sent anywhere (the pharmacy never learns which medicines or when)
  const kept=await page.evaluate(()=>JSON.parse(localStorage.getItem('asker_dose_alarms')));
  assert.deepEqual(kept.items.map(i=>[i.name,i.say,i.times,i.on]),[['زانبرازان ٢٠ قرص','زانبرازان ٢٠ قرص',['08:00','20:00'],true]]);
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.map(w=>w.rpc||w.table).filter(x=>/dose|alarm|reminder/i.test(String(x)))),[],'nothing about the alarm reaches the server');
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.map(w=>w.rpc||w.table).filter(x=>/ar_dose_save|admin_set/.test(String(x)))),[],'nothing about the alarm reaches the server');
  // another alarm by typing a name, three times a day; then change one time
  await page.click('[data-al-new]');await page.click('[data-al-pick="other"]');await page.fill('[data-al-name]','فيتامين د');await page.click('[data-al-preset="thrice"]');
  assert.deepEqual(await page.$$eval('[data-al-time]',e=>e.map(x=>x.value)),['08:00','14:00','20:00']);
@@ -149,21 +151,28 @@ run('Dose alarm: a hidden page gets a phone notification, the voice can be switc
  await page.click('[data-al-close]');
 },{home:true});
 
-run('Dose alarm: the pharmacy\'s own phone is a look only (kept for the tab, never rings); the English site shows English only',async({page,base})=>{
+run('Dose alarm: the owner\'s look sets THIS customer\'s alarms from the pharmacy phone (kept on the server, never rings there, no voice or notification settings); the English site shows English only',async({page,base})=>{
  await setup(page,'granted');
  await seed(page);
- // the owner's look: the bot is signed in on this phone
+ // the owner's look: the system is signed in on this phone
  await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
  await page.setViewportSize({width:375,height:812});
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-al-tile');
  await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet');
- assert.match(await text(page,'#alarmSheet .rg-hint'),/ده شكل المنبه عند العميل/);
+ assert.match(await text(page,'#alarmSheet .rg-hint'),/بتظبط منبهات أحمد محمود من عندك/);
+ assert.equal(await page.$('[data-al-speak]'),null,'no voice settings: they are his phone\'s');assert.equal(await page.$('[data-al-notiftest]'),null);
  await page.click('[data-al-new]');await page.click('[data-al-pick="0"]');await page.click('[data-al-save]');await page.waitForSelector('#alarmSheet .al-card');
- assert.equal(await page.evaluate(()=>localStorage.getItem('asker_dose_alarms')),null,'not kept on the pharmacy phone');
- assert.equal(await page.evaluate(()=>!!sessionStorage.getItem('asker_dose_alarms')),true,'only for this tab');
+ await page.waitForFunction(()=>window.__adminSets>=1);
+ const sent=await page.evaluate(()=>JSON.parse(localStorage.getItem('__ph')));
+ assert.deepEqual(sent.map(i=>[i.name,i.times,i.on]),[['لاكتيفينور ٣٥ قرص',['08:00','20:00'],true]],'saved for the customer on the server');assert.match(sent[0].id,/^p/);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_dose_alarms')),null,'nothing kept on the pharmacy phone');
  assert.equal(await tick(page,8,0),0,'never rings there');assert.equal(await page.$('#alarmRing'),null);
+ // a change, a switch-off and a delete are saved too
+ await page.click('#alarmSheet .al-card:nth-of-type(1) [data-al-toggle]');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('__ph'))[0].on===false);
+ await page.click('#alarmSheet .al-card:nth-of-type(1) [data-al-edit]');await page.click('[data-al-del]');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('__ph')).length===0);
+ assert.equal(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length),0,'the pharmacy phone sends no push times');
  // English: no Arabic anywhere in the alarm's own screens (the medicine's name shows in English; the phone still says the Arabic one)
- await page.evaluate(()=>{sessionStorage.clear();localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token');localStorage.setItem('asker-lang','en')});
+ await page.evaluate(()=>{localStorage.removeItem('__ph');localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token');localStorage.setItem('asker-lang','en')});
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-al-tile');
  assert.equal(await text(page,'.ac-al-tile b'),'⏰ Medicine alarm');
  await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet');
@@ -226,7 +235,7 @@ run('Dose alarm stage 2: the pharmacy\'s own phone sends nothing; a ring opened 
  await page.click('[data-al-open]');await page.click('[data-al-new]');await page.click('[data-al-pick="0"]');await page.click('[data-al-save]');await page.waitForSelector('.al-card');
  await page.waitForTimeout(500);
  assert.equal(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save').length+window.__subs),0,'the look sends nothing and subscribes nothing');
- await page.evaluate(()=>{localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token');sessionStorage.clear()});
+ await page.evaluate(()=>{localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token');sessionStorage.clear();localStorage.removeItem('__ph')});
  // the page was opened by a tap on the notification: the browser does not allow speech before a tap, so the card asks for one, and the first tap speaks
  await page.addInitScript(()=>{window.__quiet=true});
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
@@ -245,4 +254,42 @@ run('Dose alarm stage 2: the pharmacy\'s own phone sends nothing; a ring opened 
  // and the button says it again
  const b2=(await page.evaluate(()=>window.__say)).length;await page.click('[data-al-hear]');
  assert.equal((await page.evaluate(()=>window.__say)).length,b2+1);
+},{home:true});
+
+run('Dose alarm: the alarms the PHARMACY set show on his phone marked «من الصيدلية», ring and speak like his own, he can switch them off but not change them, their times go to the push, a worker message wakes the page, «جرّب الإشعار» shows a real notification',async({page,base})=>{
+ await setup(page,'granted');
+ await seed(page);
+ await page.evaluate(()=>localStorage.setItem('__ph',JSON.stringify([{id:'p1',name:'زانبرازان ٢٠ قرص',say:'',times:['20:00','08:00'],on:true}])));
+ await openAccount(page,base);
+ await page.waitForFunction(()=>window.AskerStoreAlarm.all().items.length===1);
+ assert.equal(await text(page,'.ac-al-tile small'),'منبه واحد شغال');
+ await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet .al-card');
+ assert.equal(await text(page,'#alarmSheet .al-badge'),'من الصيدلية');
+ assert.equal(await page.$('#alarmSheet [data-al-edit]'),null,'he cannot change it');assert.ok(await page.$('#alarmSheet [data-al-toggle="p1"]'),'but he can switch it');
+ assert.deepEqual(await page.$$eval('#alarmSheet .al-chip',e=>e.map(x=>x.textContent)),['8:00 ص','8:00 م']);
+ // its times go to the push (the server never sees the name), after the page asked for them
+ await page.waitForFunction(()=>window.__fakeWrites.some(w=>w.rpc==='ar_dose_save'&&JSON.stringify(w.args.p_times)==='["08:00","20:00"]'));
+ // it rings and speaks like his own
+ assert.equal(await tick(page,8,0),1);await page.waitForSelector('#alarmRing');
+ assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد دواء زانبرازان ٢٠ قرص']);await page.click('[data-al-took]');
+ // he switches it off: no ring, kept on his phone, and the push times follow (nothing on)
+ await page.click('[data-al-toggle="p1"]');
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker_dose_pharmacy')).off),{p1:true});
+ assert.equal(await tick(page,20,0),0,'switched off by him');
+ await page.waitForFunction(()=>{const s=window.__fakeWrites.filter(w=>w.rpc==='ar_dose_save');return s.length&&s[s.length-1].args.p_times.length===0});
+ await page.click('[data-al-toggle="p1"]');
+ // the pharmacy removes it: the next page load drops it and its off flag
+ await page.evaluate(()=>localStorage.setItem('__ph','[]'));await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.waitForFunction(()=>window.AskerStoreAlarm.all().items.length===0);
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker_dose_pharmacy'))),{items:[],off:{}});
+ // a push reached the worker while the app is alive in the background: the page rings at once (no tap, no wait for the 15 s clock)
+ await page.evaluate(()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a9',name:'دوا الآن',say:'',times:[p(d.getHours())+':'+p(d.getMinutes())],on:true}],snoozes:[]}))});
+ assert.equal(await page.$('#alarmRing'),null);
+ await page.evaluate(()=>window.__swl.forEach(f=>f({data:{type:'dose-due'}})));
+ await page.waitForSelector('#alarmRing');assert.match(await text(page,'#alarmRing'),/دوا الآن/);await page.click('[data-al-took]');
+ // «جرّب الإشعار»: a real notification through the worker, so he hears his phone's own sound
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-notiftest]');
+ assert.match(await text(page,'#alarmSheet .rg-body'),/لو الإشعار جه من غير صوت/);
+ await page.click('[data-al-notiftest]');await page.waitForFunction(()=>window.__shown&&window.__shown.length===1);
+ assert.deepEqual(await page.evaluate(()=>window.__shown[0]),['🔔 تجربة منبه الدوا','لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.','asker-dose-test']);
 },{home:true});

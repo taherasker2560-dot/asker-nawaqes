@@ -9,7 +9,9 @@
    - Stage 2 (the same night, owner: «انجز»): when he turns the notifications on, a push at each dose time reaches the phone even with the browser closed (store/dose/sw.js shows «ميعاد دواك», a tap
      opens the page, which rings and says the name). For that the server keeps ONLY the clock times of his alarms next to his push address (table ar_dose_push, function asker-dose, migration
      202611172300): never a medicine name, never who he is. The names stay on his phone.
-   - On the pharmacy's own phone (the owner's look at a customer's page, the bot signed in there) the card is a look only: kept for this tab, never rings.
+   - Alarms the PHARMACY sets for a customer (owner 2026-11-18: «لو هو مش عارف يظبط المنبه هظبطه له أنا من عندي»): on the pharmacy's own phone (the owner's «👁 شوف صفحته» look, the system signed in there) the sheet edits THAT customer's
+     alarms on the server (table ar_customer_alarms, migration 202611180100); on his phone they come with a «من الصيدلية» mark, ring like his own, and he can switch them off but not change them. His own alarms stay on his phone only.
+   - The owner's look never rings.
    Loaded before store/account.js, which draws the tile and nothing else here. */
 (function (root) {
   'use strict';
@@ -41,7 +43,12 @@
     notifNo: 'الإشعارات مقفولة من إعدادات المتصفح',
     open: 'المنبه بيرن لما صفحة الصيدلية تكون مفتوحة على موبايلك. فعّل الإشعارات عشان يوصلك وقت الجرعة حتى والمتصفح مقفول.',
     noVoice: 'موبايلك مفيهوش صوت عربي: هيرن من غير نطق. نزّل صوت عربي من إعدادات الموبايل ← اللغة ← تحويل النص إلى كلام.',
-    lookOnly: 'ده شكل المنبه عند العميل. على موبايل الصيدلية مبيرنش.',
+    forCustomer: 'بتظبط منبهات {n} من عندك. هتظهر في صفحته بعلامة «من الصيدلية» ويرنّ عند الميعاد على موبايله، وهو يقدر يقفلها بس مايعدّلهاش.',
+    fromPharmacy: 'من الصيدلية',
+    notifTest: '🔔 جرّب الإشعار',
+    notifTestTitle: '🔔 تجربة منبه الدوا',
+    notifTestBody: 'لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.',
+    notifSound: 'لو الإشعار جه من غير صوت: اتأكد إن الموبايل مش على الصامت، وافتح إعدادات الموبايل ← التطبيقات ← المتصفح ← الإشعارات ← صيدلية عسكر وشغّل الصوت.',
     which: 'أي دوا؟',
     fromUsual: '(من اللي بتاخده دايمًا)',
     other: '＋ دوا تاني (اكتب اسمه)',
@@ -143,11 +150,17 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   // the pharmacy's own phone = the bot is signed in here: a look only (kept for this tab, never rings)
   const pharmacy = (() => { try { return Object.keys(localStorage).some((k) => /^sb-[a-z0-9]+-auth-token$/.test(k)); } catch (e) { return false; } })();
-  const box = () => (pharmacy ? root.sessionStorage : root.localStorage);
+  const box = () => root.localStorage;
   const read = (k) => { try { return JSON.parse(box().getItem(k) || 'null'); } catch (e) { return null; } };
   const write = (k, v) => { try { box().setItem(k, JSON.stringify(v)); } catch (e) { /* private window: it stays until the page is closed */ } };
-  let data = clean(read(KEY));
-  const save = () => { write(KEY, data); syncServer(); };
+  // his own alarms (on his phone); on the pharmacy's phone `data` holds the alarms of the customer being looked at, saved to the server
+  let data = pharmacy ? clean(null) : clean(read(KEY));
+  // the alarms the PHARMACY set for this customer: they live on the server, are cached here so they ring offline, and he can only switch them on / off
+  const PH_KEY = 'asker_dose_pharmacy';
+  let ph = pharmacy ? { items: [], off: {} } : (() => { const o = read(PH_KEY) || {}; return { items: clean({ items: o.items }).items.map((x) => ({ ...x, ph: true })), off: o.off && typeof o.off === 'object' ? o.off : {} }; })();
+  const all = () => ({ ...data, items: data.items.concat(ph.items.map((x) => ({ ...x, ph: true, on: x.on !== false && !ph.off[x.id] }))) });
+  let token = null, adminTimer = null;
+  const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); };
   let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
@@ -219,7 +232,7 @@
     if (pharmacy) return [];
     const n = now || new Date();
     data = clean(read(KEY) || data);   // another tab may have changed it
-    const due = dueNow(data, n, firedMap());
+    const due = dueNow(all(), n, firedMap());
     if (!due.length) return [];
     if (ring) {   // already ringing: the new ones join it
       const keys = new Set(ring.due.map((d) => d.key)); const add = due.filter((d) => !keys.has(d.key));
@@ -231,7 +244,7 @@
   }
   function schedule() {
     clearInterval(timer); timer = null;
-    if (pharmacy || !onCount(data)) return;
+    if (pharmacy || !onCount(all())) return;
     timer = setInterval(() => tick(), CHECK_MS);
     tick();
   }
@@ -253,7 +266,7 @@
   const VAPID = 'BEz67xiIZZubLNtifD1Ryqxc6p2j509IsWF6o-YUe5M1BvyWIlUm4NwaRKUP-potwMmyN9_qxqNC2qfn1s5ozwg';   // the public half of the web-push key (the same one store/chat.js uses)
   const keyBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
   const canPush = () => !pharmacy && !!root.navigator && 'serviceWorker' in root.navigator && 'PushManager' in root && !!root.Notification;
-  const serverTimes = () => normTimes([].concat(...data.items.filter((x) => x.on).map((x) => x.times)).map((t) => cairoTime(t)));
+  const serverTimes = () => normTimes([].concat(...all().items.filter((x) => x.on).map((x) => x.times)).map((t) => cairoTime(t)));
   async function activeRegistration() {
     const reg = await root.navigator.serviceWorker.register('store/dose/sw.js', { scope: 'store/dose/' });
     if (reg.active) return reg;
@@ -277,23 +290,64 @@
     } catch (e) { /* no push on this phone: the alarm still rings while the page is open */ }
     syncing = false;
   }
+  const customerName = () => { const A = root.AskerStoreAccount; return A && A.name ? A.name() : ''; };
+  // the pharmacy's phone: the customer being looked at gets the list as it is now (the server cleans it: at most 20 alarms, valid times)
+  function adminSave() {
+    clearTimeout(adminTimer);
+    adminTimer = setTimeout(async () => {
+      const A = root.AskerStoreAccount; token = A && A.token ? A.token() : token;
+      if (!client || !token) return;
+      try { await client.rpc('ar_customer_alarms_admin_set', { p_token: token, p_items: data.items.map((x) => ({ id: x.id, name: x.name, say: x.say, times: x.times, on: x.on })) }); } catch (e) { /* the next change saves again */ }
+    }, 250);
+  }
+  // the page opens: the pharmacy's phone reads the customer's alarms to edit them; the customer's phone reads the ones the pharmacy set for him (cached for offline)
+  async function loadPharmacy() {
+    const A = root.AskerStoreAccount; token = A && A.token ? A.token() : null;
+    if (!client || !token) return;
+    try {
+      if (pharmacy) {
+        const { data: d } = await client.rpc('ar_customer_alarms_admin_get', { p_token: token });
+        if (d && d.ok) { data = { ...data, items: clean({ items: d.items }).items }; if (view) draw(); redrawTile(); }
+      } else {
+        const { data: d } = await client.rpc('ar_customer_alarms_view', { p_token: token });
+        if (d && d.ok) {
+          ph.items = clean({ items: d.items }).items.map((x) => ({ ...x, ph: true }));
+          for (const k of Object.keys(ph.off)) if (!ph.items.some((x) => x.id === k)) delete ph.off[k];
+          write(PH_KEY, { items: ph.items, off: ph.off });
+          schedule(); redrawTile(); if (view) draw(); syncServer();
+        }
+      }
+    } catch (e) { /* offline: the ones kept on the phone stay */ }
+  }
+  // «جرّب الإشعار»: a real notification now, so he hears his phone's own notification sound (the page cannot make it louder: that sound is the phone's setting)
+  async function testNotification() {
+    try {
+      const reg = await activeRegistration();
+      await reg.showNotification(TEXTS.notifTestTitle, { body: TEXTS.notifTestBody, tag: 'asker-dose-test', lang: 'ar', dir: 'rtl', vibrate: [300, 150, 300], icon: 'icons/arabic-192.png?v=logo2', data: { url: root.location.href } });
+    } catch (e) { /* no notifications on this phone */ }
+  }
+  // a dose push reached the phone's worker while the app is alive in the background: ring and speak at once (no tap needed)
+  try {
+    const sw = root.navigator && root.navigator.serviceWorker;
+    if (sw && sw.addEventListener) { sw.addEventListener('message', (e) => { if (e.data && e.data.type === 'dose-due') tick(); }); if (sw.startMessages) sw.startMessages(); }
+  } catch (e) { /* no worker messages */ }
   // ---------- the tile (store/account.js) and the sheet ----------
   function tileHtml() {
-    const n = onCount(data);
+    const n = onCount(all());
     return `<button type="button" class="ac-reg-btn ac-al-tile" data-al-open><b>${esc(TEXTS.tile)}</b><small>${esc(n ? countText(n) : TEXTS.tileHint)}</small></button>`;
   }
   const chip = (t) => `<span class="al-chip">${esc(timeText(t))}</span>`;
   function listHtml() {
-    const cards = data.items.map((it) => `<div class="al-card${it.on ? '' : ' off'}"><button type="button" class="al-card-main" data-al-edit="${esc(it.id)}"><b class="notr" dir="auto">${esc(it.name)}</b><span class="al-times">${it.times.map(chip).join('')}</span></button>` +
+    const cards = all().items.map((it) => `<div class="al-card${it.on ? '' : ' off'}">${it.ph ? `<div class="al-card-main"><b class="notr" dir="auto">${esc(it.name)}</b> <span class="al-badge">${esc(TEXTS.fromPharmacy)}</span><span class="al-times">${it.times.map(chip).join('')}</span></div>` : `<button type="button" class="al-card-main" data-al-edit="${esc(it.id)}"><b class="notr" dir="auto">${esc(it.name)}</b><span class="al-times">${it.times.map(chip).join('')}</span></button>`}` +
       `<button type="button" class="al-tg${it.on ? ' on' : ''}" role="switch" aria-checked="${it.on}" aria-label="${esc(it.on ? TEXTS.on : TEXTS.off)}" data-al-toggle="${esc(it.id)}"></button></div>`).join('');
-    const notif = root.Notification
-      ? (root.Notification.permission === 'granted' ? `<p class="rg-hint">${esc(canPush() ? TEXTS.notifDone : TEXTS.notifDone)}</p>`
+    const notif = pharmacy ? '' : root.Notification
+      ? (root.Notification.permission === 'granted' ? `<p class="rg-hint">${esc(TEXTS.notifDone)}</p><button type="button" class="al-line" data-al-notiftest><span>${esc(TEXTS.notifTest)}</span></button><p class="rg-hint">${esc(TEXTS.notifSound)}</p>`
         : root.Notification.permission === 'denied' ? `<p class="rg-hint">${esc(TEXTS.notifNo)}</p>`
           : `<button type="button" class="al-line" data-al-notif><span>${esc(TEXTS.notifOn)}</span></button><p class="rg-hint">${esc(TEXTS.notifWhy)}</p>`) : '';
-    const voice = synth() ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
+    const voice = !pharmacy && synth() ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
       `<div class="al-line"><span>${esc(TEXTS.tryVoice.replace(/^▶\s*/, ''))}</span><button type="button" class="al-try" data-al-try>${esc(TEXTS.tryVoice)}</button></div>` +
       (voiceOk === false ? `<p class="al-warn">${esc(TEXTS.noVoice)}</p>` : '') : '';
-    return `<p class="rg-hint">${esc(pharmacy ? TEXTS.lookOnly : TEXTS.hint)}</p>${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
+    return `<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : TEXTS.hint)}</p>${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
       (pharmacy ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
   }
   // the names he usually takes (store/regular.js), for the quick pick
@@ -346,7 +400,7 @@
     const d = draft, name = String(d.name || '').trim(), times = normTimes(d.times);
     if (!name) { error = TEXTS.needName; draw(); return; }
     if (!times.length) { error = TEXTS.needTime; draw(); return; }
-    const it = { id: d.id || newId(), name, say: d.say || '', times, on: true };
+    const it = { id: d.id || (pharmacy ? 'p' : '') + newId(), name, say: d.say || '', times, on: true };
     const i = data.items.findIndex((x) => x.id === it.id);
     if (i >= 0) { it.on = data.items[i].on; data.items[i] = it; } else data.items.push(it);
     data.snoozes = data.snoozes.filter((s) => s.id !== it.id);
@@ -363,8 +417,9 @@
     if (t.closest('[data-al-close]')) { if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); } else close(); return; }
     if (t.closest('[data-al-new]')) { draft = newDraft(null); view = 'edit'; error = ''; draw(); return; }
     const ed = t.closest('[data-al-edit]'); if (ed) { const it = data.items.find((x) => x.id === ed.dataset.alEdit); if (it) { draft = newDraft(it); view = 'edit'; error = ''; draw(); } return; }
-    const tg = t.closest('[data-al-toggle]'); if (tg) { const it = data.items.find((x) => x.id === tg.dataset.alToggle); if (it) { it.on = !it.on; save(); draw(); schedule(); } return; }
+    const tg = t.closest('[data-al-toggle]'); if (tg) { const tid = tg.dataset.alToggle, it = data.items.find((x) => x.id === tid); if (!it && ph.items.some((x) => x.id === tid)) { ph.off[tid] = !ph.off[tid]; save(); draw(); schedule(); return; } if (it) { it.on = !it.on; save(); draw(); schedule(); } return; }
     if (t.closest('[data-al-speak]')) { data.speak = !data.speak; save(); draw(); return; }
+    if (t.closest('[data-al-notiftest]')) { testNotification(); return; }
     if (t.closest('[data-al-try]')) { const ok = say(TEXTS.tryPhrase); if (!ok && synth() == null) { /* no speech engine: the warning in the list says so */ } return; }
     if (t.closest('[data-al-notif]')) { try { root.Notification.requestPermission().then(() => { draw(); syncServer(); }); } catch (err) { draw(); } return; }
     if (!draft) return;
@@ -386,6 +441,6 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
   window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
 
-  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, count: () => onCount(data), data: () => data, pharmacy: () => pharmacy, serverTimes, attach(c) { client = c; syncServer(); } };
+  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); } };
   schedule();
 })(typeof window === 'undefined' ? globalThis : window);
