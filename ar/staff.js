@@ -205,6 +205,8 @@
   }
   function sendOnWhatsApp(name, link) {
     const url = 'https://wa.me/?text=' + encodeURIComponent(waMessage(name, link));
+    // WhatsApp Business on Android while the box on the supplier tab is ticked (ar/app.js AskerApp.openWaUrl)
+    if (root.AskerApp && root.AskerApp.openWaUrl && root.AskerApp.openWaUrl(url)) return;
     if (!root.open(url, '_blank')) location.href = url;
   }
   async function addStaff() {

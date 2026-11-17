@@ -25,7 +25,12 @@
 
   // same tab, marked as coming from the bot: the store then shows «البوت» to come back here (store/from-bot.js)
   $('slOpen').addEventListener('click', () => { location.href = url + '?from=bot'; });
-  $('slWa').addEventListener('click', () => window.open('https://wa.me/?text=' + encodeURIComponent(shareMessage(url)), '_blank', 'noopener'));
+  // WhatsApp Business on Android while the box on the supplier tab is ticked (the default): AskerApp.openWhatsApp (ar/app.js)
+  $('slWa').addEventListener('click', () => {
+    const t = shareMessage(url);
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, '');
+    else window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
+  });
   $('slCopy').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(url); say('اتنسخ ✓ الصقه في أي رسالة', 'good'); }
     catch (e) { say('مقدرتش أنسخ. دوس مطوّل على الرابط وانسخه', 'bad'); }
