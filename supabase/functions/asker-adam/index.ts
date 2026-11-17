@@ -513,7 +513,7 @@ const HEAR = [
   'Write down, word for word, what is said in this recording.',
   'A pharmacist in Egypt is talking: Egyptian Arabic, often with medicine names in English. Write the Arabic in Arabic letters exactly as said (Egyptian, not formal Arabic); write medicine and product names as they sound, in Arabic or Latin letters.',
   'He may be talking to his voice assistant, called «آدم» (Adam): a sentence often starts with «آدم» or «يا آدم»; write the name as «آدم».',
-  'He gives the assistant orders ending in «لي» («بيع لي»، «افتح لي»، «ادفع لي»، «قول لي»، «اقرا لي»): keep the «لي» as he says it (for example «بيع لي علبة», never «بيعي علبة»).',
+  // (11-17: a line asking to «keep the لي» made Gemini ADD it: «بيع للشباب» was written «بيع لي الشباب»; «بيعي علبة» is read in commandVerb)
   'Output ONLY the words said: no quotes, no translation, no notes, nothing of these instructions. If there is no clear speech, output nothing.',
 ].join('\n');
 export async function transcribe(env: Env, f: typeof fetch, model: string, data: string, mime: string): Promise<{ text: string | null; why: string }> {
@@ -526,6 +526,8 @@ export async function transcribe(env: Env, f: typeof fetch, model: string, data:
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
   const headers = { 'Content-Type': 'application/json', 'x-goog-api-key': String(env.GEMINI_API_KEY) };
   let g = await f(url, { method: 'POST', headers, body: body(true), signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) }).catch(() => null);
+  // no answer at all (11-17: one «gemini down» in 7): once more, he is waiting
+  if (!g || g.status >= 500) g = await f(url, { method: 'POST', headers, body: body(true), signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) }).catch(() => null);
   if (g && g.status === 400) g = await f(url, { method: 'POST', headers, body: body(false), signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS) }).catch(() => null);
   if (!g || !g.ok) return { text: null, why: 'gemini ' + (g ? g.status : 'down') };
   const j = await g.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null;
