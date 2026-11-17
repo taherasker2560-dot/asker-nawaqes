@@ -21,8 +21,7 @@ html:not(.night) {
 html.night { --soft-bg: var(--tint-2, var(--card)); --green: var(--crimson-ink); }
 body { background: var(--bg); }
 
-/* ---------- the blessing strip + the header ---------- */
-.bless { margin: 0; padding: 6px 12px; text-align: center; font-size: 11.5px; font-weight: 500; letter-spacing: 0.2px; color: var(--green); background: var(--card); border-bottom: 1px solid var(--line); }
+/* ---------- the header (the blessing strip that sat above it is gone: owner 2026-11-17) ---------- */
 html body .appbar { background: var(--crimson); color: #fff; border-radius: 0; border-bottom: 0; box-shadow: none; padding-top: 8px; padding-bottom: 8px; }
 .appbar::after { display: none !important; }
 .appbar .mark { box-shadow: none; border: 2px solid rgba(255,255,255,.85); background: #fff; }
@@ -68,6 +67,5 @@ html.night body .hero { background: var(--dark); }
 /* the main buttons of the item editor and the like: the accent, never black */
 .im-edit-btn { background: var(--crimson); color: #fff; }
 
-/* the header a little slimmer; the sale screen keeps its bill high on the page (owner 2026-11-13), so the strip rests there */
+/* the header a little slimmer */
 .appbar .mark { width: 40px; height: 40px; }
-body.ts-page .bless { display: none; }

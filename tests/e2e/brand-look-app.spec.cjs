@@ -1,22 +1,23 @@
-// The bot's brand look (owner 2026-11-17: ar/brand.css over capsule.css; before it «كبسولة وموجة» of 11-16). Not only the text: a white page, the blessing strip,
-// a flat white header with no wave, 2 px corners, the greeting in the soft green, white tiles for the sections, a docked flat bottom bar with the section you
+// The bot's brand look (owner 2026-11-17: ar/brand.css over capsule.css; before it «كبسولة وموجة» of 11-16). Not only the text: a white page, no blessing strip
+// (he had it taken off the site and the bot the same day), a flat white header with no wave, 2 px corners, the greeting in the soft green, white tiles for the sections, a docked flat bottom bar with the section you
 // are in in the accent, no navy anywhere, the motion of ar/motion.js and «reduce motion». Made-up data only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');// WCAG contrast of two "rgb(r, g, b)" strings
 const contrast=(a,b)=>{const lum=s=>{const [r,g,bl]=s.match(/\d+(\.\d+)?/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return .2126*r+.7152*g+.0722*bl};const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
 const ready=page=>page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
 
-run('Brand look (bot): white page, the blessing strip, no wave, the soft green greeting, white section tiles, a docked flat bar — day',async({page})=>{
+run('Brand look (bot): white page, no blessing strip, no wave, the soft green greeting, white section tiles, a docked flat bar — day',async({page})=>{
  await page.addInitScript(()=>{window.__askerMotion=true});
  await page.reload();
  await ready(page);
  await page.evaluate(()=>{document.getElementById('todoCard').classList.remove('hidden');document.getElementById('todoList').innerHTML='<button type="button" class="todo-row" data-go="read"><b>23</b><span>جديد في الوارد</span></button>'});
  const look=await page.evaluate(()=>{const cs=(e,p)=>getComputedStyle(e,p),bar=document.querySelector('.appbar'),hero=document.querySelector('.hero'),nav=document.querySelector('.bottomnav'),link=document.querySelector('.hero-link'),h2=document.querySelector('.hero h2'),qa=document.querySelector('.card.home .qa button'),on=nav.querySelector('button:not(.secondary)');
-  return {body:cs(document.body).backgroundColor,bless:document.querySelector('.bless').textContent.trim(),barBg:cs(bar).backgroundColor,barRadius:cs(bar).borderBottomLeftRadius,wave:cs(bar,'::after').display,
+  return {body:cs(document.body).backgroundColor,bless:document.querySelectorAll('.bless').length,blessText:/اللهم صل|ﷺ/.test(document.body.textContent),barBg:cs(bar).backgroundColor,barRadius:cs(bar).borderBottomLeftRadius,wave:cs(bar,'::after').display,
    hero:cs(hero).backgroundColor,heroRadius:cs(hero).borderTopLeftRadius,h2:cs(h2).color,link:cs(link).color,linkBg:cs(link).backgroundColor,
    navBg:cs(nav).backgroundColor,navPos:cs(nav).position,navBottom:cs(nav).bottom,navRadius:cs(nav).borderTopLeftRadius,onGroup:on.dataset.group,onColor:cs(on).color,onBg:cs(on).backgroundColor,
    qaBg:cs(qa).backgroundColor,qaRadius:cs(qa).borderTopLeftRadius,qaColor:cs(qa).color,card:cs(document.querySelector('.card')).borderTopLeftRadius,accent:cs(document.documentElement).getPropertyValue('--crimson').trim(),meta:document.querySelector('meta[name="theme-color"]').content}});
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
- assert.equal(look.bless,'اللهم صل على النبي ﷺ');
+ assert.equal(look.bless,0,'no blessing strip in the bot (owner 2026-11-17: «شيل صلى عالنبى»)');
+ assert.equal(look.blessText,false,'and no blessing text anywhere on the page');
  assert.equal(look.barBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
  assert.equal(look.hero,'rgb(192, 82, 42)','the greeting in the calm orange (no aqua green)');
