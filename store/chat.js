@@ -398,6 +398,7 @@
     proc.onaudioprocess = (e) => { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
     src.connect(proc); proc.connect(ctx.destination);
     rec = { stream, ctx, src, proc, chunks, t0: Date.now(), tick: null };
+    if (root.AskerStoreMusic && root.AskerStoreMusic.hold) root.AskerStoreMusic.hold('rec'); // the calm music (store/music.js) steps aside while he records
     say(''); draw();
     rec.tick = setInterval(() => {
       const s = (Date.now() - rec.t0) / 1000, el = $('chatRecT');
@@ -410,6 +411,7 @@
     const r = rec;
     if (!r) return;
     rec = null;
+    if (root.AskerStoreMusic && root.AskerStoreMusic.release) root.AskerStoreMusic.release('rec');
     clearInterval(r.tick);
     try { r.proc.disconnect(); r.src.disconnect(); } catch (e) { /* gone */ }
     r.stream.getTracks().forEach((t) => t.stop());

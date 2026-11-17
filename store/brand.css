@@ -231,3 +231,11 @@ html[dir="ltr"] .ds-lang { display: block; }
 .share { color: var(--accent-text); }
 .sh-rx { background: var(--accent-soft); color: var(--accent-text); }
 .badge.order { background: var(--order-bg); color: var(--order); border: 1px solid var(--line); }
+
+/* ---- the calm music's small button (owner 2026-11-17: «ويكون زرار مخفي، أنا عاوزه يسمع»): a quiet round that a customer who looks for it finds, not an invitation to tap.
+   store/music.js draws it; 40 px to touch, a 28 px round to see, about 40 % see-through; sits just above the bottom bar at the end side, and over the message box in «الرسايل» ---- */
+.mus-btn { position: fixed; z-index: 8; inset-inline-end: 4px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; padding: 0; border: 0; background: none; opacity: 0.4; cursor: pointer; display: grid; place-items: center; -webkit-tap-highlight-color: transparent; transition: opacity 0.2s; }
+.mus-btn::before { content: ''; position: absolute; width: 28px; height: 28px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); }
+.mus-btn svg { position: relative; width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mus-btn:hover, .mus-btn:focus-visible { opacity: 0.95; }
+body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(safe-area-inset-bottom, 0px)); }
