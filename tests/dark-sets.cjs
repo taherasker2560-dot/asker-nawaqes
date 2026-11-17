@@ -20,12 +20,14 @@ const hsl = (h) => {
   return { h: hue, s: s * 100, l: l * 100 };
 };
 
-assert.deepEqual(S.DARKS.map((d) => d.id), ['teal', 'warm', 'charcoal', 'plum']);
-assert.equal(S.DARK_DEFAULT, 'teal', 'the default is the picture\'s green');
+assert.deepEqual(S.DARKS.map((d) => d.id), ['terra', 'warm', 'charcoal', 'plum']);
+assert.equal(S.DARK_DEFAULT, 'terra', 'the default is the calm orange (owner 2026-11-17: no aqua green)');
 assert.equal(S.darkOf('warm').name, 'قهوة دافية');
-assert.equal(S.darkOf('teal').dark2, '#018b90', 'the lighter step is exactly the picture\'s green');
-assert.equal(S.darkOf('nonsense').id, 'teal', 'an unknown choice falls back to the default');
-assert.equal(S.darkOf(undefined).id, 'teal');
+assert.equal(S.darkOf('terra').dark, '#c0522a', 'the surface is exactly the calm orange');
+assert.equal(S.darkOf('terra').dark2, '#d0653a');
+assert.equal(S.darkOf('teal').id, 'terra', 'a phone that kept the old aqua green falls back to the calm orange');
+assert.equal(S.darkOf('nonsense').id, 'terra', 'an unknown choice falls back to the default');
+assert.equal(S.darkOf(undefined).id, 'terra');
 // a color of his own: darkened until white text reads, always with a lighter step and a near-black one
 for (const own of ['c:#e0a030', 'c:#ffffff', 'c:#000000', 'c:#066f74']) {
   const o = S.darkOf(own);
@@ -33,7 +35,7 @@ for (const own of ['c:#e0a030', 'c:#ffffff', 'c:#000000', 'c:#066f74']) {
   assert.ok(S.contrast(o.dark, '#ffffff') >= 4.5, own + ': white text reads on it: ' + o.dark);
   for (const k of ['dark', 'dark2', 'deep']) assert.match(o[k], /^#[0-9a-f]{6}$/, own + ' ' + k);
 }
-assert.equal(S.darkOf('c:#zzzzzz').id, 'teal', 'a broken color falls back to the default');
+assert.equal(S.darkOf('c:#zzzzzz').id, 'terra', 'a broken color falls back to the default');
 assert.equal(new Set(S.DARKS.map((d) => d.name)).size, 4, 'four different names');
 for (const d of S.DARKS) {
   for (const k of ['dark', 'dark2', 'deep']) {
@@ -41,6 +43,8 @@ for (const d of S.DARKS) {
     const c = hsl(d[k]);
     // no navy: a saturated blue (hue 200-265) is exactly what he refused (a faint gray-blue tint in the charcoal is not navy)
     assert.ok(!(c.h >= 200 && c.h <= 265 && c.s >= 25), `${d.id}.${k} must not be navy: ${JSON.stringify(c)}`);
+    // and no aqua green (owner 2026-11-17: the calm orange instead of the orange and the aqua green, everywhere)
+    assert.ok(!(c.h >= 70 && c.h <= 200 && c.s >= 12), `${d.id}.${k} must not be green: ${JSON.stringify(c)}`);
   }
   assert.ok(S.contrast(d.dark, '#ffffff') >= 4.5, d.id + ': white text on the surface reads (AA)');
   assert.ok(S.contrast(d.dark2, '#ffffff') >= 3, d.id + ': white big text on the lighter step reads (the gradient\'s end, large text)');
@@ -60,4 +64,4 @@ assert.equal(set['--dark-2'], '#3d434b');
 assert.equal(set['--dark-deep'], '#101214');
 assert.equal(set['--dark-rgb'], '37, 40, 44');
 assert.equal(document.documentElement.dataset.dark, 'charcoal');
-console.log('PASS: dark sets: four that suit the orange, none navy, warm brown the default, readable text, the variables set');
+console.log('PASS: dark sets: four that suit the orange, none navy or green, the calm orange the default, readable text, the variables set');

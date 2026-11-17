@@ -36,4 +36,4 @@ assert.equal(S.dataAgeText('2026-11-16 23:51:23', now), 'امبارح 11:51 م')
 assert.equal(S.dataAgeText('2026-11-17 12:05:00', now), 'النهارده 12:05 م');
 assert.equal(S.dataAgeText('2026-11-10 09:00:00', now), '11/10 9:00 ص');
 assert.equal(S.dataAgeText(null, now), '');
-for (const t of ['الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:', '. ممكن يكون صنف خلص بعده.', 'الوصف بالعربي بس']) assert.doesNotMatch(global.AskerI18n.translate(t), /[؀-ۿ]/, t);console.log('store-hours ok');
+for (const t of ['الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:', 'ممكن يكون صنف خلص بعده.', 'الوصف بالعربي بس']) assert.doesNotMatch(global.AskerI18n.translate(t), /[؀-ۿ]/, t);console.log('store-hours ok');

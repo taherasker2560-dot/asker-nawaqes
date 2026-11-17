@@ -9,10 +9,10 @@
 :root {
   /* the dark surfaces (the bar, the first slide, the balance card): «قهوة دافية» unless chosen otherwise (store/theme.js sets these from the choice; the owner
      disliked the navy that was here, 2026-11-16) */
-  --dark: #3a2018;
-  --dark-2: #5b3322;
-  --dark-deep: #1c0e0a;
-  --dark-rgb: 58, 32, 24;
+  --dark: #c0522a; /* the calm orange (owner 2026-11-17); the choice «برتقالي هادي» of the dark sets, ar/settings.js */
+  --dark-2: #d0653a;
+  --dark-deep: #3a190d;
+  --dark-rgb: 192, 82, 42;
   --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
   --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
   --grad: var(--accent);
@@ -125,13 +125,13 @@ html.night .ac-bal { background: var(--dark); box-shadow: 0 0 0 1px rgba(255, 25
 .ac-bal::before { content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 60%; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)); pointer-events: none; animation: cap-sheen 4.2s ease-in-out infinite; }
 @keyframes cap-sheen { 0%, 55% { left: -70%; } 100% { left: 130%; } }
 .ac-big { font-size: 40px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
-.ac-big.owe, html.night .ac-big.owe { color: #ffe0cc; }
-.ac-big.paid, html.night .ac-big.paid { color: #d6f5e3; }
+.ac-big.owe, html.night .ac-big.owe { color: var(--accent-text); }
+.ac-big.paid, html.night .ac-big.paid { color: var(--accent-text); }
 .ac-big.zero { color: #fff; }
 .ac-bal .hint-sm { color: rgba(255, 255, 255, 0.78); }
 .ac-two div { border-radius: 18px; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.82); }
 .ac-two b, .ac-two b.paid { color: #fff; }
-.ac-two b.paid { color: #c6ecd6; }
+.ac-two b.paid { color: #fff; }
 #acctBox .ac-btn { min-height: 56px; border-radius: 999px; }
 #acctBox .ac-order { background: var(--accent); box-shadow: var(--sh-2); }
 #acctBox .ac-install { border: 0; border-radius: 999px; box-shadow: var(--sh-1); }
@@ -177,8 +177,8 @@ html.night .pay-card { background: rgba(255, 255, 255, 0.07); }
 .pay-btn { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--card); color: var(--ink); box-shadow: var(--sh-1); font: inherit; font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
 .pay-main { background: var(--dark); color: #fff; }
 .pay-how, .pay-pin { margin: 8px 2px 0; font-size: 12px; line-height: 1.8; color: var(--muted); }
-.pay-proof { display: flex; align-items: center; justify-content: center; min-height: 46px; margin: 10px 0 0; padding: 0 12px; border-radius: 999px; background: var(--card); color: #166534; box-shadow: var(--sh-1); font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; }
-html.night .pay-proof { color: #86efac; }
+.pay-proof { display: flex; align-items: center; justify-content: center; min-height: 46px; margin: 10px 0 0; padding: 0 12px; border-radius: 999px; background: var(--card); color: var(--accent-text); box-shadow: var(--sh-1); font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; }
+html.night .pay-proof { color: var(--accent-text); }
 .pay-sheet { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, 0.55); }
 .pay-sheet-card { width: 100%; max-width: 560px; max-height: 92vh; margin: 0 auto; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); overflow: auto; border-radius: 30px 30px 0 0; background: var(--card); color: var(--ink); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25); }
 .pay-grip { width: 44px; height: 5px; margin: 0 auto 10px; border-radius: 5px; background: var(--line); }
@@ -222,7 +222,7 @@ html.night .sg-err { background: rgba(255, 90, 70, 0.14); color: #ffb4a8; }
 .scan-cam { position: relative; margin: 0 16px 10px; height: 118px; border-radius: 22px; overflow: hidden; background: #1c1210; }
 .scan-cam[hidden], .scan-code[hidden], .scan-name[hidden] { display: none; }
 .scan-cam video { width: 100%; height: 100%; object-fit: cover; }
-.scan-frame { position: absolute; left: 12%; right: 12%; top: 30%; bottom: 30%; border: 2.5px solid #4ade80; border-radius: 10px; pointer-events: none; }
+.scan-frame { position: absolute; left: 12%; right: 12%; top: 30%; bottom: 30%; border: 2.5px solid var(--accent); border-radius: 10px; pointer-events: none; }
 .scan-frame::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: #ef4444; box-shadow: 0 0 8px #ef4444; }
 .scan-hint { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 11.5px; color: #e6dcd6; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
 .scan-switch { position: absolute; top: 6px; inset-inline-start: 8px; min-height: 30px; padding: 0 10px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.88); color: #3a2018; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -234,16 +234,16 @@ html.night .sg-err { background: rgba(255, 90, 70, 0.14); color: #ffb4a8; }
 .scan-hit .scan-nm { flex: 1; min-width: 0; }
 .scan-nm h3 { margin: 0; font-size: 14px; }
 .scan-msg { min-height: 20px; margin: 0 18px 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
-.scan-msg.ok { color: #166534; }
+.scan-msg.ok { color: var(--accent-text); }
 .scan-msg.bad { color: #b42318; }
-html.night .scan-msg.ok { color: #86efac; }
+html.night .scan-msg.ok { color: var(--accent-text); }
 html.night .scan-msg.bad { color: #ffb4a8; }
 .scan-list { margin: 0 16px 12px; }
 .scan-line-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
 .scan-line-row:last-child { border-bottom: 0; }
 .scan-line-row.fresh { animation: scan-pop 0.6s ease; }
-@keyframes scan-pop { from { background: rgba(74, 222, 128, 0.25); } to { background: transparent; } }
-.scan-new { margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; background: #e6f5ec; color: #166534; font-size: 10.5px; }
+@keyframes scan-pop { from { background: rgba(var(--glow), 0.25); } to { background: transparent; } }
+.scan-new { margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; background: var(--soft-bg); color: var(--muted); font-size: 10.5px; }
 .scan-go { display: flex; align-items: center; justify-content: center; min-height: 54px; margin: 0 16px 12px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 16px; font-weight: 800; text-decoration: none; box-shadow: var(--sh-2); }
 .scan-go[hidden] { display: none; }
 .scan-link { display: block; margin: 6px 16px 0; text-align: center; font-size: 14px; font-weight: 700; color: var(--accent); }

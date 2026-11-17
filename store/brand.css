@@ -2,25 +2,26 @@
    mockup Store/design/brand_look_mockup_v2.jpg, «ا»).
    A layer over store.css + look.css + polish.css + capsule.css (loaded last): it replaces «كبسولة وموجة» (the wave, the dark
    surfaces, the floating bar) with a quiet, white, flat look. Colors still come from store/theme.js (the accent = the calm
-   orange by default, the night look, the customer's own choice); the second color is a soft green.
-   - white is the page; the accent only on the main buttons, the page you are on and the cart count
-   - the soft green on small things (available, icons) and the footer
+   orange by default, the night look, the customer's own choice). ONE brand color (owner 2026-11-17: «عاوز استخدم ال calm orange بدل
+   الأورانج والأخضر المائي في جميع المواضع»): the calm orange is also what the soft green was (small things, icons, available, the footer).
+   - white is the page; the accent on the buttons, the icons, the page you are on, the cart count and the footer
+   - «--green» is the old name of the same accent now
    - square-ish corners (2 px), thin lines, no shadows, no waves; the product photos carry the colors */
 
 :root {
-  --green: var(--dark, #066f74);
-  --green-soft: color-mix(in srgb, var(--dark, #066f74) 10%, #fff);
+  --green: var(--accent);
+  --green-soft: var(--accent-soft);
   --soft-bg: #f6f4ef;
   --line: #e5e1da;
   --muted: #5f5b56;
   --ink: #1d1b19;
-  --ok: var(--dark, #066f74);
-  --ok-bg: #e7f1ed;
+  --ok: var(--accent-text);
+  --ok-bg: var(--accent-soft);
   --sh-1: none;
   --sh-2: none;
 }
 html:not(.night) { --bg: #ffffff !important; --card: #ffffff !important; }
-html.night { --soft-bg: var(--card); --green: #5fb59b; --green-soft: rgba(95, 181, 155, 0.14); }
+html.night { --soft-bg: var(--card); --green: var(--accent-text); --green-soft: rgba(var(--glow), 0.16); }
 body { background: var(--bg); padding-bottom: calc(78px + var(--safe-b, 0px)); }
 
 /* ---------- the blessing strip + the header ---------- */
@@ -114,7 +115,7 @@ html:not(.cap-ind) body .tabbar a.on { background: none; }
 .tabbar .cart-tot { color: var(--ink); }
 
 /* ---------- the footer: the soft green closes the page ---------- */
-.ft { margin-top: 28px; padding: 20px 16px 24px; background: var(--green); color: #e6f1ed; font-size: 12.5px; line-height: 2; }
+.ft { margin-top: 28px; padding: 20px 16px 24px; background: var(--green); color: rgba(255, 255, 255, 0.92); font-size: 12.5px; line-height: 2; }
 .ft strong { display: block; margin-bottom: 2px; font-size: 14px; color: #fff; }
 .ft a { display: block; color: #fff; text-decoration: none; }
 .ft span { display: block; }
@@ -150,7 +151,7 @@ html body .ac-bal { background: var(--soft-bg) !important; color: var(--ink) !im
 .ac-two b.paid { color: var(--green); }
 #acctBox .ac-order { background: var(--accent); }
 #acctBox .ac-install, .ac-row .share, .ac-chips .chip { border: 1px solid var(--line); }
-#acctBox .ac-paybtn, .pay-main, .pay-close { background: var(--green); color: #fff; }
+#acctBox .ac-paybtn, .pay-main, .pay-close { background: var(--accent-deep); color: #fff; } /* the pay buttons: the deeper step of the same orange, so they read apart from «اطلب» */
 .pay-card, .install-note { border-radius: 2px; background: var(--green-soft); }
 .pay-sheet-card, .site-gate-card { border-radius: 12px 12px 0 0; }
 
@@ -160,7 +161,7 @@ html body .ac-bal { background: var(--soft-bg) !important; color: var(--ink) !im
 .wa-tile[hidden] { display: none; }
 .wa-tile .tile { background: var(--green-soft); }
 
-html.night .ft { background: var(--dark-deep, #03292c); }
+html.night .ft { background: var(--dark-deep, #3a190d); }
 html.night .ac-bal .hint-sm, html.night .ac-two div { color: var(--muted); }
 
 /* no black buttons: the owner's editor and the chips use the accent */
@@ -178,7 +179,7 @@ html.night .thumb.card, html.night .sh-pic.card { background: var(--card); }
 
 /* the data time: a small gray line (owner 2026-11-17), so the customer knows an item may have run out since */
 .data-age { margin: 6px 16px; font-size: 11px; line-height: 1.6; color: var(--muted); }
-.ft .data-age { margin: 4px 0 0; color: #e6f1ed; opacity: .85; }
+.ft .data-age { margin: 4px 0 0; color: rgba(255, 255, 255, 0.92); opacity: .85; }
 .sheet-card .data-age { margin: 4px 0 8px; }
 
 /* ================= the polish pass (owner 2026-11-17: «فيه اخطاء فى التقسيمات … حسّن التصاميم بشكل بسيط وخلاب») ================= */
@@ -191,7 +192,7 @@ textarea { resize: none; }
 /* the header and the footer reach the screen's edges also on a tablet or a computer, where the page itself is centered (max 1200 px) */
 html body .top, html body .bar { box-shadow: 0 0 0 100vmax var(--accent); clip-path: inset(0 -100vmax); }
 .ft { --ft-bg: var(--green); background: var(--ft-bg); box-shadow: 0 0 0 100vmax var(--ft-bg); clip-path: inset(0 -100vmax); }
-html.night .ft { --ft-bg: var(--dark-deep, #03292c); background: var(--ft-bg); }
+html.night .ft { --ft-bg: var(--dark-deep, #3a190d); background: var(--ft-bg); }
 
 /* the search stays on a solid bar while the page scrolls under it */
 .top-search { margin: 0; max-width: none; padding: 10px max(16px, calc((100% - 760px) / 2)); background: var(--card); }
@@ -226,3 +227,8 @@ html[dir="ltr"] .ds-lang { display: block; }
 
 /* the sections: five departments and «كل الأصناف» = six tiles, so six columns on a wide screen (five left one alone on a second row) */
 @media (min-width: 760px) { .sections { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+/* ---- one brand color (owner 2026-11-17): the leftovers of the sweep ---- */
+.share { color: var(--accent-text); }
+.sh-rx { background: var(--accent-soft); color: var(--accent-text); }
+.badge.order { background: var(--order-bg); color: var(--order); border: 1px solid var(--line); }

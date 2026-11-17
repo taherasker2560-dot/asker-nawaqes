@@ -10,10 +10,10 @@
 :root {
   /* the dark surfaces (the bar, the greeting): «قهوة دافية» unless chosen otherwise (ar/settings.js sets these from the choice; the owner
      disliked the navy that was here, 2026-11-16) */
-  --dark: #3a2018;
-  --dark-2: #5b3322;
-  --dark-deep: #1c0e0a;
-  --dark-rgb: 58, 32, 24;
+  --dark: #c0522a; /* the calm orange (owner 2026-11-17); the choice «برتقالي هادي» of the dark sets, ar/settings.js */
+  --dark-2: #d0653a;
+  --dark-deep: #3a190d;
+  --dark-rgb: 192, 82, 42;
   --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
   --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
   --radius: 26px;
@@ -199,8 +199,8 @@ html.night .cu-head { box-shadow: 0 0 0 1px var(--line); }
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
-.cu-bal.owe, html.night .cu-bal.owe { color: #ffe0cc; }
-.cu-bal.paid, html.night .cu-bal.paid { color: #d6f5e3; }
+.cu-bal.owe, html.night .cu-bal.owe { color: #fff; } /* on the dark capsule (the calm orange): white; it was a light peach */
+.cu-bal.paid, html.night .cu-bal.paid { color: rgba(255, 255, 255, 0.9); }
 .cu-bal.zero, html.night .cu-bal.zero { color: #fff; }
 .cu-bal::before { content: ''; position: absolute; top: 0; bottom: 0; left: -70%; width: 60%; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)); pointer-events: none; animation: cap-sheen 4.2s ease-in-out infinite; }
 @keyframes cap-sheen { 0%, 55% { left: -70%; } 100% { left: 130%; } }
@@ -229,7 +229,7 @@ html.cap-still .cu-bal::before { animation: none; }
 /* ---------- مستخدمين الموقع (2026-11-17): ar/site-users.js ---------- */
 .su-dark { margin: 10px 0; padding: 16px 18px; border-radius: 28px; background: var(--dark); color: #fff; box-shadow: var(--sh-2); }
 .su-lbl { display: block; font-size: 12.5px; opacity: 0.88; }
-.su-big { display: block; margin: 2px 0; font: 700 42px var(--head); line-height: 1.1; color: #ffe3d3; }
+.su-big { display: block; margin: 2px 0; font: 700 42px var(--head); line-height: 1.1; color: #fff; }
 .su-sub { font-size: 12px; opacity: 0.85; }
 .su-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .su-grid div { padding: 7px 8px; border-radius: 16px; background: rgba(255, 255, 255, 0.14); text-align: center; font-size: 11.5px; }
@@ -243,13 +243,13 @@ html.cap-still .cu-bal::before { animation: none; }
 .su-row:last-child { border-bottom: 0; }
 .su-who { display: flex; flex-direction: column; gap: 1px; font-size: 13.5px; }
 .su-who span { font-size: 12px; color: var(--muted); }
-.su-chip { padding: 2px 10px; border-radius: 999px; background: #e6f5ec; color: #166534; font-size: 11.5px; font-weight: 700; }
+.su-chip { padding: 2px 10px; border-radius: 999px; background: var(--tint-2); color: var(--muted); font-size: 11.5px; font-weight: 700; }
 .su-chip.gone { background: #eef0f4; color: #4b5563; }
-.su-pw { flex-basis: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 14px; background: #fff8ec; font-size: 13px; }
+.su-pw { flex-basis: 100%; display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 14px; background: var(--rose); font-size: 13px; }
 .su-pw b { font: 700 18px var(--head); letter-spacing: 1px; }
-.su-note { margin: 8px 2px; padding: 8px 12px; border-radius: 16px; background: #fff8ec; font-size: 11.5px; line-height: 1.9; color: #7a4a12; }
+.su-note { margin: 8px 2px; padding: 8px 12px; border-radius: 16px; background: var(--rose); font-size: 11.5px; line-height: 1.9; color: var(--crimson-ink); }
 html.night .su-note, html.night .su-pw { background: rgba(255, 255, 255, 0.08); color: inherit; }
-html.night .su-chip { background: rgba(80, 200, 130, 0.18); color: #9be3b8; }
+html.night .su-chip { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
 html.night .su-chip.gone { background: rgba(255, 255, 255, 0.1); color: #cbd0d8; }
 .su-meta span + span::before { content: ' · '; }
 /* «👁 شوف صفحته» in a customer's statement (2026-11-17, ar/customers.js viewPage) */

@@ -19,7 +19,7 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
  assert.equal(look.bless,'اللهم صل على النبي ﷺ');
  assert.equal(look.barBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
- assert.equal(look.hero,'rgb(6, 111, 116)','the greeting in the soft green');
+ assert.equal(look.hero,'rgb(192, 82, 42)','the greeting in the calm orange (no aqua green)');
  assert.equal(look.heroRadius,'2px');
  assert.ok(contrast(look.h2,look.hero)>=4.5,'the greeting reads');
  assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);
@@ -43,7 +43,7 @@ run('Brand look (bot): night — the greeting, its link and the bar stay readabl
  assert.ok(await page.evaluate(()=>document.documentElement.classList.contains('night')));
  const n=await page.evaluate(()=>{const cs=e=>getComputedStyle(e),nav=document.querySelector('.bottomnav'),link=document.querySelector('.hero-link'),h2=document.querySelector('.hero h2'),hero=document.querySelector('.hero');
   return {nav:cs(nav).backgroundColor,link:cs(link).color,linkBg:cs(link).backgroundColor,h2:cs(h2).color,hero:cs(hero).backgroundColor,page:cs(document.body).backgroundColor}});
- assert.equal(n.nav,'rgb(3, 41, 44)');
+ assert.equal(n.nav,'rgb(58, 25, 13)');
  assert.ok(contrast(n.h2,n.hero)>=4.5,'the greeting reads at night');
  assert.ok(contrast(n.link,n.linkBg)>=4.5,'«الموقع» reads on the greeting at night: '+n.link+' on '+n.linkBg);
  assert.notEqual(n.page,'rgb(255, 255, 255)','the page is dark');

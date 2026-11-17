@@ -11,7 +11,7 @@ window.AskerEN = {
   "صحتك أولوية": "Your health is our priority",
   "مفيش حاجة فيها كل كلماتك، دي أقرب نتايج لـ «{0}»": "Nothing has all your words; these are the closest results for «{0}»",
   "الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:": "Availability is as of the pharmacy's last recorded sale:",
-  ". ممكن يكون صنف خلص بعده.": ". An item may have sold out since.",
+  "ممكن يكون صنف خلص بعده.": "An item may have sold out since.",
   "الوصف بالعربي بس": "Description in Arabic only",
   "صيدلية عسكر من سنة 1981. اطلب اللي محتاجه واستلمه جاهز من الصيدلية.": "Asker Pharmacy, since 1981. Order what you need and pick it up ready at the pharmacy.",
   "ابدأ الطلب": "Start your order",

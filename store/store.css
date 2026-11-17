@@ -5,13 +5,15 @@
   --ink: #1a1c1b;
   --muted: #5f6461;
   --line: #e8e6e0;
-  --accent: #cf4014; /* the vivid orange (2026-11-15; the blue of the round logo before); store/theme.js sets these before the page paints */
-  --accent-deep: #922d0e;
+  --accent: #c0522a; /* the calm orange (owner 2026-11-17); store/theme.js sets these before the page paints */
+  --accent-deep: #8a3b1e;
   --accent-soft: #f9efeb;
-  --ok: #0b5240;
-  --ok-bg: #e3f1ec;
-  --order: #8a4a0b;
-  --order-bg: #fcebd9;
+  --accent-text: #86391d;
+  --accent-line: #ead5cd;
+  --ok: var(--accent-text); /* available: the calm orange (no green) */
+  --ok-bg: var(--accent-soft);
+  --order: var(--muted); /* on order: a quiet gray, so it reads apart from «available» */
+  --order-bg: #f1eee8;
   --out: #4d514f;
   --out-bg: #ececea;
   --bad: #a3162f;
@@ -59,7 +61,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .cart-btn { position: relative; width: 44px; height: 44px; border-radius: 12px; background: var(--bg); display: flex; align-items: center; justify-content: center; color: var(--ink); }
 .cart-btn svg { width: 22px; height: 22px; stroke-width: 1.8; }
 .cart-btn .cart-n { position: absolute; top: 2px; left: 2px; }
-.cart-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #c2410c; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.cart-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .top-search { padding: 0 16px 16px; background: var(--card); }
 .top-search input, .search-form input {
   width: 100%; height: 48px; padding: 0 14px; border-radius: 14px; border: 1px solid #e2e0da; background: var(--bg); color: var(--ink); font-size: 15px;

@@ -16,16 +16,16 @@
     ['brown', 'بني', '#5d4037'], ['gray', 'رمادي', '#3f4650'], ['slate', 'رصاصي', '#455a64'], ['charcoal', 'فحمي', '#263238'],
   ].map(([id, name, hex]) => ({ id, name, hex }));
   const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'terra'; // the calm orange (owner 2026-11-17: «تهدي درجة الأورنج … مش فج ولا فاقع»); «برتقالي فاقع» stays in the list
-  // the dark surfaces of the new look «كبسولة وموجة» (the bottom bar, the greeting, the balance card). Owner 2026-11-16: the navy was «مش حلو»;
-  // «قهوة دافية و اعملها اوبشن اغيرها براحتى»; then he sent a picture and asked for «اللون الأخضر … بنفس درجته اللي في الصورة»: the green is the DEFAULT now,
-  // taken from that picture (its teal #018b90 is the lighter step; the surface is the same hue deepened so white text reads, 5.9:1). Four sets that suit
-  // the orange, none of them blue, plus any color of his own; each gives the surface, a lighter step of it and the near-black one for the night look.
+  // the dark surfaces of the new look (the bottom bar, the greeting, the balance card, the footer). Owner 2026-11-16: the navy was «مش حلو», then the aqua green
+  // («أخضر مائي»); 2026-11-17: «عاوز استخدم ال calm orange بدل الأورانج والأخضر المائي في جميع المواضع»: the calm orange is the DEFAULT surface now (white text on it
+  // reads, 4.7:1) and the aqua green is gone (a phone that kept it falls back to the default). Four sets, none of them blue or green, plus any color of his own;
+  // each gives the surface, a lighter step of it and the near-black one for the night look.
   // The bot keeps its choice under asker-dark, the store under asker-store-dark (store/theme.js).
   const DARKS = [
-    ['teal', 'أخضر مائي', '#066f74', '#018b90', '#03292c'], ['warm', 'قهوة دافية', '#3a2018', '#5b3322', '#1c0e0a'],
+    ['terra', 'برتقالي هادي', '#c0522a', '#d0653a', '#3a190d'], ['warm', 'قهوة دافية', '#3a2018', '#5b3322', '#1c0e0a'],
     ['charcoal', 'فحمي', '#25282c', '#3d434b', '#101214'], ['plum', 'برقوقي', '#3a1c33', '#5a2d4f', '#1a0c17'],
   ].map(([id, name, dark, dark2, deep]) => ({ id, name, dark, dark2, deep }));
-  const DARK_KEY = 'asker-dark', DARK_DEFAULT = 'teal';
+  const DARK_KEY = 'asker-dark', DARK_DEFAULT = 'terra';
   // «c:#rrggbb» = a color of his own: darkened until white text on it reads, with its lighter step and its near-black worked out
   function darkOf(id) {
     const own = /^c:(#[0-9a-f]{6})$/i.exec(String(id || ''));

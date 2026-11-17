@@ -42,7 +42,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
  assert.equal(look.accent,'#c0522a','the calm orange by default (not the vivid one)');
  assert.ok(contrast(look.orderBg,'rgb(255, 255, 255)')>=4.5,'white text reads on the main button: '+look.orderBg);
  assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
- if(look.payBg){assert.equal(look.payBg,'rgb(6, 111, 116)','the green');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on the green');}
+ if(look.payBg){assert.equal(look.payBg,'rgb(138, 59, 30)','the deep step of the calm orange');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on it');}
  assert.equal(look.meta,'#c0522a','the phone\'s top bar is the orange');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours
  await page.click('.tabbar a[data-go="home"]');
@@ -52,7 +52,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
    secs:document.querySelectorAll('#sections .sec').length,ft:cs(ft).backgroundColor,hours:ft.textContent.replace(/\s+/g,' '),promo:!!document.querySelector('.promo')}});
  assert.equal(home.hero,'rgb(246, 244, 239)');assert.equal(home.dir,'row');assert.equal(home.radius,'2px');assert.ok(home.badge,'the round logo with 1981');
  assert.equal(home.tiles,2);assert.equal(home.perks,3);assert.equal(home.secs,6);assert.equal(home.promo,false);
- assert.equal(home.ft,'rgb(6, 111, 116)','the green closes the page');
+ assert.equal(home.ft,'rgb(192, 82, 42)','the calm orange closes the page');
  assert.match(home.hours,/كل يوم 9 ص – 12 بالليل/);assert.match(home.hours,/الجمعة 3 – 11 بالليل/);assert.match(home.hours,/اللهم صل على النبي ﷺ/);
 },{home:true});
 run('Brand look: night — the balance card, the bar and the footer stay readable',async({page,base})=>{

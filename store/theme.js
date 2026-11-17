@@ -30,6 +30,7 @@
     s.setProperty('--accent-deep', t.deep);
     s.setProperty('--accent-text', t.ink);
     s.setProperty('--accent-soft', t.soft);
+    s.setProperty('--accent-line', t.line);
     s.setProperty('--glow', rgb(t.main));
     s.setProperty('--bg', t.tint);
     if (c.night) s.setProperty('--card', t.tint2); else s.removeProperty('--card');
