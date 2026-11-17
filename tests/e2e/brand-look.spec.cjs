@@ -1,5 +1,5 @@
-// The store's brand look (owner 2026-11-17: store/brand.css over capsule.css; before it «كبسولة وموجة» of 11-16). Not only the text: white page, the blessing
-// strip, a flat header with no wave, 2 px corners, a docked flat bottom bar, the calm orange by default and the soft green on small things, the balance on a
+// The store's brand look (owner 2026-11-17: store/brand.css over capsule.css; before it «كبسولة وموجة» of 11-16). Not only the text: white page, no blessing
+// strip (he had it taken off the site the same day), a flat header with no wave, 2 px corners, a docked flat bottom bar, the calm orange by default and the soft green on small things, the balance on a
 // quiet card that reads day and night; the motion of store/motion.js (the balance counts and ends exactly as written) and «reduce motion still hold.
 // Made-up customers only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');
@@ -16,7 +16,7 @@ const seed=(page)=>page.evaluate(([c,m,t])=>{localStorage.setItem('__fakeTables'
 // WCAG contrast of two "rgb(r, g, b)" strings
 const contrast=(a,b)=>{const lum=s=>{const [r,g,bl]=s.match(/\d+(\.\d+)?/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return .2126*r+.7152*g+.0722*bl};const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
 
-run('Brand look: the account — white page, the blessing strip, no wave, a quiet balance card, a docked flat bar, the calm orange and the soft green',async({page,base})=>{
+run('Brand look: the account — white page, no blessing strip, no wave, a quiet balance card, a docked flat bar, the calm orange and the soft green',async({page,base})=>{
  await seed(page);
  await page.goto(base+'store.html#me='+TOK);
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
@@ -24,12 +24,13 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
  assert.equal(await text(page,'.ac-big'),'عليك 7,174.50 ج');
  const look=await page.evaluate(()=>{const cs=(e,p)=>getComputedStyle(e,p),bal=document.querySelector('.ac-bal'),big=document.querySelector('.ac-big'),
   top=document.querySelector('[data-view="account"] .top'),bar=document.querySelector('.tabbar'),order=document.querySelector('#acctBox .ac-order'),pay=document.querySelector('#acctBox .ac-paybtn');
-  return {body:cs(document.body).backgroundColor,bless:document.querySelector('.bless').textContent.trim(),balBg:cs(bal).backgroundColor,balRadius:cs(bal).borderTopLeftRadius,big:cs(big).color,
+  return {body:cs(document.body).backgroundColor,bless:document.querySelectorAll('.bless').length,blessText:/اللهم صل|ﷺ/.test(document.body.textContent),balBg:cs(bal).backgroundColor,balRadius:cs(bal).borderTopLeftRadius,big:cs(big).color,
    wave:cs(top,'::after').display,topBg:cs(top).backgroundColor,topRadius:cs(top).borderBottomLeftRadius,
    barPos:cs(bar).position,barBottom:cs(bar).bottom,barRadius:cs(bar).borderTopLeftRadius,barBg:cs(bar).backgroundColor,
    accent:cs(document.documentElement).getPropertyValue('--accent').trim(),orderBg:cs(order).backgroundColor,orderRadius:cs(order).borderTopLeftRadius,payBg:pay?cs(pay).backgroundColor:'',meta:document.querySelector('meta[name="theme-color"]').content}});
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
- assert.equal(look.bless,'اللهم صل على النبي ﷺ');
+ assert.equal(look.bless,0,'no blessing strip on the site (owner 2026-11-17: «شيل كلمة اللهم صل على النبي من الموقع»)');
+ assert.equal(look.blessText,false,'and no blessing text anywhere on the page');
  assert.equal(look.topBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.topRadius,'0px');
  assert.equal(look.wave,'none','no wave');
@@ -53,7 +54,7 @@ run('Brand look: the account — white page, the blessing strip, no wave, a quie
  assert.equal(home.hero,'rgb(246, 244, 239)');assert.equal(home.dir,'row');assert.equal(home.radius,'2px');assert.ok(home.badge,'the round logo with 1981');
  assert.equal(home.tiles,2);assert.equal(home.perks,3);assert.equal(home.secs,6);assert.equal(home.promo,false);
  assert.equal(home.ft,'rgb(192, 82, 42)','the calm orange closes the page');
- assert.match(home.hours,/كل يوم 9 ص – 12 بالليل/);assert.match(home.hours,/الجمعة 3 – 11 بالليل/);assert.match(home.hours,/اللهم صل على النبي ﷺ/);
+ assert.match(home.hours,/كل يوم 9 ص – 12 بالليل/);assert.match(home.hours,/الجمعة 3 – 11 بالليل/);assert.match(home.hours,/© صيدلية عسكر · منذ 1981/);assert.doesNotMatch(home.hours,/اللهم|ﷺ/,'the footer has no blessing either');
 },{home:true});
 run('Brand look: night — the balance card, the bar and the footer stay readable',async({page,base})=>{
  await seed(page);
