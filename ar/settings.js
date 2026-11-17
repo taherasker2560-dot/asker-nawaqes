@@ -90,8 +90,14 @@
   function choice() {
     if (read(LOOK, '') !== '1') {
       const was = read(KEY, '');
-      // 2026-11-17: whoever still has the old default (the vivid orange nobody picked on purpose) gets the calm one, once\n    if (!was || was === 'crimson' || was === 'asker' || (was === 'flame' && !read('asker-calm', ''))) write(KEY, DEFAULT_ID);\n    write('asker-calm', '1');
+      if (!was || was === 'crimson' || was === 'asker') write(KEY, DEFAULT_ID);
       write(LOOK, '1');
+    }
+    // 2026-11-17: whoever still has the old default (the vivid orange, «flame», that nobody picked on purpose: it was written as the default)
+    // moves once to the calm orange; any other color somebody picked stays, and «برتقالي فاقع» can still be picked again.
+    if (read('asker-calm', '') !== '1') {
+      if (read(KEY, '') === 'flame') write(KEY, DEFAULT_ID);
+      write('asker-calm', '1');
     }
     let a = read(KEY, DEFAULT_ID), night = read(NIGHT, '') === '1';
     if (a === 'night') { a = 'purple'; night = true; write(KEY, a); write(NIGHT, '1'); }

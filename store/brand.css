@@ -20,7 +20,7 @@
   --sh-2: none;
 }
 html:not(.night) { --bg: #ffffff !important; --card: #ffffff !important; }
-html.night { --soft-bg: var(--tint-2, var(--card)); --green: #5fb59b; --green-soft: rgba(95, 181, 155, 0.14); }
+html.night { --soft-bg: var(--card); --green: #5fb59b; --green-soft: rgba(95, 181, 155, 0.14); }
 body { background: var(--bg); padding-bottom: calc(78px + var(--safe-b, 0px)); }
 
 /* ---------- the blessing strip + the header ---------- */

@@ -258,6 +258,7 @@ window.AskerEN = {
   "ليموني غامق": "Dark lime",
   "دهبي": "Gold",
   "برتقالي": "Orange",
+  "برتقالي هادي": "Calm orange",
   "برتقالي فاقع": "Bright orange",
   "نحاسي": "Copper",
   "بني": "Brown",
