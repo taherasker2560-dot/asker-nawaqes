@@ -8,12 +8,12 @@
   --accent-deep: #8a3b1e;
   --accent-soft: #f9efeb;
   --glow: 192, 82, 42;
-  --bg: #f3f6fc;
+  --bg: #ffffff;
   --card: #ffffff;
-  --ink: #131a27;
+  --ink: #1d1b19;
   --muted: #5b6475;
-  --line: #e3e8f1;
-  --field: #f3f6fc;
+  --line: #e5e1da;
+  --field: #f6f4ef;
   --grad: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
   --sh-1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.06);
   --sh-2: 0 12px 32px -14px rgba(15, 23, 42, 0.22), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
@@ -489,7 +489,7 @@ body.sheet-open { overflow: hidden; }
 
 /* English (store/i18n-en-store.js + ar/i18n.js): the language switch, and the Arabic item names hidden in English */
 .lang-row { display: flex; gap: 8px; margin-bottom: 14px; }
-.lang-row button { flex: 1; min-height: 44px; border-radius: 12px; border: 1.5px solid var(--line, #d8e0ed); background: var(--card, #fff); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.lang-row button { flex: 1; min-height: 44px; border-radius: 12px; border: 1.5px solid var(--line, #e5e1da); background: var(--card, #fff); color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
 .lang-row button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 html[lang="en"] .item-text .ar, html[lang="en"] #shAr, html[lang="en"] .brand span[dir="ltr"] { display: none !important; }
 html[lang="en"] .item-text h3, html[lang="en"] #shName { text-align: left; }

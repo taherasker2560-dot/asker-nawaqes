@@ -153,7 +153,7 @@
   }
   function text(ctx, s, x, y, o) {
     ctx.font = `${o.bold ? 700 : 400} ${o.size || 24}px ${FONT}`;
-    ctx.fillStyle = o.color || '#14213d';
+    ctx.fillStyle = o.color || NAVY;
     const rtl = o.dir ? o.dir === 'rtl' : AR.test(s);
     ctx.direction = rtl ? 'rtl' : 'ltr';
     ctx.textAlign = o.align || 'right';
@@ -208,7 +208,7 @@
         y = M + 60;
       }
       // the table's head
-      ctx.fillStyle = '#eef3fb'; ctx.fillRect(L, y, R - L, 46);
+      ctx.fillStyle = '#f9efeb'; ctx.fillRect(L, y, R - L, 46);
       const head = (s, col) => text(ctx, s, col[1] - 10, y + 32, { bold: true, size: 22, color: NAVY });
       head('التاريخ', COL.date); head('البيان', COL.what); head('عليه', COL.debit); head('دفع', COL.paid); head('الرصيد', COL.bal);
       y += 56;
@@ -227,7 +227,7 @@
           const m = b.m, t = parseAt(m.at);
           const label = m.kind === 'payment' ? 'دفعة' : m.kind === 'refund' ? 'رجّعناله فلوس' : m.kind === 'return' ? 'مرتجع' : 'فاتورة';
           const d = discountOf(m);
-          const color = m.kind === 'payment' ? GREEN : m.kind === 'return' ? AMBER : '#14213d';
+          const color = m.kind === 'payment' ? GREEN : m.kind === 'return' ? AMBER : NAVY;
           text(ctx, t ? `${dateText(t)} ${clock(t)}` : '', COL.date[1] - 10, y + 30, { size: 21, color: GREY, w: COL.date[1] - COL.date[0] - 14 });
           text(ctx, label + (d ? ` (خصم ${money(d)})` : ''), COL.what[1] - 10, y + 30, { bold: true, size: 23, color, w: COL.what[1] - COL.what[0] - 20 });
           if (m.kind === 'sale' || m.kind === 'return') num2(m.total, COL.debit, color);
