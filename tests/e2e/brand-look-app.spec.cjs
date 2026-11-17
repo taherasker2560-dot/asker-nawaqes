@@ -19,7 +19,7 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
  assert.equal(look.bless,'اللهم صل على النبي ﷺ');
  assert.equal(look.barBg,'rgb(192, 82, 42)','the header is the calm orange');
  assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
- assert.equal(look.hero,'rgb(47, 125, 104)','the greeting in the soft green');
+ assert.equal(look.hero,'rgb(6, 111, 116)','the greeting in the soft green');
  assert.equal(look.heroRadius,'2px');
  assert.ok(contrast(look.h2,look.hero)>=4.5,'the greeting reads');
  assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);
@@ -30,7 +30,7 @@ run('Brand look (bot): white page, the blessing strip, no wave, the soft green g
  assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'999px','and they stay oval (owner 2026-11-17)');
  assert.equal(look.card,'2px');
  assert.equal(look.accent,'#c0522a','the calm orange by default');
- assert.equal(look.meta,'#ffffff');
+ assert.equal(look.meta,'#c0522a');
  assert.match(await text(page,'.hero h2'),/صيدلية عسكر/);
  // the bar follows the section you open
  await page.click('[data-group="accounts"]');
