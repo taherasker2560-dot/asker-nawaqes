@@ -130,7 +130,7 @@
     document.documentElement.classList.toggle('night', c.night);
     // the phone's top bar = the top of the header (the main color); at night the dark page
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff'); // the header is white now (ar/brand.css)
+    if (meta) meta.setAttribute('content', t.main); // the header is the accent now (ar/brand.css)
     return c;
   }
   root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice, DARKS, DARK_DEFAULT, darkOf, applyDark };
