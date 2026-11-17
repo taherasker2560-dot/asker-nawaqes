@@ -5,7 +5,9 @@ const {run,text,assert}=require('./harness.cjs');
 const item=(id,name,why,extra={})=>({id,name,why,bag:'2428',have:0,sold30:3,min:0,need:1.4,qty:2,last_buy:'2026-11-01',...(why==='new'?{age:20}:{n:3}),...extra});
 const file=(items,at=new Date().toISOString())=>({generated_at:at,items});
 const put=(page,o)=>page.evaluate(o=>{window.__storage['orders/statement.json']=JSON.stringify(o);window.__tables.ar_po_items=[]},o);
-const openOrders=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]')};
+// the windows under the orders start closed (owner 2026-11-17): the tests that tap inside one open it first
+const openFolds=(page)=>page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
+const openOrders=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await openFolds(page)};
 run('statement: the items waiting for him, «ضيفه» and «مش دلوقتي» write the right rows, each with its undo',async({page,table})=>{
  await put(page,file([item(101,'ZEGAPETS 10MG 28TAB','new'),item(102,'BENDATREOTID 25MG VIAL','byreq',{bag:'pv',have:0.5,sold30:0,qty:1}),item(103,'COSMETIC NEW ITEM','new',{bag:'2434'})]));
  await openOrders(page);
@@ -75,4 +77,47 @@ run('statement in English: texts translate, item names stay',async({page})=>{
  assert.equal(await page.$eval('[data-st="101"] strong',e=>e.textContent.trim()),'ZEGAPETS 10MG 28TAB','item names are not touched');
  const ar=await page.evaluate(()=>[...document.querySelectorAll('#stBox *')].filter(e=>!e.closest('.notr')&&e.children.length===0&&/[؀-ۿ]/.test(e.textContent)).map(e=>e.textContent.trim()));
  assert.deepEqual(ar,[],'no Arabic left in the statement');
+});
+
+// the file is rewritten a minute or two after a tap and every 30 minutes: a refresh in between must not ask again about what he already decided (owner 2026-11-17)
+run('statement: an older file still lists what he decided; the table is checked, so it shows as done and nothing is asked twice',async({page,table})=>{
+ const now=new Date().toISOString(),old=new Date(Date.now()-9*864e5).toISOString();
+ await page.evaluate(([o,rows])=>{window.__storage['orders/statement.json']=JSON.stringify(o);window.__tables.ar_po_items=rows},[file([item(101,'ORCAVI 30 TAB','new'),item(102,'PHARMABILAST SYRUP','new'),item(103,'WILL BE WELL CREAM','new'),item(104,'ZEGAPETS 10MG','new'),item(105,'OLD NO ITEM','new'),item(106,'AUTO LINE ITEM','new')]),[
+  {id:7,item_id:101,item_name:'ORCAVI 30 TAB',status:'open',qty:1,item:{},created_at:now},
+  {id:8,item_id:102,item_name:'PHARMABILAST SYRUP',status:'cancelled',qty:1,item:{decision:'no'},created_at:now},
+  {id:9,item_id:103,item_name:'WILL BE WELL CREAM',status:'cancelled',qty:1,item:{decision:'undone'},created_at:now},
+  {id:10,item_id:105,item_name:'OLD NO ITEM',status:'cancelled',qty:1,item:{decision:'no'},created_at:old},
+  {id:11,item_id:106,item_name:'AUTO LINE ITEM',status:'open',qty:1,item:{auto:true},created_at:now}]]);
+ await openOrders(page);
+ await page.waitForSelector('#stBox:not(.hidden)');
+ // 101 = in the order (his own line) and 102 = «مش دلوقتي»: done; 103 (undone), 104 (no line), 105 (a «no» older than 7 days) and 106 (the laptop's own automatic line) are asked
+ assert.match(await text(page,'[data-st="101"] .st-done'),/✓ اتضاف لأمر الشرا/);
+ assert.match(await text(page,'[data-st="102"] .st-done'),/مش دلوقتي/);
+ for(const id of [103,104,105,106])assert.ok(await page.isVisible(`[data-st="${id}"] [data-st-add]`),'asked: '+id);
+ for(const id of [101,102])assert.ok(!(await page.$(`[data-st="${id}"] [data-st-add]`)),'not asked again: '+id);
+ assert.equal(await text(page,'#stCount'),'4');
+ // «رجّعه» on the one he added before the refresh cancels THAT line (its id came from the table)
+ await page.click('[data-st-undo="101"]');
+ await page.waitForSelector('[data-st="101"] [data-st-add]');
+ const po=await table('ar_po_items');assert.equal(po.find(r=>r.id===7).status,'cancelled');assert.equal(po.length,5,'no new line was written');
+});
+run('statement: «ضيفه» on an item that is already in the order (one open line per item) shows it as added, not as a failure',async({page,table})=>{
+ await put(page,file([item(101,'ORCAVI 30 TAB','new'),item(102,'ZEGAPETS 10MG','new')]));
+ await openOrders(page);
+ await page.waitForSelector('[data-st="101"] [data-st-add]');
+ // the laptop (or another tap) puts an open line in after the page read the file
+ await page.evaluate(()=>{window.__tables.ar_po_items.push({id:'x1',item_id:101,item_name:'ORCAVI 30 TAB',status:'open',qty:1,item:{auto:true},created_at:new Date().toISOString()})});
+ await page.click('[data-st-add="101"]');
+ await page.waitForSelector('[data-st="101"] .st-done.ok');
+ assert.ok(!(await page.isVisible('#stMsg')),'no scary message');
+ assert.equal((await table('ar_po_items')).filter(r=>r.item_id===101&&r.status==='open').length,1,'still one open line');
+ assert.equal(await text(page,'#stCount'),'1');
+ await page.click('[data-st-undo="101"]');
+ await page.waitForSelector('[data-st="101"] [data-st-add]');
+ assert.equal((await table('ar_po_items')).find(r=>r.id==='x1').status,'cancelled','«رجّعه» cancels the line that was there');
+ // another error is still told
+ await page.evaluate(()=>{const c=window.AskerApp.client,f=c.from.bind(c);c.from=(t)=>{const b=f(t);if(t==='ar_po_items'){const i=b.insert.bind(b);b.insert=()=>({select:()=>Promise.resolve({data:null,error:{message:'permission denied'}})})}return b}});
+ await page.click('[data-st-add="102"]');
+ await page.waitForSelector('#stMsg:not(.hidden)');
+ assert.match(await text(page,'#stMsg'),/ما اتضافش لأمر الشرا: permission denied/);
 });

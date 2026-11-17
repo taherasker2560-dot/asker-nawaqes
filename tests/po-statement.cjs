@@ -25,6 +25,26 @@ assert.match(S.poRow({...a,bag:'2428'}).bag,/^(pv|gs|[0-9]{1,12})$/);
 assert.deepEqual(S.noRow(b),{item_id:102,item_name:'BY REQUEST ITEM',bag:'pv',qty:1,status:'cancelled',item:{have:0.5,sold30:0,min:0,need:1,last_buy:null,decision:'no'}});
 assert.equal(S.noItem(b,'undone').decision,'undone');
 assert.equal(S.noRow({...a,name:'x'.repeat(300)}).item_name.length,200);
+// what the table already says about the items of a file (owner 2026-11-17: the item came back after a refresh, because the file is rewritten only a minute or two after a tap)
+const t0=new Date('2026-11-17T08:20:00Z'),hoursAgo=(h)=>new Date(t0.getTime()-h*3600e3).toISOString();
+const row=(id,item_id,status,item,created_at)=>({id,item_id,status,item,created_at,updated_at:created_at});
+const kd=S.knownDecisions([
+ row(1,101,'open',{},hoursAgo(1)),                                  // his own open line = added
+ row(2,102,'cancelled',{decision:'no'},hoursAgo(1)),                // «مش دلوقتي» now = skipped
+ row(3,103,'cancelled',{decision:'no'},hoursAgo(24*8)),             // «مش دلوقتي» 8 days ago = asked again
+ row(4,104,'cancelled',{decision:'undone'},hoursAgo(1)),            // «رجّعه للبيان» = asked again
+ row(5,105,'open',{auto:true},hoursAgo(1)),                         // the laptop's automatic line: the file still asks him (same as the laptop)
+ row(6,106,'cancelled',{},hoursAgo(1)),                             // «رجّعه» (plainly cancelled) = asked again
+ row(7,107,'open',{},hoursAgo(2)),row(8,107,'cancelled',{decision:'no'},hoursAgo(1)), // both: added wins
+ row(9,108,'cancelled',{decision:'no'},hoursAgo(5)),row(10,108,'cancelled',{decision:'no'},hoursAgo(1)), // the newest line of a kind
+ row(11,109,'open',null,hoursAgo(3)),                               // a line with no item json = his
+ {id:12,item_id:0,status:'open'},null,{id:13,item_id:'x',status:'open'}],t0);
+assert.deepEqual([...kd.entries()].sort((x,y)=>x[0]-y[0]),[[101,{kind:'added',rid:1}],[102,{kind:'skipped',rid:2}],[107,{kind:'added',rid:7}],[108,{kind:'skipped',rid:10}],[109,{kind:'added',rid:11}]]);
+assert.equal(S.knownDecisions(null,t0).size,0);assert.equal(S.knownDecisions([],t0).size,0);assert.equal(S.NO_DAYS,7,'the same 7 days the laptop uses');
+// the one-open-line clash is not a failure
+assert.equal(S.isDuplicate({code:'23505',message:'x'}),true);
+assert.equal(S.isDuplicate({message:'duplicate key value violates unique constraint "ar_po_items_one_open"'}),true);
+assert.equal(S.isDuplicate({message:'permission denied'}),false);assert.equal(S.isDuplicate(null),false);
 // is the file old
 const now=new Date('2026-11-16T12:00:00Z');
 assert.equal(S.isOld('2026-11-16T09:00:00Z',now),false);assert.equal(S.isOld('2026-11-14T09:00:00Z',now),true);assert.equal(S.isOld('bad',now),true);

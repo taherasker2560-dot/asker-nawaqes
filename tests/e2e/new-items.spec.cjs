@@ -52,7 +52,7 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[],new_items:[{key:'ZETAPRO 5MG SYRUP',name_en:'Zetapro 5mg syrup',qty:3,price:90,form:'شراب',best:'REDA',offers:[
   {supplier:'REDA',label:'رضا عطية',name:'زيتابرو شراب',price:90,discount:27,date:'2026-11-07',fresh:true,strength:'strong'},
   {supplier:'NEWCITY',label:'نيو سيتي',name:'زيتابرو ٥ مجم شراب',price:90,discount:24.5,date:'2026-11-08',fresh:true,strength:'strong'}]}]})});
- await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odNewBox:not(.hidden)');
  await page.waitForFunction(()=>!!document.querySelector('#odNewList [data-new-group="REDA"]'));
  assert.match(await page.textContent('#odNewTitle'),/أصناف جديدة في أمر الشراء \(1\)/);
@@ -70,7 +70,7 @@ run('New items: save with an approximate price, translated, ordered, arrived, a 
  await page.evaluate(()=>{window.__tables.ar_new_items[0].status='approved';window.__tables.ar_orders=[]});   // back to «موافق» for the plain-card part
  // not in any list (the block is gone): the plain card, a plain message, he picks the supplier
  await page.evaluate(()=>{window.__storage['orders/drafts.json']=JSON.stringify({generated_at:new Date().toISOString(),suppliers:[],no_offer:[]});window.__copied=''});
- await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-pgroup="short"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForFunction(()=>!!document.querySelector('#odNewList [data-new-group=""]'));
  assert.match(await page.textContent('#odNewList'),/Zetapro 5mg syrup.*زيتابرو.*شراب.*× 3.*≈ 90 ج.*مش لاقيه في قوايم المخازن/);
  assert.equal(await page.$('#odNewList h4'),null,'no warehouse heading');

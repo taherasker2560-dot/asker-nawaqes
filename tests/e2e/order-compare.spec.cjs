@@ -13,7 +13,7 @@ const night=(key,both,ao,bo,extra={})=>({v:2,night:key,at:key+' 00:45',comparabl
 const cash=(buy=20000,cap=17680)=>({buy_value:buy,both_value:12000,extra_items_value:buy-12000,extra_qty_value:1500,misc_value:400,cap_money:cap,bot_cost:17607});
 const file=(nights,at=new Date().toISOString())=>({generated_at:at,v:2,week:{nights:nights.length},nights});
 const put=(page,o)=>page.evaluate(o=>{window.__storage['orders/compare2.json']=JSON.stringify(o)},o);
-const openOrders=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]')};
+const openOrders=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}))};
 run('orders card: counts, rate, 7 nights, the three lists with their reasons and the quantity',async({page})=>{
  await put(page,file([night('2026-11-14',50,2,1),night('2026-11-15',60,4,2),night('2026-11-16',55,3,9,{manual:4,final:true,...cash()})]));
  await openOrders(page);
@@ -82,17 +82,17 @@ run('orders card: no file yet = says so; an old file = warns; a late night = say
  assert.match(await text(page,'#cmpEmpty'),/لسه مفيش مقارنة: أول مقارنة بتظهر بعد طلب الليلة/);assert.ok(await page.isVisible('#cmpEmpty'));assert.ok(!(await page.isVisible('#cmpMain')));
  // the laptop stopped updating for two days
  await put(page,file([night('2026-11-16',5,1,1)],new Date(Date.now()-48*3600e3).toISOString()));
- await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#cmpMain:not(.hidden)');
  assert.ok(await page.isVisible('#cmpOld'));assert.match(await text(page,'#cmpOld'),/الملف قديم/);
  assert.ok(!(await page.isVisible('#cmpLate')));
  await put(page,file([night('2026-11-16',5,1,1,{late:true})]));
- await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForFunction(()=>!document.getElementById('cmpOld').offsetParent);
  assert.ok(await page.isVisible('#cmpLate'));
  // a file that is not what the laptop writes = the same as no file
  await put(page,{nights:'oops'});
- await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForFunction(()=>!document.getElementById('cmpEmpty').classList.contains('hidden'));
  assert.ok(!(await page.isVisible('#cmpMain')));
 });

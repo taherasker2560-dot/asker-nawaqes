@@ -9,7 +9,7 @@ const drafts=()=>({generated_at:new Date().toISOString(),suppliers:[{id:'NEWCITY
 const active=(page)=>page.evaluate(()=>{const a=document.activeElement;return a&&a.closest&&a.closest('[data-k]')?a.closest('[data-k]').dataset.k:(a&&a.dataset&&a.dataset.qty)||(a&&a.tagName==='BODY'?'body':a&&a.tagName)});
 run('quantity boxes: ready on the first, type to replace, Enter for the next, blue when typed (orders)',async({page})=>{
  await page.evaluate((o)=>{window.__storage['orders/drafts.json']=JSON.stringify(o);window.__tables.ar_orders=[];window.__tables.ar_suppliers=[]},drafts());
- await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odChips [data-sup]');
  // opening «تعديل الأصناف»: the cursor is ALREADY in the first quantity, no tap needed
  await page.click('#odEdit');
@@ -85,7 +85,7 @@ run('quantity boxes in «الوارد»: ready, typed number replaces the sugges
 
 run('quantity boxes learn: the number he chose last time starts blue, the new one is remembered',async({page,table})=>{
  await page.evaluate((o)=>{window.__storage['orders/drafts.json']=JSON.stringify(o);window.__tables.ar_orders=[];window.__tables.ar_suppliers=[];window.__tables.ar_order_qty=[{item_id:11,item_name:'ITEM ONE',qty:6,suggested:23,supplier:'NEWCITY'}]},drafts());
- await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true}));
  await page.waitForSelector('#odChips [data-sup]');
  // an item he chose a number for starts at it (blue), the others at the laptop's number; the order follows
  await page.click('#odEdit');
