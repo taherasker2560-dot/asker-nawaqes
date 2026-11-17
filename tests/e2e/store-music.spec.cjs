@@ -10,10 +10,11 @@ const FAKE=()=>{
  ['pointerdown','touchend','click','keydown'].forEach(n=>addEventListener(n,()=>{gesture=true},true)); // registered before the page's own: counts as the touch itself
  window.__audio={made:0,ramps:[],suspends:0,resumes:0,ctx:null};
  class P{constructor(v){this.value=v||0}setValueAtTime(v){this.value=v}linearRampToValueAtTime(v,t){window.__audio.ramps.push(v)}exponentialRampToValueAtTime(){}cancelScheduledValues(){}}
- const node=()=>({connect(){},disconnect(){},start(){},stop(){},gain:new P(1),frequency:new P(0),detune:new P(0),Q:new P(1),delayTime:new P(0)});
+ const node=()=>({connect(){},disconnect(){},start(){},stop(){},gain:new P(1),frequency:new P(0),detune:new P(0),Q:new P(1),delayTime:new P(0),threshold:new P(0),knee:new P(0),ratio:new P(0),attack:new P(0),release:new P(0)});
  window.AudioContext=class{
-  constructor(){window.__audio.made++;window.__audio.ctx=this;this.state='suspended';this.currentTime=0;this.destination={};setInterval(()=>{if(this.state==='running')this.currentTime+=0.25},250)}
-  createGain(){return node()}createOscillator(){return node()}createBiquadFilter(){return node()}createDelay(){return node()}
+  constructor(){window.__audio.made++;window.__audio.ctx=this;this.state='suspended';this.currentTime=0;this.sampleRate=44100;this.destination={};setInterval(()=>{if(this.state==='running')this.currentTime+=0.25},250)}
+  createGain(){return node()}createOscillator(){return node()}createBiquadFilter(){return node()}createDelay(){return node()}createDynamicsCompressor(){return node()}createConvolver(){return node()}createBufferSource(){return node()}
+  createBuffer(ch,len){return {getChannelData:()=>new Float32Array(len)}}
   resume(){window.__audio.resumes++;if(!gesture)return new Promise(()=>{});if(this.state!=='running'){this.state='running';Promise.resolve().then(()=>this.onstatechange&&this.onstatechange())}return Promise.resolve()}
   suspend(){window.__audio.suspends++;this.state='suspended';Promise.resolve().then(()=>this.onstatechange&&this.onstatechange());return Promise.resolve()}
  };
@@ -127,10 +128,10 @@ run('Store music: the button is quiet and keeps out of the way — day and night
 
 run('Store music: the real sound graph renders (a real browser): not silent, not clipping, no wrong connection',async({page,base})=>{
  await open(page,base);
- const r=await page.evaluate(async()=>{const buf=await window.AskerStoreMusic.renderBuffer(10,3,22050),d=buf.getChannelData(0);let peak=0,sum=0;for(let i=0;i<d.length;i++){const v=Math.abs(d[i]);if(v>peak)peak=v;sum+=v*v}
-  // the first second is the fade-in (nearly silent); the last seconds carry the pads and bells
-  let late=0,n=0;for(let i=Math.floor(d.length*0.6);i<d.length;i++){late+=d[i]*d[i];n++}
-  return {sec:buf.duration,peak,lateRms:Math.sqrt(late/n)}});
- assert.equal(Math.round(r.sec),10);
- assert.ok(r.peak>0.05,'not silent: '+r.peak);assert.ok(r.peak<0.8,'no clipping: '+r.peak);assert.ok(r.lateRms>0.01,'the pads are heard: '+r.lateRms);
+ // every one of the eight pieces (so every instrument: electric piano, plucks, marimba, vibes, bass, kick, hats, shaker, rim) in its groove, 8 s each
+ const r=await page.evaluate(async()=>{const out=[];for(let first=0;first<8;first++){
+  const buf=await window.AskerStoreMusic.renderBuffer(8,3,22050,{first,fromBar:8}),d=buf.getChannelData(0);let peak=0;for(let i=0;i<d.length;i++){const v=Math.abs(d[i]);if(v>peak)peak=v}
+  let late=0,n=0;for(let i=Math.floor(d.length*0.5);i<d.length;i++){late+=d[i]*d[i];n++}
+  out.push({first,sec:buf.duration,peak,lateRms:Math.sqrt(late/n)})}return out});
+ for(const x of r){assert.equal(Math.round(x.sec),8);assert.ok(x.peak>0.05,'piece '+x.first+' is not silent: '+x.peak);assert.ok(x.peak<0.8,'piece '+x.first+' does not clip: '+x.peak);assert.ok(x.lateRms>0.01,'piece '+x.first+' is heard: '+x.lateRms)}
 });
