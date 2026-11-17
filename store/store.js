@@ -595,14 +595,19 @@
     });
     $('sendBtn').disabled = closed;
     if (settings.whatsapp) {
-      // «اسأل الصيدلي»: شريحة فوق وزرار واتساب عايم
+      // «اسأل الصيدلي»: شريحة فوق وسطر تحت (owner 2026-11-17, option «ب»: no floating WhatsApp button, it covers the page and he took the floating things off)
       const wa = 'https://wa.me/2' + settings.whatsapp + '?text=' + encodeURIComponent('عندي سؤال للصيدلي');
-      $('slideWaBtn').href = wa; $('waFab').href = wa;
-      $('slideWa').hidden = false; $('waFab').hidden = false;
+      $('slideWaBtn').href = wa;
+      $('slideWa').hidden = false;
       if (startSlides.redraw) startSlides.redraw();
       $('contact').hidden = false;
       $('waNumber').textContent = settings.whatsapp;
       $('waLink').href = 'https://wa.me/2' + settings.whatsapp;
+    } else {
+      // the owner cleared the number: the slide and the line go away
+      $('slideWa').hidden = true;
+      if (startSlides.redraw) startSlides.redraw();
+      $('contact').hidden = true;
     }
   }
   async function runQuery(q, append) {
