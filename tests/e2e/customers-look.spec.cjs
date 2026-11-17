@@ -26,7 +26,7 @@ run('Customers look: a round mark with the first letter, the balance a pill, the
  assert.deepEqual(marks,[['101','أ','"أ"'],['102','س','"س"'],['104','م','"م"']].sort((a,b)=>marks.findIndex(m=>m[0]===a[0])-marks.findIndex(m=>m[0]===b[0])));
  const row=await page.evaluate(()=>{const r=document.querySelector('#cuRows .cu-row'),cs=getComputedStyle(r),mk=getComputedStyle(r,'::before'),amt=getComputedStyle(r.querySelector('.cu-amt')),card=cs.backgroundColor;
   return {radius:cs.borderTopLeftRadius,markW:mk.width,markH:mk.height,markR:mk.borderTopLeftRadius,markFont:mk.fontFamily,amtR:amt.borderTopLeftRadius,amtFg:amt.color,card}});
- assert.equal(row.radius,'2px','square corners in the brand look');assert.equal(row.markW,'46px');assert.equal(row.markH,'46px');assert.equal(row.markR,'999px');
+ assert.equal(row.radius,'26px');assert.equal(row.markW,'46px');assert.equal(row.markH,'46px');assert.equal(row.markR,'999px');
  assert.match(row.markFont,/Readex Pro/);
  assert.ok(parseFloat(row.amtR)>=2,'the balance keeps a small shape: '+row.amtR);
  assert.ok(contrast(row.amtFg,row.card)>=4.5,'the amount reads on the row: '+row.amtFg+' on '+row.card);
@@ -43,7 +43,7 @@ run('Customers look: a round mark with the first letter, the balance a pill, the
  assert.equal(st.bg,'rgb(47, 125, 104)','the soft green by day');assert.ok(parseFloat(st.r)<=24,'a quiet corner: '+st.r);assert.match(st.font,/Readex Pro/);
  assert.ok(contrast(st.fg,st.bg)>=3,'the big balance reads on the dark capsule (large text): '+st.fg+' on '+st.bg);
  assert.ok(parseFloat(st.headR)<=28,'a quiet head: '+st.headR);
- if(st.sendBg){assert.notEqual(st.sendBg,'rgb(31, 168, 85)','no WhatsApp green: the main button is the bot\'s color');assert.ok(parseFloat(st.sendR)<=4,'the send button has square corners: '+st.sendR);}
+ if(st.sendBg){assert.notEqual(st.sendBg,'rgb(31, 168, 85)','no WhatsApp green: the main button is the bot\'s color');assert.equal(st.sendR,'999px');}
  // «ليه» (a credit) is a green-white text on the dark capsule
  await page.click('[data-cu-back]');await page.waitForSelector('#cuListView:not(.hidden)');
  await page.click('#cuRows [data-cu="104"]');await page.waitForSelector('#cuSt:not(.hidden) .cu-bal');
