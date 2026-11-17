@@ -1261,7 +1261,7 @@ window.AskerEN = {
   "مفيش رصيد متسجّل لسه.": "No stock recorded yet.",
   "الرصيد لسه مش متاح: محتاج تفعيل على السيرفر الأول.": "Stock is not available yet: needs to be turned on at the server first.",
   "مقدرتش أجيب الرصيد:": "Could not get the stock:",
-  "اطلب من صيدلية عسكر أونلاين وهنوصّلك لحد البيت 🏠 دوّر على الدوا، ضيفه للسلة، أو صوّر الروشتة وابعتها: {0}": "Order from Asker Pharmacy online and we'll deliver to your door 🏠 Search for the medicine, add it to the cart, or photograph the prescription and send it: {0}",
+  "اطلب من صيدلية عسكر أونلاين واستلمها من الصيدلية 🏪 دوّر على الدوا، ضيفه للسلة، أو صوّر الروشتة وابعتها: {0}": "Order from Asker Pharmacy online and pick it up at the pharmacy 🏪 Search for the medicine, add it to the cart, or photograph the prescription and send it: {0}",
   "اتنسخ ✓ الصقه في أي رسالة": "Copied ✓ paste it in any message",
   "مقدرتش أنسخ. دوس مطوّل على الرابط وانسخه": "Could not copy. Long-press the link and copy it",
   "صوّر الكود واطلب أونلاين · واستلم من الصيدلية": "Scan the code and order online · pick it up at the pharmacy",

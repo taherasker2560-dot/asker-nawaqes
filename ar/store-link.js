@@ -9,7 +9,8 @@
     return new URL('store.html', String(href || '')).href.replace(/[?#].*$/, '');
   }
   function shareMessage(url) {
-    return `اطلب من صيدلية عسكر أونلاين وهنوصّلك لحد البيت 🏠\nدوّر على الدوا، ضيفه للسلة، أو صوّر الروشتة وابعتها:\n${url}`;
+    // pickup only: the pharmacy has no delivery yet (owner 2026-11-15), so the message never promises it
+    return `اطلب من صيدلية عسكر أونلاين واستلمها من الصيدلية 🏪\nدوّر على الدوا، ضيفه للسلة، أو صوّر الروشتة وابعتها:\n${url}`;
   }
   const api = { storeUrl, shareMessage };
   root.AskerStoreLink = api;
