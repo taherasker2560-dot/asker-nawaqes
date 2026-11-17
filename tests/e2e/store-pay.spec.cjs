@@ -104,6 +104,13 @@ run('Pay by transfer, a visitor: cash by default, Vodafone Cash and InstaPay fro
  assert.equal(await text(page,'.pay-num'),'asker@instapay');
  assert.equal(await page.$('.pay-card a[data-pay-open]'),null);
  assert.match(await text(page,'.pay-how'),/افتح تطبيق إنستا باي/);
+ // «انسخ المبلغ» (owner 2026-11-17: InstaPay's link carries no amount, so the amount goes to the clipboard to paste into the app)
+ const buttons=()=>page.$$eval('.pay-card [data-pay-copy]',b=>b.map(x=>[x.getAttribute('data-pay-copy'),x.textContent.trim()]));
+ assert.deepEqual(await buttons(),[['asker@instapay','📋 انسخ العنوان'],['67','📋 انسخ المبلغ']]);
+ assert.match(await text(page,'.pay-how'),/والصق العنوان والمبلغ/);
+ await page.click('.pay-card [data-pay-copy="67"]');
+ await page.waitForFunction(()=>/اتنسخ/.test(document.querySelector('.pay-card [data-pay-copy="67"]').textContent),null,{timeout:3000});
+ assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'67','the amount is on the clipboard');
  // the order: Vodafone Cash again, the order goes with a note and says what to do next
  await page.check('#payBox input[value="vodafone"]');
  await page.fill('#cName','Ahmed');await page.fill('#cPhone','01012345678');
@@ -126,7 +133,7 @@ run('Pay by transfer, a visitor: cash by default, Vodafone Cash and InstaPay fro
  assert.deepEqual(w2,[null],'cash: no payment note (the page was reloaded, so only this order is in the list)');
  assert.equal(await page.$eval('#doneProof',e=>e.hidden),true);
  assert.equal(await page.$eval('#donePay',e=>e.hidden),true);
-},{home:true});
+},{home:true,permissions:['clipboard-read','clipboard-write']});
 
 run('Pay by transfer: an iPhone gets the app\'s name instead of a dialer; an InstaPay link opens; no numbers = no option anywhere',async({page,base})=>{
  await setup(page,UAS.ios,{vodafone:'01012345678',instapay:'https://ipn.eg/S/asker/instapay/AbC123',whatsapp:''});
@@ -137,10 +144,16 @@ run('Pay by transfer: an iPhone gets the app\'s name instead of a dialer; an Ins
  await page.waitForSelector('.pay-card');
  assert.equal(await page.$('.pay-card a[data-pay-open]'),null,'an iPhone cannot dial a transfer code');
  assert.match(await text(page,'.pay-how'),/«أنا فودافون»/);
+ // a phone that cannot dial: the number and the amount are both one tap to copy
+ assert.deepEqual(await page.$$eval('.pay-card [data-pay-copy]',b=>b.map(x=>[x.getAttribute('data-pay-copy'),x.textContent.trim()])),[['01012345678','📋 انسخ الرقم'],['67','📋 انسخ المبلغ']]);
  assert.equal(await page.$('.pay-card a[data-pay-proof]'),null,'no WhatsApp number = no proof button');
  await page.check('#payBox input[value="instapay"]');
  await page.waitForSelector('.pay-card[data-pay-card="instapay"] a[data-pay-open]');
  assert.equal(await page.getAttribute('.pay-card a[data-pay-open]','href'),'https://ipn.eg/S/asker/instapay/AbC123');
+ // his link + «انسخ المبلغ»: open the app, copy the amount, paste it (the steps say so)
+ assert.deepEqual(await page.$$eval('.pay-card .pay-row > *',b=>b.map(x=>x.textContent.trim())),['🏦 افتح إنستا باي','📋 انسخ المبلغ']);
+ assert.equal(await page.getAttribute('.pay-card [data-pay-copy]','data-pay-copy'),'67');
+ assert.equal(await text(page,'.pay-how'),'١) دوس «انسخ المبلغ» ٢) افتح إنستا باي ٣) الصق المبلغ في خانة المبلغ');
  // nothing typed by the pharmacy: the cart is as before (no payment box for a visitor)
  await page.evaluate(()=>{localStorage.removeItem('asker_store_payinfo')});
  await page.addInitScript(()=>{window.__fakeRpcs.ar_store_pay_info=()=>({vodafone:null,instapay:null,whatsapp:'01003032931'})});
@@ -172,6 +185,10 @@ run('Pay by transfer, a customer with his link: «ادفع حسابك» with the
  await page.waitForSelector('.pay-sheet .pay-card[data-pay-card="instapay"]');
  assert.equal(await text(page,'.pay-sheet .pay-num'),'asker@instapay');
  assert.equal(await page.inputValue('#payAmount'),'100','the amount stays when he switches');
+ assert.deepEqual(await page.$$eval('.pay-sheet .pay-card [data-pay-copy]',b=>b.map(x=>x.getAttribute('data-pay-copy'))),['asker@instapay','100'],'«انسخ المبلغ» follows the amount he typed');
+ await page.fill('#payAmount','250');
+ assert.deepEqual(await page.$$eval('.pay-sheet .pay-card [data-pay-copy]',b=>b.map(x=>x.getAttribute('data-pay-copy'))),['asker@instapay','250']);
+ await page.fill('#payAmount','100');
  await page.click('[data-pay-close]');
  await page.waitForSelector('.pay-sheet',{state:'detached'});
  // the cart: on account, cash, and the two transfers; a transfer goes to the server as cash (the server knows only account / cash) with a note
