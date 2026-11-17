@@ -285,7 +285,7 @@
     return items === s.items ? s : { ...s, items };
   };
   // ticks and quantities: every item of the order starts ticked at the laptop's quantity (also the carried ones), or at the number he
-  // chose last time, blue (owner 2026-11-15: «تتعلم منها … تحط الارقام اللي انا بطلبها على طول»)
+  // chose last time, highlighted (soft orange; blue until 2026-11-17) (owner 2026-11-15: «تتعلم منها … تحط الارقام اللي انا بطلبها على طول»)
   let learned = {};
   const start = (i) => (learned[String(i.item_id)] ? { on: true, qty: String(learned[String(i.item_id)]), mine: true } : { on: true, qty: String(i.qty) });
   const state = (id) => {
@@ -720,7 +720,7 @@
     if (!r || !e.target.matches('[data-qty]')) return;
     const sq = state(current)[r.dataset.k];
     sq.qty = e.target.value;
-    sq.mine = true; // a number he typed: the box turns blue (owner 2026-11-15)
+    sq.mine = true; // a number he typed: the box is filled soft orange (owner 2026-11-15; blue then, the calm orange since 2026-11-17)
     e.target.closest('.od-qty')?.classList.add('mine');
     drawOrder();
   });

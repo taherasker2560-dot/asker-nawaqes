@@ -44,7 +44,6 @@ function check(rel, opts) {
       const tok = m[0].toLowerCase();
       if (FAMILY.has(tok)) continue;
       if (opts && opts.allow && opts.allow.has(tok)) continue;
-      if (opts && opts.skipLine && opts.skipLine(ln)) continue;
       if (offBrand(tok)) bad.push(`${rel}:${i + 1} ${tok}  ${ln.trim().slice(0, 90)}`);
     }
   });
@@ -55,9 +54,8 @@ const css = [...fs.readdirSync(path.join(root, 'store')).filter((f) => f.endsWit
   ...fs.readdirSync(path.join(root, 'ar')).filter((f) => f.endsWith('.css')).map((f) => 'ar/' + f)];
 assert.ok(css.length >= 9, 'the stylesheets are found: ' + css.length);
 let bad = [];
-// the one blue left ON PURPOSE: the quantity box that holds a number he typed himself (owner 2026-11-15: «لما أكتب الرقم يبقى أزرق»), the lines that style `.mine`
-const mineBlue = (ln) => /\.mine\b/.test(ln);
-for (const f of css) bad = bad.concat(check(f, f === 'ar/look.css' ? { skipLine: mineBlue } : undefined));
+// no exception is left: the quantity box that holds a number he typed himself (.mine) was the last blue (his order of 2026-11-15); he had it turned orange on 2026-11-17 («حوّل الكمية للون بتاعنا»)
+for (const f of css) bad = bad.concat(check(f));
 // the designs drawn by the code: every script of the two apps (the statement PDF, the QR card, the customer page's manifest, the chat pieces...) except the settings
 // (the colors the people can PICK are choices, not the design) and the dictionaries, the two pages themselves, the two manifests
 const js = ['ar', 'store'].flatMap((d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith('.js') && !/^(settings|i18n)/.test(f)).map((f) => d + '/' + f));

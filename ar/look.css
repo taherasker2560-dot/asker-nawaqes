@@ -2079,11 +2079,11 @@ html.staff [data-al-view='short'] { display: none; }
 .sd-row.amber .sd-exp b { color: var(--crimson-ink); }
 html.night .sd-row.red .sd-exp b { color: #ff8a7a; }
 html.night .sd-row.amber .sd-exp b { color: var(--crimson-ink); }
-/* ---------- quantity boxes: his own number is blue (owner 2026-11-15), the cursor is already in the first one (ar/qty-input.js) ---------- */
-.od-qty.mine input, label.qty.mine input { border-color: #0a6cff; background: #eaf3ff; color: #0a4aa6; font-weight: 800; box-shadow: 0 0 0 2px rgba(10, 108, 255, 0.18); }
-.od-qty.mine span::before, label.qty.mine span::before { content: '●'; color: #0a6cff; margin-inline-end: 4px; font-size: 11px; }
-html.night .od-qty.mine input, html.night label.qty.mine input { background: #12305e; color: #cfe3ff; border-color: #5a9bff; }
-html.night .od-qty.mine span::before, html.night label.qty.mine span::before { color: #7db4ff; }
+/* ---------- quantity boxes: his own number is filled soft orange with an orange border (owner 2026-11-15 asked blue; 2026-11-17 «حوّل الكمية للون بتاعنا»: the calm orange is the only color), the cursor is already in the first one (ar/qty-input.js) ---------- */
+.od-qty.mine input, label.qty.mine input { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 800; box-shadow: 0 0 0 2px rgba(var(--glow), 0.18); }
+.od-qty.mine span::before, label.qty.mine span::before { content: '●'; color: var(--crimson); margin-inline-end: 4px; font-size: 11px; }
+html.night .od-qty.mine input, html.night label.qty.mine input { background: var(--rose); color: var(--crimson-ink); border-color: var(--crimson); }
+html.night .od-qty.mine span::before, html.night label.qty.mine span::before { color: var(--crimson-ink); }
 input[data-qty]:focus { outline: 2px solid var(--crimson); outline-offset: 1px; }
 /* ---------- «أصناف جديدة»: «موافق», the quantity and the form (owner 2026-11-15) ---------- */
 .ni-line { grid-template-columns: 1fr 0.75fr 1.4fr; }
