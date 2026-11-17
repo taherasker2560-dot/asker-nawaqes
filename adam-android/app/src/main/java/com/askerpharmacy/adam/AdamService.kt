@@ -246,7 +246,9 @@ class AdamService : Service() {
             ACTION_FEED -> {
                 val f = File(filesDir, intent.getStringExtra("file")?.replace(Regex("[^A-Za-z0-9_.\\-]"), "") ?: "test.wav")
                 val pcm = try { Audio.readWav(f.readBytes()) } catch (e: Throwable) { null }
-                if (pcm == null) log("feed: no 16-bit WAV at " + f.name) else { log("feed: " + f.name + " " + (pcm.size * 1000 / Ear.RATE) + " ms"); ear.inject(pcm) }
+                if (pcm == null) log("feed: no 16-bit WAV at " + f.name)
+                else if (intent.getStringExtra("diag") == "1") ear.diagnose(pcm)
+                else { log("feed: " + f.name + " " + (pcm.size * 1000 / Ear.RATE) + " ms"); ear.inject(pcm) }
             }
         }
         return START_STICKY

@@ -261,6 +261,52 @@ class Ear(
     private var spkRec: Recognizer? = null     // worker thread only
 
     /**
+     * Debug (adb FEED with diag=1): runs the voiceprint over [pcm] in several ways and logs what each gives (the JSON's size, whether it
+     * has «spk», how many frames, how long the words are), to find out why the speaker model gives no vector. Worker thread.
+     */
+    fun diagnose(pcm: ShortArray) {
+        worker.execute {
+            val m = Models.speech; val sm = Models.speaker
+            if (m == null || sm == null) { log("diag: no models"); return@execute }
+            fun variant(name: String, audio: ShortArray, grammar: String?, alts: Int, chunk: Int) {
+                var r: Recognizer? = null
+                try {
+                    r = if (grammar != null) Recognizer(m, RATE.toFloat(), grammar) else Recognizer(m, RATE.toFloat())
+                    r.setSpeakerModel(sm)
+                    if (alts > 0) r.setMaxAlternatives(alts)
+                    val parts = ArrayList<String>()
+                    var pos = 0
+                    while (pos < audio.size) {
+                        val n = minOf(chunk, audio.size - pos)
+                        if (r.acceptWaveForm(audio.copyOfRange(pos, pos + n), n)) parts.add(r.result)
+                        pos += n
+                    }
+                    parts.add(r.finalResult)
+                    val sb = StringBuilder()
+                    for (p in parts) {
+                        val o = JSONObject(p)
+                        val txt = o.optString("text").ifEmpty { o.optJSONArray("alternatives")?.optJSONObject(0)?.optString("text") ?: "" }
+                        sb.append(" [len ").append(p.length).append(" spk ").append(o.has("spk") || (o.optJSONArray("alternatives")?.optJSONObject(0)?.has("spk") == true))
+                            .append(" frames ").append(o.optInt("spk_frames", -1)).append(" words ").append(txt.split(' ').filter { it.isNotEmpty() }.size).append("]")
+                    }
+                    log("diag $name:$sb")
+                } catch (e: Throwable) { log("diag $name failed: " + e.message) } finally { try { r?.close() } catch (x: Throwable) { } }
+            }
+            val n = pcm.size
+            val loud = ShortArray(n) { (pcm[it] * 4).coerceIn(-32768, 32767).toShort() }
+            val padded = ShortArray(n + RATE) .also { System.arraycopy(pcm, 0, it, RATE / 2, n) }
+            log("diag: " + (n * 1000 / RATE) + " ms")
+            variant("A full 3200", pcm, null, 0, 3200)
+            variant("B full whole", pcm, null, 0, n)
+            variant("C full x4 gain", loud, null, 0, 3200)
+            variant("D full padded 0.5s", padded, null, 0, 3200)
+            variant("E full nbest1", pcm, null, 1, 3200)
+            variant("F grammar", pcm, "[\"adam\", \"a dam\", \"[unk]\"]", 0, 3200)
+            variant("G grammar adam+unk+words", pcm, "[\"the\", \"a\", \"is\", \"adam\", \"[unk]\"]", 0, 3200)
+        }
+    }
+
+    /**
      * 2) His voiceprint: the speaker model on a recognizer with the WHOLE vocabulary (real words count as speech, even if the English
      * model does not know the Arabic ones), averaged over the parts of the sentence, weighted by their speech frames. null when the
      * sentence is too short for the model (it is logged).
