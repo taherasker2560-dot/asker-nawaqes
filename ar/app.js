@@ -1497,7 +1497,7 @@
           (b.onclick = () => {
             const x = suppliers.find((s) => s.name === b.dataset.sendLink);
             if (!x || !x.phone) return;
-            window.open(`https://wa.me/${x.phone}?text=${encodeURIComponent(linkMessage(x))}`, '_blank', 'noopener');
+            window.AskerApp.openWhatsApp(linkMessage(x), x.phone);
             x.link_sent_at = new Date().toISOString();
             client.from('ar_suppliers').update({ link_sent_at: x.link_sent_at }).eq('name', x.name).then(
               () => null,
@@ -2085,6 +2085,21 @@
     if (isAndroid() && $('waBiz').checked) openUrl(waIntent(ph, t, web));
     else window.open(web, '_blank');
   };
+  // any wa.me link the owner sends from this app, anchors included: WhatsApp Business on Android while the box is ticked
+  // (on by default; owner 2026-11-17: «لما أجي أبعت يختار واتس بيزنس مش العادي»). Returns true when it handled the link;
+  // otherwise the caller opens the normal link.
+  window.AskerApp.openWaUrl = (url) => {
+    const m = String(url || '').match(/^https:\/\/wa\.me\/(\d*)(?:\?(.*))?$/);
+    if (!m || !isAndroid() || !$('waBiz').checked) return false;
+    let text = '';
+    try { text = new URLSearchParams(m[2] || '').get('text') || ''; } catch (e) {}
+    openUrl(waIntent(m[1], text, String(url)));
+    return true;
+  };
+  document.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest ? e.target.closest('a[href^="https://wa.me/"]') : null;
+    if (a && window.AskerApp.openWaUrl(a.href)) e.preventDefault();
+  });
   $('waBtn').onclick = async () => {
     const t = $('msgText').value.trim();
     if (!t) return;

@@ -33,6 +33,15 @@ run('Android opens WhatsApp Business',async({page})=>{
  assert.match(u,/^intent:\/\/send\/\?phone=201112223334&text=/);assert.match(u,/package=com\.whatsapp\.w4b;/);assert.match(u,/S\.browser_fallback_url=https%3A%2F%2Fwa\.me%2F201112223334/);
  await page.uncheck('#waBiz');await page.click('#waBtn');await page.waitForTimeout(200);
  assert.match((await page.evaluate(()=>window.__urls))[1],/^https:\/\/wa\.me\/201112223334\?text=/,'unchecked: normal link');
+ // the «رابط الموقع» button and any wa.me link on the page follow the same box (owner 2026-11-17: Business, not the normal one)
+ const last=async()=>(await page.evaluate(()=>window.__urls)).slice(-1)[0];
+ await page.evaluate(()=>{document.getElementById('waBiz').checked=true});await page.click('[data-group="sales"]');await page.click('[data-tab="storeorders"]');await page.click('#slWa');await page.waitForTimeout(200);
+ assert.match(await last(),/^intent:\/\/send\/\?text=/,'site link button: Business intent');assert.match(await last(),/package=com\.whatsapp\.w4b;/);
+ await page.evaluate(()=>{const a=document.createElement('a');a.id='waA';a.href='https://wa.me/201112223334?text=hi';a.target='_blank';a.textContent='x';document.body.append(a)});
+ await page.click('#waA');await page.waitForTimeout(200);
+ assert.match(await last(),/^intent:\/\/send\/\?phone=201112223334&text=hi#Intent;scheme=whatsapp;package=com\.whatsapp\.w4b;/,'a wa.me anchor opens Business too');
+ await page.evaluate(()=>{document.getElementById('waBiz').checked=false});await page.click('#slWa');await page.waitForTimeout(200);
+ assert.match(await last(),/^https:\/\/wa\.me\/\?text=/,'unchecked: the site link button opens the normal link');
 });
 run('paste copied WhatsApp messages',async({page})=>{
  await page.click('[data-tab="read"]');await page.click('[data-sub="manual"]');await page.click('[data-src="text"]');

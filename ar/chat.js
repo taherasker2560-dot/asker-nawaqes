@@ -206,7 +206,9 @@
       if (error) throw new Error(error.message || String(error));
       if (!data || !data.ok || !data.token) throw new Error((data && data.error) || 'مفيش رابط');
       const L = root.AskerCustomersLib, url = L.linkUrl(location.href, data.token);
-      window.open(`https://wa.me/2${me.c.phone}?text=${encodeURIComponent(L.linkMessage(a.name, url))}`, '_blank', 'noopener');
+      const waUrl = `https://wa.me/2${me.c.phone}?text=${encodeURIComponent(L.linkMessage(a.name, url))}`;
+      // WhatsApp Business on Android while the box on the supplier tab is ticked (ar/app.js AskerApp.openWaUrl)
+      if (!(window.AskerApp && window.AskerApp.openWaUrl && window.AskerApp.openWaUrl(waUrl))) window.open(waUrl, '_blank', 'noopener');
       Object.assign(me, { note: 'اتفتحت محادثته في الواتس ومعاها رابط حسابه: دوس إرسال هناك.', noteBad: false });
     } catch (e) {
       Object.assign(me, { note: 'ما اتفتحش: ' + ((e && e.message) || e), noteBad: true });
