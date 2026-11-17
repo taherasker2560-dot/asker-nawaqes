@@ -430,9 +430,10 @@
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
     html += `<a href="#search" class="ac-btn ac-order">${esc(st.stopped ? TEXTS.orderCash : TEXTS.order)}</a>`;
-    // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number; not on the pharmacy's own phone
+    // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number. Also in the owner's look on the pharmacy's own phone
+    // (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
     const P = PAY();
-    if (!pharmacyPhone && P && P.methods().length && num(st.c.balance) > CRUMB) html += `<button type="button" class="ac-btn ac-paybtn" data-acct-paysheet>${esc(P.TEXTS.payBtn)}</button>`;
+    if (P && P.methods().length && num(st.c.balance) > CRUMB) html += `<button type="button" class="ac-btn ac-paybtn" data-acct-paysheet>${esc(P.TEXTS.payBtn)}</button>`;
     const wa = waHref();
     html += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
