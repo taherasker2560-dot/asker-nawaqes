@@ -41,7 +41,7 @@ function build(text,previous){
 
 function init(host,deps){
  const box=document.createElement('details');box.className='file-import';box.id='catalogUpdate';
- box.innerHTML='<summary>تحديث قاعدة الأصناف</summary><p class="hint">طلّع ملف ASKER_ITEMS جديد من فارما فلاي (CSV)، واختاره هنا. البوت بياخد الكود والاسم والأسماء العربي بس، ومابيرفعش أسعار ولا أي بيانات تانية. الأسماء العربي اللي في القاعدة القديمة بتفضل.</p><input type="file" accept=".csv,text/csv" data-cat-file><button type="button" data-cat-upload disabled>ارفع القاعدة الجديدة</button><p class="status" data-cat-status></p>';
+ box.innerHTML='<summary>تحديث قاعدة الأصناف</summary><p class="hint">طلّع ملف ASKER_ITEMS جديد من فارما فلاي (CSV)، واختاره هنا. السيستم بياخد الكود والاسم والأسماء العربي بس، ومابيرفعش أسعار ولا أي بيانات تانية. الأسماء العربي اللي في القاعدة القديمة بتفضل.</p><input type="file" accept=".csv,text/csv" data-cat-file><button type="button" data-cat-upload disabled>ارفع القاعدة الجديدة</button><p class="status" data-cat-status></p>';
  host.append(box);
  const file=box.querySelector('[data-cat-file]'),btn=box.querySelector('[data-cat-upload]'),st=box.querySelector('[data-cat-status]');
  let built=null;

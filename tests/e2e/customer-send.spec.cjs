@@ -181,7 +181,7 @@ run('Statement on WhatsApp: every outcome of the contacts list says something; p
  await page.evaluate(()=>{window.__tables.ar_customer_phones=[];localStorage.setItem('asker-cu-pick',JSON.stringify({id:101,at:Date.now()}))});
  await page.evaluate(([c,m])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[]})),[CUSTOMERS,MOVES]);
  await page.reload();
- await page.waitForFunction(()=>/البوت اتقفل واتفتح تاني وانت في أسامي الموبايل/.test(document.getElementById('cuSt')?.textContent||''),null,{timeout:15000});
+ await page.waitForFunction(()=>/السيستم اتقفل واتفتح تاني وانت في أسامي الموبايل/.test(document.getElementById('cuSt')?.textContent||''),null,{timeout:15000});
  assert.equal(await text(page,'#cuSt .cu-name strong'),'أحمد محمود');
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker-cu-pick')),null,'said once');
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));

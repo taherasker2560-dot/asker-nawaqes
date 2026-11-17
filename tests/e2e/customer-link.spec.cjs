@@ -162,7 +162,7 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 },{home:true});
 
-run('Customer link on the pharmacy\'s phone (the bot signed in): a look only, back to the bot, nothing kept (owner: «طلعني من البوت»)',async({page,base})=>{
+run('Customer link on the pharmacy\'s phone (the bot signed in): a look only, back to the bot, nothing kept (owner: «طلعني من السيستم»)',async({page,base})=>{
  const tok='c'.repeat(64);
  await page.addInitScript(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_store_pay_info:()=>({vodafone:'01012345678',instapay:'asker@instapay',whatsapp:'01003032931'})})});
  await page.evaluate(([c,m,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[]}));

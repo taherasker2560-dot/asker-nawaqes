@@ -430,7 +430,7 @@
     });
   }
   // The same search from the box on top of every screen (owner 2026-11-10: «تخرجلى بحث المخازن تحت بحث الصيدليه فى واجهه
-  // البوت»): results only, without the review buttons (those stay in «قوايم المخازن»).
+  // السيستم»): results only, without the review buttons (those stay in «قوايم المخازن»).
   let topSeq = 0, topTimer = null;
   async function searchTop(q) {
     const seq = ++topSeq;

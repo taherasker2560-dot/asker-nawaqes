@@ -10,7 +10,7 @@ assert.ok(m.endsWith('https://x.io/store.html'),'the link is last so WhatsApp sh
 // no delivery yet (owner 2026-11-15): the shared message says pickup and never promises delivery
 assert.ok(m.includes('استلمها من الصيدلية'),'pickup wording');
 assert.ok(!/توصيل|هنوصّل|هنوصل|لحد البيت|🏠/.test(m),'no delivery promise in the message customers get');
-// «البوت» button on the store (store/from-bot.js): only when opened from the bot, remembered for that tab
+// «السيستم» button on the store (store/from-bot.js): only when opened from the bot, remembered for that tab
 const B=require('../store/from-bot.js');
 assert.equal(B.cameFromBot('?from=bot',null),true);
 assert.equal(B.cameFromBot('',null),false,'a customer never sees it');

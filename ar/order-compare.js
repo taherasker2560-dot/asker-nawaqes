@@ -1,4 +1,4 @@
-/* «طلب البوت × مشتريات تاني يوم» (card at the top of «الطلبيات», owner 2026-11-16: «عشان انا متعود على الطلب من على الجهاز، فمش عارف لسه اعتمد عليه»).
+/* «طلب السيستم × مشتريات تاني يوم» (card at the top of «الطلبيات», owner 2026-11-16: «عشان انا متعود على الطلب من على الجهاز، فمش عارف لسه اعتمد عليه»).
    v2 (owner 2026-11-16, later): «ما تقارنش بالامر الشراء اللي انا مسجله على الجهاز … هتقارن بالمشتريات اللي دخلت لك تاني يوم، هتقارن اللي انت حددته من الكميات
    دي بنفسك باللي انا هحدده عن طريق اللي هيخش من مشتريات تاني يوم». Every night the laptop (Hub\orders\ORDER_COMPARE.ps1, read only) takes the bot's order at the
    cut (the automatic lines of the purchase order that were open then) and the supplier invoices entered in the 30 hours after it, sorts each item into
@@ -37,15 +37,15 @@
     manual: () => ['إنت حطيته بإيدك في أمر الشرا', 'own'],
     postponed: () => ['إنت أجّلته (نقلته لكل الشركات)', 'own'],
     cancelled_me: () => ['إنت لغيته من أمر الشرا', 'own'],
-    closed_auto: () => ['البوت قفل سطره قبل الطلب (الرصيد رجع أو خرج من الحقيبة)', 'gray'],
+    closed_auto: () => ['السيستم قفل سطره قبل الطلب (الرصيد رجع أو خرج من الحقيبة)', 'gray'],
     unknown: () => ['السبب مش معروف (اتحسب بعد الطلب بوقت طويل)', 'gray'],
     gs: () => ['في النواقص العامة', 'gray'],
     had_stock: (r) => [r.cover != null ? `رصيده ${numText(r.have)} يكفي ${numText(r.cover)} يوم` : `عنده رصيد ${numText(r.have)}`, 'warn'],
     dup: () => ['ممكن نفس الصنف: مستني قرارك', 'gray'],
-    missed: (r) => [BAG_TXT(r) ? `رصيده قليل في ${BAG_TXT(r)} والبوت ما دخلهوش: محتاج نبص` : 'رصيده قليل والبوت ما دخلهوش: محتاج نبص', 'red'],
+    missed: (r) => [BAG_TXT(r) ? `رصيده قليل في ${BAG_TXT(r)} والسيستم ما دخلهوش: محتاج نبص` : 'رصيده قليل والسيستم ما دخلهوش: محتاج نبص', 'red'],
     other_bag: (r) => [BAG_TXT(r) ? `في حقيبة تانية (${BAG_TXT(r)})` : 'في حقيبة تانية', 'gray'],
     no_bag: () => ['مش في أي حقيبة', 'gray'],
-    not_short: () => ['مش ظاهر ناقص عند البوت وقتها', 'gray'],
+    not_short: () => ['مش ظاهر ناقص عند السيستم وقتها', 'gray'],
     // in the bot's order and did not arrive
     carried: (r) => [`سطر قديم من ${String(Math.max(1, Math.round(num(r.days))))} يوم ولسه مفتوح`, 'gray'],
     new: () => ['', 'gray'],
@@ -74,7 +74,7 @@
   const qtySame = (r) => Math.round(num(r.qty)) === Math.round(num(r.arr.q));
   function qtyChip(r) {
     if (!countsQty(r)) return null;
-    return qtySame(r) ? [`وصل ${qtyText(r.arr.q)}: نفس كمية البوت`, 'ok'] : [`البوت ${qtyText(r.qty)} ووصل ${qtyText(r.arr.q)}`, 'warn'];
+    return qtySame(r) ? [`وصل ${qtyText(r.arr.q)}: نفس كمية السيستم`, 'ok'] : [`السيستم ${qtyText(r.qty)} ووصل ${qtyText(r.arr.q)}`, 'warn'];
   }
   // the MONEY (owner 2026-11-16: «نسبتك هتبقا أدق مني وأبقا عارف أنا عديتها بقد إيه»): what he bought in the 24 hours after the bot's order, at cost price, against the
   // night's cap (frozen by the laptop from po_cap.json). The purchases split into what the bot's order accounts for, items that are not in it and packs beyond its quantity.
@@ -92,12 +92,12 @@
     if (!m || m.cap == null) return null;
     if (!n.final) return [`لحد دلوقتي اشتريت ${money(m.buy)} ج من سقف ${money(m.cap)} ج`, 'wait'];
     const d = Math.round(m.buy - m.cap), p = pctOf(Math.abs(d), m.cap);
-    if (d > 0) return [`عدّيت سقف البوت بـ ${money(d)} ج (${p}%)`, 'over'];
-    if (d < 0) return [`كنت تحت سقف البوت بـ ${money(-d)} ج (${p}%)`, 'under'];
-    return ['اشتريت على سقف البوت بالظبط', 'under'];
+    if (d > 0) return [`عدّيت سقف السيستم بـ ${money(d)} ج (${p}%)`, 'over'];
+    if (d < 0) return [`كنت تحت سقف السيستم بـ ${money(-d)} ج (${p}%)`, 'under'];
+    return ['اشتريت على سقف السيستم بالظبط', 'under'];
   }
   const buyLine = (m) => (!m ? '' : m.cap != null ? `اشتريت ${money(m.buy)} ج بسعر التكلفة، والسقف ${money(m.cap)} ج.` : `اشتريت ${money(m.buy)} ج بسعر التكلفة.`);
-  const splitLine = (m) => (!m ? '' : `منها ${money(m.bot)} ج من أمر البوت، و${money(m.extraItems)} ج أصناف مش في أمره، و${money(m.extraQty)} ج كميات أكتر من أمره.`);
+  const splitLine = (m) => (!m ? '' : `منها ${money(m.bot)} ج من أمر السيستم، و${money(m.extraItems)} ج أصناف مش في أمره، و${money(m.extraQty)} ج كميات أكتر من أمره.`);
   const miscLine = (m) => (m && m.misc > 0 ? `وغير كده ${money(m.misc)} ج أصناف متنوعة: مش محسوبة.` : '');
   // the week's money: only the nights whose invoices are all in (a night still waiting has bought less than it will) and that have a cap
   function weekMoney(nights) {
@@ -159,8 +159,8 @@
   let data = null, sel = '', opened = new Set(['ao']), loaded = false;
 
   const GROUPS = [
-    ['ao', '🟠 وصل ومش في أمر البوت', 'arrivedOnlyItems', true],
-    ['bo', '🔵 في أمر البوت وما وصلش', 'botOnlyItems', true],
+    ['ao', '🟠 وصل ومش في أمر السيستم', 'arrivedOnlyItems', true],
+    ['bo', '🔵 في أمر السيستم وما وصلش', 'botOnlyItems', true],
     ['both', '🟢 اتطلبوا ووصلوا', 'bothItems', false],
   ];
   function rowHtml(r, withWhy, final) {
@@ -192,21 +192,21 @@
     $('cmpNight').textContent = n ? `ليلة ${dm(n.night)}` : '';
     $('cmpOld').classList.toggle('hidden', !(data && isOld(data.generatedAt)));
     if (!n) return;
-    $('cmpSub').textContent = n.at ? `أمر البوت الساعة ${clock(n.at)} قدام المشتريات اللي دخلت بعده (فواتير تاني يوم)` : 'أمر البوت قدام المشتريات اللي دخلت بعده (فواتير تاني يوم)';
-    $('cmpThree').innerHTML = `<div class="cmp-n g"><b>${esc(n.both)}</b><span>اتطلبوا ووصلوا</span></div><div class="cmp-n o"><b>${esc(n.arrivedOnly)}</b><span>وصل ومش في أمر البوت</span></div><div class="cmp-n b"><b>${esc(n.botOnly)}</b><span>في أمر البوت وما وصلش</span></div>`;
-    $('cmpBig').textContent = n.cover == null ? '' : `البوت جاب ${n.cover}% من اللي وصلك`; // one text node, so the English switch can translate it
-    $('cmpPrec').textContent = n.prec == null ? '' : `و${n.prec}% من أمر البوت وصل.`;
+    $('cmpSub').textContent = n.at ? `أمر السيستم الساعة ${clock(n.at)} قدام المشتريات اللي دخلت بعده (فواتير تاني يوم)` : 'أمر السيستم قدام المشتريات اللي دخلت بعده (فواتير تاني يوم)';
+    $('cmpThree').innerHTML = `<div class="cmp-n g"><b>${esc(n.both)}</b><span>اتطلبوا ووصلوا</span></div><div class="cmp-n o"><b>${esc(n.arrivedOnly)}</b><span>وصل ومش في أمر السيستم</span></div><div class="cmp-n b"><b>${esc(n.botOnly)}</b><span>في أمر السيستم وما وصلش</span></div>`;
+    $('cmpBig').textContent = n.cover == null ? '' : `السيستم جاب ${n.cover}% من اللي وصلك`; // one text node, so the English switch can translate it
+    $('cmpPrec').textContent = n.prec == null ? '' : `و${n.prec}% من أمر السيستم وصل.`;
     // the rate is final only when the 30 hours for the invoices are over
     const until = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d)/.exec(n.until);
     $('cmpFinal').textContent = n.final ? 'النسبة دي بعد ما شفنا مشتريات تاني يوم.' : until ? `مؤقتة: لسه بنستنى الفواتير لحد ${clock(until[1] + ' ' + until[2])} يوم ${dm(until[1])}.` : '';
     $('cmpQty').classList.toggle('hidden', !n.qtyN);
-    $('cmpQty').textContent = n.qtyN ? `الكمية: ${n.qtySame} من ${n.qtyN} صنف وصلوا بنفس كمية البوت.` : '';
+    $('cmpQty').textContent = n.qtyN ? `الكمية: ${n.qtySame} من ${n.qtyN} صنف وصلوا بنفس كمية السيستم.` : '';
     $('cmpQtyNote').classList.toggle('hidden', !n.qtyN);
     $('cmpLate').classList.toggle('hidden', !n.late);
     $('cmpOutside').classList.toggle('hidden', !n.manual);
-    $('cmpOutside').textContent = n.manual ? `وفيه ${n.manual} سطر إنت حطيتهم بإيدك في أمر الشرا: مش محسوبين على البوت.` : '';
+    $('cmpOutside').textContent = n.manual ? `وفيه ${n.manual} سطر إنت حطيتهم بإيدك في أمر الشرا: مش محسوبين على السيستم.` : '';
     const w = data.week;
-    $('cmpWeek').innerHTML = `<span>الأسبوع: ${esc(w.nights)} من ${SLOTS} ليالي اتقارنت${w.cover == null ? '' : `، والبوت جاب في المتوسط ${esc(w.cover)}% من اللي وصلك`}.</span>` + (w.nights < SLOTS ? ' <span>لما يكملوا 7 ليالي قرر على أساسهم.</span>' : '');
+    $('cmpWeek').innerHTML = `<span>الأسبوع: ${esc(w.nights)} من ${SLOTS} ليالي اتقارنت${w.cover == null ? '' : `، والسيستم جاب في المتوسط ${esc(w.cover)}% من اللي وصلك`}.</span>` + (w.nights < SLOTS ? ' <span>لما يكملوا 7 ليالي قرر على أساسهم.</span>' : '');
     // the money: how far he is from the bot's cap, and what the purchases are made of
     const m = n.money, cl = capLine(n);
     $('cmpMoney').classList.toggle('hidden', !m);

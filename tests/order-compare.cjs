@@ -1,4 +1,4 @@
-// «طلب البوت × مشتريات تاني يوم» card helpers (ar/order-compare.js): reading the laptop's file (v2), the reason texts, the arrival chips, the quantity,
+// «طلب السيستم × مشتريات تاني يوم» card helpers (ar/order-compare.js): reading the laptop's file (v2), the reason texts, the arrival chips, the quantity,
 // the week's rate, the 7 slots. The reference is what ARRIVED on the supplier invoices after the bot's order (owner 2026-11-16), not the order stamped on PharmaFly.
 const assert=require('node:assert/strict');
 const C=require('../ar/order-compare.js');
@@ -15,15 +15,15 @@ const R=(why,extra={})=>C.reason({why,...extra});
 assert.deepEqual(R('manual'),['إنت حطيته بإيدك في أمر الشرا','own']);
 assert.deepEqual(R('postponed'),['إنت أجّلته (نقلته لكل الشركات)','own']);
 assert.deepEqual(R('cancelled_me'),['إنت لغيته من أمر الشرا','own']);
-assert.deepEqual(R('closed_auto'),['البوت قفل سطره قبل الطلب (الرصيد رجع أو خرج من الحقيبة)','gray']);
+assert.deepEqual(R('closed_auto'),['السيستم قفل سطره قبل الطلب (الرصيد رجع أو خرج من الحقيبة)','gray']);
 assert.equal(R('unknown')[1],'gray');assert.deepEqual(R('gs'),['في النواقص العامة','gray']);
 assert.deepEqual(R('had_stock',{have:12,cover:9.4}),['رصيده 12 يكفي 9.4 يوم','warn'],'the stock and for how many days it lasts');
 assert.deepEqual(R('had_stock',{have:2.5}),['عنده رصيد 2.5','warn'],'no sales = no days');
 assert.deepEqual(R('dup'),['ممكن نفس الصنف: مستني قرارك','gray']);
-assert.deepEqual(R('missed',{bag:'نواقص يوميه'}),['رصيده قليل في نواقص يوميه والبوت ما دخلهوش: محتاج نبص','red']);
-assert.deepEqual(R('missed'),['رصيده قليل والبوت ما دخلهوش: محتاج نبص','red'],'no bag name = still readable');
+assert.deepEqual(R('missed',{bag:'نواقص يوميه'}),['رصيده قليل في نواقص يوميه والسيستم ما دخلهوش: محتاج نبص','red']);
+assert.deepEqual(R('missed'),['رصيده قليل والسيستم ما دخلهوش: محتاج نبص','red'],'no bag name = still readable');
 assert.deepEqual(R('other_bag',{bag:'مالك'}),['في حقيبة تانية (مالك)','gray']);assert.deepEqual(R('other_bag'),['في حقيبة تانية','gray']);
-assert.equal(R('no_bag')[0],'مش في أي حقيبة');assert.equal(R('not_short')[0],'مش ظاهر ناقص عند البوت وقتها');
+assert.equal(R('no_bag')[0],'مش في أي حقيبة');assert.equal(R('not_short')[0],'مش ظاهر ناقص عند السيستم وقتها');
 assert.deepEqual(R('carried',{days:3}),['سطر قديم من 3 يوم ولسه مفتوح','gray']);assert.equal(R('carried',{days:0})[0],'سطر قديم من 1 يوم ولسه مفتوح','at least one day');
 assert.deepEqual(R('new'),['','gray'],'a new line has no reason, only its status');
 assert.deepEqual(C.reason({why:'new_code_later',txt:'نص من اللاب'}),['نص من اللاب','gray'],'a code this page does not know shows the laptop\'s own text');
@@ -38,11 +38,11 @@ assert.deepEqual(A({why:'new'},true),['ما وصلش لحد دلوقتي: غال
 assert.equal(A({why:'had_stock'},true),null,'an arrived-only line that has no arrival data shows nothing');assert.equal(A(null,true),null);
 // the QUANTITY: the bot's quantity against the packs on the invoice; it counts the bot's lines that arrived (no `why`)
 const Q=(r)=>C.qtyChip(r);
-assert.deepEqual(Q({qty:3,arr:{q:3}}),['وصل 3: نفس كمية البوت','ok'],'same quantity');
-assert.deepEqual(Q({qty:2,arr:{q:3}}),['البوت 2 ووصل 3','warn'],'a different quantity');
-assert.deepEqual(Q({qty:2,arr:{q:2.4}}),['وصل 2.4: نفس كمية البوت','ok'],'rounded to whole packs');
-assert.deepEqual(Q({qty:2,arr:{q:1.5}}),['وصل 1.5: نفس كمية البوت','ok']);
-assert.equal(Q({qty:2,arr:{q:3.6}})[0],'البوت 2 ووصل 3.6');
+assert.deepEqual(Q({qty:3,arr:{q:3}}),['وصل 3: نفس كمية السيستم','ok'],'same quantity');
+assert.deepEqual(Q({qty:2,arr:{q:3}}),['السيستم 2 ووصل 3','warn'],'a different quantity');
+assert.deepEqual(Q({qty:2,arr:{q:2.4}}),['وصل 2.4: نفس كمية السيستم','ok'],'rounded to whole packs');
+assert.deepEqual(Q({qty:2,arr:{q:1.5}}),['وصل 1.5: نفس كمية السيستم','ok']);
+assert.equal(Q({qty:2,arr:{q:3.6}})[0],'السيستم 2 ووصل 3.6');
 assert.equal(Q({why:'had_stock',arr:{q:1}}),null,'an arrived-only item has no bot quantity');
 assert.equal(Q({qty:2}),null,'nothing arrived');assert.equal(Q({qty:2,arr:{vendor:'X',h:3}}),null,'an older file without the quantity');assert.equal(Q(null),null);
 // one night
@@ -82,12 +82,12 @@ assert.equal(mon({}).money,null,'an older file without money shows none');assert
 const over=mon(base);
 assert.deepEqual(over.money,{buy:20000,cap:17680,bot:10500,extraItems:8000,extraQty:1500,misc:400},'the bot\'s part = what arrived of its items minus the packs beyond its quantity; the three add up to what he bought');
 assert.equal(over.money.bot+over.money.extraItems+over.money.extraQty,over.money.buy);
-assert.deepEqual(C.capLine(over),['عدّيت سقف البوت بـ 2,320 ج (13%)','over']);
+assert.deepEqual(C.capLine(over),['عدّيت سقف السيستم بـ 2,320 ج (13%)','over']);
 assert.equal(C.buyLine(over.money),'اشتريت 20,000 ج بسعر التكلفة، والسقف 17,680 ج.');
-assert.equal(C.splitLine(over.money),'منها 10,500 ج من أمر البوت، و8,000 ج أصناف مش في أمره، و1,500 ج كميات أكتر من أمره.');
+assert.equal(C.splitLine(over.money),'منها 10,500 ج من أمر السيستم، و8,000 ج أصناف مش في أمره، و1,500 ج كميات أكتر من أمره.');
 assert.equal(C.miscLine(over.money),'وغير كده 400 ج أصناف متنوعة: مش محسوبة.');assert.equal(C.miscLine(mon({...base,misc_value:0}).money),'','no «أصناف متنوعة» = no line');
-assert.deepEqual(C.capLine(mon({...base,buy_value:15000,both_value:9000,extra_items_value:6000})),['كنت تحت سقف البوت بـ 2,680 ج (15%)','under']);
-assert.deepEqual(C.capLine(mon({...base,buy_value:17680})),['اشتريت على سقف البوت بالظبط','under']);
+assert.deepEqual(C.capLine(mon({...base,buy_value:15000,both_value:9000,extra_items_value:6000})),['كنت تحت سقف السيستم بـ 2,680 ج (15%)','under']);
+assert.deepEqual(C.capLine(mon({...base,buy_value:17680})),['اشتريت على سقف السيستم بالظبط','under']);
 assert.deepEqual(C.capLine(mon({...base,buy_value:15000},false)),['لحد دلوقتي اشتريت 15,000 ج من سقف 17,680 ج','wait'],'a night still waiting for its invoices only says how far he is');
 const nocap=mon({...base,cap_money:null});assert.equal(nocap.money.cap,null);assert.equal(C.capLine(nocap),null,'no cap for that night = no headline');assert.equal(C.buyLine(nocap.money),'اشتريت 20,000 ج بسعر التكلفة.');
 assert.equal(mon({...base,cap_money:0}).money.cap,null,'a zero cap is no cap');

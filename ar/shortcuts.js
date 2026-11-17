@@ -1,4 +1,4 @@
-/* «الرئيسية»: the quick buttons are his own (owner 2026-11-15, his idea of 11-14: «اقدر من البوت اشيل النواقص من الرئيسية،
+/* «الرئيسية»: the quick buttons are his own (owner 2026-11-15, his idea of 11-14: «اقدر من السيستم اشيل النواقص من الرئيسية،
    واحط اي حاجة تانية … لحد 10 12 حاجه يبقوا في الوش»; mockup mockups/home_shortcuts_2026-11-15.html, «أيوه، ابدأ»).
    1) the grid under the numbers shows the sections he picked, up to 12, in his order (the first time: the six it always had);
    2) «✏️ عدّل الزراير» opens a sheet: the ones on the home in their order (▲ ▼ ✕), then every other section by group (+ ضيف);

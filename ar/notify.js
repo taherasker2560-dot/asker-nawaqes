@@ -211,7 +211,7 @@
     const perm = 'Notification' in root ? Notification.permission : 'unsupported';
     if ($('notifyPerm')) {
       $('notifyPerm').classList.toggle('hidden', perm !== 'default');
-      $('notifyPermNote').textContent = perm === 'granted' ? 'إشعارات الموبايل شغالة.' : perm === 'denied' ? 'الموبايل قافل الإشعارات للبوت: افتحها من إعدادات الموبايل ← التطبيقات ← البوت ← الإشعارات.' : perm === 'unsupported' ? 'الموبايل ده مابيدعمش إشعارات البوت.' : '';
+      $('notifyPermNote').textContent = perm === 'granted' ? 'إشعارات الموبايل شغالة.' : perm === 'denied' ? 'الموبايل قافل الإشعارات للسيستم: افتحها من إعدادات الموبايل ← التطبيقات ← السيستم ← الإشعارات.' : perm === 'unsupported' ? 'الموبايل ده مابيدعمش إشعارات السيستم.' : '';
     }
     box.innerHTML = KINDS.map((k) => `<label class="ns-row"><span>${esc(LABEL[k.key])}</span><select data-sound="${esc(k.key)}">${Object.keys(SOUNDS).map((s) => `<option value="${s}"${s === soundOf(k.key) ? ' selected' : ''}>${esc(SOUNDS[s].name)}</option>`).join('')}</select><button type="button" class="small secondary" data-try="${esc(k.key)}" aria-label="جرّب الصوت">▶</button></label>`).join('');
   }

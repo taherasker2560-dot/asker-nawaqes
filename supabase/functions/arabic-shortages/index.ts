@@ -710,14 +710,14 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     : reply(status, body, {});
   const url = new URL(req.url), say = url.searchParams.get('say') === '1';
   const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
-  if (!service || !env.SUPABASE_URL || !env.GEMINI_API_KEY) return out(503, { error: 'not-configured', message: 'البوت مش جاهز يستقبل' }, say);
+  if (!service || !env.SUPABASE_URL || !env.GEMINI_API_KEY) return out(503, { error: 'not-configured', message: 'السيستم مش جاهز يستقبل' }, say);
   if (req.method !== 'POST') return out(405, { error: 'method' }, say);
   // the service key goes in apikey; a new-style key (sb_secret_…) is not a JWT, so it is not sent as Bearer
   const base = env.SUPABASE_URL.replace(/\/$/, ''), sh = serviceHeaders(service), auth = sh;
   const key = (req.headers.get('x-inbox-key') || '').trim();
   if (!/^[0-9a-f]{32,128}$/.test(key)) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط' }, say);
   const keys = await restAll<{ key_hash: string }>(env, auth, fetchImpl, 'ar_inbox_keys?select=key_hash&key_hash=eq.' + await sha256Hex(key));
-  if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من البوت' }, say);
+  if (!keys.length) return out(401, { error: 'key', message: 'مفتاح الموبايل غلط، اعمل مفتاح جديد من السيستم' }, say);
   const reader = url.searchParams.get('reader');
   if (reader) return handleReader(reader, url, req, env, fetchImpl, base, sh);
   // AutoNotification gives only the chat's name (no «(2 رسائل)»), so the phone adds the notification's time: «… ~w<ms>».
@@ -954,13 +954,13 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
     })();
     const rt = (globalThis as unknown as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
     if (rt?.waitUntil) rt.waitUntil(retry); else await retry;
-    return out(200, { ok: false, id, retry: true, say: `${supplier}: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده` }, say);
+    return out(200, { ok: false, id, retry: true, say: `${supplier}: الوارد وصل بس جوجل مشغول، السيستم هيقراه تاني لوحده` }, say);
   }
-  if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من البوت` }, say);
+  if (error) return out(200, { ok: false, id: saved?.id, say: `${supplier}: الوارد وصل بس ماتقراش، افتحه من السيستم` }, say);
   if (maybe) {
     // said once for the photos of that moment: only the first unsure photo says it
     const earlier = saved?.received_at ? await restAll<{ id: string }>(env, auth, fetchImpl, 'ar_inbox?select=id&maybe=not.is.null&received_at=lt.' + encodeURIComponent(saved.received_at) + '&received_at=gte.' + since(SEEN_QUIET_MS)).catch(() => []) : [];
-    return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من البوت` }, say);
+    return out(200, { ok: true, id: saved?.id, maybe, say: earlier.length ? '' : `وصلت صور من أكتر من مورد في نفس الوقت: ${maybe.join(' و')}. اختار كل صورة من مين من السيستم` }, say);
   }
   // a photo/file with no product lines (a photo from another chat in the phone's folder, a logo, a chat screenshot):
   // kept for the page, but nothing is said for it

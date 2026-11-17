@@ -1,5 +1,5 @@
 // «الطلبيات» (owner 2026-11-17: «رتب صفحة الطلبيات وخلّي النوافذ الجديدة بسهم يفتحها ويقفلها … والوضع التلقائي مقفول»): the orders come first, the windows
-// under them (محتاج قرارك, أصناف جديدة, فواتير المندوبين, طلب الجهاز × طلب البوت) fold with an arrow and start closed; the count stays in the title.
+// under them (محتاج قرارك, أصناف جديدة, فواتير المندوبين, طلب الجهاز × طلب السيستم) fold with an arrow and start closed; the count stays in the title.
 const {run,text,assert}=require('./harness.cjs');
 const stmt={generated_at:new Date().toISOString(),items:[{id:101,name:'ZEGAPETS 10MG 28TAB',why:'new',bag:'2428',have:0,sold30:3,min:0,need:1,qty:1,age:5},{id:102,name:'ORCAVI 30 TAB',why:'new',bag:'2428',have:0,sold30:1,min:0,need:1,qty:1,age:9}]};
 run('orders page: the orders come first, the windows under them fold with an arrow and start closed',async({page})=>{

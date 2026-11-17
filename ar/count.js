@@ -361,7 +361,7 @@
   async function startCam() {
     const L = root.AskerTempSaleLib;
     try { actx = actx || new (root.AudioContext || root.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {}   // from his tap: the beep may play later
-    if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !L) return say('الموبايل ده مش بيقرا الباركود من البوت. اكتب الاسم أو الكود.', 'bad');
+    if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !L) return say('الموبايل ده مش بيقرا الباركود من السيستم. اكتب الاسم أو الكود.', 'bad');
     try {
       const all = await root.BarcodeDetector.getSupportedFormats();
       detector = new root.BarcodeDetector({ formats: all.filter((f) => /^(code_128|code_39|code_93|codabar|ean_13|ean_8|itf|upc_a|upc_e)$/.test(f)) });

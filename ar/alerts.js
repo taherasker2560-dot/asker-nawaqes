@@ -213,7 +213,7 @@
     if (view === 'today') {
       const today = (l) => l.filter((x) => num(x.today) > 0), week = (l) => l.filter((x) => !num(x.today));
       box.innerHTML =
-        '<p class="hint">من شاشة المهام في فارمافلاي. صحّح التشغيلات من فارمافلاي نفسه: البوت مابيغيّرش حاجة.</p>' +
+        '<p class="hint">من شاشة المهام في فارمافلاي. صحّح التشغيلات من فارمافلاي نفسه: السيستم مابيغيّرش حاجة.</p>' +
         list('صلاحيات اتلخبطت من البيع', today(a.mix), times, 'مفيش النهارده.', true) +
         list('بيع بالسالب', today(a.negative), times, 'مفيش النهارده.', true) +
         list('اتباع منتهي الصلاحية', today(a.expiredSold), times, 'مفيش النهارده.', true) +

@@ -195,7 +195,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return reply(200, { ok: true, ...out }, headers);
   }
 
-  // ---------- what a push was about (owner 2026-11-14 «وصلت البوت … بس مفيش صوت اشعار»): pushes carry nothing, so the
+  // ---------- what a push was about (owner 2026-11-14 «وصلت السيستم … بس مفيش صوت اشعار»): pushes carry nothing, so the
   // bot's worker (ar/sw.js) asks with its own push address, which must be one the pharmacy saved (ar_chat_staff_push).
   // The newest of the last 15 minutes: a warehouse that sent from its link, or a customer waiting for an answer.
   if (body.action === 'what') {
@@ -208,7 +208,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const c = (await rows(`/rest/v1/ar_chats?select=name,last_at&supplier=is.null&waiting=gt.0&last_at=gte.${since}&order=last_at.desc&limit=1`))[0] as { name?: string; last_at?: string } | undefined;
     if (w && (!c || String(w.last_at) >= String(c.last_at))) return reply(200, { title: 'وارد جديد من مخزن', body: `${w.supplier} بعت من الرابط، شوف «الوارد»`, tab: 'read' }, headers);
     if (c) return reply(200, { title: 'رسالة جديدة من عميل', body: `${c.name} كتبلك في «خدمة العملاء ← الرسايل»`, tab: 'care' }, headers);
-    return reply(200, { title: 'صيدلية عسكر', body: 'فيه جديد في البوت', tab: '' }, headers);
+    return reply(200, { title: 'صيدلية عسكر', body: 'فيه جديد في السيستم', tab: '' }, headers);
   }
 
   // ---------- a customer just wrote: the pharmacy's phones (owner 2026-11-14, «بعت رسالة … وما جاليش إشعارات») ----------
