@@ -34,6 +34,18 @@ for(const b of [7174,-200,0])check(A.afterText(b));
 for(const n of [1,2,5,14])check(A.itemsWord(n));
 for(const l of [{p:1,u:0},{p:0,u:2},{p:1,u:3}])check(A.qtyText(l)+' · 66.70');
 for(const s of ['حسابك يا Ahmed · كود 2489','خصم 5 ج','دفعت منها 100 ج','آخر تحديث النهارده 8:10 م · بيتحدث كل 10 دقايق','آخر تحديث 05/11/2026','⛔ حسابك موقوف دلوقتي','10:33 م · ','الطلب هيتحط على حسابك في الصيدلية'])check(s);
+// the payment by transfer (store/pay.js, 2026-11-17): its fixed texts and the ones it builds (numbers and the method's name put in)
+const PY=require('../store/pay.js');
+for(const [k,v] of Object.entries(PY.TEXTS)){
+  if(k==='orderNote'||k==='amountLine'||k==='amountNone')continue; // templates: checked below with the method's name in
+  check(v);
+}
+for(const m of ['فودافون كاش','إنستا باي']){
+  check(PY.TEXTS.amountLine.replace('{a}','245').replace('{m}',m));
+  check(PY.TEXTS.amountNone.replace('{m}',m));
+  check(PY.TEXTS.orderNote.replace('{m}',m));
+  check(`الدفع بتحويل ${m}. بعد التحويل ابعت صورته على واتساب.`);
+}
 // «الرسايل» (store/chat.js, 2026-11-13)
 const CH=require('../store/chat.js');
 for(const [k,v] of Object.entries(CH.TEXTS))if(typeof v==='string')check(v);else for(const e of Object.values(v))check(e);

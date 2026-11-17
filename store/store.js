@@ -838,6 +838,8 @@
     $('sumTotal').textContent = sum;
     $('sumLater').hidden = !later;
     $('sumLater').textContent = later ? `+ ${later} صنف بالطلب، سعره هيتأكد معاك على واتساب` : '';
+    // the transfer card (Vodafone Cash / InstaPay) shows this total
+    if (acct && acct.setCartTotal) acct.setCartTotal(later && later === cart.length ? null : cartTotal(cart));
   }
   function say(t, bad) {
     const el = $('formMsg');
@@ -849,8 +851,10 @@
     if (sending) return;
     // from a customer's link: his name comes from the pharmacy's card, he picks on account or cash
     const link = acct && acct.active();
+    // paid by a transfer (Vodafone Cash / InstaPay, 2026-11-17): the order goes as cash at the pharmacy's door with a note «الدفع: تحويل …» (the server's rules are not touched)
+    const PL = root.AskerStorePayLib, method = acct && acct.payChoice ? acct.payChoice() : 'cash';
     const typed = $('cName').value.trim(), name = link ? link.name || typed : typed;
-    const phone = normPhone($('cPhone').value), address = PICKUP, notes = $('cNotes').value.trim();
+    const phone = normPhone($('cPhone').value), address = PICKUP, notes = PL ? PL.joinNotes($('cNotes').value, method) : $('cNotes').value.trim();
     if (!cart.length && !rxFiles.length) return say(ERRORS.bad_items, true);
     if (!link && name.length < 2) return say(ERRORS.bad_name, true);
     if (!phone) return say(ERRORS.bad_phone, true);
@@ -887,8 +891,16 @@
         ? `طلب الروشتة رقم ${data.order_id} وصلنا. هنقرا الروشتة ونكلمك بالأسعار.`
         : `طلبك رقم ${data.order_id} وصلنا. الإجمالي ${money(data.total)} جنيه` + (changed ? ' (السعر اتحدّث من الصيدلية)' : '') + (data.rx ? '، ومعاه الروشتة' : '') + '.'
           + (later ? ` و${later} صنف بالطلب، هنكلمك بسعرهم وميعادهم.` : '');
-      $('donePay').hidden = !data.pay;
-      $('donePay').textContent = data.pay === 'account' ? 'الطلب هيتحط على حسابك في الصيدلية' : 'الدفع في الصيدلية لما تستلم';
+      $('donePay').hidden = !data.pay && !(PL && PL.isTransfer(method));
+      $('donePay').textContent = PL && PL.isTransfer(method) ? `الدفع بتحويل ${PL.NAMES[method]}. بعد التحويل ابعت صورته على واتساب.`
+        : data.pay === 'account' ? 'الطلب هيتحط على حسابك في الصيدلية' : 'الدفع في الصيدلية لما تستلم';
+      // the transfer's picture goes to the pharmacy on WhatsApp (the button is there only when the pharmacy's number is known)
+      const proof = $('doneProof');
+      if (proof) {
+        const href = PL && PL.isTransfer(method) && root.AskerStorePay ? root.AskerStorePay.proofHref(method, data.total, link ? `${link.name}` : name) : '';
+        proof.hidden = !href;
+        if (href) proof.href = href;
+      }
       say('');
       location.hash = 'done';
     } catch (err) {
@@ -1028,19 +1040,9 @@
     if (e.key === 'Escape') { if (!$('zoom').hidden) closeZoom(); else closeItem(); }
     else if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.item-text[data-open], .pc-nm[data-open]')) { e.preventDefault(); e.target.click(); }
   });
-  // «نزّل الصيدلية على موبايلك»: الزرار بيظهر بس لما المتصفح يقول إن التنزيل متاح (كروم على أندرويد)
-  let installEvt = null;
-  // not on Samsung Internet: its own install makes an app that Google Play Protect blocks («Unsafe app blocked … older version of Android», 2026-11-16);
-  // there a customer installs from Chrome (his account's install button sends him there)
-  const samsungInternet = /Android/i.test(navigator.userAgent) && /SamsungBrowser/.test(navigator.userAgent);
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); if (samsungInternet) return; installEvt = e; $('installBox').hidden = false; });
-  window.addEventListener('appinstalled', () => { installEvt = null; $('installBox').hidden = true; });
-  $('installBtn').addEventListener('click', async () => {
-    if (!installEvt) return;
-    installEvt.prompt();
-    try { await installEvt.userChoice; } catch (e) { /* closed */ }
-    installEvt = null; $('installBox').hidden = true;
-  });
+  // «نزّل الصيدلية على موبايلك»: since 2026-11-17 the box is for ANYONE who opens the site's link (a customer or not), on every phone: Chrome installs
+  // in one tap, Samsung Internet / Firefox hand the page to Chrome, an iPhone gets the guide. All of it lives in store/account.js (one install flow for the
+  // site and for a customer's account; Samsung Internet's own install is never used: Google Play Protect blocks the app it makes, 2026-11-16).
 
   $('needs').innerHTML = NEEDS.map((s) => `<a href="#search" data-section="${s.key}" class="need">${s.name}</a>`).join('');
   startSlides();
@@ -1048,6 +1050,8 @@
   const me = store.get('asker_store_me', null);
   if (me) { $('cName').value = me.name || ''; $('cPhone').value = me.phone || ''; }
   if (acct) acct.attach(client);
+  // the pharmacy's Vodafone Cash / InstaPay numbers (public function ar_store_pay_info); no number = no option
+  if (root.AskerStorePay) root.AskerStorePay.load(client);
   if (chat) chat.attach(client);
   saveCart();
   route();

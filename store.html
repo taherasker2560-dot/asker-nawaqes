@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="store/look.css?v=orange-20261115a" />
     <link rel="stylesheet" href="store/polish.css?v=acctfirst-20261116a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the three above (store/capsule.css, store/motion.js) -->
-    <link rel="stylesheet" href="store/capsule.css?v=dark-20261116a" />
+    <link rel="stylesheet" href="store/capsule.css?v=pay-20261117a" />
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=dark-20261116a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
@@ -108,8 +108,8 @@
       </div>
       <div id="installBox" class="install" hidden>
         <img src="icons/arabic-96.png?v=logo2" alt="" width="44" height="44" loading="lazy" />
-        <div><strong>نزّل الصيدلية على موبايلك</strong><span>تفتحها من الشاشة الرئيسية زي أي تطبيق</span></div>
-        <button id="installBtn" type="button">نزّل</button>
+        <div><strong>نزّل الصيدلية على موبايلك</strong><span>تفتحها من الشاشة الرئيسية زي أي تطبيق</span><span id="installNote" class="install-note" hidden></span></div>
+        <button id="installBtn" type="button">📲 ثبّته</button>
       </div>
       <section class="block">
         <h2>محتاج إيه النهارده؟</h2>
@@ -272,6 +272,7 @@
         <h1>طلبك وصل</h1>
         <p id="doneText"></p>
         <p id="donePay" class="done-pay" hidden></p>
+        <a id="doneProof" class="pay-proof" href="#" target="_blank" rel="noopener" hidden>💬 ابعت صورة التحويل على واتساب</a>
         <p>هنجهّز طلبك ونكلمك على واتساب لما يبقى جاهز تستلمه من الصيدلية. وتقدر تتابعه من «طلباتي».</p>
         <a href="#orders" class="hero-btn">تابع طلبك</a>
       </section>
@@ -354,9 +355,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>
     <script src="ar/statement-pdf.js?v=dark-20261116a"></script>
-    <script src="store/account.js?v=samsung-20261116a"></script>
+    <script src="store/pay.js?v=pay-20261117a"></script>
+    <script src="store/account.js?v=pay-20261117a"></script>
     <script src="store/chat.js?v=notme-20261114a"></script>
-    <script src="store/store.js?v=samsung-20261116a"></script>
+    <script src="store/store.js?v=pay-20261117a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
     <script src="store/from-bot.js?v=back-20261112a"></script>
     <script src="store/motion.js?v=capsule-20261116a"></script>
