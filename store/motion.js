@@ -49,7 +49,7 @@
     if (!box) return;
     let seen = false, timer = 0;
     const check = () => {
-      if (!box.querySelector('.ac-bal')) { seen = false; return; }
+      if (!box.querySelector('.ac-bal')) { if (!box.querySelector('.ac-tabs')) seen = false; return; }   // another tab of the account (no balance card) is not «leaving»: going back to the home does not play it again
       if (seen) return;
       seen = true;
       if (still()) return;

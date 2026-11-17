@@ -85,8 +85,9 @@ run('New look: the motion — the balance counts and ends exactly as written, th
  assert.equal(samples[samples.length-1],final,'and ends exactly as the page wrote it');
  assert.ok(samples.every(s=>/^عليك [\d,.]+ ج$/.test(s)),'always a clean line, never a broken one');
  assert.ok(!(await page.evaluate(()=>document.getElementById('acctBox').classList.contains('fresh'))),'«fresh» goes away (a later draw does not replay it)');
- // a later draw (a filter) does not count again
+ // a later draw (to another tab and back) does not count again
  await page.click('[data-acct-filter="sales"]');
+ await page.click('[data-acct-filter="home"]');
  assert.equal(await text(page,'.ac-big'),final);
  // reduce motion: no count, no rise, no wave, no sheen
  await page.emulateMedia({reducedMotion:'reduce'});
