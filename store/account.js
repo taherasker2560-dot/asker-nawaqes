@@ -144,7 +144,7 @@
     guide3: 'دوس «إضافة» فوق',
     guideOk: 'تمام',
     // the pharmacy's own phone (the bot signed in): a look only
-    backBot: '→ رجوع للبوت',
+    backBot: '→ رجوع للسيستم',
     feedback: '📝 شكوى أو اقتراح',
     feedbackHint: 'اكتبها أو سجّلها فويس',
     preview: 'ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.',
@@ -231,7 +231,7 @@
   // ---------- the page ----------
   // the pharmacy's own phone = the bot is signed in here (the owner or a staff member; the bot keeps its sign-in under
   // sb-…-auth-token on this same site). A customer's link opened there is only a look at that account: nothing kept on the
-  // phone (this tab only), no own manifest, no install, a way back to the bot (owner 2026-11-13: «طلعني من البوت … ومش
+  // phone (this tab only), no own manifest, no install, a way back to the bot (owner 2026-11-13: «طلعني من السيستم … ومش
   // عارف اخرج منه»: the bot is installed with the same scope, so the link opened inside the bot's window and stayed).
   const pharmacyPhone = (() => { try { return Object.keys(localStorage).some((k) => /^sb-[a-z0-9]+-auth-token$/.test(k)); } catch (e) { return false; } })();
   const box = () => (pharmacyPhone ? sessionStorage : localStorage);
@@ -602,6 +602,8 @@
     standalone,
     pharmacyPhone: () => pharmacyPhone,
     token: () => token,
+    // store/alarm.js: whose alarms the pharmacy is setting (the owner's look)
+    name: () => (st.c ? st.c.name : ''),
     // store.js: the client, once it is made (the first load starts here)
     attach(c) { client = c; if (token) { showLinked(true); drawPay(); load(false); } },
     // store.js view('account')

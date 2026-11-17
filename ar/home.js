@@ -303,7 +303,7 @@
       <label for="hsAr">الاسم العربي</label>
       <input id="hsAr" type="text" maxlength="250" dir="rtl" value="${esc(it.ar)}" placeholder="اكتب الاسم الصح بالعربي" />
       <div class="hs-editrow"><button type="button" data-save>احفظ الاسم</button><button type="button" class="secondary" data-cancel>إلغاء</button></div>
-      <p class="hint">التصليح بيظهر في النواقص والمخزون والموقع، وبيساعد البوت يفهم رسايل المخازن. فاضي = يرجع للاسم التلقائي.</p>
+      <p class="hint">التصليح بيظهر في النواقص والمخزون والموقع، وبيساعد السيستم يفهم رسايل المخازن. فاضي = يرجع للاسم التلقائي.</p>
       <p class="status" data-msg></p>
     </div>`;
   }

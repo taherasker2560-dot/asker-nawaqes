@@ -59,10 +59,10 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
 
   // who is asking: the owner, or a staff member with «storeorders»
   const auth = req.headers.get('authorization') || '';
-  if (!/^Bearer \S+$/.test(auth)) return reply(401, { error: 'auth', message: 'ادخل البوت الأول.' }, headers);
+  if (!/^Bearer \S+$/.test(auth)) return reply(401, { error: 'auth', message: 'ادخل السيستم الأول.' }, headers);
   const me = await call('/auth/v1/user', { headers: { Authorization: auth, apikey: anon } });
   const user = me.ok ? await me.json().catch(() => null) as { id?: string } | null : null;
-  if (!user?.id) return reply(401, { error: 'auth', message: 'ادخل البوت الأول.' }, headers);
+  if (!user?.id) return reply(401, { error: 'auth', message: 'ادخل السيستم الأول.' }, headers);
   if (user.id !== (env.OWNER_ID || OWNER_ID)) {
     const c = await call('/rest/v1/rpc/ar_staff_can', { method: 'POST', headers: { Authorization: auth, apikey: anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ ps: ['storeorders'] }) });
     if (!c.ok || (await c.json().catch(() => false)) !== true) return reply(403, { error: 'forbidden', message: 'التعديل ده لصاحب الصيدلية بس.' }, headers);

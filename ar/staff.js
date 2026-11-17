@@ -48,7 +48,7 @@
     return `${OP[a.op] || a.op} ${TBL[a.tbl] || a.tbl}${name}${i.status ? ` (${i.status})` : ''}`;
   }
   function waMessage(name, link) {
-    return `أهلاً ${name} 👋\nده رابط دخولك على بوت صيدلية عسكر:\n${link}\n\nافتحه من جوجل كروم، وبعدين دوس «ثبّت» عشان البوت يبقى عندك على الموبايل.\nالرابط ده ليك انت بس، ما تبعتهوش لحد.`;
+    return `أهلاً ${name} 👋\nده رابط دخولك على سيستم صيدلية عسكر:\n${link}\n\nافتحه من جوجل كروم، وبعدين دوس «ثبّت» عشان السيستم يبقى عندك على الموبايل.\nالرابط ده ليك انت بس، ما تبعتهوش لحد.`;
   }
   const api = { SECTIONS, GROUP, PGROUP, TABS, allowedTabs, fixTab, activityText, waMessage };
   root.AskerStaffLib = api;
@@ -194,7 +194,7 @@
       <div class="stf-acts">
         ${s.active ? '<button type="button" data-stf-link>ابعتله رابط الدخول على الواتس</button><button type="button" class="secondary" data-stf-stop>وقّف الحساب</button>'
           : '<button type="button" data-stf-link>شغّله تاني وابعتله رابط جديد</button>'}
-        <button type="button" class="secondary" data-stf-preview>👁 شوف البوت زي ما هيشوفه</button>
+        <button type="button" class="secondary" data-stf-preview>👁 شوف السيستم زي ما هيشوفه</button>
         <button type="button" class="secondary stf-del" data-stf-remove>🗑 امسح الحساب</button>
       </div>
       <details data-stf-log><summary>اللي عمله</summary><div class="stf-log"></div></details>
@@ -271,13 +271,13 @@
           say('stfStatus', `رابط جديد لـ ${s.name} اتفتح في الواتس. الرابط القديم مبقاش شغال.`, 'ok');
           sendOnWhatsApp(s.name, d.link);
         } else if (b.hasAttribute('data-stf-remove')) {
-          if (!root.confirm(`تمسح حساب ${s.name} نهائي؟ هيخرج من البوت ومش هيرجع. لو عايزه يرجع بعدين، استخدم «وقّف الحساب» بدل المسح.`)) return;
+          if (!root.confirm(`تمسح حساب ${s.name} نهائي؟ هيخرج من السيستم ومش هيرجع. لو عايزه يرجع بعدين، استخدم «وقّف الحساب» بدل المسح.`)) return;
           await call({ action: 'remove', user_id: s.user_id });
           openCard = '';
           await loadAdmin();
           say('stfStatus', `حساب ${s.name} اتمسح.`, 'ok');
         } else if (b.hasAttribute('data-stf-stop')) {
-          if (!root.confirm(`توقّف حساب ${s.name}؟ هيخرج من البوت على طول، والرابط بتاعه مش هيشتغل.`)) return;
+          if (!root.confirm(`توقّف حساب ${s.name}؟ هيخرج من السيستم على طول، والرابط بتاعه مش هيشتغل.`)) return;
           await call({ action: 'stop', user_id: s.user_id });
           await loadAdmin();
           say('stfStatus', `حساب ${s.name} اتوقف.`, 'ok');
@@ -293,7 +293,7 @@
     me = { user_id: s.user_id, name: s.name, perms: s.perms || [], active: !!s.active, preview: true };
     $('settingsPanel')?.classList.add('hidden');
     apply();
-    $('previewText').textContent = `بتشوف البوت زي ما ${s.name} هيشوفه`;
+    $('previewText').textContent = `بتشوف السيستم زي ما ${s.name} هيشوفه`;
     $('previewBar').classList.remove('hidden');
     if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('home');
   }
@@ -305,7 +305,7 @@
     if (root.AskerApp && root.AskerApp.showTab) root.AskerApp.showTab('home');
   }
 
-  // ---------- 4) «ثبّت البوت على موبايلك»: the same icon as the owner's ----------
+  // ---------- 4) «ثبّت السيستم على موبايلك»: the same icon as the owner's ----------
   let installEvt = null;
   const standalone = () => (root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
   function showInstall() {

@@ -327,7 +327,7 @@
     $('tsScanBox').classList.remove('hidden');
     if (!('BarcodeDetector' in root) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       $('tsScanBox').classList.add('hidden');
-      return say('tsFind', 'الموبايل ده مش بيقرا الباركود من البوت. اكتب الرقم اللي فوق الباركود في «الكود».', 'bad');
+      return say('tsFind', 'الموبايل ده مش بيقرا الباركود من السيستم. اكتب الرقم اللي فوق الباركود في «الكود».', 'bad');
     }
     try {
       const all = await root.BarcodeDetector.getSupportedFormats();

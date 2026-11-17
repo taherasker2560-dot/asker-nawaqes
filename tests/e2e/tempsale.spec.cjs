@@ -87,7 +87,7 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  assert.match(await text(page,'#tsFind'),/الكاميرا قرت 9493 \(itf\): ده مش رقم ملصق فارمافلاي/,'the number and its barcode kind are shown');
  // a phone that cannot read barcodes in the page (this test browser): told to type the number instead
  await page.click('[data-ts-way="scan"]');
- assert.match(await text(page,'#tsFind'),/مش بيقرا الباركود من البوت/);
+ assert.match(await text(page,'#tsFind'),/مش بيقرا الباركود من السيستم/);
  await page.click('[data-ts-way="code"]');
  await page.evaluate(()=>window.AskerTempSale.scanned('6221234567890',true));
  assert.match(await text(page,'#tsFind'),/مش رقم ملصق فارمافلاي/);

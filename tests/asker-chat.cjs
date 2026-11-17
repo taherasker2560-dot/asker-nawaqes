@@ -151,7 +151,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   b = await (await what(fake3({ warehouse: { supplier: 'طاهر تجربه', last_at: t1 }, customer: { name: 'سامية', last_at: t2 } }))).json();
   assert.deepEqual(b, { title: 'رسالة جديدة من عميل', body: 'سامية كتبلك في «خدمة العملاء ← الرسايل»', tab: 'care' });
   b = await (await what(fake3())).json();
-  assert.deepEqual(b, { title: 'صيدلية عسكر', body: 'فيه جديد في البوت', tab: '' });
+  assert.deepEqual(b, { title: 'صيدلية عسكر', body: 'فيه جديد في السيستم', tab: '' });
   // a push address the pharmacy never saved: nothing said
   assert.equal((await what(fake3({ known: false }))).status, 404);
   assert.equal((await F.handle(req({ action: 'what', endpoint: 'http://x' }, null), env, fake3())).status, 400);

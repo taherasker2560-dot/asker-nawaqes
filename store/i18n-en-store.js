@@ -1,4 +1,4 @@
-/* The store's English (owner 2026-11-12: «اعمل لي الموقع كمان باللغتين زي البوت»). Same engine as the bot (ar/i18n.js),
+/* The store's English (owner 2026-11-12: «اعمل لي الموقع كمان باللغتين زي السيستم»). Same engine as the system (ar/i18n.js),
    loaded right before it: «exact» = whole texts ({0}, {1} = a number or a name the code puts in), «phrases» = pieces that
    can be joined. Item names show in English; the Arabic item names, what a customer typed and the WhatsApp messages are
    never translated. A new Arabic text on the store needs its line here (tests/store-english.cjs lists the missing ones).
@@ -77,8 +77,8 @@ window.AskerEN = {
   "السلة": "Cart",
   "القائمة": "Menu",
   "رجوع": "Back",
-  "رجوع للبوت": "Back to the bot",
-  "البوت": "Bot",
+  "رجوع للسيستم": "Back to the system",
+  "السيستم": "System",
   "اقفل": "Close",
   "دوّر": "Search",
   "دوّر على دوا أو منتج…": "Search for a medicine or product…",
@@ -355,7 +355,7 @@ window.AskerEN = {
   "انزل واختار «إضافة إلى الشاشة الرئيسية»": "Scroll down and choose “Add to Home Screen”",
   "دوس «إضافة» فوق": "Tap “Add” at the top",
   "تمام": "OK",
-  "→ رجوع للبوت": "→ Back to the bot",
+  "→ رجوع للسيستم": "→ Back to the system",
   "ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.": "This is the customer's account as they will see it. It isn't saved or installed on your phone.",
   "عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية": "Open your account and order from us in one tap from your home screen",
   "على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.": "On iPhone: tap the Share button ⬆️, then “Add to Home Screen”. If you can't find it, open the link in Safari.",
@@ -510,7 +510,6 @@ window.AskerEN = {
   "🔔 فعّل الإشعارات": "🔔 Turn on notifications",
   "الإشعارات مقفولة من إعدادات المتصفح": "Notifications are blocked in the browser settings",
   "موبايلك مفيهوش صوت عربي: هيرن من غير نطق. نزّل صوت عربي من إعدادات الموبايل ← اللغة ← تحويل النص إلى كلام.": "Your phone has no Arabic voice: it will ring without speaking. Install an Arabic voice in the phone's settings → Language → Text-to-speech.",
-  "ده شكل المنبه عند العميل. على موبايل الصيدلية مبيرنش.": "This is how the alarm looks for the customer. It never rings on the pharmacy's phone.",
   "أي دوا؟": "Which medicine?",
   "(من اللي بتاخده دايمًا)": "(from what you usually take)",
   "＋ دوا تاني (اكتب اسمه)": "＋ Another medicine (type its name)",
@@ -551,7 +550,13 @@ window.AskerEN = {
   "📝 شكوى/اقتراح:": "📝 Complaint/suggestion:",
   "📝 شكوى/اقتراح (فويس)": "📝 Complaint/suggestion (voice)",
   "اكتب شكواك أو اقتراحك…": "Write your complaint or suggestion…",
-  "إلغاء": "Cancel"
+  "إلغاء": "Cancel",
+  "بتظبط منبهات {0} من عندك. هتظهر في صفحته بعلامة «من الصيدلية» ويرنّ عند الميعاد على موبايله، وهو يقدر يقفلها بس مايعدّلهاش.": "You are setting {0}'s alarms yourself. They show on his page marked “From the pharmacy” and ring at the time on his phone; he can switch them off but not change them.",
+  "من الصيدلية": "From the pharmacy",
+  "🔔 جرّب الإشعار": "🔔 Try the notification",
+  "🔔 تجربة منبه الدوا": "🔔 Medicine alarm test",
+  "لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.": "If you heard a sound and see this notification, the alarm will reach you like this at dose time. Tap it.",
+  "لو الإشعار جه من غير صوت: اتأكد إن الموبايل مش على الصامت، وافتح إعدادات الموبايل ← التطبيقات ← المتصفح ← الإشعارات ← صيدلية عسكر وشغّل الصوت.": "If the notification came without a sound: make sure the phone is not on silent, and open the phone's settings → Apps → the browser → Notifications → Asker Pharmacy and turn the sound on."
  },
  "phrases": {
   "صيدلية عسكر": "Asker Pharmacy",

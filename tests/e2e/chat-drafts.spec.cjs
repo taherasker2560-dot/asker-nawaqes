@@ -23,7 +23,7 @@ run('Suggested answers: «🤖 الرد جاهز», ابعت / عدّل / سيب
  await page.waitForFunction(()=>document.querySelectorAll('#chatPanel .ch-bot').length===3);
  assert.match(await text(page,'#chatPanel [data-chat="c1"]'),/🤖 الرد جاهز/);
  // the trial week: the bot only writes; the switches with the numbers, kind by kind
- assert.match(await text(page,'[data-chat-auto]'),/أسبوع التجربة: البوت بيكتب الرد بس، وإنت اللي بتبعت/);
+ assert.match(await text(page,'[data-chat-auto]'),/أسبوع التجربة: السيستم بيكتب الرد بس، وإنت اللي بتبعت/);
  await page.click('[data-chat-auto]');await page.waitForSelector('[data-auto-kind="availability"]');
  assert.equal(await page.$$eval('[data-auto-kind]',(e)=>e.length),8);
  // ابعت: as it is

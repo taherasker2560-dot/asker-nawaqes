@@ -47,8 +47,8 @@ run('Messages: a cash customer writes his name and number once, sends text and a
  await page.reload();await page.waitForSelector('#chatText');
  await page.waitForFunction(()=>document.querySelectorAll('#chatList .ch-b').length===3);
  assert.equal(await page.$('#chatForm'),null);
- assert.ok(await page.isHidden('#chatBack'),'a customer\'s phone: no «رجوع للبوت»');
- // the pharmacy's phone (the bot signed in): «→ رجوع للبوت» is there
+ assert.ok(await page.isHidden('#chatBack'),'a customer\'s phone: no «رجوع للسيستم»');
+ // the pharmacy's phone (the bot signed in): «→ رجوع للسيستم» is there
  await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
  await page.reload();await page.waitForSelector('#chatBack',{state:'visible'});
  assert.equal(await page.getAttribute('#chatBack','href'),'asker-nawaqes-arabic.html');

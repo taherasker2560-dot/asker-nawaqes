@@ -5,7 +5,8 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 const PAGE = () => new URL('../../store.html#account', self.registration.scope).href;
 self.addEventListener('push', (e) => {
-  e.waitUntil(self.registration.showNotification('⏰ ميعاد دواك', {
+  e.waitUntil((async () => {
+  await self.registration.showNotification('⏰ ميعاد دواك', {
     body: 'دوس عشان تسمع اسم الدوا وتاخده',
     icon: '../../icons/arabic-192.png?v=logo2',
     badge: '../../icons/arabic-192.png?v=logo2',
@@ -16,7 +17,11 @@ self.addEventListener('push', (e) => {
     lang: 'ar',
     dir: 'rtl',
     data: { url: PAGE() },
-  }));
+  });
+  // the app is alive in the background: tell it, so it rings and speaks at once without waiting for a tap on the notification
+  const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const c of list) { try { c.postMessage({ type: 'dose-due' }); } catch (err) { /* a closed window */ } }
+  })());
 });
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();

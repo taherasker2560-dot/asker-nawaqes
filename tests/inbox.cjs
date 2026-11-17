@@ -193,7 +193,7 @@ assert.equal(F.missingSay('الفتح',['📷 صورة']),'الفتح: بعت ص
  assert.match(await r.text(),/وصل بروفين/);assert.equal(g.saved[0].maybe,null,'one company: sure');
  g.media.push({supplier:'شركة النور',fresh:true,done:false});
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,21]),'application/octet-stream'),env,g);
- assert.equal(await r.text(),'وصلت صور من أكتر من مورد في نفس الوقت: المتحدة للأدوية وشركة النور. اختار كل صورة من مين من البوت');
+ assert.equal(await r.text(),'وصلت صور من أكتر من مورد في نفس الوقت: المتحدة للأدوية وشركة النور. اختار كل صورة من مين من السيستم');
  assert.deepEqual(g.saved[1].maybe,['المتحدة للأدوية','شركة النور']);
  r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,22]),'application/octet-stream'),env,g);
  assert.equal(await r.text(),'','said once');assert.ok(g.saved[2].maybe);
@@ -229,7 +229,7 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
  const h=async(u,o)=>u.startsWith('https://generativelanguage')&&calls++<1?new Response('',{status:503}):g(u,o);
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,40]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1',GEMINI_FALLBACK_MODELS:''},h);
- assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده');
+ assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، السيستم هيقراه تاني لوحده');
  assert.equal(g.saved[0].status,'new');assert.equal(g.saved[0].error,null);assert.equal(g.saved[0].sure,1);assert.equal(calls,2);}
 {const g=fake();let calls=0;const h=async(u,o)=>u.startsWith('https://generativelanguage')?(calls++,new Response('',{status:500})):g(u,o);
  await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,41]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1',GEMINI_FALLBACK_MODELS:''},h);
@@ -255,7 +255,7 @@ assert.equal(r.status,200);assert.equal(f.saved[0].status,'error');assert.match(
 {const g=fake({gem:()=>({supplier:'',rows:[{name:'بروفين ٤٠٠ مجم ٣٠ قرص',english:'BRUFEN 400MG 30TAB'}]})});let calls=0;
  const h=async(u,o)=>{if(u.startsWith('https://generativelanguage')&&calls++<1){const e=new Error('Signal timed out.');e.name='TimeoutError';throw e}return g(u,o)};
  const r=await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,42]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);
- assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، البوت هيقراه تاني لوحده');
+ assert.equal(await r.text(),'المتحدة للأدوية: الوارد وصل بس جوجل مشغول، السيستم هيقراه تاني لوحده');
  assert.equal(g.saved[0].status,'new');assert.equal(g.saved[0].sure,1);assert.equal(calls,2);}
 {const g=fake();let calls=0;const h=async(u,o)=>{if(u.startsWith('https://generativelanguage')){calls++;throw Object.assign(new Error('Signal timed out.'),{name:'TimeoutError'})}return g(u,o)};
  await F.handle(post('from='+encodeURIComponent('المتحدة للأدوية')+'&say=1',new Uint8Array([255,216,255,43]),'application/octet-stream'),{...env,INBOX_RETRY_WAIT_MS:'1'},h);

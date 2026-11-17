@@ -77,15 +77,15 @@
       const { data, error } = await db().rpc('ar_chat_staff_push_save', { p_endpoint: sub.endpoint });
       if (error || !data || !data.ok) throw new Error((error && error.message) || 'save');
       pushState = 'on';
-      reg.showNotification('بوت عسكر', { body: 'إشعار الرسايل اشتغل ✅ هيجيلك زي ده لما عميل يكتب', icon: 'icons/arabic-192.png?v=logo2', tag: 'asker-care-test', lang: 'ar', dir: 'rtl' }).catch(() => null);
+      reg.showNotification('سيستم عسكر', { body: 'إشعار الرسايل اشتغل ✅ هيجيلك زي ده لما عميل يكتب', icon: 'icons/arabic-192.png?v=logo2', tag: 'asker-care-test', lang: 'ar', dir: 'rtl' }).catch(() => null);
     } catch (e) { pushState = 'bad'; }
     drawList();
   }
   function pushHtml() {
-    if (pushState === 'off') return '<button type="button" class="secondary ch-push" data-chat-push>🔔 إشعار على موبايلك لما عميل يكتب (حتى والبوت مقفول)</button>';
+    if (pushState === 'off') return '<button type="button" class="secondary ch-push" data-chat-push>🔔 إشعار على موبايلك لما عميل يكتب (حتى والسيستم مقفول)</button>';
     if (pushState === 'busy') return '<p class="status">بيفعّل الإشعار…</p>';
     if (pushState === 'on') return '<p class="hint ch-push-on">🔔 إشعار الرسايل شغال على الموبايل ده.</p>';
-    if (pushState === 'bad') return '<p class="status bad">الموبايل ما سمحش بالإشعار. اسمح للبوت بالإشعارات من إعدادات المتصفح وجرّب تاني.</p><button type="button" class="secondary ch-push" data-chat-push>🔔 جرّب تاني</button>';
+    if (pushState === 'bad') return '<p class="status bad">الموبايل ما سمحش بالإشعار. اسمح للسيستم بالإشعارات من إعدادات المتصفح وجرّب تاني.</p><button type="button" class="secondary ch-push" data-chat-push>🔔 جرّب تاني</button>';
     return '';
   }
   // the open chat: { c, msgs, urls: {path: signedUrl}, busy, error, note, account, draft, editing }
@@ -113,7 +113,7 @@
   function autoHtml() {
     if (!ownerHere()) return '';
     const on = autoKinds.length;
-    const head = on ? `🤖 الرد التلقائي شغال على ${on} نوع` : '🤖 أسبوع التجربة: البوت بيكتب الرد بس، وإنت اللي بتبعت';
+    const head = on ? `🤖 الرد التلقائي شغال على ${on} نوع` : '🤖 أسبوع التجربة: السيستم بيكتب الرد بس، وإنت اللي بتبعت';
     // the arrow in its own piece: the words alone are translated in English
     if (!autoOpen) return `<button type="button" class="secondary small ch-auto-btn" data-chat-auto><span>${esc(head)}</span> <span aria-hidden="true">▾</span></button>`;
     const rows = Object.keys(KIND_AR).map((k) => {
@@ -122,7 +122,7 @@
         `<span class="hint">اتبعت زي ما هو ${n.sent} · اتعدّل ${n.edited} · اتساب ${n.skipped}${n.auto ? ` · راح لوحده ${n.auto}` : ''}</span></label>`;
     }).join('');
     return `<div class="ch-auto"><button type="button" class="secondary small ch-auto-btn" data-chat-auto><span>${esc(head)}</span> <span aria-hidden="true">▴</span></button>` +
-      `<p class="hint">علّم النوع اللي البوت يبعته لوحده من غير ما يستناك. الأرقام من آخر 30 يوم.</p>${rows}</div>`;
+      `<p class="hint">علّم النوع اللي السيستم يبعته لوحده من غير ما يستناك. الأرقام من آخر 30 يوم.</p>${rows}</div>`;
   }
   async function setAuto(kind, on) {
     const next = on ? [...new Set([...autoKinds, kind])] : autoKinds.filter((k) => k !== kind);
