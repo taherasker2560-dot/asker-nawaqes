@@ -18,7 +18,7 @@ const FAKE=([rows,perm])=>{
  Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{speak(u){window.__say.push(u.text);setTimeout(()=>u.onstart&&u.onstart(),0)},cancel(){window.__cancel++},getVoices(){return window.__voices?[{lang:'ar-EG',name:'Arabic (Egypt)'}]:[]},addEventListener(){}}});
  Object.defineProperty(navigator,'vibrate',{configurable:true,value:(p)=>{window.__vib.push(p);return true}});
  window.Notification=class{constructor(t,o){window.__notes.push([t,o&&o.body])}};window.Notification.permission=localStorage.getItem('__perm')||perm;window.Notification.requestPermission=()=>{window.Notification.permission='granted';localStorage.setItem('__perm','granted');return Promise.resolve('granted')};
- Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{addEventListener(t,f){(window.__swl=window.__swl||[]).push(f)},startMessages(){},register:async(url,o)=>{window.__swReg=[url,o&&o.scope];return {active:{},showNotification:async(t,o)=>{window.__shown=(window.__shown||[]).concat([[t,o&&o.body,o&&o.tag]])},pushManager:{getSubscription:async()=>window.__sub,subscribe:async(opt)=>{window.__subs++;window.__subOpt=[opt.userVisibleOnly,opt.applicationServerKey&&opt.applicationServerKey.length];window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)};return window.__sub}}}}}});
+ Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{addEventListener(t,f){(window.__swl=window.__swl||[]).push(f)},startMessages(){},register:async(url,o)=>{window.__swReg=[url,o&&o.scope];return {active:{},showNotification:async(t,o)=>{window.__shown=(window.__shown||[]).concat([[t,o&&o.body,o&&o.tag]]);window.__shownData=(window.__shownData||[]).concat([o&&o.data])},pushManager:{getSubscription:async()=>window.__sub,subscribe:async(opt)=>{window.__subs++;window.__subOpt=[opt.userVisibleOnly,opt.applicationServerKey&&opt.applicationServerKey.length];window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)};return window.__sub}}}}}});
  window.__fakeRpcs={ar_store_pay_info:()=>null,ar_customer_regular_view:()=>({ok:true,rows,at:new Date().toISOString()}),ar_dose_save:()=>({ok:true}),
   ar_customer_alarms_view:()=>({ok:true,items:JSON.parse(localStorage.getItem('__ph')||'[]')}),ar_customer_alarms_admin_get:()=>({ok:true,items:JSON.parse(localStorage.getItem('__ph')||'[]')}),
   ar_customer_alarms_admin_set:(a)=>{localStorage.setItem('__ph',JSON.stringify(a.p_items));window.__adminSets=(window.__adminSets||0)+1;return {ok:true,items:a.p_items}}};
@@ -45,7 +45,7 @@ run('Dose alarm: the tile under the two buttons, a new alarm from his usual medi
  await page.click('[data-al-save]');
  assert.match(await text(page,'#alarmSheet .al-warn'),/اكتب اسم الدوا الأول/,'no name: it asks');
  await page.click('[data-al-pick="1"]');
- assert.match(await text(page,'.al-say'),/هيقول: «ميعاد دواء زانبرازان ٢٠ قرص»/);
+ assert.match(await text(page,'.al-say'),/هيقول: «ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر»/);
  assert.deepEqual(await page.$$eval('[data-al-time]',e=>e.map(x=>x.value)),['08:00','20:00']);
  await page.click('[data-al-save]');await page.waitForSelector('#alarmSheet .al-card');
  assert.deepEqual(await chips(page),['8:00 ص','8:00 م']);
@@ -94,7 +94,7 @@ run('Dose alarm: at the time the phone rings and SAYS the medicine\'s name, vibr
  await page.waitForSelector('#alarmRing');
  assert.equal(await text(page,'#alarmRing h2'),'⏰ ميعاد الدوا');
  assert.deepEqual(await page.$$eval('#alarmRing .al-ring-med',e=>e.map(x=>x.firstChild.textContent)),['زانبرازان ٢٠ قرص','ايزابريل كو ٧٢ قرص']);
- assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد دواء زانبرازان ٢٠ قرص، وايزابريل كو ٧٢ قرص'],'the phone says it, with its own voice');
+ assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد زانبرازان، وايزابريل كو الآن، خدمة مقدمة من صيدلية عسكر'],'the phone says it, with its own voice');
  assert.equal(await page.evaluate(()=>window.__vib.length>=1),true,'and vibrates');
  assert.equal(await page.evaluate(()=>window.__notes.length),0,'the page is open: no extra notification');
  // the same minute again: no second ring
@@ -109,7 +109,7 @@ run('Dose alarm: at the time the phone rings and SAYS the medicine\'s name, vibr
  assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.data().snoozes.length),1);
  assert.equal(await tick(page,20,5),0,'not yet');
  assert.equal(await tick(page,20,11),1,'10 minutes later (a little after, as the clock ticks every 15 s)');await page.waitForSelector('#alarmRing');
- assert.deepEqual((await page.evaluate(()=>window.__say)).slice(-1),['ميعاد دواء زانبرازان ٢٠ قرص']);
+ assert.deepEqual((await page.evaluate(()=>window.__say)).slice(-1),['ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر']);
  await page.click('[data-al-took]');assert.equal(await tick(page,20,13),0);
  // the next day it rings again
  assert.equal(await tick(page,8,1,18),2);await page.click('[data-al-took]');
@@ -130,12 +130,15 @@ run('Dose alarm: a hidden page gets a phone notification, the voice can be switc
  assert.equal(await tick(page,8,0),1);
  await page.waitForFunction(()=>window.__notes.length===1);
  assert.deepEqual(await page.evaluate(()=>window.__notes),[['⏰ ميعاد دواك','دوا الصبح']]);
- await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))});
+ assert.equal(await page.$('#alarmRing'),null,'hidden: no card, and the alarm is not used up (11-18)');
+ // he opens the page (the clock still at 8:01): now the card shows, and speaks
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false})});
+ assert.equal(await tick(page,8,1),1);await page.waitForSelector('#alarmRing');
  await page.click('[data-al-took]');
  // the voice test, and the switch: off = it rings without speaking
  await page.click('[data-al-open]');await page.waitForSelector('[data-al-try]');
  await page.click('[data-al-try]');
- assert.deepEqual((await page.evaluate(()=>window.__say)).slice(-1),['ميعاد دواء، تجربة الصوت']);
+ assert.deepEqual((await page.evaluate(()=>window.__say)).slice(-1),['ميعاد دواء تجريبي الآن، خدمة مقدمة من صيدلية عسكر']);
  const before=(await page.evaluate(()=>window.__say)).length;
  await page.click('[data-al-speak]');assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.data().speak),false);
  await page.click('[data-al-try]');assert.equal((await page.evaluate(()=>window.__say)).length,before,'switched off: no voice');
@@ -184,7 +187,7 @@ run('Dose alarm: the owner\'s look sets THIS customer\'s alarms from the pharmac
  assert.match(await text(page,'#alarmSheet .al-card'),/8:00 AM.*8:00 PM/);assert.doesNotMatch(await text(page,'#alarmSheet'),/[؀-ۿ]/);
  assert.equal(await tick(page,8,0),1);await page.waitForSelector('#alarmRing');
  assert.equal(await text(page,'#alarmRing h2'),'⏰ Time for your medicine');assert.equal(await text(page,'[data-al-took]'),'✓ Taken');
- assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد دواء زانبرازان ٢٠ قرص'],'the phone says the Arabic name of the medicine');
+ assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر'],'the phone says the Arabic name of the medicine');
 },{home:true});
 
 run('Dose alarm stage 2: turning the notifications on subscribes this phone and sends ONLY the clock times of the alarms that are on (never a name); it follows every change; the pharmacy phone sends nothing',async({page,base})=>{
@@ -240,17 +243,22 @@ run('Dose alarm stage 2: the pharmacy\'s own phone sends nothing; a ring opened 
  await page.addInitScript(()=>{window.__quiet=true});
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
  await page.evaluate(()=>{localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'زانبرازان ٢٠ قرص',say:'',times:['08:00'],on:true}],snoozes:[]}));
-  // an engine that stays silent until a tap, like Chrome on a page nobody touched yet
-  let touched=false;addEventListener('pointerdown',()=>{touched=true},true);
-  speechSynthesis.speak=(u)=>{window.__say.push(u.text);if(touched)setTimeout(()=>u.onstart&&u.onstart(),0)};window.__say.length=0});
+  // an engine that stays silent until a TAP, like Chrome on a page nobody touched yet: on a phone a tap is a click (touchend / pointerup), NOT pointerdown (11-18: the first version listened to pointerdown and stayed silent on his phone);
+  // it says «not-allowed» out loud before a tap, as Chrome does
+  let touched=false;addEventListener('click',()=>{touched=true},true);
+  speechSynthesis.speak=(u)=>{window.__say.push(u.text);if(touched)setTimeout(()=>u.onstart&&u.onstart(),0);else setTimeout(()=>u.onerror&&u.onerror({error:'not-allowed'}),0)};window.__say.length=0});
  assert.equal(await page.evaluate(`window.AskerStoreAlarm.tick(new Date(2026,10,17,8,0,20)).length`),1);
  await page.waitForSelector('#alarmRing');
  await page.waitForSelector('.al-ring-hint',{timeout:5000});
  assert.equal(await text(page,'.al-ring-hint'),'دوس في أي مكان عشان تسمع اسم الدوا');
+ assert.equal(await page.$eval('.al-ring-card .al-btn',e=>e.hasAttribute('data-al-hear')),true,'«اسمع الاسم» is the first, big button while nobody has tapped');
  const before=(await page.evaluate(()=>window.__say)).length;
+ // a finger that only touched down (pointerdown, no tap yet) is not a tap for the browser: nothing is said
+ await page.evaluate(()=>document.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'touch'})));await page.waitForTimeout(300);
+ assert.equal((await page.evaluate(()=>window.__say)).length,before,'pointerdown alone does not speak');
  await page.mouse.click(30,30);   // a tap anywhere: the name is said
  await page.waitForFunction(b=>window.__say.length>b,before);
- assert.equal((await page.evaluate(()=>window.__say)).slice(-1)[0],'ميعاد دواء زانبرازان ٢٠ قرص');
+ assert.equal((await page.evaluate(()=>window.__say)).slice(-1)[0],'ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر');
  // and the button says it again
  const b2=(await page.evaluate(()=>window.__say)).length;await page.click('[data-al-hear]');
  assert.equal((await page.evaluate(()=>window.__say)).length,b2+1);
@@ -271,7 +279,7 @@ run('Dose alarm: the alarms the PHARMACY set show on his phone marked «من ا�
  await page.waitForFunction(()=>window.__fakeWrites.some(w=>w.rpc==='ar_dose_save'&&JSON.stringify(w.args.p_times)==='["08:00","20:00"]'));
  // it rings and speaks like his own
  assert.equal(await tick(page,8,0),1);await page.waitForSelector('#alarmRing');
- assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد دواء زانبرازان ٢٠ قرص']);await page.click('[data-al-took]');
+ assert.deepEqual(await page.evaluate(()=>window.__say),['ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر']);await page.click('[data-al-took]');
  // he switches it off: no ring, kept on his phone, and the push times follow (nothing on)
  await page.click('[data-al-toggle="p1"]');
  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker_dose_pharmacy')).off),{p1:true});
@@ -292,4 +300,65 @@ run('Dose alarm: the alarms the PHARMACY set show on his phone marked «من ا�
  assert.match(await text(page,'#alarmSheet .rg-body'),/لو الإشعار جه من غير صوت/);
  await page.click('[data-al-notiftest]');await page.waitForFunction(()=>window.__shown&&window.__shown.length===1);
  assert.deepEqual(await page.evaluate(()=>window.__shown[0]),['🔔 تجربة منبه الدوا','لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.','asker-dose-test']);
+ assert.equal(await page.evaluate(()=>window.__shownData[0].kind),'test','the worker knows this one is the test: a tap on it rings the demo');
+},{home:true});
+
+run('Dose alarm: a hidden page does not use the alarm up; a tap on the dose notification rings it and asks for the first tap (an open page by the worker\'s message, a new window by ?dose=1); the test notification rings a made-up «تجربة المنبه»',async({page,base})=>{
+ await setup(page,'granted');
+ await openAccount(page,base);
+ // an alarm at THIS minute (the page reads the real clock here)
+ const now=()=>page.evaluate(()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes())});
+ const setAlarm=async()=>{const t=await now();await page.evaluate((t)=>{localStorage.removeItem('asker_dose_fired');localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'دوا الصبح',say:'',times:[t],on:true}],snoozes:[]}))},t)};
+ await setAlarm();   // (set after the page is open: the page's own first look at the clock would ring it at once, visible)
+ // an engine that stays silent until a tap (Chrome on a page nobody touched)
+ const silent=()=>page.evaluate(()=>{let touched=false;addEventListener('click',()=>{touched=true},true);speechSynthesis.speak=(u)=>{window.__say.push(u.text);if(touched)setTimeout(()=>u.onstart&&u.onstart(),0);else setTimeout(()=>u.onerror&&u.onerror({error:'not-allowed'}),0)};window.__say.length=0});
+ await silent();
+ // 1. the page is hidden when the time comes: ONE notification, no card, and the alarm is not marked as rung
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true})});
+ assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.tick().length),1);assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.tick().length),1);
+ assert.equal(await page.evaluate(()=>window.__notes.length),1,'one notification, not one every 15 seconds');
+ assert.equal(await page.$('#alarmRing'),null,'nobody sees a card while the page is hidden');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_dose_fired')),null,'and the alarm is not used up');
+ // 2. he taps the notification: the worker tells the open page; it rings at once, asks for the first tap, and the tap speaks
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false})});
+ await page.evaluate(()=>window.__swl.forEach(f=>f({data:{type:'dose-open',kind:'dose'}})));
+ await page.waitForSelector('#alarmRing');assert.match(await text(page,'#alarmRing'),/دوا الصبح/);
+ await page.waitForSelector('.al-ring-hint');assert.equal(await page.$eval('.al-ring-card .al-btn',e=>e.hasAttribute('data-al-hear')),true);
+ const b1=(await page.evaluate(()=>window.__say)).length;await page.click('[data-al-hear]');
+ await page.waitForFunction(b=>window.__say.length>b,b1);assert.equal((await page.evaluate(()=>window.__say)).slice(-1)[0],'ميعاد دوا الصبح الآن، خدمة مقدمة من صيدلية عسكر');
+ await page.click('[data-al-took]');await page.waitForSelector('#alarmRing',{state:'detached'});
+ // 3. a closed page: the tap opens a NEW window with ?dose=1: it rings although the alarm was already marked as rung (he never saw it), and the address is clean
+ assert.ok(await page.evaluate(()=>!!localStorage.getItem('asker_dose_fired')),'«خدته» marked it');
+ await page.goto(base+'store.html?dose=1#account');await page.waitForSelector('#alarmRing');
+ assert.equal(await page.evaluate(()=>location.search),'','?dose= goes out of the address');assert.equal(await page.evaluate(()=>location.hash),'#account');
+ await page.click('[data-al-took]');
+ // 4. the same tap long after the time (an hour): still the notification's alarm
+ await page.evaluate(()=>{const d=new Date(Date.now()-60*60000),p=n=>String(n).padStart(2,'0');if(d.getDate()!==new Date().getDate())return;const x=JSON.parse(localStorage.getItem('asker_dose_alarms'));x.items[0].times=[p(d.getHours())+':'+p(d.getMinutes())];localStorage.setItem('asker_dose_alarms',JSON.stringify(x))});
+ const lateOk=await page.evaluate(()=>{const d=new Date(Date.now()-60*60000);return d.getDate()===new Date().getDate()});
+ if(lateOk){await page.reload();await page.waitForSelector('.ac-al-tile');assert.equal(await page.$('#alarmRing'),null,'an hour late and nobody tapped: not rung by itself');
+  await page.evaluate(()=>window.AskerStoreAlarm.doseOpened('dose'));await page.waitForSelector('#alarmRing');await page.click('[data-al-took]')}
+ // 5. the test notification: a demo ring with a made-up name; «ذكّرني» makes no real alarm
+ await page.goto(base+'store.html?dose=test#account');await page.waitForSelector('#alarmRing');
+ assert.match(await text(page,'#alarmRing'),/تجربة المنبه/);assert.equal(await page.evaluate(()=>location.search),'');
+ await page.click('[data-al-snooze]');await page.waitForSelector('#alarmRing',{state:'detached'});
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker_dose_alarms')).snoozes),[],'the demo is not an alarm');
+ // 6. the pharmacy's own phone never rings, whatever tapped
+ await page.evaluate(()=>{localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}')});await page.goto(base+'store.html?dose=1#me='+tok);await page.waitForSelector('.ac-al-tile');
+ assert.equal(await page.$('#alarmRing'),null);await page.evaluate(()=>localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token'));
+ // 7. (a photo of the card on his phone: «اسمع الاسم مبينطقش ولا بيعمل حاجة»): an engine that fails the first two ways (a listed voice that is not really installed) is tried a third way; one that fails all three says why on the card
+ await page.goto(base+'store.html?s7=1#me='+tok);await page.waitForSelector('.ac-al-tile');await setAlarm();   // (a real load: the page above was the pharmacy's look, which forgot his link and is decided when the page loads)
+ await page.evaluate(()=>{window.__tries=[];let n=0;speechSynthesis.speak=(u)=>{window.__tries.push([u.lang,!!u.voice]);n++;if(n<3)setTimeout(()=>u.onerror&&u.onerror({error:'synthesis-failed'}),0);else setTimeout(()=>u.onstart&&u.onstart(),0)}});
+ await page.evaluate(()=>window.AskerStoreAlarm.doseOpened('dose'));await page.waitForSelector('#alarmRing');
+ await page.waitForFunction(()=>window.__tries.length===3);
+ assert.deepEqual(await page.evaluate(()=>window.__tries),[['ar-EG',true],['ar',false],['',false]],'the Egyptian voice, then «ar» with the engine\'s own choice, then its default');
+ await page.waitForTimeout(200);assert.equal(await page.$('#alarmRing .al-warn'),null,'the third way worked: no warning');
+ await page.click('[data-al-took]');
+ await page.evaluate(()=>{window.__tries=[];speechSynthesis.speak=(u)=>{window.__tries.push(1);setTimeout(()=>u.onerror&&u.onerror({error:'synthesis-failed'}),0)}});
+ await page.evaluate(()=>window.AskerStoreAlarm.doseOpened('dose'));await page.waitForSelector('#alarmRing .al-warn');
+ assert.match(await text(page,'#alarmRing .al-warn'),/الموبايل ما نطقش الاسم.*synthesis-failed/);assert.equal(await page.evaluate(()=>window.__tries.length),3,'three tries, no more');
+ // an engine that «ends» at once without ever starting (nothing was said) counts as a failure too
+ await page.click('[data-al-took]');
+ await page.evaluate(()=>{window.__tries=[];speechSynthesis.speak=(u)=>{window.__tries.push(1);setTimeout(()=>u.onend&&u.onend(),0)}});
+ await page.evaluate(()=>window.AskerStoreAlarm.doseOpened('dose'));await page.waitForSelector('#alarmRing .al-warn');
+ assert.match(await text(page,'#alarmRing .al-warn'),/silent/);
 },{home:true});

@@ -23,13 +23,17 @@ self.addEventListener('push', (e) => {
   for (const c of list) { try { c.postMessage({ type: 'dose-due' }); } catch (err) { /* a closed window */ } }
   })());
 });
+// a tap on the notification: the page is told it was opened FROM a dose notification, so it rings and asks for the first tap (a page nobody touched may not speak; a hidden page never «used up» the alarm).
+// An open page gets a message (no reload: a reload threw its ring away); a new window gets ?dose=1 (?dose=test for the «جرّب الإشعار» one, which rings a made-up «تجربة المنبه»).
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || PAGE();
+  const d = e.notification.data || {}, kind = d.kind === 'test' ? 'test' : 'dose';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
     for (const c of list) {
-      if (/\/store\.html/.test(c.url)) { if (c.navigate) c.navigate(url).catch(() => null); return c.focus(); }
+      if (/\/store\.html/.test(c.url)) { try { c.postMessage({ type: 'dose-open', kind }); } catch (err) { /* a closed window */ } return c.focus(); }
     }
-    return self.clients.openWindow(url);
+    const u = new URL(d.url || PAGE());
+    u.searchParams.set('dose', kind === 'test' ? 'test' : '1');
+    return self.clients.openWindow(u.href);
   }));
 });

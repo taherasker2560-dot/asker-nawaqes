@@ -26,6 +26,11 @@ let due = A.dueNow(d1, at(8, 0), {});
 assert.equal(due.length, 1);assert.equal(due[0].time, '08:00');assert.equal(due[0].key, '2026-11-17|a1|08:00');assert.equal(due[0].name, 'زانبرازان ٢٠ قرص');
 assert.equal(A.dueNow(d1, at(8, 10), {}).length, 1, 'still rings 10 minutes late (the page was closed)');
 assert.equal(A.dueNow(d1, at(8, 11), {}).length, 0, 'after that it is missed');
+// he came from the dose notification (11-18): that time rings even an hour late, and even if a hidden page had already used it up (the caller passes no fired map), but not at ninety-one minutes or the day after
+assert.equal(A.dueNow(d1, at(9, 20), {}, A.OPEN_LATE_MIN).length, 1, 'an hour and twenty late: still the notification\'s alarm');
+assert.equal(A.dueNow(d1, at(9, 31), {}, A.OPEN_LATE_MIN).length, 0, 'past ninety minutes: missed');
+assert.equal(A.dueNow(d1, at(8, 11), {}, null).length, 0, 'no window given = the usual ten minutes');
+assert.equal(A.OPEN_LATE_MIN, 90);
 assert.equal(A.dueNow(d1, at(20, 3), {}).length, 1, 'the second time of the day');
 assert.deepEqual(A.dueNow(d1, at(8, 2), { '2026-11-17|a1|08:00': 1 }), [], 'rung already: never twice');
 assert.equal(A.dueNow(d1, at(8, 2, 18), { '2026-11-17|a1|08:00': 1 }).length, 1, 'the next day is a new day: it rings again');
@@ -45,9 +50,15 @@ assert.equal(A.dueNow(ds, new Date(at8 + 700000), { [due[0].key]: 1 }).length, 0
 assert.equal(A.dueNow(data([item({ on: false, times: ['06:00'] })], ds.snoozes), new Date(at8 + 600000), {}).length, 0, 'a snooze of an alarm that is off does not ring');
 
 // what the phone says: the medicine's own name (Arabic when there is one), one sentence for several
-assert.equal(A.sayText('زانبرازان ٢٠ قرص'), 'ميعاد دواء زانبرازان ٢٠ قرص');
-assert.equal(A.sayDue([{ say: 'أ' }]), 'ميعاد دواء أ');
-assert.equal(A.sayDue([{ say: 'أ' }, { say: 'ب' }, { say: 'ج' }]), 'ميعاد دواء أ، وب، وج');
+// (owner 2026-11-18, a photo of the card: «عاوز المنبه يقول: ميعاد فيموجيسال الآن، خدمة مقدمة من صيدلية عسكر بالظبط كده»; the brand only, without «ق» / the strength / the form)
+assert.equal(A.sayText('فيموجيسال ق'), 'ميعاد فيموجيسال الآن، خدمة مقدمة من صيدلية عسكر');
+assert.equal(A.sayText('زانبرازان ٢٠ قرص'), 'ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر');
+assert.equal(A.sayDue([{ say: 'أ' }]), 'ميعاد أ الآن، خدمة مقدمة من صيدلية عسكر');
+assert.equal(A.sayDue([{ say: 'أ' }, { say: 'ب' }, { say: 'ج' }]), 'ميعاد أ، وب، وج الآن، خدمة مقدمة من صيدلية عسكر');
+assert.equal(A.sayDue([{ say: 'زانبرازان ٢٠ قرص' }, { say: 'ايزابريل كو ٧٢ قرص' }]), 'ميعاد زانبرازان، وايزابريل كو الآن، خدمة مقدمة من صيدلية عسكر');
+// the name as it is said: the forms and the strength go, a name that is only those (or a single word) stays whole, an ordinary name is left alone
+for (const [name, said] of [['فيموجيسال ق', 'فيموجيسال'], ['بنادول اكسترا 24 قرص', 'بنادول اكسترا'], ['اوميز 20 مجم كبسولة', 'اوميز'], ['فيتامين د', 'فيتامين د'], ['فيتامين ب12', 'فيتامين ب12'], ['قرص', 'قرص'], ['٢٠', '٢٠'], ['  دوا   الضغط  ', 'دوا الضغط'], ['Panadol 500 mg', 'Panadol'], ['', '']]) assert.equal(A.spokenName(name), said, name);
+assert.equal(A.TEXTS.tryPhrase, 'ميعاد دواء تجريبي الآن، خدمة مقدمة من صيدلية عسكر');
 assert.equal(A.dueNow(data([item({ say: 'اسم للنطق' })]), at(8, 0), {})[0].say, 'اسم للنطق');
 assert.equal(A.dueNow(data([item()]), at(8, 0), {})[0].say, 'زانبرازان ٢٠ قرص', 'no special name: the name itself');
 
