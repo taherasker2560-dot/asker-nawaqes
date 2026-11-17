@@ -2,21 +2,21 @@
    One strong colour (crimson app bar + active states), everything else quiet: warm-white paper, soft rose tints,
    a thin gold line under the bar as the only ornament. Arabic UI type: IBM Plex Sans Arabic. */
 :root {
-  --crimson: #cf4014; /* the main color (since 2026-11-15 the vivid orange; ar/settings.js sets these before the page paints): app bar, primary buttons, active tab */
-  --crimson-deep: #922d0e;
-  --crimson-ink: #952e0e; /* the color as text on light backgrounds */
+  --crimson: #c0522a; /* the main color = the calm orange (owner 2026-11-17; ar/settings.js sets these before the page paints): app bar, primary buttons, active tab */
+  --crimson-deep: #8a3b1e;
+  --crimson-ink: #86391d; /* the color as text on light backgrounds */
   --rose: #f9efeb; /* soft tint for secondary buttons and selected states */
   --rose-line: #ead4cd;
-  --gold: #c39a3e; /* thin royal accent */
+  --gold: var(--crimson); /* the focus ring and the thin line: the calm orange */
   --paper: #fbf8f8;
   --card: #ffffff;
   --ink: #241518;
   --muted: #76666a;
   --line: #ece3e5;
-  --good: #1d6f48;
-  --good-bg: #e4f3eb;
-  --warn: #8d5b00;
-  --warn-bg: #fbf0d9;
+  --good: var(--crimson-ink); /* a done / good state: the calm orange's ink on a quiet tint; a state that needs attention (--warn) sits on the stronger tint (owner 2026-11-17: no green, no amber) */
+  --good-bg: var(--tint-2, var(--rose));
+  --warn: var(--crimson-ink);
+  --warn-bg: var(--rose);
   --bad: #a3162f;
   --bad-bg: #fbe4e8;
   --radius: 16px;
@@ -56,7 +56,7 @@ body {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  box-shadow: 0 0 0 1.5px rgba(195, 154, 62, 0.7);
+  box-shadow: 0 0 0 1.5px rgba(var(--glow), 0.7);
 }
 .brand {
   flex: 1;
@@ -685,8 +685,8 @@ button.small {
   font-variant-numeric: tabular-nums;
 }
 .qty.own {
-  background: #f6ecd0;
-  color: #7a5a10;
+  background: var(--rose);
+  color: var(--crimson-ink);
 }
 .sr-empty {
   padding: 18px 4px;
@@ -774,8 +774,8 @@ button.small {
   margin: 12px 0 6px;
   padding: 18px 12px;
   border-radius: 14px;
-  background: #ffd54f;
-  color: #3a2a00;
+  background: var(--crimson);
+  color: #fff;
   font-size: 18px;
   font-weight: 700;
   text-align: center;
@@ -817,11 +817,11 @@ button.small {
 .dc-st {
   font-size: 13px;
   font-weight: 700;
-  color: #b25f00;
+  color: var(--crimson-ink);
 }
 .dc-st.dc-entered,
 .dc-st.dc-kept {
-  color: #2e7d32;
+  color: var(--crimson-ink);
 }
 .dc-st.dc-skipped {
   color: var(--muted);
@@ -836,8 +836,8 @@ button.small {
 }
 .rf-btn {
   width: 100%;
-  background: #ffd54f;
-  color: #3a2a00;
+  background: var(--crimson);
+  color: #fff;
   font-weight: 700;
 }
 .rf-btn:disabled {
@@ -901,8 +901,8 @@ button.small {
 .od-edit {
   width: 100%;
   margin-top: 10px;
-  background: #ffd54f;
-  color: #3a2a00;
+  background: var(--crimson);
+  color: #fff;
   font-weight: 700;
 }
 .od-editbox {
@@ -997,7 +997,7 @@ button.small {
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1.35;
-  color: #b25f00;
+  color: var(--crimson-ink);
 }
 /* the other supplier's own discount for the item, when the order is sent to it (ar/order-drafts.js, 2026-11-12) */
 .od-at {
@@ -1060,7 +1060,7 @@ button.small {
 .so-st {
   font-size: 13px;
   font-weight: 700;
-  color: #b25f00;
+  color: var(--crimson-ink);
 }
 .so-confirmed .so-st,
 .so-done .so-st {
@@ -1089,7 +1089,7 @@ button.small {
   min-height: 36px;
   padding: 0 14px;
   border-radius: 10px;
-  background: #1f8a4c;
+  background: var(--crimson);
   color: #fff;
   font-weight: 700;
   text-decoration: none;
@@ -1425,13 +1425,13 @@ html.night {
   --ink: #ece8f2;
   --muted: #a39cad;
   --line: #332f3b;
-  --good: #6fd3a0;
-  --good-bg: #183528;
-  --warn: #f0c060;
-  --warn-bg: #3a2e12;
+  --good: var(--crimson-ink);
+  --good-bg: var(--tint-2, var(--rose));
+  --warn: var(--crimson-ink);
+  --warn-bg: var(--rose);
   --bad: #ff8fa3;
   --bad-bg: #3d1a22;
-  --gold: #8f79c9;
+  --gold: var(--crimson);
   color-scheme: dark;
 }
 html.night .bottomnav {
@@ -1558,7 +1558,7 @@ html.night textarea {
   white-space: nowrap;
 }
 .hs-offers-t tr.best td {
-  background: var(--good-bg, #e7f6ec);
+  background: var(--good-bg, var(--rose));
   color: var(--good);
   font-weight: 700;
 }

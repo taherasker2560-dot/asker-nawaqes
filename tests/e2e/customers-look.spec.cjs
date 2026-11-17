@@ -40,7 +40,7 @@ run('Customers look: a round mark with the first letter, the balance a pill, the
  assert.equal(await text(page,'#cuSt .cu-head > .hint'),'الحد 5,000 ج · زيادة 2,174.50 ج');
  const st=await page.evaluate(()=>{const cs=e=>getComputedStyle(e),bal=document.querySelector('#cuSt .cu-bal'),send=document.querySelector('#cuSt button.cu-send'),head=document.querySelector('#cuSt .cu-head');
   return {bg:cs(bal).backgroundColor,fg:cs(bal).color,r:cs(bal).borderTopLeftRadius,font:cs(bal).fontFamily,sendBg:send?cs(send).backgroundColor:'',sendR:send?cs(send).borderTopLeftRadius:'',headR:cs(head).borderTopLeftRadius,sheen:cs(bal,'::before').animationName}});
- assert.equal(st.bg,'rgb(6, 111, 116)','the green by day');assert.ok(parseFloat(st.r)<=24,'a quiet corner: '+st.r);assert.match(st.font,/Readex Pro/);
+ assert.equal(st.bg,'rgb(192, 82, 42)','the calm orange by day');assert.ok(parseFloat(st.r)<=24,'a quiet corner: '+st.r);assert.match(st.font,/Readex Pro/);
  assert.ok(contrast(st.fg,st.bg)>=3,'the big balance reads on the dark capsule (large text): '+st.fg+' on '+st.bg);
  assert.ok(parseFloat(st.headR)<=28,'a quiet head: '+st.headR);
  if(st.sendBg){assert.notEqual(st.sendBg,'rgb(31, 168, 85)','no WhatsApp green: the main button is the bot\'s color');assert.equal(st.sendR,'999px');}
@@ -62,7 +62,7 @@ run('Customers look: night — the rows, the mark and the dark capsule stay read
  assert.ok(contrast(n.amtFg,n.row)>=4.5,'the amount reads at night: '+n.amtFg+' on '+n.row);
  await page.click('#cuRows [data-cu="101"]');await page.waitForSelector('#cuSt:not(.hidden) .cu-bal');
  const s=await page.evaluate(()=>{const b=document.querySelector('#cuSt .cu-bal'),cs=getComputedStyle(b);return {fg:cs.color,bg:cs.backgroundColor}});
- assert.equal(s.bg,'rgb(6, 111, 116)');
+ assert.equal(s.bg,'rgb(192, 82, 42)');
  assert.ok(contrast(s.fg,s.bg)>=3,'the balance reads at night: '+s.fg);
 },{home:true});
 

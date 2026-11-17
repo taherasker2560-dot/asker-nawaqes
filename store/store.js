@@ -624,8 +624,8 @@
       const txt = dataAgeText(data && data[0] && data[0].data_at);
       document.querySelectorAll('.data-age').forEach((el) => {
         if (!txt) { el.hidden = true; return; }
-        el.innerHTML = '<span>الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:</span> <bdi></bdi><span>. ممكن يكون صنف خلص بعده.</span>';
-        el.querySelector('bdi').textContent = txt;
+        el.innerHTML = '<span>الأصناف المتاحة حسب آخر بيع اتسجل في الصيدلية:</span> <bdi></bdi> <span>ممكن يكون صنف خلص بعده.</span>';
+        el.querySelector('bdi').textContent = txt + '.'; // the full stop stays with the time (at a line's start it would hang alone)
         el.hidden = false;
       });
       // the footer's old «every few hours» line gives way to the real time

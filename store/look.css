@@ -4,10 +4,10 @@
    Taking its <link> out of store.html brings the old look back. Colors: «أزرق عسكر» from the round logo; the night look follows
    the phone's dark mode. */
 :root {
-  --accent: #cf4014;
-  --accent-deep: #06306e;
-  --accent-soft: #e6edf9;
-  --glow: 10, 74, 166;
+  --accent: #c0522a;
+  --accent-deep: #8a3b1e;
+  --accent-soft: #f9efeb;
+  --glow: 192, 82, 42;
   --bg: #f3f6fc;
   --card: #ffffff;
   --ink: #131a27;
@@ -30,10 +30,10 @@ html.night {
   --muted: #9aa3b5;
   --line: rgba(255, 255, 255, 0.09);
   --field: rgba(255, 255, 255, 0.05);
-  --ok-bg: rgba(52, 168, 110, 0.16);
-  --ok: #7fd3a6;
-  --order-bg: rgba(230, 160, 60, 0.16);
-  --order: #f0b45c;
+  --ok-bg: rgba(var(--glow), 0.16);
+  --ok: var(--accent-text);
+  --order-bg: rgba(255, 255, 255, 0.06);
+  --order: var(--muted);
   --out-bg: rgba(255, 255, 255, 0.08);
   --out: #b7bfcc;
   --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -94,7 +94,7 @@ body::before {
   color: #fff;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
-.cart-n { background: #f97316; box-shadow: 0 0 0 2px #fff; }
+.cart-n { background: var(--accent); box-shadow: 0 0 0 2px #fff; }
 .tabbar .cart-n { box-shadow: none; }
 
 /* the search floats on the header's edge */

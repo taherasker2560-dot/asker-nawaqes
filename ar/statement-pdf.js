@@ -127,7 +127,7 @@
   // ---------- drawing the pages (A4 at 150 dpi) ----------
   const PW = 1240, PH = 1754, M = 70, FONT = '"IBM Plex Sans Arabic", system-ui, sans-serif';
   // 2026-11-16: the paper follows the new look (the orange of the bot and the warm brown), the navy and the blue are gone; the names stayed
-  const BLUE = '#cf4014', NAVY = '#3a2018', GREY = '#6b7280', LINE = '#e3e7ef', RED = '#c41a30', GREEN = '#1b7f3b', AMBER = '#a35d00';
+  const BLUE = '#c0522a', NAVY = '#3a2018', GREY = '#6b7280', LINE = '#e3e7ef', RED = '#c41a30', GREEN = '#86391d', AMBER = '#7a6f68'; // 2026-11-17: ONE brand color, the calm orange (BLUE = its main, GREEN = its ink for money received, AMBER = a quiet warm gray for returns); the names are old
   const AR = /[؀-ۿ]/;
   const L = M, R = PW - M;
   // an item's row: 34 px, or 70 px when the item has a picture (owner 2026-11-16: the items' pictures in the statement); the picture is 62 px (about 1 cm on the A4 page)
