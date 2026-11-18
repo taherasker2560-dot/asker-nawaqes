@@ -465,8 +465,8 @@
     html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
     // «⏰ منبه الدوا» (2026-11-17, store/alarm.js): the customer's own dose reminders, kept on his phone
     html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
-    // «📋 ابعت الروشتة» (2026-11-18, owner: «مكان مخصص للعميل يبعت الروشتة على الصفحة عشان القراءة الأوتوماتيك»; WhatsApp later): a page of its own that sends the photos as an order the pharmacy reads (nothing in the pharmacy's look)
-    const rxTile = root.AskerStoreRx && !pharmacyPhone ? root.AskerStoreRx.tileHtml() : '';
+    // «📋 ابعت الروشتة» (2026-11-18, owner: «مكان مخصص للعميل يبعت الروشتة على الصفحة عشان القراءة الأوتوماتيك»; WhatsApp later): a page of its own that sends the photos as an order the pharmacy reads (in the pharmacy's look it shows too, but sends nothing)
+    const rxTile = root.AskerStoreRx ? root.AskerStoreRx.tileHtml() : '';
     html += rxTile ? `<div class="ac-al-wrap">${rxTile}</div>` : '';
     // «📝 شكوى أو اقتراح» (2026-11-18, owner: «رابط يوصل لرسائل الصفحة بالشكاوى والمقترحات … فويس أو مكتوبة»): the messages page, opened as a complaint / suggestion
     html += root.AskerStoreChat ? `<div class="ac-al-wrap"><a href="#chat" class="ac-reg-btn ac-fb-tile" data-ac-feedback><b>${esc(TEXTS.feedback)}</b><small>${esc(TEXTS.feedbackHint)}</small></a></div>` : '';

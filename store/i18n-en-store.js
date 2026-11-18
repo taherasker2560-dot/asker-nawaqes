@@ -605,6 +605,7 @@ window.AskerEN = {
   "وصلتنا الروشتة ✓": "We got your prescription ✓",
   "هنقراها ونكلمك بالأسعار على واتساب. هتلاقيها في «طلباتي» كمان.": "We'll read it and call you with prices on WhatsApp. You'll find it in “My orders” too.",
   "ابعت روشتة تانية": "Send another prescription",
+  "ده شكل الصفحة زي ما العميل بيشوفها. الإرسال من موبايل الصيدلية مش شغال.": "This is the page as the customer sees it. Sending from the pharmacy's phone is off.",
   "أهلاً يا {0} · حساب {1}": "Hi {0} · {1}'s account",
   "أهلاً يا {0}": "Hi {0}",
   "ده حساب {0}. تقدر تطلب، وتشوف مشترياتك وأدويتك، وتظبط منبهك.": "This is {0}'s account. You can order, see your purchases and medicines, and set your alarm.",

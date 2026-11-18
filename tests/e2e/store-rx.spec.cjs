@@ -47,7 +47,7 @@ run('Prescription: a tile on his account opens a page of its own; photos, his nu
  await page.waitForSelector('#ordersList .order');assert.match(await text(page,'#ordersList'),/طلب بالروشتة/);
 },{home:true});
 
-run('Prescription: the phone number is checked, a failing server shows its words, and the pharmacy\'s own phone (the owner\'s look) has no such tile',async({page,base})=>{
+run('Prescription: the phone number is checked, a failing server shows its words, and the pharmacy\'s own phone (the owner\'s look) shows the tile but sends nothing',async({page,base})=>{
  await setup(page);
  await open(page,base,'.ac-rx-tile');
  await page.click('.ac-rx-tile');await page.waitForSelector('#rxSheet');
@@ -60,7 +60,11 @@ run('Prescription: the phone number is checked, a failing server shows its words
  // the owner's look: nothing to send from there
  await page.evaluate(()=>{localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}');sessionStorage.clear();localStorage.removeItem('asker_store_customer')});
  await page.goto(base+'store.html?look=1#me='+TOK);await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
- assert.equal(await page.$('.ac-rx-tile'),null);assert.ok(await page.$('.ac-fb-tile'));
+ assert.ok(await page.$('.ac-rx-tile'),'he sees what the customer sees');assert.ok(await page.$('.ac-fb-tile'));
+ await page.click('.ac-rx-tile');await page.waitForSelector('#rxSheet');await page.setInputFiles('#rxsFile',[png(1)]);await page.waitForSelector('#rxSheet .rx-thumb');
+ await page.click('[data-rxs-send]');await page.waitForSelector('#rxSheet .al-warn');
+ assert.equal(await text(page,'#rxSheet .al-warn'),'ده شكل الصفحة زي ما العميل بيشوفها. الإرسال من موبايل الصيدلية مش شغال.');
+ assert.equal(await page.evaluate(()=>(window.__tables.ar_store_orders||[]).length),0,'nothing was sent');assert.equal(await page.evaluate(()=>Object.keys(window.__storage).filter(k=>k.startsWith('rx/')).length),0,'and nothing uploaded');
  await page.evaluate(()=>localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token'));
 },{home:true});
 

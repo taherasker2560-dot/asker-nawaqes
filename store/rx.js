@@ -3,7 +3,7 @@
    A page of its own (the same look as the regular-items and alarm pages): photos (camera or gallery, 4 at most, a PDF too), his number, an optional note, one big button. It goes as an ORDER with
    no items and the photos (the same upload and the same server function as the cart's prescription panel, store/store.js sendRx), so it reaches «طلبات الموقع» in the system with the photos, and the
    customer finds it in «طلباتي» as «طلب بالروشتة». Reading it automatically is the pharmacy's side; sending it by WhatsApp comes with the paid WhatsApp.
-   Never on the pharmacy's own phone (the owner's look at a customer's page): nothing could be sent from there by mistake. Loaded before store/account.js, which draws the tile. */
+   On the pharmacy's own phone (the owner's look at a customer's page) the tile and the page show like everything else there, and nothing is sent from there by mistake. Loaded before store/account.js, which draws the tile. */
 (function (root) {
   'use strict';
   const TEXTS = {
@@ -27,6 +27,7 @@
     doneMore: 'هنقراها ونكلمك بالأسعار على واتساب. هتلاقيها في «طلباتي» كمان.',
     ok: 'تمام',
     another: 'ابعت روشتة تانية',
+    lookOnly: 'ده شكل الصفحة زي ما العميل بيشوفها. الإرسال من موبايل الصيدلية مش شغال.',
   };
   const fill = (s, v) => String(s).replace(/\{(\w+)\}/g, (m, k) => (v && v[k] != null ? String(v[k]) : m));
   // the pure part: what to do with a picked list of files (at most 4; a PDF over 8 MB is refused, a big photo is shrunk later by the uploader)
@@ -55,7 +56,8 @@
   const MAX = () => (store() && store().MAX_RX) || 4;
   const MAXB = () => (store() && store().MAX_RX_BYTES) || 8 * 1024 * 1024;
 
-  const tileHtml = () => (pharmacy ? '' : `<button type="button" class="ac-reg-btn ac-rx-tile" data-rxs-open><b>${esc(TEXTS.tile)}</b><small>${esc(TEXTS.tileHint)}</small></button>`);
+  // (the owner's look at a customer's page shows it too, like everything he sees there: only the sending is off; his words 11-17: «لازم المعاينة تبيّن اللي العميل بيشوفه»)
+  const tileHtml = () => `<button type="button" class="ac-reg-btn ac-rx-tile" data-rxs-open><b>${esc(TEXTS.tile)}</b><small>${esc(TEXTS.tileHint)}</small></button>`;
   // his saved number: the account's own (the owner of the account), else the one typed on this phone before
   function savedPhone() {
     let p = '';
@@ -93,7 +95,6 @@
     if (root.AskerI18n && root.AskerI18n.lang && root.AskerI18n.lang() === 'en') [ph, nt].forEach((x) => { if (x && x.placeholder && /[؀-ۿ]/.test(x.placeholder)) x.placeholder = root.AskerI18n.translate(x.placeholder); });
   }
   function open() {
-    if (pharmacy) return;
     Object.assign(st, { view: true, files: [], urls: [], phone: savedPhone(), note: '', busy: false, error: '', done: null });
     try { history.pushState({ asRx: 1 }, '', location.href); } catch (e) { /* the close button still works */ }
     draw();
@@ -113,6 +114,7 @@
   async function send() {
     if (st.busy) return;
     const S = store(), L = lib();
+    if (pharmacy) { st.error = TEXTS.lookOnly; draw(); return; }   // the pharmacy's own phone: nothing is sent from a look at a customer's page
     if (!st.files.length) { st.error = TEXTS.needPhoto; draw(); return; }
     if (!S || !S.sendRx) return;
     st.busy = true; st.error = ''; draw();
