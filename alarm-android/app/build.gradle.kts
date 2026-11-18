@@ -13,8 +13,8 @@ android {
         minSdk = 27
         // 34, not 35: from 35 the system draws the page under the status and navigation bars
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
     }
 
     // one signing key for every build (made once and kept in the build's cache), so a new build updates the old one in place;

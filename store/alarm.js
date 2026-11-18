@@ -284,7 +284,7 @@
     const attempt = (n) => {
       try {
         const u = new root.SpeechSynthesisUtterance(text), v = n === 0 ? arabicVoice() : null;
-        u.lang = n === 0 ? (v ? v.lang : 'ar-EG') : n === 1 ? 'ar' : ''; if (v) u.voice = v; u.rate = 0.9; u.volume = 1;
+        u.lang = n === 0 ? (v ? v.lang : 'ar-EG') : n === 1 ? 'ar' : ''; if (v) u.voice = v; u.rate = 0.8; u.volume = 1;
         let started = false, handled = false, timer = null;
         const t0 = Date.now();
         const next = (code) => { if (handled) return; handled = true; clearTimeout(timer); if (n < 2) attempt(n + 1); else report({ ok: false, code }); };
@@ -465,7 +465,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118i'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118j'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
