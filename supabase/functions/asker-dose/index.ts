@@ -46,15 +46,103 @@ export function cairoMinute(now: Date): { hhmm: string; day: string } {
   return { hhmm: `${p.hour}:${p.minute}`, day: `${p.year}-${p.month}-${p.day}` };
 }
 
+// ---- the voice of the alarm (owner 2026-11-18: «زرار جرب الصوت من عند العميل ما بيشتغلش»; the phone's own text-to-speech did not speak on his customer's phone) ----
+//   POST {action:'voice', name}  -> the WAV of «ميعاد <name> الآن، خدمة مقدمة من صيدلية عسكر» (the sentence is built HERE from the name: this is not a general text-to-speech door),
+//   spoken by Gemini's speech model (the one asker-voice uses for «آدم»). Every sentence is made once: the file is kept in the private bucket ar-dose-voice (made on first use) under the hash of
+//   the sentence, so the same medicine costs one call for everybody and answers at once afterwards. Limits: a name of at most 40 letters; 150 NEW sentences a day for everyone; 30 an hour for one address.
+//   The answer is `application/octet-stream` so supabase-js hands the page a Blob. The phone keeps it in its own cache, ready for the alarm.
+export const BUCKET = 'ar-dose-voice', MAX_NAME = 40, VOICE_DAILY = 150, VOICE_HOURLY_PER_IP = 30, DEFAULT_VOICE = 'Charon', TEMPERATURE = 0.4;
+const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
+export const FALLBACK_MODELS = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview'];
+const GEMINI_TIMEOUT_MS = 40000;
+export function voiceSentence(name: unknown): string | null {
+  if (typeof name !== 'string') return null;
+  const n = name.replace(/[^؀-ۿa-zA-Z0-9\s.+\-]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (n.length < 1 || n.length > MAX_NAME || !/[؀-ۿa-zA-Z]/.test(n)) return null;
+  return `ميعاد ${n} الآن، خدمة مقدمة من صيدلية عسكر`;
+}
+// raw 16-bit mono PCM -> a WAV file the phone's player opens
+export function wav(pcm: Uint8Array, rate = 24000): Uint8Array {
+  const h = new DataView(new ArrayBuffer(44));
+  const w = (o: number, s: string) => { for (let i = 0; i < s.length; i++) h.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); h.setUint32(4, 36 + pcm.length, true); w(8, 'WAVE'); w(12, 'fmt ');
+  h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 1, true); h.setUint32(24, rate, true);
+  h.setUint32(28, rate * 2, true); h.setUint16(32, 2, true); h.setUint16(34, 16, true); w(36, 'data'); h.setUint32(40, pcm.length, true);
+  const out = new Uint8Array(44 + pcm.length);
+  out.set(new Uint8Array(h.buffer), 0); out.set(pcm, 44);
+  return out;
+}
+const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const sha256hex = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', enc(s)))).map((x) => x.toString(16).padStart(2, '0')).join('');
+// best effort, per running copy of the function: one address may start at most VOICE_HOURLY_PER_IP new sentences an hour
+const seenIp = new Map<string, number[]>();
+function tooManyFromIp(ip: string, now: number): boolean {
+  const list = (seenIp.get(ip) || []).filter((t) => now - t < 3600000);
+  list.push(now);
+  seenIp.set(ip, list);
+  if (seenIp.size > 200) for (const k of seenIp.keys()) { if (k !== ip) seenIp.delete(k); }
+  return list.length > VOICE_HOURLY_PER_IP;
+}
+async function voice(body: { name?: unknown }, headers: Record<string, string>, req: Request, env: Env, fetchImpl: typeof fetch, now: Date): Promise<Response> {
+  if (!env.GEMINI_API_KEY) return reply(503, { error: 'not-configured' }, headers);
+  const sentence = voiceSentence(body.name);
+  if (!sentence) return reply(400, { error: 'name' }, headers);
+  const base = String(env.SUPABASE_URL).replace(/\/$/, ''), sh = serviceHeaders(env.SUPABASE_SERVICE_ROLE_KEY || '');
+  const voiceName = (env.DOSE_VOICE || DEFAULT_VOICE).trim(), model = (env.GEMINI_TTS_MODEL || DEFAULT_MODEL).trim();
+  const file = `${(await sha256hex(sentence + '|' + voiceName)).slice(0, 40)}.wav`;
+  const out = (bytes: ArrayBuffer | Uint8Array, how: string) => new Response(bytes, { status: 200, headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Cache-Control': 'public, max-age=86400', 'X-Voice': how } });
+  // 1) made before: the same bytes for everybody
+  const hit = await fetchImpl(`${base}/storage/v1/object/authenticated/${BUCKET}/${file}`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+  if (hit && hit.ok) { const bytes = await hit.arrayBuffer(); if (bytes.byteLength > 44) return out(bytes, 'cache'); }
+  // 2) a new one: the limits (this is what the Gemini quota pays for)
+  const ip = String(req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown').split(',')[0].trim();
+  if (tooManyFromIp(ip, now.getTime())) return reply(429, { error: 'rate' }, headers);
+  const ls = await fetchImpl(`${base}/storage/v1/object/list/${BUCKET}`, { method: 'POST', headers: { ...sh, 'Content-Type': 'application/json' }, body: JSON.stringify({ prefix: '', limit: 1000, sortBy: { column: 'created_at', order: 'desc' } }), signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+  const listed = ls && ls.ok ? await ls.json().catch(() => []) : [];
+  const today = Array.isArray(listed) ? listed.filter((o: { created_at?: string }) => o && o.created_at && now.getTime() - Date.parse(o.created_at) < 86400000).length : 0;
+  if (today >= VOICE_DAILY) return reply(429, { error: 'busy' }, headers);
+  // 3) Gemini (every speech model has its own daily quota: the next one is tried when one is out of quota or down)
+  let g: Response | null = null, why = '';
+  for (const m of [model, ...FALLBACK_MODELS.filter((x) => x !== model)]) {
+    g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+      body: JSON.stringify({ contents: [{ parts: [{ text: sentence }] }], generationConfig: { responseModalities: ['AUDIO'], temperature: TEMPERATURE, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } }),
+    }).catch(() => null);
+    if (g && g.status !== 429 && g.status < 500) break;
+    if (g) why = (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+  }
+  if (!g) return reply(504, { error: 'gemini-timeout' }, headers);
+  if (g.status === 429) return reply(429, { error: 'gemini-busy' }, headers);
+  if (g.status >= 500) { console.log('asker-dose voice gemini', g.status, why); return reply(502, { error: 'gemini', status: g.status }, headers); }
+  const j = g.ok ? await g.json().catch(() => null) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] } | null : null;
+  const part = j?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+  if (!part?.inlineData?.data) { console.log('asker-dose voice gemini no audio', g.status); return reply(502, { error: 'gemini', status: g.status }, headers); }
+  const rate = Number(/rate=(\d{4,6})/.exec(String(part.inlineData.mimeType || ''))?.[1] || 24000);
+  const pcm = unb64(part.inlineData.data);
+  if (pcm.length < 2000) return reply(502, { error: 'empty' }, headers);
+  const bytes = wav(pcm, rate);
+  // 4) kept for everybody (the bucket is made on first use); a failure to keep it never loses this answer
+  const put = () => fetchImpl(`${base}/storage/v1/object/${BUCKET}/${file}`, { method: 'POST', headers: { ...sh, 'Content-Type': 'audio/wav', 'x-upsert': 'true' }, body: bytes, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+  let up = await put();
+  if (up && !up.ok && (up.status === 404 || up.status === 400)) {
+    await fetchImpl(`${base}/storage/v1/bucket`, { method: 'POST', headers: { ...sh, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: BUCKET, name: BUCKET, public: false }), signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+    up = await put();
+  }
+  if (!up || !up.ok) console.log('asker-dose voice keep', up ? up.status : 'none');
+  return out(bytes, 'new');
+}
+
 export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, now: Date = new Date()): Promise<Response> {
   const headers = cors(req.headers.get('origin'), env, req.headers.get('access-control-request-headers'));
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
   if (req.method !== 'POST') return reply(405, { error: 'method' }, headers);
   if (!headers['Access-Control-Allow-Origin']) return reply(403, { error: 'origin' }, headers);
   const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
-  if (!env.SUPABASE_URL || !service || !env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
-  let body: { action?: unknown };
+  if (!env.SUPABASE_URL || !service) return reply(503, { error: 'not-configured' }, headers);
+  let body: { action?: unknown; name?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body' }, headers); }
+  if (body.action === 'voice') return voice(body, headers, req, env, fetchImpl, now);
+  if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
   if (body.action !== 'tick') return reply(400, { error: 'action' }, headers);
   const base = env.SUPABASE_URL.replace(/\/$/, ''), sh = serviceHeaders(service);
   const call = (path: string, init: RequestInit = {}) => fetchImpl(base + path, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });

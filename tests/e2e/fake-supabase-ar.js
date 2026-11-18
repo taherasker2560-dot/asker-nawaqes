@@ -25,6 +25,8 @@ function builder(table){let filters=[],op='select',payload=null,opts={},range=nu
 const catalog=[{id:'1',name:'BRUFEN 400'},{id:'2',name:'سليسبت 500'},{id:'3',name:'JANUVIA 50MG 28TAB'},{id:'4',name:'JANUVIA 100MG 28TAB'}];
 window.__invokes=[];
 const functions={invoke:async(name,{body})=>{
+ // a spec's own answer for a function (window.__fakeInvokes[name](body) → {data, error}), set before the page's scripts run
+ if(window.__fakeInvokes&&window.__fakeInvokes[name]){window.__invokes.push(name+':'+(body&&body.action));return await window.__fakeInvokes[name](body)}
  // a warehouse's messages page → «الوارد» (arabic-shortages ?chat=1, migration 202611141400): each message once, via 'link'
  if(name==='arabic-shortages?chat=1'){window.__invokes.push('chatinbox');const c=(tables.ar_chats||[]).find(x=>x.secret===body.secret);if(!c||!c.supplier)return {data:{ok:false,error:'not-supplier'},error:null};
   // two a call, like the real one's few a call: the page asks again while some are left

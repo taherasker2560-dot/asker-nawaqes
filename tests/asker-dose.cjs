@@ -61,5 +61,82 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.equal((await F.handle(req({ action: 'save' }), env, fake(), now)).status, 400);
   assert.equal((await F.handle(req({ action: 'tick' }), { ...env, VAPID_PRIVATE_JWK: '' }, fake(), now)).status, 503);
   assert.equal((await F.handle(new Request('https://p.supabase.co/x', { method: 'OPTIONS', headers: { origin: ORIGIN } }), env, fake(), now)).status, 200);
+
+  // ---- the voice of the alarm (2026-11-18): «ميعاد <الاسم> الآن، خدمة مقدمة من صيدلية عسكر» spoken by Gemini, made once per sentence, kept in a private bucket ----
+  assert.equal(F.voiceSentence('فيموجيسال ق'), 'ميعاد فيموجيسال ق الآن، خدمة مقدمة من صيدلية عسكر');
+  assert.equal(F.voiceSentence('  Panadol   500 mg '), 'ميعاد Panadol 500 mg الآن، خدمة مقدمة من صيدلية عسكر');
+  assert.equal(F.voiceSentence('دوا<script>x</script>'), 'ميعاد دوا script x script الآن، خدمة مقدمة من صيدلية عسكر', 'no markup survives: only letters, digits and a few marks');
+  for (const bad of ['', '   ', '123', '...', null, undefined, 5, {}, 'ا'.repeat(41)]) assert.equal(F.voiceSentence(bad), null, String(bad));
+  assert.equal(F.voiceSentence('ا'.repeat(40)).length > 40, true, 'forty letters are allowed');
+  const pcm = new Uint8Array(4000).map((_, i) => i % 251), w = F.wav(pcm, 24000);
+  assert.equal(Buffer.from(w.subarray(0, 4)).toString(), 'RIFF'); assert.equal(Buffer.from(w.subarray(8, 12)).toString(), 'WAVE'); assert.equal(w.length, 44 + 4000);
+  assert.equal(new DataView(w.buffer).getUint32(24, true), 24000, 'the rate is in the header');
+  const vreq = (body, o = {}) => new Request('https://p.supabase.co/functions/v1/asker-dose', { method: 'POST', headers: { 'content-type': 'application/json', origin: o.origin || ORIGIN, 'cf-connecting-ip': o.ip || '10.0.0.1' }, body: JSON.stringify(body) });
+  const venv = { ...env, GEMINI_API_KEY: 'g-key' };
+  const geminiOk = () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: Buffer.from(new Uint8Array(6000).fill(7)).toString('base64') } }] } }] }));
+  function vfake({ stored = null, listed = [], gemini = [geminiOk], bucketMissing = false } = {}) {
+    const calls = [], puts = [], gem = [], made = { bucket: 0 };
+    let queue = gemini.slice(), missing = bucketMissing;
+    const f = async (url, o = {}) => {
+      calls.push(url); const u = new URL(url);
+      if (u.pathname.startsWith('/storage/v1/object/authenticated/')) return stored ? new Response(stored) : new Response('{}', { status: 404 });
+      if (u.pathname.startsWith('/storage/v1/object/list/')) return new Response(JSON.stringify(listed));
+      if (u.pathname === '/storage/v1/bucket') { made.bucket++; missing = false; return new Response('{}', { status: 200 }); }
+      if (u.pathname.startsWith('/storage/v1/object/ar-dose-voice/')) { if (missing) return new Response('{"message":"Bucket not found"}', { status: 404 }); puts.push({ url, o }); return new Response('{}', { status: 200 }); }
+      if (u.hostname === 'generativelanguage.googleapis.com') { gem.push({ url, o }); const n = queue.length > 1 ? queue.shift() : queue[0]; return n(); }
+      throw Error('unexpected ' + url);
+    };
+    return Object.assign(f, { calls, puts, gem, made });
+  }
+  // a sentence made before: the same bytes for everybody, no Gemini
+  let vf = vfake({ stored: new Uint8Array(w) });
+  r = await F.handle(vreq({ action: 'voice', name: 'فيموجيسال ق' }, { ip: '10.0.1.1' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(r.headers.get('content-type'), 'application/octet-stream', 'a Blob for supabase-js'); assert.equal(r.headers.get('x-voice'), 'cache');
+  assert.equal(Buffer.from(await r.arrayBuffer()).length, 44 + 4000); assert.equal(vf.gem.length, 0);
+  assert.equal(r.headers.get('access-control-allow-origin'), ORIGIN);
+  // a new one: Gemini says the whole sentence in the chosen voice, the file is kept, the answer is the WAV
+  vf = vfake();
+  r = await F.handle(vreq({ action: 'voice', name: 'فيموجيسال ق' }, { ip: '10.0.1.2' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(r.headers.get('x-voice'), 'new');
+  const got = Buffer.from(await r.arrayBuffer()); assert.equal(got.subarray(0, 4).toString(), 'RIFF'); assert.equal(got.length, 44 + 6000);
+  assert.equal(vf.gem.length, 1); const gb = JSON.parse(vf.gem[0].o.body);
+  assert.equal(gb.contents[0].parts[0].text, 'ميعاد فيموجيسال ق الآن، خدمة مقدمة من صيدلية عسكر'); assert.equal(gb.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Charon');
+  assert.ok(vf.gem[0].url.includes('gemini-2.5-flash-preview-tts')); assert.equal(vf.gem[0].o.headers['x-goog-api-key'], 'g-key');
+  assert.equal(vf.puts.length, 1); assert.equal(vf.puts[0].o.headers['x-upsert'], 'true'); assert.equal(vf.puts[0].o.headers['Content-Type'], 'audio/wav'); assert.match(vf.puts[0].url, /\/ar-dose-voice\/[0-9a-f]{40}\.wav$/);
+  // the same sentence maps to the same file; another voice or another sentence to another
+  const f1 = vf.puts[0].url; vf = vfake(); await F.handle(vreq({ action: 'voice', name: 'فيموجيسال ق' }, { ip: '10.0.1.3' }), venv, vf, now); assert.equal(vf.puts[0].url, f1);
+  vf = vfake(); await F.handle(vreq({ action: 'voice', name: 'بنادول' }, { ip: '10.0.1.3' }), venv, vf, now); assert.notEqual(vf.puts[0].url, f1);
+  vf = vfake(); await F.handle(vreq({ action: 'voice', name: 'فيموجيسال ق' }, { ip: '10.0.1.3' }), { ...venv, DOSE_VOICE: 'Kore' }, vf, now); assert.notEqual(vf.puts[0].url, f1); assert.equal(JSON.parse(vf.gem[0].o.body).generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Kore');
+  // the bucket is made on first use
+  vf = vfake({ bucketMissing: true }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.1.4' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.made.bucket, 1); assert.equal(vf.puts.length, 1, 'kept after the bucket was made');
+  // a failure to KEEP the file never loses the answer
+  vf = vfake({ bucketMissing: true }); const keepFail = async (url, o) => (new URL(url).pathname.startsWith('/storage/v1/object/ar-dose-voice/') ? new Response('{}', { status: 500 }) : vf(url, o));
+  r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.1.5' }), venv, keepFail, now); assert.equal(r.status, 200);
+  // the daily limit: 150 new sentences in 24 hours for everybody, none made past it (a cached one still answers)
+  const recent = Array.from({ length: 150 }, (_, i) => ({ name: i + '.wav', created_at: new Date(now.getTime() - 3600000).toISOString() }));
+  vf = vfake({ listed: recent }); r = await F.handle(vreq({ action: 'voice', name: 'جديد' }, { ip: '10.0.1.6' }), venv, vf, now);
+  assert.equal(r.status, 429); assert.deepEqual(await r.json(), { error: 'busy' }); assert.equal(vf.gem.length, 0);
+  const old = Array.from({ length: 150 }, (_, i) => ({ name: i + '.wav', created_at: new Date(now.getTime() - 2 * 86400000).toISOString() }));
+  vf = vfake({ listed: old }); r = await F.handle(vreq({ action: 'voice', name: 'جديد' }, { ip: '10.0.1.7' }), venv, vf, now); assert.equal(r.status, 200, 'files older than a day do not count');
+  vf = vfake({ listed: recent, stored: new Uint8Array(w) }); r = await F.handle(vreq({ action: 'voice', name: 'جديد' }, { ip: '10.0.1.8' }), venv, vf, now); assert.equal(r.status, 200, 'a kept sentence is free');
+  // one address: 30 new sentences an hour
+  let last; for (let i = 0; i < 31; i++) last = await F.handle(vreq({ action: 'voice', name: 'دوا' + 'ا'.repeat(i % 20) + String.fromCharCode(0x0621 + (i % 28)) }, { ip: '10.9.9.9' }), venv, vfake(), now);
+  assert.equal(last.status, 429, 'the 31st new sentence from one address is refused'); assert.deepEqual(await last.json(), { error: 'rate' });
+  // a speech model out of quota: the next one is tried; all of them out: 429 for the page, which then uses the phone's own voice
+  vf = vfake({ gemini: [() => new Response('quota', { status: 429 }), geminiOk] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.2.1' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.gem.length, 2); assert.ok(vf.gem[1].url.includes('gemini-3.8-flash-lite-tts'));
+  vf = vfake({ gemini: [() => new Response('quota', { status: 429 })] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.2.2' }), venv, vf, now);
+  assert.equal(r.status, 429); assert.deepEqual(await r.json(), { error: 'gemini-busy' }); assert.equal(vf.puts.length, 0);
+  vf = vfake({ gemini: [() => new Response('boom', { status: 500 })] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.2.3' }), venv, vf, now); assert.equal(r.status, 502);
+  vf = vfake({ gemini: [() => new Response(JSON.stringify({ candidates: [] }))] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.2.4' }), venv, vf, now); assert.equal(r.status, 502, 'no audio in the answer');
+  vf = vfake({ gemini: [() => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;rate=24000', data: Buffer.from(new Uint8Array(100)).toString('base64') } }] } }] }))] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.2.5' }), venv, vf, now); assert.equal(r.status, 502, 'a few bytes are not a sentence');
+  // checks: the name, the origin, the key
+  assert.equal((await F.handle(vreq({ action: 'voice', name: '' }, { ip: '10.0.3.1' }), venv, vfake(), now)).status, 400);
+  assert.equal((await F.handle(vreq({ action: 'voice', name: 'x'.repeat(60) }, { ip: '10.0.3.1' }), venv, vfake(), now)).status, 400);
+  assert.equal((await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { origin: 'https://evil.example', ip: '10.0.3.2' }), venv, vfake(), now)).status, 403);
+  assert.equal((await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.3.3' }), env, vfake(), now)).status, 503, 'no Gemini key');
+  // the push side does not need the speech key, and the voice does not need the push keys
+  assert.equal((await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.3.4' }), { ...venv, VAPID_PRIVATE_JWK: '', VAPID_PUBLIC_KEY: '' }, vfake(), now)).status, 200);
   console.log('asker-dose ok');
 })().catch((e) => { console.error(e); process.exit(1); });

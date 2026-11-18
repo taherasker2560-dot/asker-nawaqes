@@ -352,3 +352,7 @@ body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(s
 .rxs-done h2 { margin: 6px 0 8px; font-size: 21px; color: var(--accent-text); }
 .rxs-sheet .rx-thumbs { margin-top: 10px; }
 .rxs-sheet textarea.al-name { resize: vertical; min-height: 64px; }
+
+/* ---- the alarm's voice check and the answers written under the buttons (owner 2026-11-18: a button that does nothing is the worst answer) ---- */
+.al-note { margin: 6px 0 0; padding: 7px 10px; background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
+.al-diag { margin: 8px 0 0; padding: 10px; max-height: 46vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); background: var(--soft-bg); color: var(--ink); font: 11.5px/1.6 ui-monospace, Menlo, Consolas, monospace; text-align: left; }

@@ -138,7 +138,10 @@ run('Dose alarm: a hidden page gets a phone notification, the voice can be switc
  // the voice test, and the switch: off = it rings without speaking
  await page.click('[data-al-open]');await page.waitForSelector('[data-al-try]');
  await page.click('[data-al-try]');
+ // (the answer comes after the server's voice was asked for and not there: the phone's own voice, and the answer is written under the button)
+ await page.waitForFunction(()=>window.__say.slice(-1)[0]==='ميعاد دواء تجريبي الآن، خدمة مقدمة من صيدلية عسكر');
  assert.deepEqual((await page.evaluate(()=>window.__say)).slice(-1),['ميعاد دواء تجريبي الآن، خدمة مقدمة من صيدلية عسكر']);
+ await page.waitForSelector('#alarmSheet .al-note');assert.equal(await text(page,'#alarmSheet .al-note'),'✓ اتنطق بصوت الموبايل');
  const before=(await page.evaluate(()=>window.__say)).length;
  await page.click('[data-al-speak]');assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.data().speak),false);
  await page.click('[data-al-try]');assert.equal((await page.evaluate(()=>window.__say)).length,before,'switched off: no voice');
@@ -261,7 +264,7 @@ run('Dose alarm stage 2: the pharmacy\'s own phone sends nothing; a ring opened 
  assert.equal((await page.evaluate(()=>window.__say)).slice(-1)[0],'ميعاد زانبرازان الآن، خدمة مقدمة من صيدلية عسكر');
  // and the button says it again
  const b2=(await page.evaluate(()=>window.__say)).length;await page.click('[data-al-hear]');
- assert.equal((await page.evaluate(()=>window.__say)).length,b2+1);
+ await page.waitForFunction(b=>window.__say.length===b+1,b2);
 },{home:true});
 
 run('Dose alarm: the alarms the PHARMACY set show on his phone marked «من الصيدلية», ring and speak like his own, he can switch them off but not change them, their times go to the push, a worker message wakes the page, «جرّب الإشعار» shows a real notification',async({page,base})=>{
@@ -361,4 +364,95 @@ run('Dose alarm: a hidden page does not use the alarm up; a tap on the dose noti
  await page.evaluate(()=>{window.__tries=[];speechSynthesis.speak=(u)=>{window.__tries.push(1);setTimeout(()=>u.onend&&u.onend(),0)}});
  await page.evaluate(()=>window.AskerStoreAlarm.doseOpened('dose'));await page.waitForSelector('#alarmRing .al-warn');
  assert.match(await text(page,'#alarmRing .al-warn'),/silent/);
+},{home:true});
+
+// ---- 2026-11-18 (a photo of the card, then «زرار جرّب الصوت من عند العميل برضو ما بيشتغلش … صخرة صلبة»): the phone's own speech engine stayed silent on his customer's phone, so the sentence is a sound
+// file made by the server, kept on the phone, and the engine is the second way; and every answer is written on the page ----
+const sentence=(n)=>`ميعاد ${n} الآن، خدمة مقدمة من صيدلية عسكر`;
+run('Dose alarm voice: the sentence comes from the server and is kept on the phone, plays at the dose time from that copy, a refused sound asks for a tap, a failing server falls back to the phone\'s voice',async({page,base})=>{
+ await setup(page,'granted');
+ await page.addInitScript(()=>{
+  window.__played=[];window.__playMode='ok';window.__server=localStorage.getItem('__server')||'ok';window.__voiceBodies=[];
+  window.__fakeInvokes={'asker-dose':async(b)=>{if(b&&b.action==='voice'){window.__voiceBodies.push(b.name);if(window.__server==='ok')return {data:new Blob([new Uint8Array(3000)],{type:'audio/wav'}),error:null};return {data:null,error:{message:'Edge Function returned a non-2xx status code',context:{status:429,clone(){return {json:async()=>({error:'busy'})}}}}}}return {data:null,error:{message:'bad'}}}};
+  const orig=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){if(!String(this.src).startsWith('blob:'))return orig.call(this);window.__played.push('blob:');if(window.__playMode==='deny'){window.__playMode='ok';return Promise.reject(Object.assign(new Error('blocked'),{name:'NotAllowedError'}))}setTimeout(()=>this.dispatchEvent(new Event('playing')),0);return Promise.resolve()};
+ });
+ await openAccount(page,base);
+ await page.evaluate(()=>{localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['08:00'],on:true}],snoozes:[]}))});
+ await page.reload();await page.waitForSelector('.ac-al-tile');
+ // 1. when the page opens it asks for the sentence once (the brand only, as it will be said) and keeps it on the phone
+ await page.waitForFunction(()=>window.__voiceBodies.length===1,null,{timeout:8000});
+ assert.deepEqual(await page.evaluate(()=>window.__voiceBodies),['فيموجيسال']);
+ await page.waitForFunction(async()=>{if(!window.caches)return true;return (await (await caches.open('asker-dose-voice-v1')).keys()).length===1},null,{timeout:5000});
+ // 2. the dose time: the sound plays from the phone's own copy; the phone's voice is not used and the server is not asked again
+ assert.equal(await tick(page,8,0),1);await page.waitForSelector('#alarmRing');
+ await page.waitForFunction(()=>window.__played.length===1);
+ assert.deepEqual(await page.evaluate(()=>window.__say),[],'the phone\'s own voice stays quiet');assert.equal(await page.evaluate(()=>window.__voiceBodies.length),1);
+ assert.equal(await page.evaluate(()=>window.__played[0]),'blob:');
+ await page.click('[data-al-took]');
+ // 3. the browser refuses the sound (no tap yet): the card asks for a tap, the big «اسمع الاسم» button comes first, and the tap plays it
+ await page.evaluate(()=>{window.__playMode='deny'});
+ assert.equal(await tick(page,8,0,18),1);await page.waitForSelector('#alarmRing .al-ring-hint');
+ assert.equal(await page.$eval('.al-ring-card .al-btn',e=>e.hasAttribute('data-al-hear')),true);
+ const p0=(await page.evaluate(()=>window.__played)).length;await page.click('[data-al-hear]');await page.waitForFunction(n=>window.__played.length===n+1,p0);
+ assert.deepEqual(await page.evaluate(()=>window.__say),[]);await page.click('[data-al-took]');
+ // 4. a medicine not on the phone yet and the server failing (busy): the phone's own voice says the same sentence
+ await page.evaluate(()=>{window.__server='fail';localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a2',name:'اوميز',say:'',times:['09:00'],on:true}],snoozes:[]}))});
+ assert.equal(await tick(page,9,0),1);await page.waitForSelector('#alarmRing');
+ await page.waitForFunction(()=>window.__say.length===1);assert.deepEqual(await page.evaluate(()=>window.__say),[sentence('اوميز')]);
+ await page.click('[data-al-took]');
+ // 5. the test button writes its answer under itself: the natural voice when the server answers, the phone's when not, and the reason when nothing speaks
+ await page.evaluate(()=>{window.__server='ok';window.__playMode='ok'});
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-try]');
+ await page.click('[data-al-try]');await page.waitForSelector('#alarmSheet .al-note');
+ await page.waitForFunction(()=>/الصوت الطبيعي/.test(document.querySelector('#alarmSheet .al-note').textContent));
+ assert.equal(await text(page,'#alarmSheet .al-note'),'✓ اتنطق بالصوت الطبيعي');
+ // (the sentence was kept on the phone by the first press: clear the phone's copy, make the server fail and the engine fail, and open the page again)
+ await page.evaluate(async()=>{localStorage.setItem('__server','fail');if(window.caches)await caches.delete('asker-dose-voice-v1')});
+ await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.evaluate(()=>{speechSynthesis.speak=(u)=>{setTimeout(()=>u.onerror&&u.onerror({error:'synthesis-failed'}),0)}});
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-try]');await page.click('[data-al-try]');
+ await page.waitForFunction(()=>/ما نطقش/.test(document.querySelector('#alarmSheet .al-note').textContent),null,{timeout:15000});
+ assert.match(await text(page,'#alarmSheet .al-note'),/ما نطقش\. دوس «🔍 فحص الصوت» وصوّر النتيجة\. \(synthesis-failed\)/);
+},{home:true});
+
+run('Dose alarm voice: «🔍 فحص الصوت» writes down what this phone has and what each way did, and copies it',async({page,base})=>{
+ await setup(page,'granted');
+ await page.addInitScript(()=>{
+  window.__fakeInvokes={'asker-dose':async(b)=>b&&b.action==='voice'?{data:new Blob([new Uint8Array(3000)],{type:'audio/wav'}),error:null}:{data:null,error:{message:'bad'}}};
+  const orig=HTMLMediaElement.prototype.play;window.__beepMode='ok';HTMLMediaElement.prototype.play=function(){if(!String(this.src).startsWith('blob:'))return orig.call(this);if(window.__beepMode==='deny')return Promise.reject(Object.assign(new Error('x'),{name:'NotAllowedError'}));setTimeout(()=>this.dispatchEvent(new Event('playing')),0);return Promise.resolve()};
+  Object.defineProperty(navigator,'clipboard',{value:{writeText:async(t)=>{window.__copied=t}},configurable:true});
+ });
+ await openAccount(page,base);
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-diag]');
+ await page.click('[data-al-diag]');
+ await page.waitForFunction(()=>/\ndone$/.test((document.querySelector('#alarmSheet .al-diag')||{}).textContent||''),null,{timeout:30000});
+ const d=await page.$eval('#alarmSheet .al-diag',e=>e.textContent);
+ assert.match(d,/^version: /m);assert.match(d,/^ua: /m);assert.match(d,/^active: /m);
+ assert.match(d,/beep \(audio element\): playing/);assert.match(d,/server voice: (server|cache) · \d+ bytes/);assert.match(d,/server voice play: playing/);
+ assert.match(d,/speechSynthesis: 1 voices · arabic: Arabic \(Egypt\) \[ar-EG/);
+ assert.match(d,/tts ar-EG voice: start/);assert.match(d,/tts ar: start/);assert.match(d,/tts default: start/);
+ await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{value:{writeText:async(t)=>{window.__copied=t}},configurable:true})});
+ await page.click('[data-al-diagcopy]');await page.waitForFunction(()=>!!window.__copied);
+ assert.equal(await page.evaluate(()=>window.__copied),d,'the copy is what is on the page');
+ await page.waitForFunction(()=>/اتنسخت/.test(document.querySelector('[data-al-diagcopy]').textContent));
+ // an engine that is not there at all and a sound that cannot play are written down too
+ await page.evaluate(()=>{window.__beepMode='deny';Object.defineProperty(window,'speechSynthesis',{configurable:true,value:undefined})});
+ await page.evaluate(()=>window.AskerStoreAlarm.runDiag());
+ const d2=await page.$eval('#alarmSheet .al-diag',e=>e.textContent);assert.match(d2,/beep \(audio element\): rejected NotAllowedError/);assert.match(d2,/speechSynthesis: none/);
+},{home:true});
+
+run('Dose alarm, the pharmacy\'s phone: a save says whether it reached the server, and the calls go through the owner\'s sign-in (the store\'s own client is a visitor\'s: the server answered 401 and nothing was said)',async({page,base})=>{
+ await setup(page,'granted');await seed(page);
+ await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
+ await page.setViewportSize({width:375,height:812});await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.click('[data-al-open]');await page.click('[data-al-new]');await page.click('[data-al-pick="0"]');await page.click('[data-al-save]');
+ await page.waitForSelector('#alarmSheet .al-note');assert.equal(await text(page,'#alarmSheet .al-note'),'✓ اتحفظ. هيظهر عند العميل أول ما يفتح صفحته.');
+ // the server refuses: the page says so (it used to say nothing)
+ await page.evaluate(()=>{window.__fakeRpcs.ar_customer_alarms_admin_set=()=>({ok:false,error:'forbidden'})});
+ await page.click('#alarmSheet .al-card:nth-of-type(1) [data-al-toggle]');await page.waitForSelector('#alarmSheet .al-warn');
+ assert.match(await text(page,'#alarmSheet .al-warn'),/ما اتحفظش على السيرفر: مفيش دخول للسيستم على الموبايل ده/);
+ // the guard: the owner's functions are never called on the visitor client
+ const src=await page.evaluate(()=>fetch('store/alarm.js').then(r=>r.text()));
+ assert.doesNotMatch(src,/\bclient\.rpc\('ar_customer_alarms_admin_/);assert.match(src,/adminClient\(\)\.rpc\('ar_customer_alarms_admin_get'/);assert.match(src,/c\.rpc\('ar_customer_alarms_admin_set'/);
+ const st=await page.evaluate(()=>fetch('store/store.js').then(r=>r.text()));assert.match(st,/createClient\(SUPABASE_URL, SUPABASE_KEY, \{ auth: \{ persistSession: false \} \}\)/,'(the store\'s client stays a visitor\'s: that is why the owner\'s calls need their own)');
 },{home:true});
