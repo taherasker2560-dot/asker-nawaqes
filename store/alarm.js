@@ -32,7 +32,7 @@
     title: 'منبه الدوا',
     newTitle: 'منبه جديد',
     editTitle: 'تعديل المنبه',
-    hint: 'اختار الدوا وحدد المواعيد، وعند الميعاد الموبايل بيقولك اسم الدوا بصوته. المواعيد محفوظة على موبايلك انت بس.',
+    hint: 'اختار الدوا وحدد المواعيد. عند الميعاد بيجيلك إشعار باسم الدوا، وبيتنطق الاسم لو الصفحة مفتوحة أو دوست على الإشعار. المواعيد محفوظة على موبايلك انت بس.',
     empty: 'لسه مفيش منبهات. دوس «＋ منبه جديد».',
     add: '＋ منبه جديد',
     speak: '🔊 ينطق اسم الدوا بصوت الموبايل',
@@ -50,6 +50,7 @@
     notifTestTitle: '🔔 تجربة منبه الدوا',
     notifTestBody: 'لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.',
     // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
+    getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل التطبيق:',
     getApp: '📲 نزّل تطبيق المنبه',
     getAppWhy: 'التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو الموبايل مقفول والمتصفح مقفول (المتصفح مش بيقدر يعمل كده).',
     getAppSteps: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها ارجع هنا واضغط الزرار تاني، هيفتح التطبيق بمنبهاتك.',
@@ -92,6 +93,16 @@
     triedFail: 'ما نطقش. دوس «🔍 فحص الصوت» وصوّر النتيجة.',
     diag: '🔍 فحص الصوت',
     diagBusy: 'بيفحص…',
+    dsBeepOk: '✓ الموبايل بيشغّل صوت من الصفحة',
+    dsBeepNo: '✗ الموبايل مش بيشغّل صوت من الصفحة (الصوت واطي أو على الصامت)',
+    dsServerOk: '✓ صوت الصيدلية الطبيعي وصل واشتغل',
+    dsServerNo: '✗ صوت الصيدلية الطبيعي ما وصلش (النت ضعيف؟)',
+    dsServerNoPlay: '✗ صوت الصيدلية الطبيعي وصل بس الموبايل ما شغّلوش',
+    dsTtsOk: '✓ صوت الموبايل العربي شغال',
+    dsTtsNone: '✗ الموبايل مفيهوش نطق خالص',
+    dsTtsNo: '✗ صوت الموبايل العربي مش شغال (إعدادات الموبايل ← تحويل النص إلى كلام)',
+    dsNote: 'ℹ️ الموقع بينطق وهو مفتوح بس. عشان ينطق والموبايل مقفول نزّل التطبيق (الزرار اللي فوق).',
+    dsDetails: 'تفاصيل فنية (للصيدلية)',
     diagCopy: '📋 انسخ النتيجة',
     diagCopied: 'اتنسخت ✓',
     // the pharmacy's own phone saving a customer's alarms (his sign-in as the owner is needed: without it the server refuses, and the page used to say nothing)
@@ -200,7 +211,7 @@
   const all = () => ({ ...data, items: data.items.concat(ph.items.map((x) => ({ ...x, ph: true, on: x.on !== false && !ph.off[x.id] }))) });
   let token = null, adminTimer = null;
   const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); prefetchVoices(); mirrorAlarms(); };
-  let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
+  let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
   const synth = () => (root.speechSynthesis && root.SpeechSynthesisUtterance ? root.speechSynthesis : null);
@@ -401,11 +412,11 @@
   }
   // «🔍 فحص الصوت»: writes down what this phone has and what each way did, so the reason is a fact on the screen (a photo of it is enough)
   async function runDiag() {
-    const L = [];
+    const L = [], R = { tts: [] };
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
-    diag = []; add('...');
+    diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118e'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118f'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -415,8 +426,8 @@
       for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.round(Math.sin(i / rate * 2 * Math.PI * 660) * 9000), true);
       const url = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })), a = new Audio(url);
       const r = await new Promise((ok) => { a.onplaying = () => ok('playing'); a.onerror = () => ok('error'); const p = a.play(); if (p && p.catch) p.catch((e) => ok('rejected ' + (e && e.name))); setTimeout(() => ok('no-event'), 3000); });
-      add('beep (audio element): ' + r); try { a.pause(); URL.revokeObjectURL(url); } catch (e) { /* done */ }
-    } catch (e) { add('beep: exception ' + String((e && e.message) || e).slice(0, 50)); }
+      R.beep = r; add('beep (audio element): ' + r); try { a.pause(); URL.revokeObjectURL(url); } catch (e) { /* done */ }
+    } catch (e) { R.beep = 'exception'; add('beep: exception ' + String((e && e.message) || e).slice(0, 50)); }
     // 2) the server's sentence
     try {
       const t0 = Date.now(), got = await voiceBlob(TRY_NAME, 20000);
@@ -424,12 +435,12 @@
         add('server voice: ' + got.from + ' · ' + got.blob.size + ' bytes · ' + (Date.now() - t0) + ' ms');
         const url = URL.createObjectURL(got.blob), a = new Audio(url);
         const r = await new Promise((ok) => { a.onplaying = () => ok('playing'); a.onerror = () => ok('error'); const p = a.play(); if (p && p.catch) p.catch((e) => ok('rejected ' + (e && e.name))); setTimeout(() => ok('no-event'), 4000); });
-        add('server voice play: ' + r); try { a.pause(); URL.revokeObjectURL(url); } catch (e) { /* done */ }
+        R.server = 'ok'; R.serverPlay = r; add('server voice play: ' + r); try { a.pause(); URL.revokeObjectURL(url); } catch (e) { /* done */ }
       } else add('server voice: FAILED ' + got.error);
     } catch (e) { add('server voice: exception ' + String((e && e.message) || e).slice(0, 50)); }
     // 3) the phone's own speech engine
     const s = synth();
-    if (!s) add('speechSynthesis: none');
+    if (!s) { R.noSynth = true; add('speechSynthesis: none'); }
     else {
       let vs = []; try { vs = s.getVoices() || []; } catch (e) { vs = []; }
       add('speechSynthesis: ' + vs.length + ' voices · arabic: ' + (vs.filter((x) => /^ar/i.test(x.lang)).map((x) => x.name + ' [' + x.lang + (x.localService ? ',local' : ',net') + ']').join('; ') || 'none'));
@@ -444,10 +455,17 @@
             s.speak(u); setTimeout(() => fin('timeout'), 4000);
           } catch (e) { ok('exception ' + String((e && e.message) || e).slice(0, 40)); }
         });
-        add('tts ' + label + ': ' + r);
+        R.tts.push(r); add('tts ' + label + ': ' + r);
         try { s.cancel(); } catch (e) { /* nothing */ }
       }
     }
+    // what a customer can read: one line per thing, ✓ or ✗ (the technical lines above stay folded for the pharmacy)
+    diagSum = [
+      R.beep === 'playing' ? TEXTS.dsBeepOk : TEXTS.dsBeepNo,
+      R.serverPlay === 'playing' ? TEXTS.dsServerOk : R.server === 'ok' ? TEXTS.dsServerNoPlay : TEXTS.dsServerNo,
+      R.tts.some((x) => /^start/.test(x)) ? TEXTS.dsTtsOk : R.noSynth ? TEXTS.dsTtsNone : TEXTS.dsTtsNo,
+    ];
+    if (isAndroidBrowser()) diagSum.push(TEXTS.dsNote);
     add('done');
   }  if (synth()) { try { root.speechSynthesis.addEventListener('voiceschanged', () => { voiceOk = !!arabicVoice(); if (view) draw(); }); voiceOk = !!arabicVoice(); } catch (e) { /* no voices event */ } }
 
@@ -671,15 +689,15 @@
     const appBox = A ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
       `<button type="button" class="al-line" data-al-apptest><span>${esc(TEXTS.appTest)}</span></button>` + appNeeds() + `<p class="rg-hint">${esc(TEXTS.appOn)}</p>` : '';
     // in the browser on an Android phone: one button, «افتح في التطبيق» if it is installed, else its download (the intent's fallback address), carrying his link and his alarms
-    const getApp = isAndroidBrowser() && !pharmacy ? `<div class="al-app"><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.getApp)}</span></a><p class="rg-hint">${esc(TEXTS.getAppWhy)}</p><p class="rg-hint">${esc(TEXTS.getAppSteps)}</p></div>` : '';
+    const getApp = isAndroidBrowser() && !pharmacy ? `<div class="al-app"><p class="al-app-head">${esc(TEXTS.getAppHead)}</p><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.getApp)}</span></a><p class="rg-hint">${esc(TEXTS.getAppWhy)}</p><p class="rg-hint">${esc(TEXTS.getAppSteps)}</p></div>` : '';
     const voice = A ? appBox : !pharmacy ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
       `<div class="al-line"><span>${esc(TEXTS.tryVoice.replace(/^▶\s*/, ''))}</span><button type="button" class="al-try" data-al-try>${esc(TEXTS.tryVoice)}</button></div>` +
       (voiceNote ? `<p class="rg-hint al-note" role="status">${esc(voiceNote)}</p>` : '') +
       (voiceOk === false ? `<p class="al-warn">${esc(TEXTS.noVoice)}</p>` : '') +
       `<div class="al-line"><span>${esc(diagBusy ? TEXTS.diagBusy : TEXTS.diag)}</span><button type="button" class="al-try" data-al-diag${diagBusy ? ' disabled' : ''}>${esc(diagBusy ? '…' : '▶')}</button></div>` +
-      (diag && diag.length ? `<pre class="al-diag notr" dir="ltr" translate="no">${esc(diag.join('\n'))}</pre><button type="button" class="al-line" data-al-diagcopy><span>${esc(diagCopied ? TEXTS.diagCopied : TEXTS.diagCopy)}</span></button>` : '') : '';
+      (diag && diag.length ? `${diagSum.length ? `<div class="al-diag-sum" role="status">${diagSum.map((x) => `<p>${esc(x)}</p>`).join('')}</div>` : ''}<details class="al-diag-more"><summary>${esc(TEXTS.dsDetails)}</summary><pre class="al-diag notr" dir="ltr" translate="no">${esc(diag.join('\n'))}</pre></details><button type="button" class="al-line" data-al-diagcopy><span>${esc(diagCopied ? TEXTS.diagCopied : TEXTS.diagCopy)}</span></button>` : '') : '';
     const note = pharmacy && adminNote ? `<p class="${adminNote === 'saved' ? 'rg-hint al-note' : 'al-warn'}" role="status">${esc(adminNote === 'saved' ? TEXTS.adminSaved : TEXTS.adminFail)}</p>` : '';
-    return `<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : A ? TEXTS.hintApp : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${getApp}${voice}${notif}` +
+    return `${getApp}<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : A ? TEXTS.hintApp : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
       (pharmacy || A ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
   }
   // the link of the button (an Android intent: link): opens the app with the customer's link (?me=) and the alarms he made here; with no app on the phone Chrome goes to the download instead
