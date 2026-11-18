@@ -64,12 +64,16 @@ const PROMO_LINES = [
   'افتح التطبيق دلوقتي... وسيب الباقي علينا.',
 ];
 export const PROMO_TEXT = PROMO_LINES.join(' ');
-export const PROMO_STYLE = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer: calm and unhurried, a little slower than normal speech, friendly and engaging but never loud or pushy, a clear short pause at every "...", and a gentle smile on the last line:';
-// A speech model sometimes answers 200 with NO sound (2026-11-18: the calmer style line + the stressed alarm line did, twice). The advert is made once and kept, so it may try again:
-// the same words once more, then the style line the owner first heard, then the first wording he heard (his samples); the kept file is named after the FIRST one.
-const PROMO_STYLE_FIRST = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer selling something people love: engaging and exciting but never shouting, a clear steady rhythm, a short pause at every "...", and a smile on the last line:';
+// The style line is an instruction in English and the speech model once READ IT OUT LOUD: the owner heard a strange English voice at the start of the advert (2026-11-18; the longer "calm and
+// unhurried" line made a 52 s render instead of 34 s). The line below is the one of the first samples he approved. And the function now LISTENS before it keeps anything: every render is written
+// out by a text model (VERIFY_MODELS); English letters in it (the advert has none) or a length over PROMO_MAX_SECONDS (the real one is ~34 s) reject it and the next attempt runs. A missing transcript
+// (the checker is down) does not block it. The log line `asker-dose promo try N` says the length, the verdict and the first words, so what was said can be read without listening.
+export const PROMO_STYLE = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer selling something people love: engaging and exciting but never shouting, a clear steady rhythm, a short pause at every "...", and a smile on the last line:';
 const PROMO_TEXT_FIRST = [PROMO_LINES[0], PROMO_LINES[1], 'وعلشان ماتفوتش جرعة، منبّه الدوا بيفكّرك بميعاد كل دوا باسمه.', PROMO_LINES[3], PROMO_LINES[4], PROMO_LINES[5]].join(' ');
-export const PROMO_ATTEMPTS = [`${PROMO_STYLE} ${PROMO_TEXT}`, `${PROMO_STYLE} ${PROMO_TEXT}`, `${PROMO_STYLE_FIRST} ${PROMO_TEXT}`, `${PROMO_STYLE_FIRST} ${PROMO_TEXT_FIRST}`];
+// the attempts: the style + the text, again (a speech model is not the same twice), the text alone (nothing to read out), then the first wording he heard; the kept file is named after the FIRST attempt
+export const PROMO_ATTEMPTS = [`${PROMO_STYLE} ${PROMO_TEXT}`, `${PROMO_STYLE} ${PROMO_TEXT}`, PROMO_TEXT, `${PROMO_STYLE} ${PROMO_TEXT_FIRST}`];
+export const PROMO_MAX_SECONDS = 46, VERIFY_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+export const hasEnglish = (t: string) => /[A-Za-z]{3,}/.test(t);
 const PROMO_BUDGET_MS = 100000;   // no new attempt after this long (the function may run about 150 s)
 export const PROMO_VOICES = ['Orus', 'Charon', 'Fenrir', 'Puck', 'Algenib', 'Kore'], PROMO_DEFAULT_VOICE = 'Orus', PROMO_TEMPERATURE = 0.6;   // Orus = the owner's pick (2026-11-18)
 export function promoVoice(v: unknown, env: Env): string {
@@ -97,6 +101,23 @@ export function wav(pcm: Uint8Array, rate = 24000): Uint8Array {
   return out;
 }
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+// what the audio really says, written out by a text model (null when no model answers: the caller then does not block on it)
+async function transcript(bytes: Uint8Array, env: Env, fetchImpl: typeof fetch): Promise<string | null> {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const data = btoa(bin);
+  for (const m of [...new Set([String(env.GEMINI_VERIFY_MODEL || '').trim(), ...VERIFY_MODELS].filter(Boolean))]) {
+    const r = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY || '' }, signal: AbortSignal.timeout(45000),
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'Transcribe this audio exactly as spoken, in the language that is spoken. Write any English word in English letters. Reply with the transcript only.' }, { inlineData: { mimeType: 'audio/wav', data } }] }], generationConfig: { temperature: 0 } }),
+    }).catch(() => null);
+    if (!r || !r.ok) continue;
+    const j = await r.json().catch(() => null) as { candidates?: { content?: { parts?: { text?: string }[] } }[] } | null;
+    const t = (j?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(' ').trim();
+    if (t) return t;
+  }
+  return null;
+}
 const sha256hex = async (s: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', enc(s)))).map((x) => x.toString(16).padStart(2, '0')).join('');
 // best effort, per running copy of the function: one address may start at most VOICE_HOURLY_PER_IP new sentences an hour
 const seenIp = new Map<string, number[]>();
@@ -146,7 +167,16 @@ async function voice(body: { name?: unknown; voice?: unknown }, headers: Record<
     if (g.status >= 500) { console.log('asker-dose voice gemini', g.status, why); return reply(502, { error: 'gemini', status: g.status }, headers); }
     const j = g.ok ? await g.json().catch(() => null) as GemOut | null : null;
     part = j?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-    if (part?.inlineData?.data) break;
+    if (part?.inlineData?.data) {
+      if (!promo) break;
+      // the advert is listened to before it is kept (see PROMO_STYLE): too long, or any English in it = rejected, the next attempt runs
+      const rate0 = Number(/rate=(\d{4,6})/.exec(String(part.inlineData.mimeType || ''))?.[1] || 24000), pcm0 = unb64(part.inlineData.data), secs = pcm0.length / 2 / rate0;
+      const said = await transcript(wav(pcm0, rate0), env, fetchImpl);
+      const bad = secs > PROMO_MAX_SECONDS ? 'too-long' : said && hasEnglish(said) ? 'english' : '';
+      console.log('asker-dose promo', `try ${n + 1}`, `${Math.round(secs)}s`, bad || 'ok', (said || '(no transcript)').replace(/\s+/g, ' ').slice(0, 120));
+      if (!bad) break;
+      part = undefined; continue;
+    }
     console.log('asker-dose voice gemini no audio', g.status, promo ? `try ${n + 1}` : '', j?.candidates?.[0]?.finishReason || '', j?.promptFeedback?.blockReason || '');
     if (!promo) return reply(502, { error: 'gemini', status: g.status }, headers);
   }
