@@ -442,7 +442,7 @@ run('Alarm app card on the pharmacy app\'s home (owner 2026-11-18: «المنب�
  await setup(page,'granted');await withUa(page,ANDROID_UA);
  await page.setViewportSize({width:375,height:812});await page.goto(base+'store.html');
  await page.waitForSelector('#alarmAppBox:not([hidden]) [data-al-getapp]');
- assert.equal(await text(page,'#alarmAppBox strong'),'⏰ منبه الدوا');
+ assert.equal(await text(page,'#alarmAppBox strong'),'منبه الدوا');
  assert.equal(await text(page,'#alarmAppBox .al-home-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.');
  assert.equal(await text(page,'#alarmAppBox [data-al-getapp]'),'📲 نزّل تطبيق المنبه');
  const href=await page.$eval('#alarmAppBox [data-al-getapp]',e=>e.getAttribute('href'));

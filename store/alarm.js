@@ -52,7 +52,6 @@
     // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
     getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:',
     getAppIos: '⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.',
-    homeTitle: '⏰ منبه الدوا',
     homeSub: 'تطبيق أندرويد بيرنّ وينطق اسم الدوا في ميعاده والموبايل مقفول.',
     homeLinked: '✓ متوصّل: المنبهات اللي بتظبطها هنا بتروح له لوحدها.',
     appLinked: '✓ تطبيق «منبه الدوا» متوصّل: أي منبه تظبطه هنا بيروح له لوحده وهو اللي بيرنّ وينطق (هتشوف وميض سريع لحظة الحفظ).',
@@ -272,7 +271,7 @@
     box.hidden = !show;
     if (!show) { box.innerHTML = ''; return; }
     const linked = android && appLinked();
-    box.innerHTML = `<span class="al-home-ico" aria-hidden="true">⏰</span><div><strong>${esc(TEXTS.homeTitle)}</strong><span>${esc(linked ? TEXTS.homeLinked : TEXTS.homeSub)}</span><span class="al-home-warn">${esc(TEXTS.getAppIos)}</span></div>` +
+    box.innerHTML = `<span class="al-home-ico" aria-hidden="true">⏰</span><div><strong>${esc(TEXTS.title)}</strong><span>${esc(linked ? TEXTS.homeLinked : TEXTS.homeSub)}</span><span class="al-home-warn">${esc(TEXTS.getAppIos)}</span></div>` +
       (android ? `<a class="al-home-btn" data-al-getapp href="${esc(appLink())}">${esc(linked ? TEXTS.appOpen : TEXTS.getApp)}</a>` : '');
   }
   let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], appRinging = false, appRingTimer = null, appBatt = false, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
@@ -480,7 +479,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118k'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118l'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
