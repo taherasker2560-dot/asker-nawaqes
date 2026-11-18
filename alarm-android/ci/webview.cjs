@@ -86,7 +86,7 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   await page.waitForSelector('#alarmSheet .al-diag-sum');
   const sum = await page.$$eval('#alarmSheet .al-diag-sum p', (els) => els.map((e) => e.textContent));
   console.log('app check:\n' + sum.join('\n'));
-  assert.ok(sum.some((l) => /إصدار التطبيق 1\.1/.test(l)), 'the version');
+  assert.ok(sum.some((l) => /إصدار التطبيق 1\.2/.test(l)), 'the version');
   assert.ok(sum.some((l) => /صوت المنبه/.test(l)), 'the alarm volume line');
   assert.ok(sum.some((l) => /البطارية/.test(l)), 'the battery line');
   assert.ok(sum.some((l) => /الرنين بدأ: تجربة المنبه/.test(l)), 'the ring log says the test ring started');
