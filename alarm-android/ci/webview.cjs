@@ -51,13 +51,28 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   let voices = '';
   for (let k = 0; k < 40; k++) { voices = await sh(`run-as ${PKG} ls files/voice`); if (/\.wav/.test(voices)) break; await sleep(1000); }
   console.log('voice files:', voices.trim() || '(none)');
-  // «جرّب المنبه»: the app starts the ring
+  // what the page itself got from the server's voice function (soft: this page is served from the CI machine, so the function's origin rule may refuse it; the live page is checked separately)
+  const vb = await page.evaluate(async () => { const r = await window.AskerStoreAlarm.voiceBlob('Pemojet', 20000); return r.blob ? { ok: true, size: r.blob.size, from: r.from } : { ok: false, error: r.error }; });
+  console.log('voice from the page:', JSON.stringify(vb));
+  // the app's own file door, whatever the network did: a real WAV (1.2 s, 440 Hz) for the test ring's name is handed over exactly as the page does (base64), and the app has it
+  const rate = 22050, n = Math.round(rate * 1.2), wav = Buffer.alloc(44 + n * 2);
+  wav.write('RIFF', 0); wav.writeUInt32LE(36 + n * 2, 4); wav.write('WAVEfmt ', 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(rate, 24); wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) wav.writeInt16LE(Math.round(Math.sin(i / rate * 2 * Math.PI * 440) * 9000), 44 + i * 2);
+  assert.equal(await page.evaluate((b) => window.AskerAndroid.saveVoice('تجربة المنبه', b), wav.toString('base64')), true, 'the app took the sound file');
+  assert.equal(await page.evaluate(() => window.AskerAndroid.hasVoice('تجربة المنبه')), true);
+  voices = await sh(`run-as ${PKG} ls files/voice`);
+  assert.match(voices, /\.wav/, 'the sound file is on the phone');
+  // «جرّب المنبه»: the app starts the ring (with that file as its voice)
   await page.click('[data-al-apptest]');
   let svc = '';
   for (let k = 0; k < 20; k++) { svc = await sh(`dumpsys activity services ${PKG}`); if (/RingService/.test(svc)) break; await sleep(500); }
   assert.match(svc, /RingService/, 'the test ring started the ring service');
   const notes = await sh('dumpsys notification --noredact');
   assert.match(notes, /android\.title=String \(⏰ ميعاد تجربة المنبه الآن\)/, 'the ring\'s notification');
+  // is the sentence really being PLAYED as an alarm sound? (soft: printed for the log; the emulator's audio is virtual)
+  await sleep(2500);
+  const audio = await sh('dumpsys audio');
+  console.log('players:', (audio.split('\n').filter((l) => /AudioPlaybackConfiguration|USAGE_ALARM|state:started|piid/i.test(l) && /askerpharmacy|ALARM|started/i.test(l)).slice(0, 8).join('\n') || '(none shown)'));
   // the back button of the app leaves it (the page answers false on the list)
   assert.equal(await page.evaluate(() => window.AskerStoreAlarm.appBack()), false);
   await sh(`am force-stop ${PKG}`);
