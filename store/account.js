@@ -448,8 +448,13 @@
     }
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
     // a person of the house whose owner keeps the total to himself: a greeting in place of the balance (the server sent no number)
+    // «ادفع حسابك» (2026-11-17; owner 2026-11-18: «خدمة الدفع المفروض تبقى تحت المبلغ كده، وحلوة»): right under the amount he owes, only when he owes and the pharmacy has set a transfer number.
+    // Also in the owner's look on the pharmacy's own phone (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
+    const P = PAY();
+    const payNow = P && P.methods().length && num(st.c.balance) > CRUMB
+      ? `<button type="button" class="ac-paybtn ac-paynow" data-acct-paysheet><span class="ac-paynow-t"><b>${esc(P.TEXTS.payBtn)}</b><small>${esc(P.methods().map((m) => ((root.AskerStorePayLib || {}).NAMES || {})[m] || m).join(' · '))}</small></span><span class="ac-paynow-go" aria-hidden="true">‹</span></button>` : '';
     if (hide) html += `<section class="ac-bal ac-hi"><div class="ac-big zero">${esc(fillT(TEXTS.memberHi, { n: st.me.name }))}</div><div class="hint-sm">${esc(fillT(TEXTS.memberHint, { o: st.c.name }))}</div></section>`;
-    else html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` +
+    else html += `<section class="ac-bal"><div class="ac-big ${b.cls}">${esc(b.text)}</div>` + payNow +
       (upd ? `<div class="hint-sm">${esc(upd)} · ${esc(TEXTS.every10)}</div>` : '') +
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
@@ -460,15 +465,14 @@
     html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
     // «⏰ منبه الدوا» (2026-11-17, store/alarm.js): the customer's own dose reminders, kept on his phone
     html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
+    // «📋 ابعت الروشتة» (2026-11-18, owner: «مكان مخصص للعميل يبعت الروشتة على الصفحة عشان القراءة الأوتوماتيك»; WhatsApp later): a page of its own that sends the photos as an order the pharmacy reads (nothing in the pharmacy's look)
+    const rxTile = root.AskerStoreRx && !pharmacyPhone ? root.AskerStoreRx.tileHtml() : '';
+    html += rxTile ? `<div class="ac-al-wrap">${rxTile}</div>` : '';
     // «📝 شكوى أو اقتراح» (2026-11-18, owner: «رابط يوصل لرسائل الصفحة بالشكاوى والمقترحات … فويس أو مكتوبة»): the messages page, opened as a complaint / suggestion
     html += root.AskerStoreChat ? `<div class="ac-al-wrap"><a href="#chat" class="ac-reg-btn ac-fb-tile" data-ac-feedback><b>${esc(TEXTS.feedback)}</b><small>${esc(TEXTS.feedbackHint)}</small></a></div>` : '';
     // «👨‍👩‍👧 أهل البيت» (2026-11-18, store/family.js): the owner of the account sends the app to his house and controls it (nothing for a person of the house)
     const fam = root.AskerStoreFamily ? root.AskerStoreFamily.tileHtml() : '';
     html += fam ? `<div class="ac-al-wrap">${fam}</div>` : '';
-    // «ادفع حسابك» (2026-11-17): only when he owes and the pharmacy has set a transfer number. Also in the owner's look on the pharmacy's own phone
-    // (his words 11-17: «مش شايف ان العميل الاجل يقدر يدفع الحساب»: the preview must show what the customer sees)
-    const P = PAY();
-    if (P && P.methods().length && num(st.c.balance) > CRUMB) html += `<button type="button" class="ac-btn ac-paybtn" data-acct-paysheet>${esc(P.TEXTS.payBtn)}</button>`;
     const wa = waHref();
     html += `<div class="ac-row">${hide ? '' : `<button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>`}` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
@@ -626,6 +630,8 @@
     token: () => token,
     // store/alarm.js: whose alarms the pharmacy is setting (the owner's look)
     name: () => (st.c ? st.c.name : ''),
+    // store/rx.js: his saved number (the owner of the account only; a person of the house types his own)
+    phone: () => st.phone || '',
     // store.js: the client, once it is made (the first load starts here)
     attach(c) { client = c; if (token) { showLinked(true); drawPay(); load(false); } },
     // store.js view('account')
