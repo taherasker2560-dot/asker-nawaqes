@@ -136,4 +136,19 @@ for(let seed=1;seed<=200;seed++){
  if(seed===1)assert.ok(new Set(seen).size>=5,'the rounds are shuffled differently');
 }
 assert.deepEqual(M.nextRound(()=>0.5,-1,1),[0],'one piece: just that one');
+
+// ---- the promo voice (owner 2026-11-18): once, then not again for a few days ----
+assert.equal(M.PROMO.voice,'Orus','the owner picked Orus');
+assert.ok(M.PROMO.delay>=5&&M.PROMO.delay<=30,'it comes a few seconds after the music is sounding: '+M.PROMO.delay);
+assert.ok(M.PROMO.everyDays>=1&&M.PROMO.everyDays<=7,'not every visit: '+M.PROMO.everyDays);
+assert.ok(M.PROMO.gain>0.1&&M.PROMO.gain<0.35,'soft on purpose («أوطى شوية، ما يبقاش مزعج»): '+M.PROMO.gain);
+assert.equal(M.dayKey(new Date(2026,10,5)),'2026-11-05','a day is the phone\'s own date');
+assert.equal(M.promoDue(null,'2026-11-18',3),true,'never heard here: due');
+assert.equal(M.promoDue('garbage','2026-11-18',3),true);
+assert.equal(M.promoDue('2026-11-18','2026-11-18',3),false,'heard today');
+assert.equal(M.promoDue('2026-11-16','2026-11-18',3),false,'two days ago: not yet');
+assert.equal(M.promoDue('2026-11-15','2026-11-18',3),true,'three days ago: due again');
+assert.equal(M.promoDue('2026-10-31','2026-11-02',3),false,'across a month end');
+assert.equal(M.promoDue('2026-10-29','2026-11-02',3),true);
+assert.equal(M.promoDue('2026-11-20','2026-11-18',3),true,'a clock set back: due, never stuck');
 console.log('store-music ok');
