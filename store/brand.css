@@ -284,7 +284,12 @@ body:has([data-view="chat"]:not([hidden])) .mus-btn { bottom: calc(144px + env(s
 .al-tg.on::after { inset-inline-start: 3px; }
 .al-add { display: block; width: 100%; margin-top: 10px; padding: 11px; border: 1.5px dashed var(--accent); border-radius: 2px; background: none; color: var(--accent-text); font: inherit; font-weight: 700; cursor: pointer; }
 .al-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 10px; padding: 10px 12px; border: 0; background: var(--soft-bg); color: var(--ink); font: inherit; font-size: 13px; text-align: right; }
-.al-app a.al-line { text-decoration: none; font-weight: 700; color: var(--accent-text); border: 1.5px solid var(--accent); background: none; }
+.al-app { margin: 0 0 14px; padding: 12px; border: 1.5px solid var(--accent); background: var(--accent-soft); }
+.al-app-head { margin: 0 0 2px; font-size: 14px; font-weight: 700; line-height: 1.7; color: var(--accent-text); }
+.al-app a.al-line { justify-content: center; text-decoration: none; font-weight: 700; font-size: 15px; color: #fff; border: 0; background: var(--accent); }
+.al-diag-sum p { margin: 6px 0 0; font-size: 13px; line-height: 1.7; }
+.al-diag-more { margin-top: 8px; }
+.al-diag-more summary { font-size: 12px; color: var(--muted); cursor: pointer; }
 .al-try { padding: 4px 12px; border: 1px solid var(--accent); border-radius: 999px; background: var(--card); color: var(--accent-text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .al-warn { margin: 8px 0 0; font-size: 12.5px; line-height: 1.7; color: var(--accent-text); }
 .al-lbl { margin: 14px 0 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }

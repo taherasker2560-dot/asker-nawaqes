@@ -411,6 +411,8 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
  assert.deepEqual(JSON.parse(decodeURIComponent(m[2])),{v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['08:00'],on:true}]},'and his alarms');
  assert.equal(decodeURIComponent(m[3]),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk','no app on the phone: the download');
  assert.match(await text(page,'#alarmSheet .al-app'),/بعد ما الملف ينزل: افتحه واضغط «تثبيت»/);
+ assert.match(await text(page,'#alarmSheet .al-app-head'),/الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل التطبيق:/);
+ assert.ok(await page.evaluate(()=>{const a=document.querySelector('#alarmSheet .al-app'),b=document.querySelector('#alarmSheet .al-add');return !!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)}),'the download box is the first thing in the sheet, above the alarms and the add button');
  // the push way is still offered there (the app is an extra)
  assert.ok(await page.$('[data-al-notiftest]'),'(notifications are allowed in this test: its test button shows)');
  // the pharmacy's own phone: no button
@@ -544,6 +546,9 @@ run('Dose alarm voice: «🔍 فحص الصوت» writes down what this phone ha
  assert.match(d,/beep \(audio element\): playing/);assert.match(d,/server voice: (server|cache) · \d+ bytes/);assert.match(d,/server voice play: playing/);
  assert.match(d,/speechSynthesis: 1 voices · arabic: Arabic \(Egypt\) \[ar-EG/);
  assert.match(d,/tts ar-EG voice: start/);assert.match(d,/tts ar: start/);assert.match(d,/tts default: start/);
+ // what the customer reads: one plain line per thing; the technical lines stay folded
+ assert.deepEqual(await page.$$eval('#alarmSheet .al-diag-sum p',els=>els.map(e=>e.textContent)),['✓ الموبايل بيشغّل صوت من الصفحة','✓ صوت الصيدلية الطبيعي وصل واشتغل','✓ صوت الموبايل العربي شغال']);
+ assert.equal(await page.$('#alarmSheet details.al-diag-more[open]'),null,'the technical lines are folded');
  await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{value:{writeText:async(t)=>{window.__copied=t}},configurable:true})});
  await page.click('[data-al-diagcopy]');await page.waitForFunction(()=>!!window.__copied);
  assert.equal(await page.evaluate(()=>window.__copied),d,'the copy is what is on the page');
@@ -552,6 +557,7 @@ run('Dose alarm voice: «🔍 فحص الصوت» writes down what this phone ha
  await page.evaluate(()=>{window.__beepMode='deny';Object.defineProperty(window,'speechSynthesis',{configurable:true,value:undefined})});
  await page.evaluate(()=>window.AskerStoreAlarm.runDiag());
  const d2=await page.$eval('#alarmSheet .al-diag',e=>e.textContent);assert.match(d2,/beep \(audio element\): rejected NotAllowedError/);assert.match(d2,/speechSynthesis: none/);
+ assert.deepEqual(await page.$$eval('#alarmSheet .al-diag-sum p',els=>els.map(e=>e.textContent)),['✗ الموبايل مش بيشغّل صوت من الصفحة (الصوت واطي أو على الصامت)','✗ صوت الصيدلية الطبيعي وصل بس الموبايل ما شغّلوش','✗ الموبايل مفيهوش نطق خالص']);
 },{home:true});
 
 run('Dose alarm, the pharmacy\'s phone: a save says whether it reached the server, and the calls go through the owner\'s sign-in (the store\'s own client is a visitor\'s: the server answered 401 and nothing was said)',async({page,base})=>{

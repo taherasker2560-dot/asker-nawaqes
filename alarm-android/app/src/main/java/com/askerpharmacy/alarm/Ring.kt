@@ -39,27 +39,45 @@ import java.util.Locale
 /** Starting a ring, and the one notification that goes with it (the heads-up / full-screen card on the lock screen). */
 object Ring {
     const val CHANNEL = "dose_ring"
+    const val CHANNEL_LOUD = "dose_ring_loud"
     const val NOTIF_ID = 4107
     const val ACTION_RING = "com.askerpharmacy.alarm.RING"
     const val ACTION_TOOK = "com.askerpharmacy.alarm.TOOK"
     const val ACTION_SNOOZE = "com.askerpharmacy.alarm.SNOOZE"
 
     /** The system started us from an exact alarm, so a foreground service is allowed; if the phone refuses anyway, the notification alone still shows (and opens the card on the lock screen). */
-    fun start(context: Context, names: List<String>, ids: List<String>) {
+    fun start(context: Context, names: List<String>, ids: List<String>, fromCard: Boolean = false) {
         val ctx = context.applicationContext
         val i = Intent(ctx, RingService::class.java).setAction(ACTION_RING)
             .putStringArrayListExtra("names", ArrayList(names)).putStringArrayListExtra("ids", ArrayList(ids))
         try {
             ctx.startForegroundService(i)
         } catch (e: Exception) {
-            Notifier.post(ctx, names, ids, ongoing = false)
+            // the phone refused the service (a battery rule): the notification itself must then make the sound, and the card starts the voice when it opens
+            if (!fromCard) Notifier.post(ctx, names, ids, ongoing = false, loud = true)   // from the card it would only re-open the card
         }
     }
 }
 
 object Notifier {
-    private fun channel(ctx: Context) {
+    private fun channel(ctx: Context, loud: Boolean) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (loud) {
+            if (nm.getNotificationChannel(Ring.CHANNEL_LOUD) != null) return
+            // used only when the ring service could not start: then the notification itself must be heard (the phone's own alarm tone, the alarm volume)
+            val c = NotificationChannel(Ring.CHANNEL_LOUD, "منبه الدوا (صوت)", NotificationManager.IMPORTANCE_HIGH)
+            c.description = "بيرنّ بصوت المنبه لو التطبيق ما قدرش يشغّل النطق"
+            c.setSound(
+                android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM),
+                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build(),
+            )
+            c.enableVibration(true)
+            c.vibrationPattern = longArrayOf(0, 500, 250, 500, 250, 500)
+            c.setShowBadge(false)
+            c.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            nm.createNotificationChannel(c)
+            return
+        }
         if (nm.getNotificationChannel(Ring.CHANNEL) != null) return
         val c = NotificationChannel(Ring.CHANNEL, "منبه الدوا", NotificationManager.IMPORTANCE_HIGH)
         c.description = "ميعاد الدوا: اسم الدوا بصوته"
@@ -70,18 +88,20 @@ object Notifier {
         nm.createNotificationChannel(c)
     }
 
-    fun build(ctx: Context, names: List<String>, ids: List<String>, ongoing: Boolean): Notification {
-        channel(ctx)
+    fun build(ctx: Context, names: List<String>, ids: List<String>, ongoing: Boolean, loud: Boolean = false): Notification {
+        channel(ctx, loud)
         val fl = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        // «auto»: only when the ring service never started: the card, once opened, starts the voice itself (it is in front now, so the phone allows it)
         val card = PendingIntent.getActivity(
-            ctx, 10,
+            ctx, if (loud) 13 else 10,
             Intent(ctx, RingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                .putStringArrayListExtra("names", ArrayList(names)).putStringArrayListExtra("ids", ArrayList(ids)),
+                .putStringArrayListExtra("names", ArrayList(names)).putStringArrayListExtra("ids", ArrayList(ids))
+                .putExtra("auto", loud).putExtra("at", System.currentTimeMillis()),
             fl,
         )
         val took = PendingIntent.getService(ctx, 11, Intent(ctx, RingService::class.java).setAction(Ring.ACTION_TOOK).putStringArrayListExtra("ids", ArrayList(ids)), fl)
         val snooze = PendingIntent.getService(ctx, 12, Intent(ctx, RingService::class.java).setAction(Ring.ACTION_SNOOZE).putStringArrayListExtra("ids", ArrayList(ids)), fl)
-        val b = Notification.Builder(ctx, Ring.CHANNEL)
+        val b = Notification.Builder(ctx, if (loud) Ring.CHANNEL_LOUD else Ring.CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_alarm)
             .setContentTitle(Plan.title(names))
             .setContentText("خدمة مقدمة من صيدلية عسكر")
@@ -96,9 +116,9 @@ object Notifier {
         return b.build()
     }
 
-    fun post(ctx: Context, names: List<String>, ids: List<String>, ongoing: Boolean) {
+    fun post(ctx: Context, names: List<String>, ids: List<String>, ongoing: Boolean, loud: Boolean = false) {
         try {
-            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(Ring.NOTIF_ID, build(ctx, names, ids, ongoing))
+            (ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(Ring.NOTIF_ID, build(ctx, names, ids, ongoing, loud))
         } catch (e: Exception) {
             // notifications are off for the app: nothing more can be shown
         }
@@ -150,7 +170,15 @@ class RingService : Service() {
         ringIds = ids.toList()
         ringNames = names.toList()
         val note = Notifier.build(this, names.toList(), ids.toList(), ongoing = true)
-        if (Build.VERSION.SDK_INT >= 29) startForeground(Ring.NOTIF_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK) else startForeground(Ring.NOTIF_ID, note)
+        try {
+            if (Build.VERSION.SDK_INT >= 29) startForeground(Ring.NOTIF_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK) else startForeground(Ring.NOTIF_ID, note)
+        } catch (e: Exception) {
+            // the phone would not let this service run in front: a notification that makes the alarm sound by itself, and the service ends (an unanswered start would crash the app)
+            Notifier.post(this, names.toList(), ids.toList(), ongoing = false, loud = true)
+            running = false
+            stopSelf()
+            return
+        }
         // a new ring (or one more medicine at the same minute) starts the whole cycle again
         seq++
         says = 0
@@ -244,25 +272,27 @@ class RingService : Service() {
             tts = TextToSpeech(applicationContext) { status ->
                 h.post {
                     val t = tts
-                    if (status != TextToSpeech.SUCCESS || t == null) { afterSpeech(mine); return@post }
-                    ttsOk = true
+                    // no speech engine, or none with Arabic (a Samsung phone's own engine has none): the phone's alarm tone rings instead, so there is always a sound at the dose time
+                    if (status != TextToSpeech.SUCCESS || t == null) { playTone(mine); return@post }
                     try {
                         t.setAudioAttributes(alarmAttrs())
-                        if (t.setLanguage(Locale("ar", "EG")) < 0) t.setLanguage(Locale("ar"))
+                        val arabic = t.setLanguage(Locale("ar", "EG")) >= 0 || t.setLanguage(Locale("ar")) >= 0
+                        if (!arabic) { playTone(mine); return@post }
                         t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                             override fun onStart(utteranceId: String?) {}
                             override fun onDone(utteranceId: String?) { h.post { afterSpeech(seq) } }
                             @Deprecated("the engine's own error callback")
-                            override fun onError(utteranceId: String?) { h.post { afterSpeech(seq) } }
+                            override fun onError(utteranceId: String?) { h.post { playTone(seq) } }
                         })
                     } catch (e: Exception) {
                         // the engine speaks with its own settings
                     }
+                    ttsOk = true
                     if (mine == seq) say(t)
                 }
             }
         } catch (e: Exception) {
-            afterSpeech(mine)
+            playTone(mine)
         }
     }
 
@@ -357,6 +387,10 @@ class RingActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         names = intent.getStringArrayListExtra("names") ?: emptyList()
         ids = intent.getStringArrayListExtra("ids") ?: emptyList()
+        // the ring service never started (the phone refused it) and only the notification sounded: opening the card starts the voice now, within 5 minutes of the dose time
+        if (intent.getBooleanExtra("auto", false) && !RingService.running && names.isNotEmpty() && System.currentTimeMillis() - intent.getLongExtra("at", 0L) < 5 * 60_000L) {
+            Ring.start(this, names, ids, fromCard = true)
+        }
         val orange = Color.parseColor("#C0522A")
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
