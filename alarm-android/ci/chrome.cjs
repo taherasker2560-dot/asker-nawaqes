@@ -19,7 +19,7 @@ setTimeout(() => { console.error('CHROME HANDOFF NOT PROVEN: it took too long (C
   assert.ok(device, 'no android device');
   const sh = async (c) => (await device.shell(c)).toString();
   const pk = await sh('pm list packages com.android.chrome');
-  if (!/com\.android\.chrome/.test(pk)) { console.log('CHROME HANDOFF: SKIPPED (no Chrome on this emulator image)'); server.close(); await device.close(); return; }
+  if (!/com\.android\.chrome/.test(pk)) { console.log('CHROME HANDOFF: SKIPPED (no Chrome on this emulator image)'); server.close(); await device.close(); process.exit(0); }
   await sh(`pm clear ${PKG}`);
   const context = await device.launchBrowser();
   const page = await context.newPage();
@@ -41,4 +41,5 @@ setTimeout(() => { console.error('CHROME HANDOFF NOT PROVEN: it took too long (C
   server.close();
   await context.close();
   await device.close();
+  process.exit(0);
 })().catch((e) => { console.error('CHROME HANDOFF NOT PROVEN:', e && e.message ? e.message : e); try { server.close(); } catch (x) { /* closed */ } process.exit(1); });

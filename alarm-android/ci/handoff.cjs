@@ -36,4 +36,6 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   assert.match(voices, /\.wav/, 'the app asked the pharmacy\'s voice function itself and kept the sound');
   assert.match(prefs, /وصلت منبهات من الموقع/, 'the log says the alarms came from the site');
   console.log('HANDOFF OK: the alarms came over an intent link with no screen, and the app fetched the sound itself');
+  await device.close();
+  process.exit(0);   // (the adb connection keeps node alive otherwise: this is what hung the first CI run)
 })().catch((e) => { console.error('HANDOFF FAILED', e); process.exit(1); });
