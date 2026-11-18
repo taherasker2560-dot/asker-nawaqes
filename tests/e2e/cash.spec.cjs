@@ -19,7 +19,7 @@ run('Cash: the boxes, today\'s in and out, a statement with the balance after ea
    {id:14,account_id:2,at:at(y,23,41),op:52,kind:'transfer_out',amount:-8800,who:'احتياطى 2',memo:null,n:null},
    {id:15,account_id:2,at:at(y,20,0),op:51,kind:'other_out',amount:-41.99,who:null,memo:null,n:null}];});
  await page.click('[data-group="accounts"]');
- assert.deepEqual(await names(page,'.subbar[data-for="accounts"] [data-tab]'),['العملاء','الموردين','الخزن','العمليات']);
+ assert.deepEqual(await names(page,'.subbar[data-for="accounts"] [data-tab]'),['العملاء','الموردين','الخزن','المدفوعات','العمليات']);
  await page.click('[data-tab="cash"]');
  assert.ok(await page.isVisible('#cashPanel'));assert.ok(!(await page.isVisible('#customersPanel')));
  await page.waitForSelector('#csList .cs-box');

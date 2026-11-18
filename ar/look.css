@@ -2281,3 +2281,53 @@ html.night .rt-v .pill.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95
 .od-fold[open] > summary { margin-bottom: 8px; }
 .stmt > summary h3 b { background: var(--crimson); color: #fff; border-radius: 10px; padding: 0 8px; font-size: 12.5px; }
 html.night .stmt > summary h3 b { background: var(--crimson); color: #fff; }
+/* «💸 المدفوعات» (ar/pay.js, owner 2026-11-19, mockup mockups/payments_2026-11-19.png): one color, every button sets its own text color */
+.py-new { display: block; width: 100%; margin: 4px 0 10px; padding: 13px; border: 0; border-radius: 14px; background: var(--grad, var(--crimson)); color: #fff; font-size: 17px; font-weight: 800; text-align: center; box-shadow: var(--sh-acc, none); }
+.py-wide { display: block; width: 100%; margin: 0 0 8px; }
+.py-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 6px; }
+.py-tile { padding: 9px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); }
+.py-tile span, .py-tile small { display: block; color: var(--muted); font-size: 12.5px; }
+.py-tile b { display: block; margin: 2px 0; font-size: 19px; }
+.py-h { display: flex; align-items: center; gap: 6px; margin: 14px 2px 6px; font-size: 14.5px; color: var(--muted); }
+.py-num { min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--crimson); color: #fff; font-size: 12px; text-align: center; }
+.py-card { margin: 0 0 7px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); }
+.py-card.py-wait { border-color: var(--crimson); }
+.py-card.py-look { border-color: var(--crimson); background: var(--rose); }
+html.night .py-card.py-look { background: var(--card); box-shadow: 0 0 0 1px var(--crimson); }
+.py-l1 { display: flex; align-items: center; gap: 8px; }
+.py-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.py-amt { flex: none; font-weight: 800; white-space: nowrap; }
+.py-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 4px; color: var(--muted); font-size: 12.5px; }
+.py-pill { margin-inline-start: auto; padding: 1px 9px; border-radius: 999px; background: var(--rose); color: var(--crimson-ink); font-size: 11.5px; white-space: normal; }
+.py-pill.on { background: var(--crimson); color: #fff; }
+html.night .py-pill { background: var(--tint-2, var(--rose)); color: var(--ink); }
+.py-diff { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--card); color: var(--ink); border: 1px dashed var(--crimson); font-size: 13px; line-height: 1.8; }
+.py-diff span { color: var(--muted); }
+.py-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.py-acts button { margin: 0; }
+.py-p { background: var(--crimson); color: #fff; border: 0; }
+.py-warn { background: var(--bad, #a3162f); color: #fff; border: 0; }
+.py-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; }
+.py-filters .chips { margin: 0; }
+.py-filters select { width: auto; min-width: 120px; margin: 0; }
+.py-lab { display: block; margin: 12px 2px 5px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.py-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.py-seg button { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font-weight: 700; box-shadow: none; }
+.py-seg button.on { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); }
+.py-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); }
+.py-field small { color: var(--muted); }
+.py-field input { flex: 1; min-width: 0; margin: 0; border: 0; background: transparent; color: var(--ink); font-size: 20px; font-weight: 800; box-shadow: none; }
+.py-field button { margin: 0 4px 0 0; }
+.py-picks, .py-boxes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.py-pick, .py-bx { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); text-align: start; box-shadow: none; }
+.py-pick b, .py-bx b { font-size: 13.5px; overflow-wrap: anywhere; }
+.py-pick small, .py-bx small { color: var(--muted); font-size: 12px; }
+.py-bx.on { border-color: var(--crimson); background: var(--rose); color: var(--ink); }
+.py-bx.low { opacity: 0.5; }
+.py-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.py-cats .chip { margin: 0; }
+.py-sum { margin: 12px 0 10px; padding: 10px 12px; border: 1px dashed var(--crimson); border-radius: 14px; background: var(--card); color: var(--ink); font-size: 13.5px; line-height: 1.9; }
+.py-sum span { color: var(--muted); }
+.py-warnline { color: var(--bad, #a3162f); font-weight: 700; }
+.py-confirm { border-color: var(--crimson); }
+.py-big { margin: 4px 0; font-size: 26px; font-weight: 800; }
