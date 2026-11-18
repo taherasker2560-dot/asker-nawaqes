@@ -134,3 +134,42 @@ run('Customers: opening an invoice\'s items on his own screen shows the store\'s
  assert.equal((await page.$$('#cuMoves .cu-items a.cu-pic')).length,1);
  assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>/customer|store/.test(w.table||w.rpc||''))),[],'nothing is written');
 });
+
+// «عملاء التوصيل» (owner 2026-11-19; PharmaFly's delivery-customer cards: they phone, someone of theirs collects the order): the same accounts but APART — their own chip and totals,
+// never in «عدّوا الحد», «عليهم», «صافي الدين» or «ديون قديمة»; a name search from «الكل» finds them with a small tag; their statement opens like anyone's.
+run('Customers: «عملاء التوصيل» are apart from the credit customers (their own chip and totals, not in the numbers, found by a name search)',async({page})=>{
+ const PICK=[{id:2902,name:'عميل توصيل تجربة',credit_limit:0,balance:350,last_at:at(today,10,0),last_kind:'sale',moves:1,kind:'pickup'},
+  {id:2903,name:'ياسمين الدسوقي',credit_limit:null,balance:9000,last_at:at(new Date(Date.now()-100*864e5),10,0),last_kind:'sale',moves:2,kind:'pickup'}];   // 100 days of silence: an «old debt» if she were a credit customer
+ await setData(page,CUSTOMERS.concat(PICK).map(c=>({kind:'credit',...c})),MOVES);
+ await page.click('[data-group="accounts"]');
+ await page.waitForSelector('#cuBox:not(.hidden)');
+ // the credit numbers are exactly what they were without them
+ assert.deepEqual(await page.$$eval('#cuStats .cu-stat',b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim())),['1عدّوا الحد','3عليهم فلوس','1ليهم فلوس']);
+ assert.match(await text(page,'#cuNet'),/عليهم 17,586.50 − ليهم/);
+ assert.deepEqual(await page.$$eval('#cuChips .chip',c=>c.map(x=>x.textContent.replace(/\s+/g,' ').trim())).then(a=>a.filter(x=>/^(الكل|عملاء التوصيل|ديون قديمة)/.test(x))),['ديون قديمة 0','الكل 5','عملاء التوصيل 2'],'old debts and «الكل» count the credit customers only (her 100 days are not an old debt)');
+ await page.click('#cuStats [data-cu-view="owing"]');
+ assert.deepEqual(await page.$$eval('#cuRows .cu-row strong',s=>s.map(x=>x.textContent)),['سامية عبد الله','أحمد محمود','هدى كمال'],'owing: credit customers only');
+ await page.click('#cuChips [data-cu-view="all"]');
+ assert.equal((await page.$$('#cuRows .cu-row')).length,5,'«الكل» has no delivery customer');
+ // their own chip: most owed first, their own total, the hint, and a statement opens like anyone's
+ await page.click('#cuChips [data-cu-view="pickup"]');
+ assert.deepEqual(await page.$$eval('#cuRows .cu-row strong',s=>s.map(x=>x.textContent)),['ياسمين الدسوقي','عميل توصيل تجربة']);
+ assert.equal(await text(page,'#cuCount'),'2 عميل عليهم 9,350 ج');
+ assert.match(await text(page,'#cuRows .hint'),/وحد منهم بيستلم/);
+ assert.equal(await page.$('#cuRows .cu-row.warn'),null,'no limit, nothing over');
+ await page.click('#cuRows [data-cu="2902"]');
+ await page.waitForSelector('#cuStatement:not(.hidden), .cu-st',{timeout:8000}).catch(()=>{});
+ await page.goBack();
+ await page.waitForSelector('#cuChips');
+ // a name search from «الكل» finds them, with a small tag
+ await page.click('#cuChips [data-cu-view="all"]');
+ await page.fill('#cuQ','ياسمين');
+ assert.deepEqual(await page.$$eval('#cuRows .cu-row strong',s=>s.map(x=>x.textContent)),['ياسمين الدسوقي']);
+ assert.equal(await text(page,'#cuRows [data-cu="2903"] .cu-kind'),'توصيل');
+ // searching from «عليهم» stays inside the credit customers
+ await page.click('#cuChips [data-cu-view="owing"]');
+ await page.fill('#cuQ','ياسمين');
+ assert.equal((await page.$$('#cuRows .cu-row')).length,0);
+ // nothing is written
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>/customer/.test(w.table||w.rpc||''))),[]);
+});

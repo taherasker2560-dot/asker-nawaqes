@@ -102,7 +102,7 @@
     const t = new Date(Date.now() - days * 864e5), p = (n) => String(n).padStart(2, '0');
     const cut = `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())}T${p(t.getHours())}:${p(t.getMinutes())}:00`;
     try {
-      const { data, error } = await c.from('ar_customers').select('balance').gt('balance', 0.5).lt('last_at', cut).limit(2000);
+      const { data, error } = await c.from('ar_customers').select('balance').gt('balance', 0.5).lt('last_at', cut).neq('kind', 'pickup').limit(2000);
       return error ? null : { n: (data || []).length, amount: (data || []).reduce((s, r) => s + (Number(r.balance) || 0), 0), days };
     } catch (e) { return null; }
   }

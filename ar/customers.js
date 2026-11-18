@@ -23,6 +23,10 @@
   }
   const owes = (c) => num(c.balance) > CRUMB;
   const prepaid = (c) => num(c.balance) < -CRUMB;
+  // «عملاء التوصيل» (owner 2026-11-19; PharmaFly's «عميل توصيل» cards, ar_customers.kind = 'pickup'): they phone, someone of theirs collects the order. Same account, same page, but APART:
+  // never in «عدّوا الحد», «صافي الدين», «ديون قديمة» or the old-debts badge; their own chip and totals; a name search from «الكل» finds them too
+  const isPickup = (c) => !!c && c.kind === 'pickup';
+  const creditOnly = (list) => (list || []).filter((c) => !isPickup(c));
   const limitOf = (c) => (num(c.credit_limit) > 0 ? num(c.credit_limit) : 0);
   const isOver = (c) => limitOf(c) > 0 && num(c.balance) > limitOf(c);
   const isNear = (c) => limitOf(c) > 0 && !isOver(c) && num(c.balance) >= 0.9 * limitOf(c);
@@ -83,6 +87,9 @@
     const words = norm(q).split(' ').filter(Boolean);
     let v = view;
     if (words.length && v === 'over') v = 'all';
+    // the delivery customers are apart: only in their own chip, in «💊 مزمن» (their late medicines count like anyone's) and in a name search from «الكل»
+    const withPickup = v === 'chronic' || (v === 'all' && words.length > 0);
+    list = v === 'pickup' ? (list || []).filter(isPickup) : withPickup ? (list || []) : creditOnly(list);
     let out = list.filter((c) => (v === 'over' ? isOver(c) || isNear(c) : v === 'owing' ? owes(c) : v === 'old' ? isOld(c, days) : v === 'prepaid' ? prepaid(c) : true));
     if (words.length) {
       out = out.filter((c) => {
@@ -95,6 +102,7 @@
       owing: (a, b) => num(b.balance) - num(a.balance),
       old: (a, b) => num(b.balance) - num(a.balance),
       prepaid: (a, b) => num(a.balance) - num(b.balance),
+      pickup: (a, b) => (num(b.balance) - num(a.balance)) || String(a.name).localeCompare(String(b.name), 'ar'),
       all: (a, b) => String(a.name).localeCompare(String(b.name), 'ar'),
     }[v] || ((a, b) => num(b.balance) - num(a.balance));
     return { view: v, rows: out.sort(by) };
@@ -244,7 +252,7 @@
     const m = /\p{L}/u.exec(bare) || /\p{L}/u.exec(full);
     return m ? m[0].toUpperCase() : '•';
   }
-  const api = { OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage, initialOf };
+  const api = { isPickup, creditOnly, OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage, initialOf };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -304,7 +312,7 @@
       try {
         const rows = [];
         for (let from = 0; from < 20000; from += PAGE) {
-          const { data, error } = await db().from('ar_customers').select('id,name,credit_limit,balance,last_at,last_kind,moves').order('id').range(from, from + PAGE - 1);
+          const { data, error } = await db().from('ar_customers').select('id,name,credit_limit,balance,last_at,last_kind,moves,kind').order('id').range(from, from + PAGE - 1);
           if (error) throw new Error(error.message || String(error));
           rows.push(...(data || []));
           if (!data || data.length < PAGE) break;
@@ -338,8 +346,8 @@
     const b = balanceText(c.balance), lim = limitOf(c);
     const pct = lim ? Math.max(0, Math.min(100, Math.round(100 * num(c.balance) / lim))) : 0;
     const last = c.last_at ? `<small>آخر حركة ${esc(whenText(c.last_at, new Date()))} (${esc(KIND_WORD[c.last_kind] || 'بيع')})</small>` : '<small>مفيش حركات</small>';
-    return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}" data-cu="${esc(c.id)}" data-ini="${esc(initialOf(c.name))}">` +
-      `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}${isStopped(c.id) ? ' ⛔' : ''}</strong>${last}` +
+    return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}${isPickup(c) ? ' cu-pick' : ''}" data-cu="${esc(c.id)}" data-ini="${esc(initialOf(c.name))}">` +
+      `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}${isStopped(c.id) ? ' ⛔' : ''}</strong>${isPickup(c) ? '<i class="cu-kind">توصيل</i>' : ''}${last}` +
       (lim && owes(c) ? `<i class="cu-bar"><b class="${isOver(c) ? 'r' : ''}" style="width:${pct}%"></b></i>` : '') + '</span>' +
       `<span class="cu-amt ${b.cls}">${esc(b.text)}${lim ? `<small>الحد ${esc(money(lim))}</small>` : ''}</span></button>`;
   }
@@ -378,18 +386,18 @@
     box.classList.toggle('hidden', !have);
     $('alCustomers')?.classList.toggle('hidden', have);
     if (!have) return;
-    const n = counts(list);
+    const credit = creditOnly(list), n = counts(credit), pickups = list.filter(isPickup), pn = counts(pickups);
     if (!view) view = n.over ? 'over' : 'owing';
     const stat = (v, x, label) => `<button type="button" class="stat cu-stat${view === v ? ' on' : ''}" data-cu-view="${v}"><strong>${x}</strong>${label}</button>`;
     $('cuStats').innerHTML = stat('over', n.over, 'عدّوا الحد') + stat('owing', n.owing, 'عليهم فلوس') + stat('prepaid', n.prepaid, 'ليهم فلوس');
     if ($('cuNet')) $('cuNet').innerHTML = `<span>صافي الدين</span><b>${money(n.net)} ج</b><small>عليهم ${money(n.owed)} − ليهم ${money(n.credit)}</small>`;
     const r = pick(list, view, query, oldDays);
-    const od = oldCounts(list, oldDays);
+    const od = oldCounts(credit, oldDays);
     const chip = (v, label, x) => `<button type="button" class="chip${r.view === v ? ' on' : ''}" data-cu-view="${v}">${label} <b>${x}</b></button>`;
     // «💊 مزمن» (owner 2026-11-16): the file comes from the laptop; ask for it once, then draw again
     const AC = root.AskerChronic;
     if (AC && !chronAsked) { chronAsked = true; AC.load(false).then(() => drawList()); }
-    $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('old', 'ديون قديمة', od.n) + (AC && AC.loaded() ? chip('chronic', '💊 مزمن', AC.count()) : '') + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all) +
+    $('cuChips').innerHTML = chip('over', 'عدّوا الحد', n.over) + chip('owing', 'عليهم', n.owing) + chip('old', 'ديون قديمة', od.n) + (AC && AC.loaded() ? chip('chronic', '💊 مزمن', AC.count()) : '') + chip('prepaid', 'ليهم', n.prepaid) + chip('all', 'الكل', n.all) + (pickups.length ? chip('pickup', 'عملاء التوصيل', pickups.length) : '') +
       (r.view === 'old' ? '<span class="cu-days" role="group" aria-label="مدة من غير حركة">' + OLD_DAYS.map((d) => `<button type="button" class="chip small${oldDays === d ? ' on' : ''}" data-cu-days="${d}">${d} يوم</button>`).join('') + '</span>' : '');
     // the chosen chip stays in sight when the row is wider than the screen (the «💊 مزمن» one sits near the far end; the pin button covers the very end)
     const chipsEl = $('cuChips'), onChip = chipsEl.querySelector('.chip.on');
@@ -420,7 +428,8 @@
       const one = r.view === 'old' ? oldRowHtml : rowHtml;
       html = r.rows.slice(0, shown).map(one).join('') || `<p class="hint">${r.view === 'old' && !query ? 'مفيش ديون قديمة بالمدة دي ✅' : 'مفيش عميل بالاسم ده.'}</p>`;
       if (r.rows.length > shown) html += `<button type="button" class="secondary cu-more" data-cu-more>اعرض ${Math.min(SHOW, r.rows.length - shown)} كمان</button>`;
-      $('cuCount').textContent = query ? `${r.rows.length} عميل` : r.view === 'owing' ? `${r.rows.length} عميل عليهم ${money(n.owed)} ج` : r.view === 'old' ? `${r.rows.length} عميل عليهم ${money(od.amount)} ج` : `${r.rows.length} عميل`;
+      if (r.view === 'pickup' && !query) html = `<p class="hint">${esc('عملاء بيطلبوا بالتليفون وحد منهم بيستلم. حسابهم لوحده: مش داخل في «عدّوا الحد» ولا «صافي الدين».')}</p>` + html;
+      $('cuCount').textContent = query ? `${r.rows.length} عميل` : r.view === 'owing' ? `${r.rows.length} عميل عليهم ${money(n.owed)} ج` : r.view === 'old' ? `${r.rows.length} عميل عليهم ${money(od.amount)} ج` : r.view === 'pickup' ? `${r.rows.length} عميل عليهم ${money(pn.owed)} ج` : `${r.rows.length} عميل`;
     }
     if (r.view !== 'old' && r.view !== 'chronic') note('');
     $('cuRows').innerHTML = html;
