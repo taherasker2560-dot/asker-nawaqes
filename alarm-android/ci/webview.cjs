@@ -93,7 +93,9 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   assert.ok(sum.some((l) => /البطارية/.test(l)), 'the battery line');
   assert.ok(sum.some((l) => /الرنين بدأ: تجربة المنبه/.test(l)), 'the ring log says the test ring started');
   assert.ok(sum.some((l) => /اتقفل/.test(l)), 'the ring log says it was stopped from the page');
-  // the back button of the app leaves it (the page answers false on the list)
+  // the back button asks the page first: the sheet is open, so it closes it (true); with nothing open the page answers false and the app goes back through the store itself
+  assert.equal(await page.evaluate(() => window.AskerStoreAlarm.appBack()), true);
+  await page.waitForFunction(() => !document.getElementById('alarmSheet'));
   assert.equal(await page.evaluate(() => window.AskerStoreAlarm.appBack()), false);
   await sh(`am force-stop ${PKG}`);
   console.log('WEBVIEW OK: the page works inside the real app');
