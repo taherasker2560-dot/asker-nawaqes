@@ -204,3 +204,72 @@ run('Store music: the score tool still renders in a real browser (all eight piec
   out.push({first,sec:buf.duration,peak,lateRms:Math.sqrt(late/n)})}return out});
  for(const x of r){assert.equal(Math.round(x.sec),8);assert.ok(x.peak>0.05,'piece '+x.first+' is not silent: '+x.peak);assert.ok(x.peak<2.5,'piece '+x.first+' is not wildly loud (the render tool scales every file under 0.98): '+x.peak);assert.ok(x.lateRms>0.005,'piece '+x.first+' is heard: '+x.lateRms)}
 });
+
+// ---- the promo voice (owner 2026-11-18: a spoken advert over the music, voice Orus, soft; once, then not again for a few days) ----
+// The function asker-dose is answered by the test (a small made-up WAV); the audio fakes are the ones above, plus a note of every gain the page makes.
+const makeWav=()=>{const n=24000,pcm=Buffer.alloc(n*2);for(let i=0;i<n;i++)pcm.writeInt16LE(Math.round(3000*Math.sin(i/20)),i*2);const h=Buffer.alloc(44);h.write('RIFF',0);h.writeUInt32LE(36+pcm.length,4);h.write('WAVEfmt ',8);h.writeUInt32LE(16,16);h.writeUInt16LE(1,20);h.writeUInt16LE(1,22);h.writeUInt32LE(24000,24);h.writeUInt32LE(48000,28);h.writeUInt16LE(2,32);h.writeUInt16LE(16,34);h.write('data',36);h.writeUInt32LE(pcm.length,40);return Buffer.concat([h,pcm])};
+const NOTE_GAINS=()=>{const o=window.AudioContext.prototype.createGain;window.__gains=[];window.AudioContext.prototype.createGain=function(){const g=o.call(this);window.__gains.push(g);return g}};
+const serveAdvert=async(page,{status=200}={})=>{const asked=[],cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST, OPTIONS'},wav=makeWav();
+ await page.route('**/functions/v1/asker-dose',route=>{const q=route.request();if(q.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});asked.push(JSON.parse(q.postData()));
+  return status===200?route.fulfill({status:200,headers:{...cors,'content-type':'application/octet-stream'},body:wav}):route.fulfill({status,headers:cors,body:'{"error":"x"}'})});return asked};
+const promo=page=>page.evaluate(()=>window.AskerStoreMusic.promoState());
+const fast=(page,s)=>page.evaluate(s=>{window.AskerStoreMusic.PROMO.delay=s},s);
+
+run('Store music: the promo voice — a few seconds after the music, soft, once; the same phone does not hear it again for days; it comes back from the phone\'s own copy when due',async({page,base})=>{
+ await page.addInitScript(FAKE);await page.addInitScript(NOTE_GAINS);const asked=await serveAdvert(page);
+ await open(page,base);await fast(page,0.4);
+ assert.deepEqual(await promo(page),{armed:false,playing:false,done:false},'nothing before the music is sounding');
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing);
+ assert.deepEqual(asked,[{action:'promo',voice:'Orus'}],'it asks the function for the Orus advert and sends nothing else');
+ assert.equal(await sounding(page),true,'the music goes on under it');
+ const gains=await page.evaluate(()=>window.__gains.map(g=>g.gain.value));assert.ok(gains.includes(0.21),'the voice is played through its own soft gain: '+gains);
+ const pe=await page.evaluate(()=>({el:window.__audio.madeEl,attr:window.__audio.el.getAttribute('data-music'),src:window.__audio.el.src.slice(0,5),paused:window.__audio.el.paused}));
+ assert.deepEqual(pe,{el:2,attr:'promo',src:'blob:',paused:false},'a second audio element, marked as ours (the music does not step aside for it)');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_promo_day')),await page.evaluate(()=>window.AskerStoreMusic.dayKey()),'counted for today once it really started');
+ // it ends: the music goes on alone
+ await page.evaluate(()=>window.__audio.el.dispatchEvent(new Event('ended')));
+ assert.equal((await promo(page)).playing,false);assert.equal(await sounding(page),true);
+ // the next visit, the same day: no advert (nothing asked, no second element)
+ await page.reload();await page.waitForFunction(()=>window.AskerStoreMusic);await fast(page,0.4);
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());await page.waitForTimeout(1200);
+ assert.equal((await promo(page)).playing,false,'not again the same day');assert.equal(await page.evaluate(()=>window.__audio.madeEl),1);assert.equal(asked.length,1);
+ // four days later: due again, and the phone has its own copy: the function is not asked a second time
+ await page.evaluate(()=>{const d=new Date();d.setDate(d.getDate()-4);localStorage.setItem('asker_store_promo_day',window.AskerStoreMusic.dayKey(d))});
+ await page.reload();await page.waitForFunction(()=>window.AskerStoreMusic);await fast(page,0.4);
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing);
+ assert.equal(asked.length,1,'the second hearing comes from the phone\'s copy');
+},{home:true});
+
+run('Store music: the promo voice — the button stops it with the music; a locked phone cancels it before it starts; no network: no advert and no retry, the music goes on',async({page,base})=>{
+ await page.addInitScript(FAKE);const asked=await serveAdvert(page);
+ await open(page,base);await fast(page,0.4);
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing);
+ await page.click('.mus-btn');await page.waitForFunction(()=>!window.AskerStoreMusic.sounding());
+ assert.equal((await promo(page)).playing,false,'the stop button silences the advert too');
+ assert.equal(await page.evaluate(()=>window.__audio.el.paused),true);
+ // another visit (not yet heard: the first one never counted?) it did count: clear it, and lock the phone before the advert is due
+ await page.evaluate(()=>{localStorage.removeItem('asker_store_promo_day');localStorage.removeItem('asker_store_music_off')});
+ await page.reload();await page.waitForFunction(()=>window.AskerStoreMusic);await fast(page,1.2);
+ const before=asked.length;
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'))});
+ await page.waitForTimeout(1900);
+ assert.equal(asked.length,before,'a locked phone never even asks for the advert');assert.deepEqual(await promo(page),{armed:false,playing:false,done:false});
+},{home:true});
+
+run('Store music: the promo voice — the function is down: no advert, no retry in the visit, the music is not touched',async({page,base})=>{
+ await page.addInitScript(FAKE);const asked=await serveAdvert(page,{status:500});
+ await open(page,base);await fast(page,0.3);
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.promoState().done);
+ assert.equal(await sounding(page),true);assert.equal(await page.evaluate(()=>window.__audio.madeEl),1,'no second element was made');
+ await page.waitForTimeout(900);assert.equal(asked.length,1,'asked once, no retry');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_promo_day')),null,'not counted as heard: tried again on a later visit');
+});
+
+run('Store music: the promo voice — never on the pharmacy\'s own phone',async({page,base})=>{
+ await page.addInitScript(FAKE);await page.addInitScript(()=>{try{localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"fake":true}')}catch(e){}});
+ const asked=await serveAdvert(page);await open(page,base);await fast(page,0.2);
+ await page.mouse.click(190,420);await page.waitForTimeout(900);
+ assert.equal(asked.length,0,'the function is never asked');assert.equal(await page.evaluate(()=>window.__audio.madeEl),0);
+});

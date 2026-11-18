@@ -38,6 +38,20 @@
     stop: 'وقّف الموسيقى الهادية',
     start: 'شغّل الموسيقى الهادية',
   };
+  // The promo voice (owner 2026-11-18: «صوت ترويجي بأسلوب مذيع يسوّق للصيدلية، والموسيقى تفضل تحته وصوته أعلى منها حاجة بسيطة»; picked the voice Orus; «أوطى شوية، ما يبقاش مزعج»).
+  // ONE spoken advert from the function asker-dose (action 'promo': a fixed text kept on the server), played over the music `delay` seconds after the music is sounding, then not again for
+  // `everyDays` days on that phone. The voice is meant to sit about 6 dB above the music: the file's speech is about -13.5 dBFS, the music at VOLUME about -33, so `gain` 0.21 lands the voice near
+  // -27 dBFS (soft on purpose; the owner heard the first samples much louder and asked for quieter). It never plays on the pharmacy's phone, nor when the customer stopped the music; the same
+  // button stops both. `file` names the kept copy: change it when the advert's text changes on the server.
+  const PROMO = { on: true, voice: 'Orus', delay: 12, everyDays: 3, gain: 0.21, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v1-orus' };
+  const dayKey = (d) => { const x = d || new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  // is the advert due: never heard on this phone, or the last time was `every` days ago or more (a clock set back counts as due)
+  function promoDue(last, today, every) {
+    if (!last || !/^\d{4}-\d{2}-\d{2}$/.test(String(last))) return true;
+    const t = (s) => { const p = String(s).split('-').map(Number); return Date.UTC(p[0], p[1] - 1, p[2]) / 86400000; };
+    const gap = t(today) - t(last);
+    return !(gap >= 0 && gap < every);
+  }
 
   // ---------- pure logic (tests/store-music.cjs) ----------
   // the pharmacy's own phone: the owner's bot is signed in there (the same test store/account.js uses)
@@ -57,7 +71,7 @@
     return a;
   }
 
-  const api = { isPharmacyPhone, modeOf, wanted, nextRound, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE };
+  const api = { isPharmacyPhone, modeOf, wanted, nextRound, promoDue, dayKey, PROMO, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -73,6 +87,55 @@
   const sounding = () => !!ctx && ctx.state === 'running' && target > 0 && !!el && !el.paused;
   api.sounding = sounding;
   api.track = () => last;
+
+  // ---------- the promo voice ----------
+  let pTimer = null, pEl = null, pUrl = null, pRun = 0, pArmed = false, pDone = false;   // pDone: heard (or failed) in this page's life: never twice
+  api.promoState = () => ({ armed: pArmed, playing: !!pEl, done: pDone });
+  function promoStop() {   // quiet the advert, or cancel a waiting one: the music went quiet (stopped, hidden, a voice note) or the advert ended
+    pRun++; pArmed = false; clearTimeout(pTimer); pTimer = null;
+    if (pEl) { try { pEl.pause(); } catch (e) { /* gone */ } pEl = null; }
+    if (pUrl) { try { URL.revokeObjectURL(pUrl); } catch (e) { /* gone */ } pUrl = null; }
+  }
+  function promoArm() {   // the music is sounding: wait a few seconds, then say it, if this phone is due
+    if (!PROMO.on || pArmed || pDone || !!pEl) return;
+    if (!promoDue(store((ls) => ls.getItem(PROMO.key)), dayKey(), PROMO.everyDays)) return;
+    pArmed = true; pTimer = setTimeout(promoGo, PROMO.delay * 1000);
+  }
+  // the advert's WAV: kept on the phone after the first time, else asked from the function (nothing is sent but «which voice»)
+  async function promoBlob() {
+    const key = 'https://asker-store-promo.invalid/' + PROMO.file;
+    try { if (root.caches) { const r = await (await root.caches.open(PROMO.cache)).match(key); if (r) { const b = await r.blob(); if (b && b.size > 1000) return b; } } } catch (e) { /* no cache */ }
+    const S = root.AskerStore;
+    if (!S || !S.SUPABASE_URL || !S.SUPABASE_KEY || typeof root.fetch !== 'function') return null;
+    const ac = typeof AbortController === 'function' ? new AbortController() : null, t = setTimeout(() => { if (ac) ac.abort(); }, 30000);
+    try {
+      const r = await root.fetch(String(S.SUPABASE_URL).replace(/\/$/, '') + '/functions/v1/asker-dose', { method: 'POST', signal: ac ? ac.signal : undefined, headers: { 'Content-Type': 'application/json', apikey: S.SUPABASE_KEY, Authorization: 'Bearer ' + S.SUPABASE_KEY }, body: JSON.stringify({ action: 'promo', voice: PROMO.voice }) });
+      if (!r.ok) return null;
+      const b = new Blob([await r.arrayBuffer()], { type: 'audio/wav' });
+      if (b.size < 10000) return null;
+      try { if (root.caches) await (await root.caches.open(PROMO.cache)).put(key, new Response(b, { headers: { 'Content-Type': 'audio/wav' } })); } catch (e) { /* not kept: asked again next time */ }
+      return b;
+    } catch (e) { return null; } finally { clearTimeout(t); }
+  }
+  async function promoGo() {
+    pTimer = null;
+    const run = ++pRun, ok = () => run === pRun && mode === 'auto' && !document.hidden && holds.size === 0 && sounding();
+    if (!ok()) { pArmed = false; return; }   // the music went quiet meanwhile: the next time it plays, it is armed again
+    const blob = await promoBlob();
+    if (!blob) { pDone = true; pArmed = false; return; }   // no network / no advert: no retry in this visit
+    if (!ok()) { if (run === pRun) pArmed = false; return; }
+    try {
+      const a = new root.Audio(); a.setAttribute('data-music', 'promo');   // our own sound: the music does not step aside for it, and the voice-note rule does not count it
+      pUrl = URL.createObjectURL(blob); a.src = pUrl;
+      const g = ctx.createGain(); g.gain.value = PROMO.gain;
+      ctx.createMediaElementSource(a).connect(g); g.connect(ctx.destination);
+      a.addEventListener('playing', () => { pDone = true; store((ls) => ls.setItem(PROMO.key, dayKey())); });   // counted once it really starts
+      a.addEventListener('ended', promoStop);
+      a.addEventListener('error', () => { pDone = true; promoStop(); });
+      pEl = a;
+      const p = a.play(); if (p && p.catch) p.catch(() => { pDone = true; promoStop(); });
+    } catch (e) { pDone = true; promoStop(); }
+  }
 
   function ramp(to, secs) {
     const p = gain.gain, now = ctx.currentTime;
@@ -112,7 +175,7 @@
     ctx.onstatechange = () => { sync(); };
     el.addEventListener('ended', next);
     el.addEventListener('error', fail);
-    el.addEventListener('playing', () => { failed = 0; draw(); });
+    el.addEventListener('playing', () => { failed = 0; draw(); promoArm(); });
     el.addEventListener('pause', draw);
     next();
     return true;
@@ -128,6 +191,7 @@
       if (ctx.state !== 'running') { const p = ctx.resume(); if (p && p.catch) p.catch(() => { /* the browser wants a tap first: the next one starts it */ }); draw(); return; }
       if (target !== VOLUME) { target = VOLUME; ramp(VOLUME, FADE_IN); }
     } else if (ctx) {
+      promoStop();   // the music is going quiet: the advert goes with it
       if (target !== 0) { target = 0; if (ctx.state === 'running') ramp(0, document.hidden ? 0.05 : FADE_OUT); }
       if (!suspendTimer && (!el.paused || ctx.state === 'running')) {
         suspendTimer = setTimeout(() => {
