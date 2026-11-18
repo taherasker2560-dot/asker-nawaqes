@@ -729,10 +729,11 @@
       (pharmacy || A ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
   }
   // the link of the button (an Android intent: link): opens the app with the customer's link (?me=) and the alarms he made here; with no app on the phone Chrome goes to the download instead
-  function appLink() {
+  // sheet: false = the app opens on the store, not on its alarm sheet (the site's «install» button, owner 2026-11-18: the customer gets the app instead of the installed page)
+  function appLink(sheet) {
     const acc = root.AskerStoreAccount, t = acc && acc.token ? acc.token() : '';
     const mine = data.items.length ? 'S.alarms=' + encodeURIComponent(JSON.stringify({ v: 1, speak: data.speak, items: data.items })) + ';' : '';
-    return 'intent://alarm' + (t ? '?me=' + t : '') + '#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;S.sheet=1;' + mine + 'S.browser_fallback_url=' + encodeURIComponent(APK_URL) + ';end';
+    return 'intent://alarm' + (t ? '?me=' + t : '') + '#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;' + (sheet === false ? '' : 'S.sheet=1;') + mine + 'S.browser_fallback_url=' + encodeURIComponent(APK_URL) + ';end';
   }
   // «🔍 فحص المنبه»: the app answers what the phone says (notifications, the exact-alarm permission, the alarm volume, do-not-disturb, the battery rule, the sound files, the last rings), written in plain Arabic
   function appDiag() {
@@ -874,7 +875,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
   window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
 
-  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice, appBack };
+  root.AskerStoreAlarm = { appLink, tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice, appBack };
   schedule();
   if (openedBy) doseOpened(openedBy);
   // inside the app (owner 2026-11-18: «ب طبعا»: one app, the store itself) the store comes first like on the site; the alarm sheet opens by itself only when the app was opened FROM the site's
