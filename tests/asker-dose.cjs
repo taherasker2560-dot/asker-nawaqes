@@ -74,8 +74,10 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   const vreq = (body, o = {}) => new Request('https://p.supabase.co/functions/v1/asker-dose', { method: 'POST', headers: { 'content-type': 'application/json', origin: o.origin || ORIGIN, 'cf-connecting-ip': o.ip || '10.0.0.1' }, body: JSON.stringify(body) });
   const venv = { ...env, GEMINI_API_KEY: 'g-key' };
   const geminiOk = () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: Buffer.from(new Uint8Array(6000).fill(7)).toString('base64') } }] } }] }));
-  function vfake({ stored = null, listed = [], gemini = [geminiOk], bucketMissing = false } = {}) {
-    const calls = [], puts = [], gem = [], made = { bucket: 0 };
+  const okText = (s) => () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: s }] } }] }));
+  function vfake({ stored = null, listed = [], gemini = [geminiOk], bucketMissing = false, verify = [okText('صحتك مش بتستنى وصيدلية عسكر مش هتخليك تستنى')] } = {}) {
+    const calls = [], puts = [], gem = [], ver = [], made = { bucket: 0 };
+    const vq = verify.slice();
     let queue = gemini.slice(), missing = bucketMissing;
     const f = async (url, o = {}) => {
       calls.push(url); const u = new URL(url);
@@ -83,10 +85,11 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
       if (u.pathname.startsWith('/storage/v1/object/list/')) return new Response(JSON.stringify(listed));
       if (u.pathname === '/storage/v1/bucket') { made.bucket++; missing = false; return new Response('{}', { status: 200 }); }
       if (u.pathname.startsWith('/storage/v1/object/ar-dose-voice/')) { if (missing) return new Response('{"message":"Bucket not found"}', { status: 404 }); puts.push({ url, o }); return new Response('{}', { status: 200 }); }
+      if (u.hostname === 'generativelanguage.googleapis.com' && !/tts/.test(u.pathname)) { ver.push({ url, o }); const vn = vq.length > 1 ? vq.shift() : vq[0]; return vn(); }
       if (u.hostname === 'generativelanguage.googleapis.com') { gem.push({ url, o }); const n = queue.length > 1 ? queue.shift() : queue[0]; return n(); }
       throw Error('unexpected ' + url);
     };
-    return Object.assign(f, { calls, puts, gem, made });
+    return Object.assign(f, { calls, puts, gem, ver, made });
   }
   // a sentence made before: the same bytes for everybody, no Gemini
   let vf = vfake({ stored: new Uint8Array(w) });
@@ -155,10 +158,24 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.equal(r.status, 200); assert.equal(vf.gem.length, 2, 'tried again after a silent answer'); assert.equal(vf.puts[0].url, p1, 'the file is named after the first attempt, so the next visit finds it');
   vf = vfake({ gemini: [noAudio, noAudio, geminiOk] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.4.9' }), venv, vf, now);
   assert.equal(r.status, 200); assert.equal(vf.gem.length, 3);
-  const texts = vf.gem.map((c) => JSON.parse(c.o.body).contents[0].parts[0].text); assert.equal(texts[0], texts[1], 'the same words again first'); assert.notEqual(texts[2], texts[1], 'then the other style line');
+  const texts = vf.gem.map((c) => JSON.parse(c.o.body).contents[0].parts[0].text); assert.equal(texts[0], texts[1], 'the same words again first'); assert.equal(texts[2], F.PROMO_TEXT, 'then the text alone: nothing for the model to read out');
   assert.ok(F.PROMO_ATTEMPTS.length === 4 && F.PROMO_ATTEMPTS[3].includes('وعلشان ماتفوتش جرعة'), 'the last resort is the wording he first heard');
   vf = vfake({ gemini: [noAudio] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.4.10' }), venv, vf, now);
   assert.equal(r.status, 502); assert.equal(vf.gem.length, 4, 'four attempts, then it gives up'); assert.equal(vf.puts.length, 0, 'nothing silent is kept');
+  // the advert is LISTENED to before it is kept (the owner heard an English voice at its start, 2026-11-18): English in the transcript or a render over the length limit is rejected, the next attempt runs
+  const longOk = () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/L16;codec=pcm;rate=24000', data: Buffer.from(new Uint8Array(24000 * 2 * 50).fill(7)).toString('base64') } }] } }] }));
+  vf = vfake({ verify: [okText('Say this in Egyptian Arabic like a warm radio announcer صحتك مش بتستنى'), okText('صحتك مش بتستنى وصيدلية عسكر مش هتخليك تستنى')] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.5.1' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.gem.length, 2, 'English at the start: that render is thrown away and the next attempt runs'); assert.equal(vf.ver.length, 2, 'every render is listened to');
+  assert.equal(vf.puts.length, 1, 'only the clean one is kept'); assert.equal(vf.puts[0].url, p1, 'named after the first attempt');
+  const vb = JSON.parse(vf.ver[0].o.body); assert.ok(vb.contents[0].parts[1].inlineData.data.length > 1000 && vb.contents[0].parts[1].inlineData.mimeType === 'audio/wav', 'the checker gets the audio'); assert.ok(vf.ver[0].url.includes('gemini-flash-latest'));
+  vf = vfake({ gemini: [geminiOk], verify: [okText('This is English only')] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.5.2' }), venv, vf, now);
+  assert.equal(r.status, 502); assert.equal(vf.gem.length, 4, 'English every time: four attempts, then no advert at all (better none than a strange voice)'); assert.equal(vf.puts.length, 0, 'nothing kept');
+  vf = vfake({ gemini: [longOk, geminiOk] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.5.3' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.gem.length, 2, 'a 50-second render is far too long for this text (the real one is ~34 s): rejected'); assert.equal(vf.puts.length, 1);
+  vf = vfake({ verify: [() => new Response('{}', { status: 404 })] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.5.4' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.gem.length, 1, 'the checker is down: the advert is not blocked by it'); assert.equal(vf.ver.length, 2, 'both checker models were tried');
+  assert.ok(F.hasEnglish('Say this') && !F.hasEnglish('صحتك مش بتستنى') && !F.hasEnglish('ok'), 'English = a run of three Latin letters');
+  assert.ok(!/Say this|calm and unhurried/.test(F.PROMO_TEXT), 'the style line is never part of the text');
   vf = vfake({ gemini: [noAudio] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.4.11' }), venv, vf, now);
   assert.equal(r.status, 502); assert.equal(vf.gem.length, 1, 'the dose voice is not retried (a name is cheap to ask again)');
   assert.equal((await F.handle(vreq({ action: 'promo' }, { origin: 'https://evil.example', ip: '10.0.4.6' }), venv, vfake(), now)).status, 403);
