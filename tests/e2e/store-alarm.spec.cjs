@@ -438,6 +438,59 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
 const ANDROID_UA='Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 const withUa=(page,ua)=>page.addInitScript((u)=>{Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=>u})},ua);
+run('Account movement alerts (owner 2026-11-18, «🔔 تنبيه حركة الحساب»): the owner of the account has the tile; a tap asks for the notifications, registers the account worker (scope store/acct/), subscribes with the public key and tells the server this phone\'s address with his link; a second tap turns it off; a refusal from the server is said; nothing on the pharmacy\'s own phone or inside the Android app',async({page,base})=>{
+ await setup(page,'default');
+ await page.addInitScript(()=>{window.__fakeRpcs.ar_account_push_save=()=>({ok:true});if(localStorage.getItem('__keepsub'))window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)}});   // (on every load, so the address told again after a reload is recorded too; a real browser keeps its subscription, the fake one is told to)
+ await openAccount(page,base);
+ await page.waitForSelector('.ac-push-tile');
+ assert.equal(await text(page,'.ac-push-tile b'),'🔔 تنبيه حركة الحساب');
+ assert.match(await text(page,'.ac-push-tile small'),/اضغط عشان يوصلك إشعار لما يحصل حركة جديدة على حسابك/);
+ await page.click('.ac-push-tile');
+ await page.waitForSelector('.ac-push-tile.on');
+ assert.match(await text(page,'.ac-push-tile small'),/✓ شغّال: هيجيلك إشعار/);
+ assert.deepEqual(await page.evaluate(()=>window.__swReg),['store/acct/sw.js','store/acct/'],'its own worker and scope');
+ assert.equal(await page.evaluate(()=>window.__subs),1);
+ const saves=()=>page.evaluate(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_account_push_save').map(x=>x.args));
+ assert.deepEqual(await saves(),[{p_token:tok,p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_on:true}],'the server gets the address and his link, nothing else');
+ // a later open tells the server the address again (the push service may have changed it)
+ await page.evaluate(()=>localStorage.setItem('__keepsub','1'));
+ await page.reload();await page.waitForSelector('.ac-push-tile.on');
+ await page.waitForFunction(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_account_push_save').length>=1);
+ assert.deepEqual(await saves(),[{p_token:tok,p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_on:true}],'the same address, told again');
+ // off: the server forgets the address
+ await page.click('.ac-push-tile');
+ await page.waitForFunction(()=>!document.querySelector('.ac-push-tile.on'));
+ assert.equal((await saves()).pop().p_on,false);
+ assert.match(await text(page,'.ac-push-tile small'),/اضغط عشان يوصلك إشعار/);
+ // the server refuses (a person of his house, a bad link): it is said, and it stays off
+ await page.evaluate(()=>{window.__fakeRpcs.ar_account_push_save=()=>({ok:false,error:'not_owner'})});
+ await page.click('.ac-push-tile');
+ await page.waitForFunction(()=>/ما اتفعّلش/.test((document.querySelector('.ac-push-tile small')||{}).textContent||''));
+ assert.equal(await page.$('.ac-push-tile.on'),null);
+ // the pharmacy's own phone (the system is signed in): no tile
+ await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
+ await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
+ assert.equal(await page.$('.ac-push-tile'),null,'not on the pharmacy\'s phone');
+},{home:true});
+
+run('Account movement alerts: the account worker shows «فيه حركة جديدة على حسابك» and nothing else (no amount, no name), and a tap opens the account page; nothing inside the Android app',async({page,base})=>{
+ await setup(page,'granted');await page.addInitScript(APPFAKE);
+ await openAccount(page,base);await page.waitForSelector('.al-setup, .ac-al-tile');
+ assert.equal(await page.$('.ac-push-tile'),null,'a WebView has no web push: the tile is not offered inside the app');
+ // the worker file itself: run it with a fake worker scope
+ const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','..','store','acct','sw.js'),'utf8');
+ const shown=await page.evaluate((code)=>{
+  const handlers={},out={shown:[],opened:[]};
+  const self={registration:{scope:'https://x.test/asker-nawaqes/store/acct/',showNotification:async(t,o)=>{out.shown.push([t,o])}},skipWaiting(){},clients:{claim(){},matchAll:async()=>[],openWindow:async(u)=>{out.opened.push(u)}},addEventListener(t,f){handlers[t]=f}};
+  new Function('self',code)(self);
+  const waits=[];handlers.push({waitUntil:(p)=>waits.push(p)});
+  return Promise.all(waits).then(()=>{const c={notification:{close(){},data:out.shown[0][1].data},waitUntil:(p)=>waits.push(p)};handlers.notificationclick(c);return Promise.all(waits)}).then(()=>out);
+ },src);
+ assert.equal(shown.shown.length,1);assert.equal(shown.shown[0][0],'صيدلية عسكر');assert.equal(shown.shown[0][1].body,'فيه حركة جديدة على حسابك، دوس عشان تشوفها');
+ assert.ok(!/\d/.test(shown.shown[0][1].body),'no amount in the notification');
+ assert.deepEqual(shown.opened,['https://x.test/asker-nawaqes/store.html#account'],'a tap opens the account page');
+},{home:true});
+
 run('Dose alarm inside the app: the «🔧 جهّز موبايلك» card (owner 2026-11-18, a Redmi: «عايز حاجة في متناول المستخدم الغبي»): one big button per missing step (battery question, the maker\'s autostart screen + «✓ عملتها»), a real-alarm test whose answer (waiting, failed, ok) comes from the phone, and a plain «موبايلك جاهز» when all is done',async({page,base})=>{
  await setup(page,'granted');await page.addInitScript(APPFAKE);
  await page.addInitScript(()=>{window.__app.battery=false;window.__app.autostart=true;window.__app.selftest='none'});

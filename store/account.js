@@ -355,6 +355,8 @@
         if (root.AskerStoreFamily) root.AskerStoreFamily.attach(client, token, st.me.role !== 'member', draw);
         if (root.AskerStoreRegular) root.AskerStoreRegular.load(client, token, { moves: () => st.moves, redraw: draw });   // his regular items (store/regular.js); the buttons appear when they arrive
         if (root.AskerStoreAlarm && root.AskerStoreAlarm.attach) root.AskerStoreAlarm.attach(client);   // the dose alarm's push (store/alarm.js, stage 2)
+        // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): only the owner of the account, never the pharmacy's own phone
+        if (root.AskerStoreAcctPush) root.AskerStoreAcctPush.attach(client, token, st.me.role !== 'member' && !pharmacyPhone);
         const ph = $('cPhone');
         if (ph && !ph.value && data.phone) ph.value = /^20\d{10}$/.test(data.phone) ? '0' + data.phone.slice(2) : data.phone;
         drawPay();
@@ -473,6 +475,10 @@
     // «👨‍👩‍👧 أهل البيت» (2026-11-18, store/family.js): the owner of the account sends the app to his house and controls it (nothing for a person of the house)
     const fam = root.AskerStoreFamily ? root.AskerStoreFamily.tileHtml() : '';
     html += fam ? `<div class="ac-al-wrap">${fam}</div>` : '';
+    // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): a phone notification when a new movement reaches his account («فيه حركة جديدة على حسابك», no amounts); nothing for a person of his house.
+    // Last of the tiles: the tests pin the order alarm → prescription → complaint → house.
+    const pushTile = root.AskerStoreAcctPush ? root.AskerStoreAcctPush.tileHtml() : '';
+    html += pushTile ? `<div class="ac-al-wrap">${pushTile}</div>` : '';
     const wa = waHref();
     html += `<div class="ac-row">${hide ? '' : `<button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>`}` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
