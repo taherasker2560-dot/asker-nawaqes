@@ -5,6 +5,9 @@ const http = require('node:http'), fs = require('node:fs'), path = require('node
 const { _android: android } = require('playwright');
 const repo = path.resolve(__dirname, '..', '..');
 const PKG = 'com.askerpharmacy.alarm';
+// PAGE_BASE set (a manual run of the workflow): the page as the customers have it (https://taherasker2560-dot.github.io/asker-nawaqes/store.html) instead of this repository's copy,
+// and the server's voice file MUST arrive in the app (the function accepts only that origin, so the CI copy cannot ask it)
+const LIVE = process.env.PAGE_BASE || '';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg' };
 const server = http.createServer((q, r) => {
   const u = new URL(q.url, 'http://x'), f = path.join(repo, decodeURIComponent(u.pathname));
@@ -13,7 +16,7 @@ const server = http.createServer((q, r) => {
 });
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 (async () => {
-  await new Promise((ok) => server.listen(8123, '0.0.0.0', ok));
+  if (!LIVE) await new Promise((ok) => server.listen(8123, '0.0.0.0', ok));
   const [device] = await android.devices();
   assert.ok(device, 'no android device');
   const sh = async (c) => (await device.shell(c)).toString();
@@ -21,7 +24,7 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   // a clean start: no data, no old alarm, notifications allowed
   await sh(`pm clear ${PKG}`);
   await sh(`pm grant ${PKG} android.permission.POST_NOTIFICATIONS`);
-  await sh(`am start -n ${PKG}/.MainActivity --es base http://10.0.2.2:8123/store.html`);
+  await sh(`am start -n ${PKG}/.MainActivity --es base ${LIVE || 'http://10.0.2.2:8123/store.html'}`);
   const wv = await device.webView({ pkg: PKG }, { timeout: 90000 });
   const page = await wv.page();
   console.log('webview page', page.url());
@@ -49,8 +52,9 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   assert.match(dump, /com\.askerpharmacy\.alarm\.FIRE/, 'the system has the alarm clock');
   // the sound file: the page asked the server's voice function and handed the file over (soft: the server and the internet are not this test's business)
   let voices = '';
-  for (let k = 0; k < 40; k++) { voices = await sh(`run-as ${PKG} ls files/voice`); if (/\.wav/.test(voices)) break; await sleep(1000); }
+  for (let k = 0; k < (LIVE ? 90 : 40); k++) { voices = await sh(`run-as ${PKG} ls files/voice`); if (/\.wav/.test(voices)) break; await sleep(1000); }
   console.log('voice files:', voices.trim() || '(none)');
+  if (LIVE) assert.match(voices, /\.wav/, 'the live page got the sentence from the server and handed it to the app');
   // what the page itself got from the server's voice function (soft: this page is served from the CI machine, so the function's origin rule may refuse it; the live page is checked separately)
   const vb = await page.evaluate(async () => { const r = await window.AskerStoreAlarm.voiceBlob('Pemojet', 20000); return r.blob ? { ok: true, size: r.blob.size, from: r.from } : { ok: false, error: r.error }; });
   console.log('voice from the page:', JSON.stringify(vb));

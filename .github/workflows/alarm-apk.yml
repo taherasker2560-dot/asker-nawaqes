@@ -9,6 +9,11 @@ on:
       - 'alarm-android/**'
       - '.github/workflows/alarm-apk.yml'
   workflow_dispatch:
+    inputs:
+      page_base:
+        description: 'The page the emulator test opens inside the app (empty = this repository copy). For the live page: https://taherasker2560-dot.github.io/asker-nawaqes/store.html'
+        required: false
+        default: ''
   schedule:
     - cron: '23 4 * * 1'   # weekly: touch the signing key's cache so GitHub never evicts it (a new key would stop customers from updating in place)
 permissions:
@@ -99,6 +104,8 @@ jobs:
       - name: Playwright
         run: npm install --no-save --prefix alarm-android/ci playwright@1.48.2
       - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          PAGE_BASE: ${{ github.event.inputs.page_base }}
         with:
           api-level: 34
           arch: x86_64
