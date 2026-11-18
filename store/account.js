@@ -467,9 +467,6 @@
     html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
     // «⏰ منبه الدوا» (2026-11-17, store/alarm.js): the customer's own dose reminders, kept on his phone
     html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
-    // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): a phone notification when a new movement reaches his account («فيه حركة جديدة على حسابك», no amounts); nothing for a person of his house
-    const pushTile = root.AskerStoreAcctPush ? root.AskerStoreAcctPush.tileHtml() : '';
-    html += pushTile ? `<div class="ac-al-wrap">${pushTile}</div>` : '';
     // «📋 ابعت الروشتة» (2026-11-18, owner: «مكان مخصص للعميل يبعت الروشتة على الصفحة عشان القراءة الأوتوماتيك»; WhatsApp later): a page of its own that sends the photos as an order the pharmacy reads (in the pharmacy's look it shows too, but sends nothing)
     const rxTile = root.AskerStoreRx ? root.AskerStoreRx.tileHtml() : '';
     html += rxTile ? `<div class="ac-al-wrap">${rxTile}</div>` : '';
@@ -478,6 +475,10 @@
     // «👨‍👩‍👧 أهل البيت» (2026-11-18, store/family.js): the owner of the account sends the app to his house and controls it (nothing for a person of the house)
     const fam = root.AskerStoreFamily ? root.AskerStoreFamily.tileHtml() : '';
     html += fam ? `<div class="ac-al-wrap">${fam}</div>` : '';
+    // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): a phone notification when a new movement reaches his account («فيه حركة جديدة على حسابك», no amounts); nothing for a person of his house.
+    // Last of the tiles: the tests pin the order alarm → prescription → complaint → house.
+    const pushTile = root.AskerStoreAcctPush ? root.AskerStoreAcctPush.tileHtml() : '';
+    html += pushTile ? `<div class="ac-al-wrap">${pushTile}</div>` : '';
     const wa = waHref();
     html += `<div class="ac-row">${hide ? '' : `<button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>`}` +
       // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
