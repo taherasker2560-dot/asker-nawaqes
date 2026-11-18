@@ -8,6 +8,7 @@ const CUSTOMERS=[
  {id:202,name:'عميل قديم صغير',credit_limit:10000,balance:400,last_at:ago(95),last_kind:'payment',moves:2},
  {id:203,name:'عميل حديث',credit_limit:10000,balance:800,last_at:ago(5),last_kind:'sale',moves:2},
  {id:204,name:'دافع مقدم',credit_limit:10000,balance:-100,last_at:ago(80),last_kind:'payment',moves:1},
+ {id:2905,name:'عميل توصيل قديم',credit_limit:null,balance:5000,last_at:ago(100),last_kind:'sale',moves:2,kind:'pickup'},   // a delivery customer's silence is not an «old debt»: not on the home row, not in the list
 ];
 run('Old debts: the home row, the list by days, biggest first, the reminder (WhatsApp or copied)',async({page})=>{
  await page.evaluate(([c,at])=>{window.__tables.ar_customers=c;window.__tables.ar_customer_moves=[];

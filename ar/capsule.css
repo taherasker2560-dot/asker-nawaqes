@@ -168,6 +168,8 @@ html.cap-still .appbar::after, html.cap-still .hero::before, html.cap-still .her
 }
 .cu-row.warn { border-inline-start: 0; box-shadow: 0 0 0 2px var(--crimson), var(--sh-1); }
 .cu-row.warn::before { background: var(--crimson); color: #fff; }
+/* «عملاء التوصيل» (2026-11-19): a small tag on their row where they show among others (a name search from «الكل») */
+.cu-kind { display: inline-block; margin-inline-start: 6px; padding: 0 8px; border-radius: 999px; background: var(--tint-2); color: var(--muted); font-size: 11px; font-style: normal; font-weight: 700; }
 html.night .cu-row, html.night .cu-mv { box-shadow: 0 0 0 1px var(--line); }
 html.night .cu-row.warn { box-shadow: 0 0 0 2px var(--crimson); }
 .cu-amt { padding: 6px 14px; border-radius: 999px; background: color-mix(in srgb, currentColor 11%, transparent); text-align: center; }

@@ -25,6 +25,24 @@ assert.deepEqual(L.pick(C,'all','هدي').rows.map(c=>c.id),[103]);
 assert.deepEqual(L.pick(C,'all','٢٤٨٩').rows.map(c=>c.id),[2489]);
 assert.deepEqual(L.pick(C,'all','248').rows.map(c=>c.id),[2489],'3+ digits: the start of a code');
 const r=L.pick(C,'over','منى');assert.equal(r.view,'all');assert.deepEqual(r.rows.map(c=>c.id),[105]);
+// «عملاء التوصيل» (owner 2026-11-19; PharmaFly's delivery-customer cards, kind 'pickup'): the same accounts but APART. Not in the numbers, «عدّوا الحد», «عليهم», «ديون قديمة»; their own view;
+// a name search from «الكل» finds them, a late medicine («💊 مزمن») counts like anyone's.
+const D=[...C,
+ {id:2902,name:'عميل توصيل تجربة',credit_limit:0,balance:350,last_at:'2026-11-12T10:00:00',last_kind:'sale',kind:'pickup'},
+ {id:2903,name:'منى توصيل',credit_limit:null,balance:9000,last_at:'2026-08-01T10:00:00',last_kind:'sale',kind:'pickup'}];
+assert.equal(L.isPickup(D[6]),true);assert.equal(L.isPickup(C[0]),false,'no kind = a credit customer');assert.equal(L.isPickup(null),false);
+assert.deepEqual(L.creditOnly(D).map(c=>c.id),C.map(c=>c.id));
+assert.deepEqual(L.counts(L.creditOnly(D)),L.counts(C),'the credit numbers do not change when delivery customers exist');
+assert.deepEqual(L.counts(D.filter(L.isPickup)),{over:0,near:0,owing:2,prepaid:0,all:2,owed:9350,credit:0,net:9350},'their own numbers');
+assert.deepEqual(L.pick(D,'over','').rows.map(c=>c.id),[101,102]);
+assert.deepEqual(L.pick(D,'owing','').rows.map(c=>c.id),[102,101,103,2489],'owing: credit customers only');
+assert.equal(L.pick(D,'all','').rows.length,6,'the list «الكل» has the credit customers only');
+assert.deepEqual(L.pick(D,'pickup','').rows.map(c=>c.id),[2903,2902],'their own chip: most owed first');
+assert.deepEqual(L.pick(D,'pickup','تجربة').rows.map(c=>c.id),[2902],'searching inside their chip');
+assert.deepEqual(L.pick(D,'all','توصيل').rows.map(c=>c.id),[2902,2903],'a name search from «الكل» finds them too (by name)');
+assert.deepEqual(L.pick(D,'owing','منى').rows.map(c=>c.id),[],'a search from «عليهم» stays inside the credit customers');
+assert.equal(L.pick(D,'chronic','').rows.length,8,'«💊 مزمن» is about medicines: everyone');
+assert.deepEqual(L.oldCounts(L.creditOnly(D),60,new Date(2026,10,13)),L.oldCounts(C,60,new Date(2026,10,13)),'a delivery customer\'s old debt is not an «old debt»');
 // the balance in words
 assert.deepEqual(L.balanceText(7174.5),{cls:'owe',text:'عليه 7,174.50 ج'});
 assert.deepEqual(L.balanceText(-227.4),{cls:'paid',text:'ليه 227.40 ج'});
