@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -29,9 +30,14 @@ class MainActivity : Activity() {
     }
 
     private lateinit var web: WebView
+    // the page's address: always the pharmacy's own; only a debug build (the CI test) may be pointed somewhere else, with --es base <url>
+    private var base = BASE
+    private var baseHost = HOST
+    private val debuggable: Boolean get() = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (debuggable) WebView.setWebContentsDebuggingEnabled(true)
         web = WebView(this)
         setContentView(web)
         val s = web.settings
@@ -44,7 +50,7 @@ class MainActivity : Activity() {
         web.addJavascriptInterface(Bridge(this), "AskerAndroid")
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                if (request.url.host == HOST) return false
+                if (request.url.host == HOST || request.url.host == baseHost) return false
                 try { startActivity(Intent(Intent.ACTION_VIEW, request.url)) } catch (e: Exception) { /* no app for it */ }
                 return true
             }
@@ -76,7 +82,12 @@ class MainActivity : Activity() {
         val me = d?.getQueryParameter("me")?.takeIf { LINK.matches(it) }
         val alarms = i?.getStringExtra("alarms")
         if (!alarms.isNullOrEmpty() && alarms.length < 20_000) Store(this).seed = alarms
-        if (first || me != null || !alarms.isNullOrEmpty()) web.loadUrl(BASE + (if (me != null) "?me=$me" else ""))
+        val other = if (debuggable) i?.getStringExtra("base") else null
+        if (other != null) {
+            base = other
+            baseHost = Uri.parse(other).host ?: HOST
+        }
+        if (first || other != null || me != null || !alarms.isNullOrEmpty()) web.loadUrl(base + (if (me != null) "?me=$me" else ""))
     }
 
     private fun offline() {
@@ -84,7 +95,7 @@ class MainActivity : Activity() {
             null,
             "<html dir='rtl'><body style='font-family:sans-serif;text-align:center;padding:48px 20px;color:#222'><h2 style='color:#C0522A'>⏰ منبه الدوا</h2>" +
                 "<p>مفيش إنترنت دلوقتي. المنبهات اللي ضبطتها قبل كده <b>بترن عادي</b> حتى من غير نت.</p>" +
-                "<p>عشان تضيف أو تعدّل منبه، اتصل بالنت وبعدين:</p><p><a href='$BASE' style='color:#C0522A;font-size:20px'>جرّب تاني</a></p></body></html>",
+                "<p>عشان تضيف أو تعدّل منبه، اتصل بالنت وبعدين:</p><p><a href='$base' style='color:#C0522A;font-size:20px'>جرّب تاني</a></p></body></html>",
             "text/html", "utf-8", null,
         )
     }
