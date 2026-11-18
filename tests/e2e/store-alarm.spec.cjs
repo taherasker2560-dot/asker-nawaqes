@@ -349,6 +349,76 @@ run('Dose alarm: the page keeps a copy of the alarms that are ON (the name as it
  assert.equal((await push(20,0))[0][0],'⏰ ميعاد دواك','nothing on at 20:00 any more');
 },{home:true});
 
+// ---- 2026-11-18 (owner: «مش موافق عالحل ده … لو بتينا APK ينزل من الموقع»): the customer's Android app «منبه الدوا» (alarm-android/) is a WebView that shows THIS page; the app is what rings ----
+const APPFAKE=()=>{
+ window.__app={sets:[],voices:{},asks:[],tests:0,closed:0,seed:localStorage.getItem('__seed')||'',notif:true,fs:true};window.__invoked=[];
+ window.AskerAndroid={setAlarms:(j)=>{window.__app.sets.push(JSON.parse(j));window.__app.seed='';return true},seed:()=>window.__app.seed,hasVoice:(n)=>!!window.__app.voices[n],saveVoice:(n,b)=>{window.__app.voices[n]=b.length;return true},
+  status:()=>JSON.stringify({v:1,notifications:window.__app.notif,fullScreen:window.__app.fs}),ask:(k)=>{window.__app.asks.push(k)},testRing:()=>{window.__app.tests++},close:()=>{window.__app.closed++},version:()=>'1'};
+ window.__fakeInvokes={'asker-dose':async(b)=>{window.__invoked.push(b&&b.name);return {data:new Blob([new Uint8Array(3000)],{type:'audio/wav'}),error:null}}};
+};
+run('Dose alarm inside the Android app: the alarm sheet is the screen, the alarms that are ON (his own, the browser\'s seed, the pharmacy\'s) are handed to the app, the page never rings or asks for notifications, the sound files are handed over once, the app\'s needs and test ring work, back and close leave through the app',async({page,base})=>{
+ await setup(page,'granted');
+ await page.addInitScript(APPFAKE);
+ await page.evaluate(()=>{localStorage.setItem('__seed',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['20:00','08:00'],on:true}]}));
+  localStorage.setItem('__ph',JSON.stringify([{id:'p1',name:'زانبرازان ٢٠ قرص',say:'',times:['20:00','08:00'],on:true}]))});
+ await openAccount(page,base);
+ // the sheet is already open (nobody tapped): his alarm from the browser (the app's seed, taken over once) and the pharmacy's
+ await page.waitForSelector('#alarmSheet .al-card');
+ await page.waitForFunction(()=>window.AskerStoreAlarm.all().items.length===2);
+ assert.deepEqual(await page.evaluate(()=>window.AskerStoreAlarm.all().items.map(i=>[i.id,i.name,i.times])),[['a1','فيموجيسال ق',['08:00','20:00']],['p1','زانبرازان ٢٠ قرص',['08:00','20:00']]]);
+ await page.waitForFunction(()=>{const s=window.__app.sets.slice(-1)[0];return s&&s.items.length===2});
+ assert.deepEqual(await page.evaluate(()=>window.__app.sets.slice(-1)[0]),{speak:true,items:[{id:'a1',spoken:'فيموجيسال',times:['08:00','20:00']},{id:'p1',spoken:'زانبرازان',times:['08:00','20:00']}]},'the app gets the name as it is said and the times');
+ assert.equal(await page.evaluate(()=>window.__app.seed),'','the seed was taken over once');
+ // no browser ring, no notifications box, no push: the app does all that
+ assert.equal(await tick(page,8,0),0,'the page does not ring in the app');assert.equal(await page.$('#alarmRing'),null);
+ assert.equal(await page.$('[data-al-notif]'),null);assert.equal(await page.$('.rg-warn'),null);assert.equal(await page.$('[data-al-try]'),null);assert.equal(await page.$('[data-al-getapp]'),null,'already in the app: no download button');
+ assert.equal(await page.evaluate(()=>window.__subs),0,'no push subscription from inside the app');
+ // the sound files are handed to the app: once per name, the test ring's too, and never asked again
+ await page.waitForFunction(()=>Object.keys(window.__app.voices).length===3);
+ assert.deepEqual(await page.evaluate(()=>Object.entries(window.__app.voices).sort()),[['زانبرازان',4000],['فيموجيسال',4000],['تجربة المنبه',4000]].sort(),'3000 bytes of sound = 4000 characters of base64 handed over');
+ const asked=await page.evaluate(()=>window.__invoked.length);
+ // a change follows at once: switching his alarm off leaves only the pharmacy's; the voice switch goes to the app
+ await page.click('[data-al-toggle="a1"]');
+ await page.waitForFunction(()=>window.__app.sets.slice(-1)[0].items.length===1);
+ assert.deepEqual(await page.evaluate(()=>window.__app.sets.slice(-1)[0].items.map(i=>i.id)),['p1']);
+ await page.click('[data-al-speak]');await page.waitForFunction(()=>window.__app.sets.slice(-1)[0].speak===false);
+ await page.waitForTimeout(300);assert.equal(await page.evaluate(()=>window.__invoked.length),asked,'the sound files are not asked for twice');
+ // what the app still needs from the phone, read again when he comes back from the settings
+ assert.equal(await page.$('[data-al-ask]'),null,'nothing missing');
+ await page.evaluate(()=>{window.__app.notif=false;window.__app.fs=false;document.dispatchEvent(new Event('visibilitychange'))});
+ await page.waitForSelector('[data-al-ask="notifications"]');await page.click('[data-al-ask="notifications"]');await page.click('[data-al-ask="fullScreen"]');
+ assert.deepEqual(await page.evaluate(()=>window.__app.asks),['notifications','fullScreen']);
+ // the test ring is the app's
+ await page.click('[data-al-apptest]');assert.equal(await page.evaluate(()=>window.__app.tests),1);
+ // back: the editor goes back to the list through the app's back button; from the list the app is asked to leave
+ await page.click('[data-al-new]');await page.waitForSelector('[data-al-save]');
+ assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.appBack()),true);await page.waitForSelector('[data-al-new]');
+ assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.appBack()),false,'on the list the app closes itself');
+ await page.click('[data-al-close]');assert.equal(await page.evaluate(()=>window.__app.closed),1);
+},{home:true});
+
+run('Dose alarm in the browser on an Android phone: one button opens the app with his link and his alarms, or (no app) downloads it; not on a computer, not on the pharmacy\'s phone',async({page,base})=>{
+ await setup(page,'granted');
+ await page.addInitScript(()=>{Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=>'Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'})});
+ await page.evaluate(()=>localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['08:00'],on:true}],snoozes:[]})));
+ await openAccount(page,base);
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-getapp]');
+ assert.equal(await text(page,'[data-al-getapp]'),'📲 نزّل تطبيق المنبه');
+ const href=await page.$eval('[data-al-getapp]',e=>e.getAttribute('href'));
+ const m=/^intent:\/\/alarm\?me=([0-9a-f]{64})#Intent;scheme=askeralarm;package=com\.askerpharmacy\.alarm;S\.alarms=([^;]+);S\.browser_fallback_url=([^;]+);end$/.exec(href);
+ assert.ok(m,'the intent link: '+href);
+ assert.equal(m[1],tok,'his link goes to the app');
+ assert.deepEqual(JSON.parse(decodeURIComponent(m[2])),{v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['08:00'],on:true}]},'and his alarms');
+ assert.equal(decodeURIComponent(m[3]),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk','no app on the phone: the download');
+ assert.match(await text(page,'#alarmSheet .al-app'),/بعد ما الملف ينزل: افتحه واضغط «تثبيت»/);
+ // the push way is still offered there (the app is an extra)
+ assert.ok(await page.$('[data-al-notiftest]'),'(notifications are allowed in this test: its test button shows)');
+ // the pharmacy's own phone: no button
+ await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
+ await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
+ await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet');assert.equal(await page.$('[data-al-getapp]'),null);
+},{home:true});
+
 run('Dose alarm: a hidden page does not use the alarm up; a tap on the dose notification rings it and asks for the first tap (an open page by the worker\'s message, a new window by ?dose=1); the test notification rings a made-up «تجربة المنبه»',async({page,base})=>{
  await setup(page,'granted');
  await openAccount(page,base);

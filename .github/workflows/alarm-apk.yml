@@ -1,0 +1,118 @@
+# Builds «منبه الدوا», the customer's Android app (alarm-android/), on GitHub's machines. It rings at the dose time and says the medicine's name with the app CLOSED
+# (a web page cannot). The APK holds no secret. It is tested here: the plain logic (JUnit) and a real Android emulator (install, set an alarm, close the app, the alarm
+# fires and the ring starts). The finished APK is attached to a pre-release called «alarm-build» as asker-alarm.apk: the page's «نزّل تطبيق المنبه» button links to it.
+name: alarm-apk
+on:
+  push:
+    branches: [main, 'alarm-**']
+    paths:
+      - 'alarm-android/**'
+      - '.github/workflows/alarm-apk.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'   # weekly: touch the signing key's cache so GitHub never evicts it (a new key would stop customers from updating in place)
+permissions:
+  contents: write
+concurrency:
+  group: alarm-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v4
+        id: ks
+        with:
+          path: ~/alarm.keystore
+          key: alarm-keystore-v1
+      - run: echo "signing key cache hit = ${{ steps.ks.outputs.cache-hit }}"
+  build:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      # one signing key for every build (made the first time, kept in the cache), so a new build updates the app in place
+      - name: Signing key (cached)
+        id: ks
+        uses: actions/cache@v4
+        with:
+          path: ~/alarm.keystore
+          key: alarm-keystore-v1
+      - name: Make the signing key
+        if: steps.ks.outputs.cache-hit != 'true'
+        run: |
+          keytool -genkeypair -keystore ~/alarm.keystore -storepass alarm-sideload -keypass alarm-sideload -alias alarm -keyalg RSA -keysize 2048 -validity 9125 -dname "CN=Asker Pharmacy Alarm"
+      - name: Test and build
+        working-directory: alarm-android
+        env:
+          ALARM_KEYSTORE: /home/runner/alarm.keystore
+          ALARM_KS_PASS: alarm-sideload
+        run: gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+      - name: Show the errors (on failure)
+        if: failure()
+        run: |
+          grep -E '^e: |error:|FAILED|What went wrong|Could not|Unresolved|AAPT' /tmp/build.log | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+      - name: What is inside the APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=alarm-android/app/build/outputs/apk/release/app-release.apk
+          ls -l "$APK"; sha256sum "$APK"
+          "$BT/apksigner" verify --print-certs "$APK" | head -5
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|uses-permission|launchable-activity|application-label:" | head -30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alarm-apk-release
+          path: alarm-android/app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alarm-apk-debug
+          path: alarm-android/app/build/outputs/apk/debug/app-debug.apk
+  # a real phone (an emulator): the alarm must fire with the app CLOSED and start the ring
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: alarm-apk-debug
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash alarm-android/ci/smoke.sh apk/app-debug.apk
+  publish:
+    needs: [build, smoke]
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: alarm-apk-release
+          path: apk
+      - name: Attach to the pre-release «alarm-build»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp apk/app-release.apk asker-alarm.apk
+          sha256sum asker-alarm.apk
+          gh release view alarm-build --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create alarm-build --repo "$GITHUB_REPOSITORY" --prerelease --title "Medicine alarm app" --notes "The customer's Android app «منبه الدوا». Built and tested by the alarm-apk workflow; the asset is replaced by each build."
+          gh release upload alarm-build asker-alarm.apk --clobber --repo "$GITHUB_REPOSITORY"

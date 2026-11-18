@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- the test in CI sets an alarm through this door (the debug build only: the customer's build has no such receiver) -->
+        <receiver android:name="com.askerpharmacy.alarm.DebugReceiver" android:exported="true" />
+    </application>
+</manifest>
