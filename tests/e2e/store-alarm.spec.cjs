@@ -424,7 +424,8 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
  assert.deepEqual(JSON.parse(decodeURIComponent(m[2])),{v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['08:00'],on:true}]},'and his alarms');
  assert.equal(decodeURIComponent(m[3]),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk','no app on the phone: the download');
  assert.match(await text(page,'#alarmSheet .al-app'),/بعد ما الملف ينزل: افتحه واضغط «تثبيت»/);
- assert.match(await text(page,'#alarmSheet .al-app-head'),/الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل التطبيق:/);
+ assert.match(await text(page,'#alarmSheet .al-app-head'),/الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:/);
+ assert.equal(await text(page,'#alarmSheet .al-app .al-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.','written under the download button: Android only, not on iPhone');
  assert.ok(await page.evaluate(()=>{const a=document.querySelector('#alarmSheet .al-app'),b=document.querySelector('#alarmSheet .al-add');return !!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)}),'the download box is the first thing in the sheet, above the alarms and the add button');
  // the push way is still offered there (the app is an extra)
  assert.ok(await page.$('[data-al-notiftest]'),'(notifications are allowed in this test: its test button shows)');
@@ -432,6 +433,46 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
  await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
  await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet');assert.equal(await page.$('[data-al-getapp]'),null);
+},{home:true});
+
+const ANDROID_UA='Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+run('Dose alarm hand-off (owner 2026-11-18: the work stays on the site, the «منبه الدوا» app only rings): once the app is connected every save / toggle / voice switch / delete hands the alarms to it (an askeralarm://handoff intent link sent from inside the tap); the button that opens the app marks it connected; before that, on a computer and in the app, nothing is sent',async({page,base})=>{
+ await setup(page,'granted');
+ await page.addInitScript((ua)=>{Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=>ua});window.__intents=[];window.__askerGoIntent=(u)=>window.__intents.push(u)},ANDROID_UA);
+ await openAccount(page,base);
+ await page.click('[data-al-open]');await page.waitForSelector('[data-al-new]');
+ const add=async(name)=>{await page.click('[data-al-new]');await page.click('[data-al-pick="other"]');await page.fill('[data-al-name]',name);await page.click('[data-al-preset="once"]');await page.click('[data-al-save]');await page.waitForSelector('#alarmSheet .al-card')};
+ const sent=()=>page.evaluate(()=>window.__intents.map(u=>{const m=/^intent:\/\/handoff#Intent;scheme=askeralarm;package=com\.askerpharmacy\.alarm;S\.alarms=([^;]+);end$/.exec(u);return m?JSON.parse(decodeURIComponent(m[1])):u}));
+ // the app is not connected yet: a save sends nothing (with no app Chrome would open Google Play)
+ await add('فيموجيسال ق');
+ assert.equal((await sent()).length,0,'not connected: nothing is sent');
+ // the button opened the app: the page went to the background right after the tap, so the app is there
+ await page.evaluate(()=>document.querySelector('[data-al-getapp]').addEventListener('click',(e)=>e.preventDefault(),true));   // (no real navigation in the test)
+ await page.click('[data-al-getapp]');
+ await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))});
+ await page.waitForSelector('[data-al-appoff]');
+ assert.match(await text(page,'#alarmSheet .al-app-head'),/تطبيق «منبه الدوا» متوصّل/);
+ assert.equal(await text(page,'[data-al-getapp]'),'📲 افتح منبه الدوا');
+ // now a new alarm goes over: the app's list (the name as it is said) and the site's own copy (kept as the seed of the app's page)
+ await add('زانبرازان ٢٠ قرص');
+ let s=await sent();assert.equal(s.length,1,'one hand-off for one save');
+ assert.equal(s[0].app.speak,true);
+ assert.deepEqual(s[0].app.items.map(i=>[i.spoken,i.times]),[['فيموجيسال',['08:00']],['زانبرازان',['08:00']]]);
+ assert.deepEqual(s[0].page.items.map(i=>i.name),['فيموجيسال ق','زانبرازان ٢٠ قرص']);
+ // a toggle, the voice switch and a delete go over too
+ const id0=await page.evaluate(()=>window.AskerStoreAlarm.data().items[0].id);
+ await page.click(`[data-al-toggle="${id0}"]`);
+ s=await sent();assert.equal(s.length,2);assert.deepEqual(s[1].app.items.map(i=>i.spoken),['زانبرازان'],'the switched-off alarm is not in the app\'s list');
+ await page.click('[data-al-speak]');
+ s=await sent();assert.equal(s.length,3);assert.equal(s[2].app.speak,false);
+ await page.click(`[data-al-edit="${id0}"]`);await page.waitForSelector('[data-al-del]');await page.click('[data-al-del]');
+ await page.waitForSelector('#alarmSheet .al-card');
+ s=await sent();assert.equal(s.length,4);assert.deepEqual(s[3].page.items.map(i=>i.name),['زانبرازان ٢٠ قرص'],'the deleted alarm is gone from the site\'s copy');
+ // «مش متثبّت؟ شيل التوصيل»: back to the download box, and a save sends nothing again
+ await page.click('[data-al-appoff]');await page.waitForSelector('[data-al-getapp]');
+ assert.equal(await text(page,'[data-al-getapp]'),'📲 نزّل تطبيق المنبه');
+ await page.click('[data-al-speak]');
+ assert.equal((await sent()).length,4,'disconnected: nothing more is sent');
 },{home:true});
 
 run('Dose alarm: a hidden page does not use the alarm up; a tap on the dose notification rings it and asks for the first tap (an open page by the worker\'s message, a new window by ?dose=1); the test notification rings a made-up «تجربة المنبه»',async({page,base})=>{

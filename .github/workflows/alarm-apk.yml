@@ -114,6 +114,8 @@ jobs:
           script: |
             bash alarm-android/ci/smoke.sh apk/app-debug.apk
             node alarm-android/ci/webview.cjs
+            node alarm-android/ci/handoff.cjs
+            node alarm-android/ci/chrome.cjs || echo "CHROME HANDOFF: not proven on this emulator (see the lines above; this line never fails the run)"
   publish:
     needs: [build, smoke]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}

@@ -53,5 +53,6 @@ class AlarmReceiver : BroadcastReceiver() {
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Scheduler.reschedule(context)
+        VoiceJob.schedule(context)
     }
 }

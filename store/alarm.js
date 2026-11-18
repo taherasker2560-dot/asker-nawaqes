@@ -50,10 +50,14 @@
     notifTestTitle: '🔔 تجربة منبه الدوا',
     notifTestBody: 'لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.',
     // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
-    getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل التطبيق:',
+    getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:',
+    getAppIos: '⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.',
+    appLinked: '✓ تطبيق «منبه الدوا» متوصّل: أي منبه تظبطه هنا بيروح له لوحده وهو اللي بيرنّ وينطق (هتشوف وميض سريع لحظة الحفظ).',
+    appOpen: '📲 افتح منبه الدوا',
+    appUnlink: 'مش متثبّت؟ شيل التوصيل',
     getApp: '📲 نزّل تطبيق المنبه',
     getAppWhy: 'التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو الموبايل مقفول والمتصفح مقفول (المتصفح مش بيقدر يعمل كده).',
-    getAppSteps: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها ارجع هنا واضغط الزرار تاني، هيفتح التطبيق بمنبهاتك.',
+    getAppSteps: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها ارجع هنا واضغط الزرار تاني، هيفتح التطبيق بمنبهاتك، ومن بعدها أي منبه تظبطه هنا بيروح له لوحده.',
     hintApp: 'اختار الدوا وحدد المواعيد. التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو التطبيق مقفول.',
     appOn: '✓ التطبيق شغّال: بيرنّ وينطق اسم الدوا في ميعاده حتى لو التطبيق مقفول.',
     appTest: '🔔 جرّب المنبه',
@@ -226,13 +230,36 @@
   // his own alarms (on his phone); on the pharmacy's phone `data` holds the alarms of the customer being looked at, saved to the server
   let data = pharmacy ? clean(null) : clean(read(KEY));
   // the alarms he made in the browser before installing the app come with the app's first open (the link's «alarms» part): taken over once, when the app has none of its own yet
-  if (A && !pharmacy && !read(KEY)) { try { const s = A.seed(); if (s) { data = clean(JSON.parse(s)); write(KEY, data); } } catch (e) { /* no seed */ } }
+  // (the website's copy wins: it comes with the first open from the site's button and with every hand-off after it; it is taken over once and cleared when the app has it)
+  if (A && !pharmacy) { try { const s = A.seed(); if (s) { data = clean(JSON.parse(s)); write(KEY, data); } } catch (e) { /* no seed */ } }
   // the alarms the PHARMACY set for this customer: they live on the server, are cached here so they ring offline, and he can only switch them on / off
   const PH_KEY = 'asker_dose_pharmacy';
   let ph = pharmacy ? { items: [], off: {} } : (() => { const o = read(PH_KEY) || {}; return { items: clean({ items: o.items }).items.map((x) => ({ ...x, ph: true })), off: o.off && typeof o.off === 'object' ? o.off : {} }; })();
   const all = () => ({ ...data, items: data.items.concat(ph.items.map((x) => ({ ...x, ph: true, on: x.on !== false && !ph.off[x.id] }))) });
   let token = null, adminTimer = null;
-  const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); prefetchVoices(); mirrorAlarms(); };
+  const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); prefetchVoices(); mirrorAlarms(); queueHandoff(); };
+  // what the Android app keeps: the alarms that are ON, the name as it is said and the times (the voice switch with them)
+  const appPayload = () => ({ speak: data.speak, items: all().items.filter((x) => x.on).map((x) => ({ id: x.id, spoken: spokenName(x.say || x.name), times: x.times })) });
+  // ---- hand-off to the «منبه الدوا» app (owner 2026-11-18: the work stays on the site on every phone, the small Android app only rings and speaks) ----
+  // Once the app has opened from the site's button (the page went to the background right after the tap: it is installed) every save/toggle/delete hands the alarms over: an Android intent link
+  // (askeralarm://handoff) that shows no screen in the app. Chrome allows it only on the customer's own tap, so it is sent from inside the click, never later; with no app Chrome would open Google Play.
+  const APP_KEY = 'asker_dose_app';
+  const appLinked = () => read(APP_KEY) === 1;
+  const goIntent = (u) => { if (root.__askerGoIntent) { root.__askerGoIntent(u); return; } try { root.location.href = u; } catch (e) { /* the page stays */ } };   // (the test hook only exists in tests)
+  let handoffQueued = false, appTapAt = 0;
+  function queueHandoff() {
+    if (A || pharmacy || handoffQueued || !isAndroidBrowser() || !appLinked()) return;
+    const ua = root.navigator && root.navigator.userActivation; if (ua && !ua.isActive) return;
+    handoffQueued = true;
+    Promise.resolve().then(() => {   // still inside the tap: several changes of one tap make one hand-off
+      handoffQueued = false;
+      goIntent('intent://handoff#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;S.alarms=' + encodeURIComponent(JSON.stringify({ app: appPayload(), page: { v: 1, speak: data.speak, items: data.items } })) + ';end');
+    });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (appTapAt && Date.now() - appTapAt < 4000 && !appLinked()) write(APP_KEY, 1); }   // the app opened from the button: it is there
+    else { appTapAt = 0; if (view) draw(); }
+  });
   let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], appRinging = false, appRingTimer = null, appBatt = false, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
@@ -361,7 +388,7 @@
     if (pharmacy) return;
     // inside the app: the app is the one that rings, so it gets the alarms that are on (the name as it is said + the times) and, after them, the sound files
     if (A) {
-      try { A.setAlarms(JSON.stringify({ speak: data.speak, items: all().items.filter((x) => x.on).map((x) => ({ id: x.id, spoken: spokenName(x.say || x.name), times: x.times })) })); } catch (e) { /* the app keeps the last list */ }
+      try { A.setAlarms(JSON.stringify(appPayload())); } catch (e) { /* the app keeps the last list */ }
       giveVoices();
       return;
     }
@@ -438,7 +465,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118g'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118i'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -717,7 +744,9 @@
       `<div class="al-line"><span>${esc(TEXTS.adRow)}</span><button type="button" class="al-try" data-al-appdiag>▶</button></div>` + diagHtml() +
       (appBatt ? `<button type="button" class="al-line" data-al-battery><span>${esc(TEXTS.adBattBtn)}</span></button>` : '') : '';
     // in the browser on an Android phone: one button, «افتح في التطبيق» if it is installed, else its download (the intent's fallback address), carrying his link and his alarms
-    const getApp = isAndroidBrowser() && !pharmacy ? `<div class="al-app"><p class="al-app-head">${esc(TEXTS.getAppHead)}</p><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.getApp)}</span></a><p class="rg-hint">${esc(TEXTS.getAppWhy)}</p><p class="rg-hint">${esc(TEXTS.getAppSteps)}</p></div>` : '';
+    const getApp = !isAndroidBrowser() || pharmacy ? ''
+      : appLinked() ? `<div class="al-app"><p class="al-app-head">${esc(TEXTS.appLinked)}</p><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.appOpen)}</span></a><button type="button" class="al-unlink" data-al-appoff>${esc(TEXTS.appUnlink)}</button></div>`
+        : `<div class="al-app"><p class="al-app-head">${esc(TEXTS.getAppHead)}</p><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.getApp)}</span></a><p class="al-warn">${esc(TEXTS.getAppIos)}</p><p class="rg-hint">${esc(TEXTS.getAppWhy)}</p><p class="rg-hint">${esc(TEXTS.getAppSteps)}</p></div>`;
     const voice = A ? appBox : !pharmacy ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
       `<div class="al-line"><span>${esc(TEXTS.tryVoice.replace(/^▶\s*/, ''))}</span><button type="button" class="al-try" data-al-try>${esc(TEXTS.tryVoice)}</button></div>` +
       (voiceNote ? `<p class="rg-hint al-note" role="status">${esc(voiceNote)}</p>` : '') +
@@ -831,6 +860,8 @@
 
   document.addEventListener('click', (e) => {
     const t = e.target;
+    if (t.closest('[data-al-getapp]')) { appTapAt = Date.now(); return; }   // (the link itself opens the app, or downloads it: see the visibilitychange above)
+    if (t.closest('[data-al-appoff]')) { write(APP_KEY, 0); draw(); return; }
     if (t.closest('[data-al-open]')) { open(); return; }
     if (t.closest('[data-al-took]')) { stopRing(); return; }
     if (t.closest('[data-al-hear]')) { if (ring) speakDue(ring.due); return; }

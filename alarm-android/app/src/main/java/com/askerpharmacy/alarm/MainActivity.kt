@@ -79,6 +79,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Scheduler.reschedule(this)   // whatever happened while the app was closed, the next alarm is set
+        VoiceJob.schedule(this)      // and any sentence sound that is still missing is asked for
     }
 
     /** the link that opened the app may carry the customer's personal link (?me=) and the alarms he made in the browser: kept for the page to take over once */
@@ -126,6 +127,7 @@ class Bridge(private val act: Activity) {
         if (ok) {
             st.seed = ""
             Scheduler.reschedule(act)
+            VoiceJob.schedule(act)
         }
         return ok
     }
