@@ -58,13 +58,13 @@ export const BUCKET = 'ar-dose-voice', MAX_NAME = 40, VOICE_DAILY = 150, VOICE_H
 export const PROMO_TEXT = [
   'صحتك مش بتستنّى... وصيدلية عسكر مش هتخلّيك تستنّى.',
   'من موبايلك، اطلب دواك في ثواني... ابعت الروشتة بصورة... وكرّر علاجك المعتاد بلمسة واحدة.',
-  'وعلشان ماتفوتش جرعة، منبّه الدوا بيفكّرك بميعاد كل دوا باسمه.',
+  'وأهم حاجة... منبّه الدوا: بيفكّرك بميعاد كل جرعة، باسم دواك، في وقتها بالظبط.',
   'تتابع حسابك... وتدفع من مكانك... وأهل بيتك كلّهم في مكان واحد.',
   'صيدلية عسكر... أمان في الدوا، وراحة في البال.',
   'افتح التطبيق دلوقتي... وسيب الباقي علينا.',
 ].join(' ');
-export const PROMO_STYLE = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer selling something people love: engaging and exciting but never shouting, a clear steady rhythm, a short pause at every "...", and a smile on the last line:';
-export const PROMO_VOICES = ['Fenrir', 'Charon', 'Orus', 'Puck', 'Algenib', 'Kore'], PROMO_DEFAULT_VOICE = 'Fenrir', PROMO_TEMPERATURE = 0.7;
+export const PROMO_STYLE = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer: calm and unhurried, a little slower than normal speech, friendly and engaging but never loud or pushy, a clear short pause at every "...", and a gentle smile on the last line:';
+export const PROMO_VOICES = ['Orus', 'Charon', 'Fenrir', 'Puck', 'Algenib', 'Kore'], PROMO_DEFAULT_VOICE = 'Orus', PROMO_TEMPERATURE = 0.6;   // Orus = the owner's pick (2026-11-18)
 export function promoVoice(v: unknown, env: Env): string {
   const pick = typeof v === 'string' ? PROMO_VOICES.find((x) => x.toLowerCase() === v.trim().toLowerCase()) : undefined;
   return pick || PROMO_VOICES.find((x) => x === String(env.PROMO_VOICE || '').trim()) || PROMO_DEFAULT_VOICE;
