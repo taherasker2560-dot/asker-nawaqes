@@ -202,8 +202,29 @@
   // the pharmacy's WhatsApp number arrives a moment after the page: only the «forgot» line is touched (what he already typed stays)
   if (root.AskerStorePay && root.AskerStorePay.onChange) root.AskerStorePay.onChange(() => { const f = document.querySelector('#siteGate .sg-fine'); if (f) f.innerHTML = fineHtml(); });
 
+  // «منبه الدوا» on this phone (owner 2026-11-18: «عايز أشوف الناس اللي بتنزل الأبليكيشن»): once the app opened from the site's button, store/alarm.js keeps
+  // asker_dose_app = 1; the server is told who has it (his own secret only: a customer's / member's link or this account's session; migration 202611190030
+  // ar_app_seen), at most once every 12 hours, never from the pharmacy's own phone. The owner's «👥 المستخدمين» shows «⏰ نزّل المنبه» next to him.
+  const APP_FLAG = 'asker_dose_app', APP_SAID = 'asker_app_seen_at', APP_EVERY = 12 * 3600e3;
+  async function appSeen() {
+    if (!client) return;
+    const a = A();
+    if (a.pharmacyPhone && a.pharmacyPhone()) return;
+    let flag = null, said = 0;
+    try { flag = JSON.parse(localStorage.getItem(APP_FLAG) || 'null'); said = Number(localStorage.getItem(APP_SAID) || 0); } catch (e) { return; }
+    if (flag !== 1 || Date.now() - said < APP_EVERY) return;
+    const tok = a.linked && a.linked() && a.token ? a.token() : null, s = read();
+    if (!tok && !s) return;
+    try {
+      const { data } = await client.rpc('ar_app_seen', { p_token: tok || null, p_site_token: tok ? null : s.t });
+      if (data && data.ok) localStorage.setItem(APP_SAID, String(Date.now()));
+    } catch (e) { /* next time */ }
+  }
+  // back from «منبه الدوا» (the button opened it: the flag was just set) or any later open
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) appSeen(); });
+
   root.AskerSiteUser = {
-    attach(c) { client = c; check_(); },
+    attach(c) { client = c; check_().then(appSeen, appSeen); },
     signedIn: () => !!read(),
     gateOpen: () => shown,
   };
