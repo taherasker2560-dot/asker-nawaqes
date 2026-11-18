@@ -183,7 +183,7 @@
   let ph = pharmacy ? { items: [], off: {} } : (() => { const o = read(PH_KEY) || {}; return { items: clean({ items: o.items }).items.map((x) => ({ ...x, ph: true })), off: o.off && typeof o.off === 'object' ? o.off : {} }; })();
   const all = () => ({ ...data, items: data.items.concat(ph.items.map((x) => ({ ...x, ph: true, on: x.on !== false && !ph.off[x.id] }))) });
   let token = null, adminTimer = null;
-  const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); prefetchVoices(); };
+  const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); prefetchVoices(); mirrorAlarms(); };
   let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
@@ -284,7 +284,26 @@
       prefetching = false;
     }, 1200);
   }
-  let audioEl = null, speakSeq = 0;
+  // The dose notification carries the medicine's name (owner 2026-11-18: «من غير ما يكون الابليكيشن مفتوح» → «أمشي عليه»: the way with no second program). The server's push stays empty, so the worker
+  // (store/dose/sw.js) writes the name from THIS copy: only the enabled alarms, the name as it is said and the times. It stays on this phone (IndexedDB); a change of the alarms updates it.
+  async function mirrorAlarms() {
+    if (pharmacy || !root.indexedDB) return;
+    try {
+      const items = all().items.filter((x) => x.on).map((x) => ({ id: x.id, spoken: spokenName(x.say || x.name), times: x.times }));
+      await new Promise((ok) => {
+        const r = root.indexedDB.open('asker-dose', 1);
+        r.onupgradeneeded = () => { try { r.result.createObjectStore('kv'); } catch (e) { /* made already */ } };
+        r.onerror = () => ok();
+        r.onsuccess = () => {
+          try {
+            const tx = r.result.transaction('kv', 'readwrite');
+            tx.objectStore('kv').put({ items, at: Date.now() }, 'alarms');
+            tx.oncomplete = tx.onerror = tx.onabort = () => { try { r.result.close(); } catch (e) { /* closed */ } ok(); };
+          } catch (e) { ok(); }
+        };
+      });
+    } catch (e) { /* the plain «ميعاد دواك» notification stays */ }
+  }  let audioEl = null, speakSeq = 0;
   function stopAudio() { speakSeq++; if (audioEl) { try { audioEl.pause(); } catch (e) { /* not playing */ } audioEl = null; } }
   // plays the sentences one after the other; `done({ok, how, code})` is told once, when the first one starts or the first fails
   function playBlobs(blobs, seq, done) {
@@ -554,7 +573,7 @@
           ph.items = clean({ items: d.items }).items.map((x) => ({ ...x, ph: true }));
           for (const k of Object.keys(ph.off)) if (!ph.items.some((x) => x.id === k)) delete ph.off[k];
           write(PH_KEY, { items: ph.items, off: ph.off });
-          schedule(); redrawTile(); if (view) draw(); syncServer(); prefetchVoices();
+          schedule(); redrawTile(); if (view) draw(); syncServer(); prefetchVoices(); mirrorAlarms();
         }
       }
     } catch (e) { /* offline: the ones kept on the phone stay */ }
@@ -706,7 +725,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
   window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
 
-  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); }, speakDue, voiceBlob, runDiag, tryVoice };
+  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice };
   schedule();
   if (openedBy) doseOpened(openedBy);
 })(typeof window === 'undefined' ? globalThis : window);
