@@ -231,18 +231,25 @@ run('Customer link install: Samsung Internet never gets its own install (Play Pr
  await page.waitForTimeout(700);
  assert.equal(await page.evaluate(()=>window.__prompted),false,'Samsung Internet\'s own install is never started');
  assert.match(await text(page,'.ac-install-note'),/افتح الرابط في كروم/,'the steps stay on screen');
- // Chrome on the same phone model: its prompt is called as before
+ // Chrome on the same phone model: the pharmacy's APP (this store + the dose alarm) instead of the installed page (owner 2026-11-18); the browser's own install is not used
  await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'));
  await page.goto(base+'store.html?x=1#me='+tok);await page.reload();
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
  await page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
+ await page.evaluate(()=>{window.__appHref='';document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^="intent://"]');if(a){window.__appHref=a.getAttribute('href');e.preventDefault()}},true)});
  await page.click('[data-acct-install]');
- await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
+ await page.waitForFunction(()=>!!window.__appHref,null,{timeout:8000});
+ const href=await page.evaluate(()=>window.__appHref);
+ assert.ok(href.startsWith('intent://alarm?me='+tok+'#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;'),'the app opens with his link: '+href);
+ assert.ok(!href.includes('S.sheet=1'),'on the store, not on the alarm sheet');
+ assert.ok(href.includes('S.browser_fallback_url='+encodeURIComponent('https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk')),'with no app on the phone: its download');
+ assert.equal(await page.evaluate(()=>window.__prompted),false,'the browser\'s own install is not used');
+ assert.match(await text(page,'.ac-install-note'),/افتحه واضغط «تثبيت»/);
  await page.evaluate(()=>{sessionStorage.removeItem('__ua');localStorage.removeItem('__fakeTables')});
 },{home:true});
 // the store home's own «نزّل الصيدلية» box (not the account's): since 2026-11-17 it is for anyone who opens the site (see tests/e2e/store-pay.spec.cjs for the
 // visitor on each browser); the rule from 2026-11-16 stays: Samsung Internet's OWN install offer is never used (Play Protect blocks the app it makes)
-run('Store home install box: Chrome installs on its offer; Samsung Internet shows the box but never uses its own install offer',async({page,base})=>{
+run('Store home install box: Android Chrome gets the pharmacy\'s app (not the installed page); Samsung Internet shows the box but never uses its own install offer',async({page,base})=>{
  await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua})});
  const offer=()=>page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'dismissed'});window.dispatchEvent(e)});
  await page.evaluate(()=>sessionStorage.setItem('__ua','Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36'));
@@ -257,8 +264,14 @@ run('Store home install box: Chrome installs on its offer; Samsung Internet show
  await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
  await offer();
  await page.waitForFunction(()=>!document.getElementById('installBox').hidden,null,{timeout:5000});
+ await page.evaluate(()=>{window.__appHref='';document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^="intent://"]');if(a){window.__appHref=a.getAttribute('href');e.preventDefault()}},true)});
  await page.click('#installBtn');
- await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
+ await page.waitForFunction(()=>!!window.__appHref,null,{timeout:8000});
+ const hh=await page.evaluate(()=>window.__appHref);
+ assert.ok(hh.startsWith('intent://alarm#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;'),'a visitor: the app opens on the store, no account link: '+hh);
+ assert.ok(!hh.includes('S.sheet=1')&&!hh.includes('?me='),'no account link, not the alarm sheet');
+ assert.ok(hh.includes('S.browser_fallback_url='+encodeURIComponent('https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk')),'with no app: the download');
+ assert.equal(await page.evaluate(()=>window.__prompted),false,'the browser\'s own install offer is not used');
  await page.evaluate(()=>sessionStorage.removeItem('__ua'));
 },{home:true});
 // the items' pictures in his own account and in the PDF he downloads (owner 2026-11-16: «الصور تبان فى الحساب لما ابعتله رابط حسابه مش الكشف بس»)

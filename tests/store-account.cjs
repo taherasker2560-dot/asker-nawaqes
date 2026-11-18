@@ -115,8 +115,13 @@ assert.equal(A.mintsOwnApp(UA.edge), false);
 assert.equal(A.mintsOwnApp('Mozilla/5.0 (Windows NT 10.0) SamsungBrowser/26.0'), false, 'only on Android');
 assert.equal(A.mintsOwnApp(''), false);
 const plan = (ua, hasPrompt, handed) => A.installPlan(ua, ua === UA.iosChrome ? 'iPhone' : 'Linux armv81', 5, hasPrompt, handed);
-assert.equal(plan(UA.chrome, true, false), 'prompt', 'Chrome: its own prompt');
-assert.equal(plan(UA.chrome, true, true), 'prompt', 'Chrome after the hand-off: the prompt');
+// Android Chrome: the pharmacy's APP (this store + the dose alarm) instead of the installed page (owner 2026-11-18)
+assert.equal(plan(UA.chrome, true, false), 'app', 'Android Chrome: the app, even when Chrome offers its own install');
+assert.equal(plan(UA.chrome, false, false), 'app');
+assert.equal(plan(UA.chrome, true, true), 'app', 'Chrome after the hand-off from another browser: the app');
+assert.equal(A.appFirst(UA.chrome), true);assert.equal(A.appFirst(UA.samsung), false, 'Samsung Internet first goes to Chrome');assert.equal(A.appFirst(UA.firefox), false);assert.equal(A.appFirst(UA.edge), false);assert.equal(A.appFirst(UA.iosChrome), false, 'the iPhone keeps the page');assert.equal(A.appFirst('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36'), false, 'and so does a computer');assert.equal(A.appFirst(''), false);
+assert.equal(plan('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36', true, false), 'prompt', 'a computer: the browser\'s own prompt as before');
+assert.match(A.TEXTS.installApp, /تثبيت/, 'the note says what to do with the file');
 assert.equal(plan(UA.edge, true, false), 'prompt', 'a browser that offers its prompt is trusted, as before');
 assert.equal(plan(UA.samsung, true, false), 'chrome', 'Samsung Internet WITH a prompt: still no prompt, the account goes to Chrome');
 assert.equal(plan(UA.samsung, false, false), 'chrome');

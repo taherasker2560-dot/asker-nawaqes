@@ -155,6 +155,7 @@
     preview: 'ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
     installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
+  installApp: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها افتح «صيدلية عسكر» من الشاشة الرئيسية.',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
     // Samsung Internet's own install is blocked by Google Play Protect: open the account in Chrome (2026-11-16)
     installSamsung: 'متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن». افتح الرابط في كروم، وبعدين دوس «ثبّت التطبيق الآن».',
@@ -202,8 +203,12 @@
   // older version of Android» (owner 2026-11-16: a customer, Maryam, got it on her phone; Progressier reports the same for every site on Samsung Internet).
   // So there the browser's own install is never offered: the account goes to Chrome, which installs it properly.
   const mintsOwnApp = (ua) => /Android/i.test(String(ua || '')) && /SamsungBrowser/.test(String(ua || ''));
-  // what the install button does: the browser's own prompt (Chrome and the like), a hand-off to Chrome, the iPhone guide, or the written steps
+  // A customer on an Android phone is given the pharmacy's APP («صيدلية عسكر»: this same store + the dose alarm that rings with the app closed, alarm-android/) instead of the installed page
+  // (owner 2026-11-18, «التطبيق ينزل عند العملاء بدل ما ينزلوا الصفحة»). Android Chrome (and any Android browser that is not handed to Chrome first); the iPhone and the computer keep the page.
+  const appFirst = (ua) => /Android/i.test(String(ua || '')) && !offerChrome(ua);
+  // what the install button does: the app (Android), the browser's own prompt (a computer), a hand-off to Chrome, the iPhone guide, or the written steps
   function installPlan(ua, platform, touch, hasPrompt, handedOff) {
+    if (appFirst(ua)) return 'app';
     if (hasPrompt && !mintsOwnApp(ua)) return 'prompt';
     if (offerChrome(ua) && !handedOff) return 'chrome';
     if (isIos(ua, platform, touch)) return 'guide';
@@ -228,7 +233,7 @@
     const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^(me|install)=/.test(p));
     return rest.length ? '?' + rest.join('&') : '';
   }
-  const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, mintsOwnApp, installPlan, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
+  const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, mintsOwnApp, appFirst, installPlan, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') { root.AskerStoreAccountLib = api; return; }
   root.AskerStoreAccountLib = api;
@@ -568,12 +573,23 @@
   async function install() {
     if (installBusy) return;
     const ua = navigator.userAgent, ios = isIos(ua, navigator.platform, navigator.maxTouchPoints);
-    if (!installEvt && !ios && !offerChrome(ua)) {
+    // the app (Android): no browser install offer to wait for
+    if (!installEvt && !ios && !offerChrome(ua) && !appFirst(ua)) {
       installBusy = true; draw();
       await waitOffer(2500);
       installBusy = false;
     }
     const plan = installPlan(ua, navigator.platform, navigator.maxTouchPoints, !!installEvt, handedOff);
+    if (plan === 'app') {
+      // the same intent link as the alarm sheet's button (store/alarm.js): the app opens on the store (with his account when he came by his link); with no app on the phone Chrome goes to its download
+      const AL = root.AskerStoreAlarm, link = AL && typeof AL.appLink === 'function' ? AL.appLink(false) : '';
+      if (link) {
+        installNote = TEXTS.installApp;
+        draw();
+        const a = document.createElement('a'); a.href = link; a.rel = 'noopener'; a.hidden = true; document.body.appendChild(a); a.click(); a.remove();
+        return;
+      }
+    }
     if (plan === 'prompt') {
       const e = installEvt;
       installEvt = null;
