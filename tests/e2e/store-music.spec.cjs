@@ -275,3 +275,22 @@ run('Store music: the promo voice — never on the pharmacy\'s own phone',async(
  await page.mouse.click(190,420);await page.waitForTimeout(900);
  assert.equal(asked.length,0,'the function is never asked');assert.equal(await page.evaluate(()=>window.__audio.madeEl),0);
 });
+run('Store music: the promo voice — the test link ?promo=1 plays it 3 s after the music, even on a phone that heard it yesterday, and does not count as heard',async({page,base})=>{
+ await page.addInitScript(FAKE);const asked=await serveAdvert(page);
+ await page.addInitScript(()=>{try{const d=new Date();d.setDate(d.getDate()-1);localStorage.setItem('asker_store_promo_day',d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}catch(e){}});
+ await open(page,base,'?promo=1');
+ const yesterday=await page.evaluate(()=>localStorage.getItem('asker_store_promo_day'));
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing,null,{timeout:9000});
+ assert.deepEqual(asked,[{action:'promo',voice:'Orus'}],'asked although yesterday it was heard (the 3-day rule)');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_promo_day')),yesterday,'a test visit is not counted as heard');
+ assert.equal(await sounding(page),true);
+},{home:true});
+
+run('Store music: without ?promo=1 a phone that heard the advert yesterday does not get it (the 3-day rule)',async({page,base})=>{
+ await page.addInitScript(FAKE);const asked=await serveAdvert(page);
+ await page.addInitScript(()=>{try{const d=new Date();d.setDate(d.getDate()-1);localStorage.setItem('asker_store_promo_day',d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}catch(e){}});
+ await open(page,base);await fast(page,0.4);
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());await page.waitForTimeout(1200);
+ assert.equal(asked.length,0);assert.equal((await promo(page)).playing,false);
+},{home:true});

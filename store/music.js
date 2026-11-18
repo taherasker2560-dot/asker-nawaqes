@@ -44,7 +44,10 @@
   // comes out louder or quieter: -13.5 dBFS once, -17.6 another time) and plays it at `targetDb` -27 dBFS (soft on purpose; the owner heard the first samples much louder and asked for quieter);
   // `gain` is only the fallback when the level cannot be read. It never plays on the pharmacy's phone, nor when the customer stopped the music; the same button stops both.
   // `file` names the kept copy: change it when the advert's text changes on the server.
-  const PROMO = { on: true, voice: 'Orus', delay: 12, everyDays: 3, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v1-orus' };
+  // `file` v2 (2026-11-18): a phone that tried the advert while its text was still changing kept a 102-second render under v1: v2 makes every phone fetch the current one.
+  // A TEST LINK: store.html?promo=1 plays the advert 3 s after the music sounds, whatever the 3-day rule says, and does not count as heard (the owner tests on a phone that already heard it).
+  const PROMO = { on: true, voice: 'Orus', delay: 12, everyDays: 3, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v2-orus' };
+  const FORCE = (() => { try { return /[?&]promo=1(&|#|$)/.test(String(root.location && root.location.search)); } catch (e) { return false; } })();
   const dayKey = (d) => { const x = d || new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
   // is the advert due: never heard on this phone, or the last time was `every` days ago or more (a clock set back counts as due)
   function promoDue(last, today, every) {
@@ -112,8 +115,8 @@
   }
   function promoArm() {   // the music is sounding: wait a few seconds, then say it, if this phone is due
     if (!PROMO.on || pArmed || pDone || !!pEl) return;
-    if (!promoDue(store((ls) => ls.getItem(PROMO.key)), dayKey(), PROMO.everyDays)) return;
-    pArmed = true; pTimer = setTimeout(promoGo, PROMO.delay * 1000);
+    if (!FORCE && !promoDue(store((ls) => ls.getItem(PROMO.key)), dayKey(), PROMO.everyDays)) return;
+    pArmed = true; pTimer = setTimeout(promoGo, (FORCE ? 3 : PROMO.delay) * 1000);
   }
   // the advert's WAV: kept on the phone after the first time, else asked from the function (nothing is sent but «which voice»)
   async function promoBlob() {
@@ -145,7 +148,7 @@
       pUrl = URL.createObjectURL(blob); a.src = pUrl;
       const g = ctx.createGain(); g.gain.value = gain;
       ctx.createMediaElementSource(a).connect(g); g.connect(ctx.destination);
-      a.addEventListener('playing', () => { pDone = true; store((ls) => ls.setItem(PROMO.key, dayKey())); });   // counted once it really starts
+      a.addEventListener('playing', () => { pDone = true; if (!FORCE) store((ls) => ls.setItem(PROMO.key, dayKey())); });   // counted once it really starts (a test visit is not counted)
       a.addEventListener('ended', promoStop);
       a.addEventListener('error', () => { pDone = true; promoStop(); });
       pEl = a;
