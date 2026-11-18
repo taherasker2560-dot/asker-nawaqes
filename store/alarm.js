@@ -66,6 +66,20 @@
     appNotifOff: 'الإشعارات مقفولة للتطبيق، فالمنبه مش هيظهر. اضغط وشغّلها.',
     appFsOff: 'عشان كارت المنبه يظهر على شاشة القفل، اسمح له من الإعدادات.',
     appFix: 'افتح الإعدادات',
+    // the setup card inside the app (owner 2026-11-18, a Redmi Note 13: «عايز حاجة في متناول المستخدم الغبي»): one big button per missing step, then the phone's own verdict on a real alarm
+    stTitle: '🔧 جهّز موبايلك عشان المنبه يشتغل',
+    stBattery: '🔋 خلّي التطبيق يفضل شغّال في الخلفية',
+    stBatteryBtn: 'اضغط وبعدين «سماح»',
+    stAuto: '🚀 اسمح له يشتغل لوحده (التشغيل التلقائي)',
+    stAutoBtn: 'افتح الإعدادات',
+    stAutoHint: 'هتلاقي «منبه الدوا» في القايمة: شغّله، وارجع هنا.',
+    stAutoDone: '✓ عملتها',
+    stTest: '🧪 جرّب منبه حقيقي (هيرنّ بعد دقيقة)',
+    stWait: '⏳ اقفل الشاشة وسيب الموبايل. المنبه هيرنّ بعد دقيقة تقريبًا.',
+    stOk: '✓ المنبه رنّ وهو مقفول.',
+    stReady: '✓ موبايلك جاهز: المنبه رنّ وهو مقفول.',
+    stFail: '✗ المنبه ما رنّش: موبايلك بيمنعه. اعمل الخطوات اللي فوق وجرّب تاني.',
+    stRetry: 'جرّب تاني',
     appStop: '⏹ وقّف الرنين',
     // «🔍 فحص المنبه» inside the app: the phone's own answers in plain Arabic (owner 2026-11-18: the first real phone rang nothing and nobody knew why)
     adRow: '🔍 فحص المنبه',
@@ -245,19 +259,37 @@
   // ---- hand-off to the «منبه الدوا» app (owner 2026-11-18: the work stays on the site on every phone, the small Android app only rings and speaks) ----
   // Once the app has opened from the site's button (the page went to the background right after the tap: it is installed) every save/toggle/delete hands the alarms over: an Android intent link
   // (askeralarm://handoff) that shows no screen in the app. Chrome allows it only on the customer's own tap, so it is sent from inside the click, never later; with no app Chrome would open Google Play.
-  const APP_KEY = 'asker_dose_app';
+  // The site finds out BY ITSELF whether the app is on the phone (owner 2026-11-18: «ما بيتحفظش … لازم أروح لتطبيق المنبه»: the first version waited for a tap on the download button, which nobody does):
+  // while the answer is not known a save tries the hand-off, and the intent link carries a harmless fallback: THIS page with «#alarm-noapp». No app: Chrome goes to that address (only the hash
+  // changes: no reload, no Google Play), the page learns «no app» and stops trying for 3 days; the app is there: its door opens, the hash never comes and after a moment it is «connected».
+  // The same fallback undoes «connected» when the app is removed later.
+  const APP_KEY = 'asker_dose_app', NOAPP_KEY = 'asker_dose_noapp', NOAPP_HASH = '#alarm-noapp';
   const appLinked = () => read(APP_KEY) === 1;
+  const noAppRecent = () => { const t = read(NOAPP_KEY); return typeof t === 'number' && Date.now() - t < 3 * 864e5; };
   const goIntent = (u) => { if (root.__askerGoIntent) { root.__askerGoIntent(u); return; } try { root.location.href = u; } catch (e) { /* the page stays */ } };   // (the test hook only exists in tests)
-  let handoffQueued = false, appTapAt = 0;
+  let handoffQueued = false, appTapAt = 0, probing = false, hashBefore = '';
   function queueHandoff() {
-    if (A || pharmacy || handoffQueued || !isAndroidBrowser() || !appLinked()) return;
+    if (A || pharmacy || handoffQueued || !isAndroidBrowser()) return;
+    const linked = appLinked();
+    if (!linked && noAppRecent()) return;
     const ua = root.navigator && root.navigator.userActivation; if (ua && !ua.isActive) return;
     handoffQueued = true;
     Promise.resolve().then(() => {   // still inside the tap: several changes of one tap make one hand-off
       handoffQueued = false;
-      goIntent('intent://handoff#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;S.alarms=' + encodeURIComponent(JSON.stringify({ app: appPayload(), page: { v: 1, speak: data.speak, items: data.items } })) + ';end');
+      let here = ''; try { here = root.location.href.split('#')[0]; hashBefore = root.location.hash; } catch (e) { /* no address */ }
+      goIntent('intent://handoff#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;S.alarms=' + encodeURIComponent(JSON.stringify({ app: appPayload(), page: { v: 1, speak: data.speak, items: data.items } })) +
+        ';S.browser_fallback_url=' + encodeURIComponent(here + NOAPP_HASH) + ';end');
+      if (!linked) { probing = true; setTimeout(() => { if (probing) { probing = false; write(APP_KEY, 1); if (view) draw(); drawHomeBox(); } }, 2500); }   // nothing came back: the app took it
     });
   }
+  function noApp() {   // the fallback came: there is no app on this phone (the store's own router never sees this hash: it is stopped below, and the address goes back to where it was)
+    probing = false; write(APP_KEY, 0); write(NOAPP_KEY, Date.now());
+    try { root.history.replaceState(null, '', root.location.pathname + root.location.search + hashBefore); } catch (e) { /* the address stays */ }
+    hashBefore = ''; if (view) draw(); drawHomeBox();
+  }
+  // (a fragment navigation fires popstate first, and every sheet of the store closes on a popstate: the marker must not reach them, so these two listeners run first, in the capture phase)
+  root.addEventListener('popstate', (e) => { if (root.location.hash === NOAPP_HASH) e.stopImmediatePropagation(); }, true);
+  root.addEventListener('hashchange', (e) => { if (root.location.hash === NOAPP_HASH) { e.stopImmediatePropagation(); noApp(); } }, true);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (appTapAt && Date.now() - appTapAt < 4000 && !appLinked()) write(APP_KEY, 1); }   // the app opened from the button: it is there
     else { appTapAt = 0; if (view) draw(); drawHomeBox(); }
@@ -479,7 +511,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118l'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118m'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -768,7 +800,7 @@
       `<div class="al-line"><span>${esc(diagBusy ? TEXTS.diagBusy : TEXTS.diag)}</span><button type="button" class="al-try" data-al-diag${diagBusy ? ' disabled' : ''}>${esc(diagBusy ? '…' : '▶')}</button></div>` +
       diagHtml() : '';
     const note = pharmacy && adminNote ? `<p class="${adminNote === 'saved' ? 'rg-hint al-note' : 'al-warn'}" role="status">${esc(adminNote === 'saved' ? TEXTS.adminSaved : TEXTS.adminFail)}</p>` : '';
-    return `${getApp}<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : A ? TEXTS.hintApp : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
+    return `${getApp}${A ? setupHtml() : ''}<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : A ? TEXTS.hintApp : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
       (pharmacy || A ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
   }
   // the link of the button (an Android intent: link): opens the app with the customer's link (?me=) and the alarms he made here; with no app on the phone Chrome goes to the download instead
@@ -805,6 +837,29 @@
       let on = false; try { on = !!A.ringing(); } catch (e) { on = false; }
       if (!on && Date.now() - t0 > 3000) { appRinging = false; clearInterval(appRingTimer); if (view) draw(); }
     }, 1000);
+  }
+  // the setup card (inside the app only): what is still missing, each with its one big button, and the real-alarm test whose answer comes from the phone itself.
+  // «التشغيل التلقائي» (Xiaomi, Oppo, Vivo, Huawei) cannot be read by an app: the customer says «✓ عملتها» once.
+  const AUTO_KEY = 'asker_dose_autostart';
+  let setupTimer = null;
+  function setupHtml() {
+    let s = {}; try { s = JSON.parse(A.status() || '{}'); } catch (e) { s = {}; }
+    const st = s.selftest || 'none';
+    if (st === 'pending' && !setupTimer) setupTimer = setInterval(() => {   // the answer comes by itself: the card is redrawn until it does
+      let n = {}; try { n = JSON.parse(A.status() || '{}'); } catch (e) { n = {}; }
+      if (n.selftest !== 'pending') { clearInterval(setupTimer); setupTimer = null; }
+      if (view) draw();
+    }, 2000);
+    const step = (text, btn, kind) => `<div class="al-step"><span>${esc(text)}</span><button type="button" class="al-try" data-al-ask="${kind}">${esc(btn)}</button></div>`;
+    const rows = [];
+    if (s.battery === false) rows.push(step(TEXTS.stBattery, TEXTS.stBatteryBtn, 'battery'));
+    if (s.needsAutostart && read(AUTO_KEY) !== 1) rows.push(step(TEXTS.stAuto, TEXTS.stAutoBtn, 'autostart') + `<p class="rg-hint">${esc(TEXTS.stAutoHint)}</p><button type="button" class="al-line" data-al-autodone><span>${esc(TEXTS.stAutoDone)}</span></button>`);
+    if (st === 'ok' && !rows.length) return `<div class="al-setup"><p class="al-ok">${esc(TEXTS.stReady)}</p></div>`;
+    const test = st === 'ok' ? `<p class="al-ok">${esc(TEXTS.stOk)}</p>`
+      : st === 'pending' ? `<p class="rg-hint al-note" role="status">${esc(TEXTS.stWait)}</p>`
+        : st === 'failed' ? `<p class="al-warn" role="status">${esc(TEXTS.stFail)}</p><button type="button" class="al-line" data-al-selftest><span>${esc(TEXTS.stRetry)}</span></button>`
+          : `<button type="button" class="al-line" data-al-selftest><span>${esc(TEXTS.stTest)}</span></button>`;
+    return `<div class="al-setup"><p class="al-app-head">${esc(TEXTS.stTitle)}</p>${rows.join('')}${test}</div>`;
   }
   // what the app asks the phone for: notifications on, and the card over the lock screen (Android 14+)
   function appNeeds() {
@@ -883,6 +938,8 @@
     if (t.closest('[data-al-snooze]')) { snooze(); return; }
     if (!view) return;
     // inside the app: what it still needs from the phone, and a real test ring
+    if (t.closest('[data-al-selftest]')) { try { A.selfTest(); } catch (err) { /* no app */ } draw(); return; }
+    if (t.closest('[data-al-autodone]')) { write(AUTO_KEY, 1); draw(); return; }
     const ask = t.closest('[data-al-ask]'); if (ask) { try { A.ask(ask.dataset.alAsk); } catch (err) { /* no settings page */ } return; }
     if (t.closest('[data-al-apptest]')) { try { if (appRinging) { A.stopRing(); appRinging = false; clearInterval(appRingTimer); } else { A.testRing(); appRinging = true; watchAppRing(); } } catch (err) { /* no app */ } draw(); return; }
     if (t.closest('[data-al-appdiag]')) { appDiag(); return; }
@@ -918,6 +975,7 @@
 
   root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice, appBack };
   schedule();
+  if (root.location && root.location.hash === NOAPP_HASH) noApp();   // (the fallback reloaded the page after all)
   drawHomeBox();
   if (openedBy) doseOpened(openedBy);
   // inside the app the alarm sheet IS the screen (the page behind it is only there for his link and his usual medicines)

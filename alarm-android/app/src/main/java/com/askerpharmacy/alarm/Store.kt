@@ -65,6 +65,15 @@ class Store(context: Context) {
         get() = p.getString("seed", "") ?: ""
         set(v) { p.edit().putString("seed", v).apply() }
 
+    // ---- «جرّب منبه حقيقي» (SelfTest): when its alarm was set for and what came of it ----
+    var selftestAt: Long
+        get() = p.getLong("selftest_at", 0L)
+        set(v) { p.edit().putLong("selftest_at", v).apply() }
+
+    var selftestState: String
+        get() = p.getString("selftest_state", "") ?: ""
+        set(v) { p.edit().putString("selftest_state", v).apply() }
+
     // ---- what happened at the last rings (the page's «🔍 فحص المنبه» shows it in plain Arabic: the facts instead of guesses) ----
     fun log(msg: String) {
         try {

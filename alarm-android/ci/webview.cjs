@@ -86,11 +86,21 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   await page.waitForSelector('#alarmSheet .al-diag-sum');
   const sum = await page.$$eval('#alarmSheet .al-diag-sum p', (els) => els.map((e) => e.textContent));
   console.log('app check:\n' + sum.join('\n'));
-  assert.ok(sum.some((l) => /إصدار التطبيق 1\.5/.test(l)), 'the version');
+  assert.ok(sum.some((l) => /إصدار التطبيق 1\.6/.test(l)), 'the version');
   assert.ok(sum.some((l) => /صوت المنبه/.test(l)), 'the alarm volume line');
   assert.ok(sum.some((l) => /البطارية/.test(l)), 'the battery line');
   assert.ok(sum.some((l) => /الرنين بدأ: تجربة المنبه/.test(l)), 'the ring log says the test ring started');
   assert.ok(sum.some((l) => /اتقفل/.test(l)), 'the ring log says it was stopped from the page');
+  // «جرّب منبه حقيقي»: the real bridge sets a real alarm clock (15 s in a debug build) and the phone must wake the app with it; the page reads the phone's verdict back
+  assert.equal(await page.evaluate(() => JSON.parse(window.AskerAndroid.status()).selftest), 'none', 'no test yet');
+  await page.click('[data-al-selftest]');
+  let verdict = '';
+  for (let k = 0; k < 60; k++) { verdict = await page.evaluate(() => JSON.parse(window.AskerAndroid.status()).selftest); if (verdict === 'ok') break; await sleep(1000); }
+  assert.equal(verdict, 'ok', 'the real test alarm woke the app');
+  await page.waitForFunction(() => /المنبه رنّ وهو مقفول/.test((document.querySelector('#alarmSheet .al-setup') || {}).textContent || ''), null, { timeout: 20000 });
+  const selfLog = await sh(`run-as ${PKG} cat shared_prefs/asker_alarm.xml`);
+  assert.match(selfLog, /التجربة الحقيقية: المنبه صحّى التطبيق/);
+  console.log('self-test OK: the phone woke the app with a real alarm clock');
   // the back button of the app leaves it (the page answers false on the list)
   assert.equal(await page.evaluate(() => window.AskerStoreAlarm.appBack()), false);
   await sh(`am force-stop ${PKG}`);

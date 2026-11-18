@@ -145,14 +145,30 @@ class Bridge(private val act: Activity) {
     @JavascriptInterface fun status(): String {
         val nm = act.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val fullScreen = if (Build.VERSION.SDK_INT >= 34) nm.canUseFullScreenIntent() else true
-        return JSONObject().put("v", 1).put("notifications", nm.areNotificationsEnabled()).put("fullScreen", fullScreen).put("sdk", Build.VERSION.SDK_INT).toString()
+        val pm = act.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return JSONObject().put("v", 1).put("notifications", nm.areNotificationsEnabled()).put("fullScreen", fullScreen).put("sdk", Build.VERSION.SDK_INT)
+            .put("battery", pm.isIgnoringBatteryOptimizations(act.packageName))
+            .put("maker", Build.MANUFACTURER)
+            .put("needsAutostart", Vendor.needsAutostart(Build.MANUFACTURER))
+            .put("selftest", SelfTest.state(st, System.currentTimeMillis()))
+            .toString()
     }
 
-    /** "notifications" | "fullScreen": the question or the settings page for it */
+    /** «جرّب منبه حقيقي»: a real alarm clock about a minute ahead (15 seconds in a debug build, the CI test), to see whether this phone lets it wake the app */
+    @JavascriptInterface fun selfTest() {
+        val debuggable = (act.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        SelfTest.start(act, if (debuggable) 15_000L else SelfTest.WAIT_MS)
+    }
+
+    /** "notifications" | "fullScreen" | "battery" | "autostart": the question or the settings page for it */
     @JavascriptInterface fun ask(kind: String) {
         act.runOnUiThread {
             try {
-                if (kind == "notifications") {
+                if (kind == "battery") {
+                    Vendor.askBattery(act)
+                } else if (kind == "autostart") {
+                    Vendor.openAutostart(act)
+                } else if (kind == "notifications") {
                     if (Build.VERSION.SDK_INT >= 33 && act.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                         act.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7)
                     } else {
@@ -219,6 +235,7 @@ class Bridge(private val act: Activity) {
             o.put("ringer", au.ringerMode)
             o.put("dnd", nm.currentInterruptionFilter)
             o.put("battery", pm.isIgnoringBatteryOptimizations(ctx.packageName))
+            o.put("selftest", SelfTest.state(st, System.currentTimeMillis()))
             o.put("speak", st.speak)
             o.put("names", names.size)
             o.put("voices", names.count { st.hasVoice(it) })
