@@ -70,6 +70,12 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
+        <!-- once a day: tells the server a phone has the app (a random id + the version) -->
+        <service
+            android:name=".PingJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <!-- the ring card over the lock screen -->
         <activity
             android:name=".RingActivity"

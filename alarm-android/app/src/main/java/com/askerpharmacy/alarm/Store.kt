@@ -65,6 +65,18 @@ class Store(context: Context) {
         get() = p.getString("seed", "") ?: ""
         set(v) { p.edit().putString("seed", v).apply() }
 
+    // ---- «عدّاد موبايلات المنبه» (AppPing): a random id made once (no person, no name, no link) and when it was last told to the server / last tried ----
+    val appId: String
+        get() = p.getString("app_id", null)?.takeIf { AppPing.validId(it) } ?: AppPing.newId().also { p.edit().putString("app_id", it).apply() }
+
+    var pingOk: Long
+        get() = p.getLong("ping_ok", 0L)
+        set(v) { p.edit().putLong("ping_ok", v).apply() }
+
+    var pingTry: Long
+        get() = p.getLong("ping_try", 0L)
+        set(v) { p.edit().putLong("ping_try", v).apply() }
+
     // ---- «جرّب منبه حقيقي» (SelfTest): when its alarm was set for and what came of it ----
     var selftestAt: Long
         get() = p.getLong("selftest_at", 0L)

@@ -22,6 +22,7 @@ class HandoffActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val st = Store(this)
+        AppPing.kick(this)   // «عدّاد الموبايلات»: a phone that only gets its alarms from the site still tells the server once a day it has the app
         try {
             val raw = intent?.getStringExtra("alarms")
             if (!raw.isNullOrEmpty() && raw.length < 60_000) {
@@ -52,7 +53,7 @@ class HandoffActivity : Activity() {
  */
 object VoiceFetcher {
     private const val FUNCTION = "https://qwrzdjdgvanmhaicncuk.supabase.co/functions/v1/asker-dose"
-    private const val KEY = "sb_publishable_af0XfsvB0Fwwo3HORqMN2g_iJNd9o0q"   // the site's public key (it is in the page too)
+    internal const val KEY = "sb_publishable_af0XfsvB0Fwwo3HORqMN2g_iJNd9o0q"   // the site's public key (it is in the page too); AppPing uses it as well
     private const val ORIGIN = "https://taherasker2560-dot.github.io"          // the function answers the pharmacy's own address only
 
     /** true when every sound is here (or the voice is off), false when something is still missing and the job should try again later */
