@@ -83,12 +83,18 @@
     ipaStepsAmount: 'افتح تطبيق إنستا باي، واختار «تحويل»، والصق العنوان والمبلغ.',
     ipaStepsLink: '١) دوس «انسخ المبلغ»  ٢) افتح إنستا باي  ٣) الصق المبلغ في خانة المبلغ',
     sheetTitle: 'ادفع حسابك',
+    sheetTitleAny: 'ادفع للصيدلية',
     sheetAmount: 'المبلغ (تقدر تعدّله)',
     sheetClose: 'تمام',
     payBtn: '💳 ادفع حسابك',
     orderNote: 'الدفع بتحويل {m}. بعد التحويل ابعت صورته على واتساب.',
   };
-  const api = { cleanWallet, cleanInstapay, parseInfo, methodsOf, isTransfer, wholeAmount, vodafoneDial, proofText, proofHref, orderNote, joinNotes, NAMES, TEXTS };
+  // the direct link the owner can send to anyone: store.html#pay (the sheet, no amount) or store.html#pay=250 (250 pounds); anything else = null
+  function parsePayHash(h) {
+    const m = /^#pay(?:=(\d{1,6}))?$/.exec(String(h || ''));
+    return m ? { amount: m[1] ? Number(m[1]) : 0 } : null;
+  }
+  const api = { cleanWallet, cleanInstapay, parseInfo, methodsOf, isTransfer, wholeAmount, vodafoneDial, proofText, proofHref, orderNote, joinNotes, parsePayHash, NAMES, TEXTS };
   if (typeof module !== 'undefined') module.exports = api;
   root.AskerStorePayLib = api;
   if (typeof document === 'undefined') return;
@@ -101,7 +107,7 @@
   const android = () => /Android/i.test(navigator.userAgent || '');
   let info = { vodafone: '', instapay: null, whatsapp: '' };
   const listeners = [];
-  const tell = () => listeners.forEach((f) => { try { f(); } catch (e) { /* a listener's trouble is its own */ } });
+  const tell = () => { drawHome(); tryOpen(); listeners.forEach((f) => { try { f(); } catch (e) { /* a listener's trouble is its own */ } }); };
   const lsGet = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } };
   const lsSet = (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* private window */ } };
   const cached = lsGet();
@@ -180,12 +186,12 @@
     const methods = methodsOf(info);
     if (!methods.length) return;
     let method = methods[0], amount = wholeAmount(ctx && ctx.amount);
-    const who = (ctx && ctx.who) || '';
+    const who = (ctx && ctx.who) || '', title = (ctx && ctx.title) || TEXTS.sheetTitle;
     sheet = document.createElement('div');
-    sheet.className = 'pay-sheet'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-label', TEXTS.sheetTitle);
+    sheet.className = 'pay-sheet'; sheet.setAttribute('role', 'dialog'); sheet.setAttribute('aria-label', title);
     const draw = () => {
       const opt = (m) => `<label class="pay-opt${method === m ? ' on' : ''}"><input type="radio" name="paySheet" value="${m}"${method === m ? ' checked' : ''} /> ${esc(TEXTS[m])}</label>`;
-      sheet.innerHTML = `<div class="pay-sheet-card"><div class="pay-grip"></div><h2>${esc(TEXTS.sheetTitle)}</h2>` +
+      sheet.innerHTML = `<div class="pay-sheet-card"><div class="pay-grip"></div><h2>${esc(title)}</h2>` +
         `<label class="pay-amount"><span>${esc(TEXTS.sheetAmount)}</span><span class="pay-amount-in"><input id="payAmount" type="number" inputmode="numeric" min="1" step="1" value="${amount || ''}" /> ج</span></label>` +
         methods.map(opt).join('') + `<div id="payDetails">${detailsHtml(method, amount, who)}</div>` +
         `<button type="button" class="pay-btn pay-close" data-pay-close>${esc(TEXTS.sheetClose)}</button></div>`;
@@ -199,6 +205,34 @@
     });
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+
+  // «ادفع للصيدلية» for anyone (owner 2026-11-19): a card on the home (shown only when the pharmacy's numbers are set) opens the sheet with no amount (he types it); the direct link
+  // store.html#pay / #pay=250 opens it too (the address is cleaned at once so the page goes on as the home). A customer with his link gets his name in the transfer's proof message.
+  const nameNow = () => { try { const A = root.AskerStoreAccount; return A && A.linked && A.linked() && A.name ? String(A.name() || '') : ''; } catch (e) { return ''; } };
+  const openAny = (amount) => openSheet({ amount, who: nameNow(), title: TEXTS.sheetTitleAny });
+  function drawHome() {
+    const c = $('payCard');
+    if (c) c.hidden = !methodsOf(info).length;
+  }
+  let want = null;
+  function tryOpen() {
+    if (!want || !methodsOf(info).length) return;
+    const w = want; want = null;
+    openAny(w.amount);
+  }
+  function fromLink() {
+    const p = parsePayHash(location.hash);
+    if (!p) return;
+    want = p;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* the address stays */ }
+    tryOpen();
+  }
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('#payCard')) { e.preventDefault(); openAny(0); }
+  });
+  window.addEventListener('hashchange', fromLink);
+  fromLink();
+  drawHome();
 
   root.AskerStorePay = {
     load, openSheet, closeSheet, detailsHtml,

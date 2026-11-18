@@ -213,3 +213,75 @@ run('Pay by transfer, a customer with his link: «ادفع حسابك» with the
  await page.waitForTimeout(600);
  assert.equal(await page.$('[data-acct-paysheet]'),null,'no number, no «ادفع حسابك»');
 },{home:true,permissions:['clipboard-read','clipboard-write']});
+
+// «ادفع للصيدلية» for anyone (owner 2026-11-19: «رابط الدفع ظاهر في الموقع، مش شرط يكون شاري حاجة … يبعت لي منه إنستا أو فودافون بسهولة من غير ما يقول لي الرقم»):
+// a card on the home for a visitor and a customer alike (only when the numbers are set), a sheet with no amount (he types it), and the direct link store.html#pay / #pay=250
+run('Pay the pharmacy: a card on the home for anyone opens the sheet (no purchase needed); both ways with the numbers, the dial, copy and the WhatsApp proof',async({page,base})=>{
+ await setup(page,UAS.chrome,INFO);
+ await page.goto(base+'store.html?p=1');
+ await page.waitForSelector('#payCard:not([hidden])');
+ assert.equal(await text(page,'#payCard strong'),'ادفع للصيدلية');
+ assert.match(await text(page,'#payCard span:not(.hc-ico):not(.hc-text):not(.hc-go)'),/من غير ما تسأل عن الرقم/);
+ assert.equal(await page.$('#payCard[href="#pay"]')!==null,true,'a real link too (a tap opens the sheet, the address stays clean)');
+ await page.click('#payCard');
+ await page.waitForSelector('.pay-sheet');
+ assert.equal(await text(page,'.pay-sheet h2'),'ادفع للصيدلية');
+ assert.equal(await page.inputValue('#payAmount'),'','no amount yet: he types it');
+ assert.equal(await page.evaluate(()=>location.hash),'','the address is not changed by the tap');
+ // Vodafone Cash first: the number, copy, the dialer (Android) holding the amount he types
+ assert.equal(await text(page,'[data-pay-card="vodafone"] .pay-num'),'01012345678');
+ await page.fill('#payAmount','250');
+ assert.equal(await text(page,'[data-pay-card="vodafone"] .pay-amt'),'حوّل 250 ج على فودافون كاش');
+ assert.equal(await page.getAttribute('[data-pay-card="vodafone"] a[data-pay-open]','href'),'tel:*9*7*01012345678*250%23');
+ const proof=await page.getAttribute('[data-pay-proof]','href');
+ assert.equal(decodeURIComponent(proof.split('?text=')[1]),'حوّلت 250 ج على فودافون كاش. دي صورة التحويل.','a visitor: no name in the message');
+ // InstaPay: the address and the steps
+ await page.click('.pay-opt input[value="instapay"]');
+ assert.equal(await text(page,'[data-pay-card="instapay"] .pay-num'),'asker@instapay');
+ assert.equal(await text(page,'[data-pay-card="instapay"] .pay-amt'),'حوّل 250 ج على إنستا باي');
+ await page.click('[data-pay-close]');
+ await page.waitForSelector('.pay-sheet',{state:'detached'});
+ // a visit with no numbers set: the card is not there at all (nothing to show)
+});
+
+run('Pay the pharmacy: the direct link #pay / #pay=250 opens the sheet (the address is cleaned), also on a first visit before the numbers arrive; no numbers = nothing',async({page,base})=>{
+ await setup(page,UAS.chrome,INFO);
+ await page.goto(base+'store.html?p=2#pay=250');
+ await page.waitForSelector('.pay-sheet');
+ assert.equal(await page.inputValue('#payAmount'),'250');
+ assert.equal(await text(page,'.pay-sheet h2'),'ادفع للصيدلية');
+ assert.equal(await page.evaluate(()=>location.hash),'','the link is cleaned at once, the page goes on as the home');
+ await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
+ await page.click('[data-pay-close]');
+ // the same phone, the plain #pay, from inside the page (a link tapped in a chat while the page is open)
+ await page.evaluate(()=>{location.hash='#pay'});
+ await page.waitForSelector('.pay-sheet');
+ assert.equal(await page.inputValue('#payAmount'),'');
+ await page.click('[data-pay-close]');
+ // a word that only starts like it is not the link
+ await page.evaluate(()=>{location.hash='#payment'});
+ await page.waitForTimeout(400);
+ assert.equal(await page.$('.pay-sheet'),null);
+});
+
+run('Pay the pharmacy: no numbers set = no card and the link does nothing; a customer with his link has his name in the proof message',async({page,base})=>{
+ await setup(page,UAS.chrome,{vodafone:null,instapay:null,whatsapp:'01003032931'});
+ await page.goto(base+'store.html?p=3#pay=100');
+ await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
+ await page.waitForTimeout(600);
+ assert.equal(await page.$eval('#payCard',e=>e.hidden),true,'nothing to pay with: no card');
+ assert.equal(await page.$('.pay-sheet'),null,'and the link opens nothing');
+ // a customer with his link (the numbers are set): his name goes into the message the pharmacy gets
+ await page.addInitScript(()=>{window.__fakeRpcs.ar_store_pay_info=()=>({vodafone:'01012345678',instapay:null,whatsapp:'01003032931'})});
+ await seedCustomer(page);
+ await page.goto(base+'store.html#me='+tok);await page.reload();
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ await page.goto(base+'store.html?p=4#home');
+ await page.waitForSelector('#payCard:not([hidden])');
+ await page.click('#payCard');
+ await page.waitForSelector('.pay-sheet');
+ await page.fill('#payAmount','120');
+ const proof=await page.getAttribute('[data-pay-proof]','href');
+ assert.match(decodeURIComponent(proof.split('?text=')[1]),/^حوّلت 120 ج على فودافون كاش \(أحمد محمود\)/);
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+},{home:true});
