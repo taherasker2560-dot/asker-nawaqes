@@ -77,6 +77,27 @@ class Store(context: Context) {
         get() = p.getLong("ping_try", 0L)
         set(v) { p.edit().putLong("ping_try", v).apply() }
 
+    // ---- «تحديث التطبيق» (AppUpdate): the newest version the published version file named, and when it was last read / tried ----
+    var latestCode: Int
+        get() = p.getInt("latest_code", 0)
+        set(v) { p.edit().putInt("latest_code", v).apply() }
+
+    val latestName: String get() = p.getString("latest_name", "") ?: ""
+    val latestSize: Long get() = p.getLong("latest_size", 0L)
+    val latestSha: String get() = p.getString("latest_sha", "") ?: ""
+
+    fun setLatest(i: AppUpdate.Info) {
+        p.edit().putInt("latest_code", i.code).putString("latest_name", i.name).putLong("latest_size", i.size).putString("latest_sha", i.sha256).apply()
+    }
+
+    var updateOk: Long
+        get() = p.getLong("update_ok", 0L)
+        set(v) { p.edit().putLong("update_ok", v).apply() }
+
+    var updateTry: Long
+        get() = p.getLong("update_try", 0L)
+        set(v) { p.edit().putLong("update_try", v).apply() }
+
     // ---- «جرّب منبه حقيقي» (SelfTest): when its alarm was set for and what came of it ----
     var selftestAt: Long
         get() = p.getLong("selftest_at", 0L)

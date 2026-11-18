@@ -225,7 +225,7 @@
   const GROUP_OF = {
     home: 'home',
     short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
-    customers: 'accounts', vendors: 'accounts', cash: 'accounts', ops: 'accounts', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
+    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
   };
   const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
@@ -293,6 +293,9 @@
     // «الخزن» (ar/cash.js, owner 2026-11-15): PharmaFly's cash boxes; owner only
     $('cashPanel')?.classList.toggle('hidden', tab !== 'cash');
     if (tab === 'cash') window.AskerCash?.open();
+    // «💸 المدفوعات» (ar/pay.js, owner 2026-11-19): payment orders from the boxes; owner only
+    $('payPanel')?.classList.toggle('hidden', tab !== 'pay');
+    if (tab === 'pay') window.AskerPay?.open();
     // «العمليات» (ar/ops.js, owner 2026-11-15): what Adam recorded by voice
     $('opsPanel')?.classList.toggle('hidden', tab !== 'ops');
     if (tab === 'ops') window.AskerOps?.open();
