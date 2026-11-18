@@ -371,7 +371,7 @@ run('Dose alarm inside the Android app: the alarm sheet is the screen, the alarm
  assert.equal(await page.evaluate(()=>window.__app.seed),'','the seed was taken over once');
  // no browser ring, no notifications box, no push: the app does all that
  assert.equal(await tick(page,8,0),0,'the page does not ring in the app');assert.equal(await page.$('#alarmRing'),null);
- assert.equal(await page.$('[data-al-notif]'),null);assert.equal(await page.$('.rg-warn'),null);assert.equal(await page.$('[data-al-try]'),null);assert.equal(await page.$('[data-al-getapp]'),null,'already in the app: no download button');
+ assert.equal(await page.$('[data-al-notif]'),null);assert.equal(await page.$('.rg-warn'),null);assert.equal(await page.$('[data-al-try]'),null);assert.equal(await page.$('#alarmSheet [data-al-getapp]'),null,'already in the app: no download button');
  assert.equal(await page.evaluate(()=>window.__subs),0,'no push subscription from inside the app');
  // the sound files are handed to the app: once per name, the test ring's too, and never asked again
  await page.waitForFunction(()=>Object.keys(window.__app.voices).length===3);
@@ -415,9 +415,9 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
  await page.addInitScript(()=>{Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=>'Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'})});
  await page.evaluate(()=>localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['08:00'],on:true}],snoozes:[]})));
  await openAccount(page,base);
- await page.click('[data-al-open]');await page.waitForSelector('[data-al-getapp]');
- assert.equal(await text(page,'[data-al-getapp]'),'📲 نزّل تطبيق المنبه');
- const href=await page.$eval('[data-al-getapp]',e=>e.getAttribute('href'));
+ await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet [data-al-getapp]');
+ assert.equal(await text(page,'#alarmSheet [data-al-getapp]'),'📲 نزّل تطبيق المنبه');
+ const href=await page.$eval('#alarmSheet [data-al-getapp]',e=>e.getAttribute('href'));
  const m=/^intent:\/\/alarm\?me=([0-9a-f]{64})#Intent;scheme=askeralarm;package=com\.askerpharmacy\.alarm;S\.alarms=([^;]+);S\.browser_fallback_url=([^;]+);end$/.exec(href);
  assert.ok(m,'the intent link: '+href);
  assert.equal(m[1],tok,'his link goes to the app');
@@ -432,10 +432,46 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
  // the pharmacy's own phone: no button
  await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));
  await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('.ac-al-tile');
- await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet');assert.equal(await page.$('[data-al-getapp]'),null);
+ await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet');assert.equal(await page.$('#alarmSheet [data-al-getapp]'),null);
 },{home:true});
 
 const ANDROID_UA='Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+const IPHONE_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+const withUa=(page,ua)=>page.addInitScript((u)=>{Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=>u})},ua);
+run('Alarm app card on the pharmacy app\'s home (owner 2026-11-18: «المنبه ينزل من جوه التطبيق»): an Android phone gets the card with the download button (the intent link, whose fallback is the download) and «⚠️ ده لأندرويد بس…» under it; once the app has opened from the button the card says connected and the button opens it',async({page,base})=>{
+ await setup(page,'granted');await withUa(page,ANDROID_UA);
+ await page.setViewportSize({width:375,height:812});await page.goto(base+'store.html');
+ await page.waitForSelector('#alarmAppBox:not([hidden]) [data-al-getapp]');
+ assert.equal(await text(page,'#alarmAppBox strong'),'منبه الدوا');
+ assert.equal(await text(page,'#alarmAppBox .al-home-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.');
+ assert.equal(await text(page,'#alarmAppBox [data-al-getapp]'),'📲 نزّل تطبيق المنبه');
+ const href=await page.$eval('#alarmAppBox [data-al-getapp]',e=>e.getAttribute('href'));
+ assert.match(href,/^intent:\/\/alarm#Intent;scheme=askeralarm;package=com\.askerpharmacy\.alarm;S\.browser_fallback_url=https%3A%2F%2Fgithub\.com%2F[^;]+asker-alarm\.apk;end$/);
+ // connected (the mark the button's tap leaves when the app opens): the card says so and the button opens the app
+ await page.evaluate(()=>localStorage.setItem('asker_dose_app','1'));await page.reload();
+ await page.waitForSelector('#alarmAppBox:not([hidden]) [data-al-getapp]');
+ assert.equal(await text(page,'#alarmAppBox [data-al-getapp]'),'📲 افتح منبه الدوا');
+ assert.match(await text(page,'#alarmAppBox'),/✓ متوصّل: المنبهات اللي بتظبطها هنا بتروح له لوحدها/);
+},{home:true});
+
+run('Alarm app card on the home: an iPhone sees the card and the note with NO download button; a computer, the pharmacy\'s own phone (the system is signed in) and the Android app itself see nothing',async({page,base})=>{
+ await setup(page,'granted');await withUa(page,IPHONE_UA);
+ await page.setViewportSize({width:375,height:812});await page.goto(base+'store.html');
+ await page.waitForSelector('#alarmAppBox:not([hidden])');
+ assert.equal(await text(page,'#alarmAppBox .al-home-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.');
+ assert.equal(await page.$('#alarmAppBox [data-al-getapp]'),null,'no download button on an iPhone');
+ // the pharmacy's own phone, even on Android: nothing
+ await withUa(page,ANDROID_UA);
+ await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));await page.reload();
+ await page.waitForSelector('#sections');
+ assert.equal(await page.$eval('#alarmAppBox',e=>e.hidden),true,'hidden where the system is signed in');
+ // a computer: nothing
+ await page.evaluate(()=>localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token'));
+ await withUa(page,'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+ await page.reload();await page.waitForSelector('#sections');
+ assert.equal(await page.$eval('#alarmAppBox',e=>e.hidden),true,'hidden on a computer');
+},{home:true});
+
 run('Dose alarm hand-off (owner 2026-11-18: the work stays on the site, the «منبه الدوا» app only rings): once the app is connected every save / toggle / voice switch / delete hands the alarms to it (an askeralarm://handoff intent link sent from inside the tap); the button that opens the app marks it connected; before that, on a computer and in the app, nothing is sent',async({page,base})=>{
  await setup(page,'granted');
  await page.addInitScript((ua)=>{Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=>ua});window.__intents=[];window.__askerGoIntent=(u)=>window.__intents.push(u)},ANDROID_UA);
@@ -447,12 +483,12 @@ run('Dose alarm hand-off (owner 2026-11-18: the work stays on the site, the «م
  await add('فيموجيسال ق');
  assert.equal((await sent()).length,0,'not connected: nothing is sent');
  // the button opened the app: the page went to the background right after the tap, so the app is there
- await page.evaluate(()=>document.querySelector('[data-al-getapp]').addEventListener('click',(e)=>e.preventDefault(),true));   // (no real navigation in the test)
- await page.click('[data-al-getapp]');
+ await page.evaluate(()=>document.querySelector('#alarmSheet [data-al-getapp]').addEventListener('click',(e)=>e.preventDefault(),true));   // (no real navigation in the test)
+ await page.click('#alarmSheet [data-al-getapp]');
  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'))});
  await page.waitForSelector('[data-al-appoff]');
  assert.match(await text(page,'#alarmSheet .al-app-head'),/تطبيق «منبه الدوا» متوصّل/);
- assert.equal(await text(page,'[data-al-getapp]'),'📲 افتح منبه الدوا');
+ assert.equal(await text(page,'#alarmSheet [data-al-getapp]'),'📲 افتح منبه الدوا');
  // now a new alarm goes over: the app's list (the name as it is said) and the site's own copy (kept as the seed of the app's page)
  await add('زانبرازان ٢٠ قرص');
  let s=await sent();assert.equal(s.length,1,'one hand-off for one save');
@@ -469,8 +505,8 @@ run('Dose alarm hand-off (owner 2026-11-18: the work stays on the site, the «م
  await page.waitForSelector('#alarmSheet .al-card');
  s=await sent();assert.equal(s.length,4);assert.deepEqual(s[3].page.items.map(i=>i.name),['زانبرازان ٢٠ قرص'],'the deleted alarm is gone from the site\'s copy');
  // «مش متثبّت؟ شيل التوصيل»: back to the download box, and a save sends nothing again
- await page.click('[data-al-appoff]');await page.waitForSelector('[data-al-getapp]');
- assert.equal(await text(page,'[data-al-getapp]'),'📲 نزّل تطبيق المنبه');
+ await page.click('[data-al-appoff]');await page.waitForSelector('#alarmSheet [data-al-getapp]');
+ assert.equal(await text(page,'#alarmSheet [data-al-getapp]'),'📲 نزّل تطبيق المنبه');
  await page.click('[data-al-speak]');
  assert.equal((await sent()).length,4,'disconnected: nothing more is sent');
 },{home:true});

@@ -285,6 +285,7 @@ class RingService : Service() {
                         t.setAudioAttributes(alarmAttrs())
                         val arabic = t.setLanguage(Locale("ar", "EG")) >= 0 || t.setLanguage(Locale("ar")) >= 0
                         if (!arabic) { Store(this).log("الموبايل مفيهوش نطق عربي: نغمة"); playTone(mine); return@post }
+                        t.setSpeechRate(0.75f)   // slower than the engine's normal (owner 2026-11-18 on a Samsung: «بيتكلم بسرعة جدًا»): a name of a medicine must be understood the first time
                         t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                             override fun onStart(utteranceId: String?) { Store(this@RingService).log("النطق بدأ") }
                             override fun onDone(utteranceId: String?) { h.post { afterSpeech(seq) } }
