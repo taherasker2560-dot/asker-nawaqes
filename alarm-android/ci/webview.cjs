@@ -30,7 +30,9 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   console.log('webview page', page.url());
   await page.waitForFunction(() => !!window.AskerAndroid && !!window.AskerStoreAlarm, null, { timeout: 60000 });
   assert.equal(await page.evaluate(() => window.AskerAndroid.version()), '1', 'the bridge answers');
-  // the sheet is open by itself (inside the app it IS the screen), and no browser-only box shows
+  // inside the app the STORE comes first (one app, the store itself); the alarm sheet opens from the page like on the site, and no browser-only box shows
+  assert.equal(await page.$('#alarmSheet'), null, 'the store first, not the alarm sheet');
+  await page.evaluate(() => window.AskerStoreAlarm.open());
   await page.waitForSelector('#alarmSheet', { timeout: 30000 });
   assert.equal(await page.$('[data-al-notif]'), null);
   assert.equal(await page.$('[data-al-getapp]'), null);
@@ -86,7 +88,7 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   await page.waitForSelector('#alarmSheet .al-diag-sum');
   const sum = await page.$$eval('#alarmSheet .al-diag-sum p', (els) => els.map((e) => e.textContent));
   console.log('app check:\n' + sum.join('\n'));
-  assert.ok(sum.some((l) => /إصدار التطبيق 1\.2/.test(l)), 'the version');
+  assert.ok(sum.some((l) => /إصدار التطبيق 1\.3/.test(l)), 'the version');
   assert.ok(sum.some((l) => /صوت المنبه/.test(l)), 'the alarm volume line');
   assert.ok(sum.some((l) => /البطارية/.test(l)), 'the battery line');
   assert.ok(sum.some((l) => /الرنين بدأ: تجربة المنبه/.test(l)), 'the ring log says the test ring started');

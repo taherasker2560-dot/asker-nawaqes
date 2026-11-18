@@ -50,10 +50,10 @@
     notifTestTitle: '🔔 تجربة منبه الدوا',
     notifTestBody: 'لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.',
     // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
-    getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل التطبيق:',
-    getApp: '📲 نزّل تطبيق المنبه',
+    getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، استخدم تطبيق صيدلية عسكر (فيه المتجر كله):',
+    getApp: '📲 نزّل تطبيق صيدلية عسكر',
     getAppWhy: 'التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو الموبايل مقفول والمتصفح مقفول (المتصفح مش بيقدر يعمل كده).',
-    getAppSteps: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها ارجع هنا واضغط الزرار تاني، هيفتح التطبيق بمنبهاتك.',
+    getAppSteps: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها ارجع هنا واضغط الزرار تاني، هيفتح التطبيق بمنبهاتك. وبعد كده امسح أيقونة الموقع القديمة وخلّي التطبيق بس.',
     hintApp: 'اختار الدوا وحدد المواعيد. التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو التطبيق مقفول.',
     appOn: '✓ التطبيق شغّال: بيرنّ وينطق اسم الدوا في ميعاده حتى لو التطبيق مقفول.',
     appTest: '🔔 جرّب المنبه',
@@ -65,7 +65,7 @@
     adRow: '🔍 فحص المنبه',
     adNotifOk: '✓ الإشعارات شغالة',
     adNotifNo: '✗ الإشعارات مقفولة للتطبيق (من إعدادات الموبايل)',
-    adExactNo: '✗ «المنبهات والتذكيرات» مش مسموحة للتطبيق (إعدادات الموبايل ← التطبيقات ← منبه الدوا)',
+    adExactNo: '✗ «المنبهات والتذكيرات» مش مسموحة للتطبيق (إعدادات الموبايل ← التطبيقات ← صيدلية عسكر)',
     adNone: '✗ مفيش منبه شغال محفوظ في التطبيق',
     adNextOk: '✓ المنبه الجاي الساعة {t} ومتسجل في نظام الموبايل',
     adNextNo: '✗ المنبه الجاي الساعة {t} مش متسجل في نظام الموبايل',
@@ -438,7 +438,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118g'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118h'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -732,7 +732,7 @@
   function appLink() {
     const acc = root.AskerStoreAccount, t = acc && acc.token ? acc.token() : '';
     const mine = data.items.length ? 'S.alarms=' + encodeURIComponent(JSON.stringify({ v: 1, speak: data.speak, items: data.items })) + ';' : '';
-    return 'intent://alarm' + (t ? '?me=' + t : '') + '#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;' + mine + 'S.browser_fallback_url=' + encodeURIComponent(APK_URL) + ';end';
+    return 'intent://alarm' + (t ? '?me=' + t : '') + '#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;S.sheet=1;' + mine + 'S.browser_fallback_url=' + encodeURIComponent(APK_URL) + ';end';
   }
   // «🔍 فحص المنبه»: the app answers what the phone says (notifications, the exact-alarm permission, the alarm volume, do-not-disturb, the battery rule, the sound files, the last rings), written in plain Arabic
   function appDiag() {
@@ -802,14 +802,18 @@
   function redrawTile() { const t = document.querySelector('.ac-al-tile'); if (t) t.outerHTML = tileHtml(); }
   function open() {
     view = 'list'; error = '';
-    if (!A) { try { history.pushState({ asAlarm: 1 }, '', location.href); } catch (e) { /* the close button still works */ } }   // (the app's own back button asks appBack)
+    try { history.pushState({ asAlarm: 1 }, '', location.href); } catch (e) { /* the close button still works */ }
     draw();
   }
-  // the app's back button: the editor goes back to the list (true); from the list the app closes itself (false)
-  function appBack() { if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); return true; } return false; }
+  // the app's back button (inside the app the store is the screen and the sheet is on top of it): the editor goes back to the list (true), the list closes the sheet (true),
+  // with nothing open the app goes back through the store's pages itself (false)
+  function appBack() {
+    if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); return true; }
+    if (view) { close(); return true; }
+    return false;
+  }
   function close(quiet) {
     if (!view) return;
-    if (A) { try { A.close(); } catch (e) { /* the app stays */ } return; }
     view = ''; draft = null; error = '';
     draw(); schedule();
     if (!quiet) { try { if (history.state && history.state.asAlarm) history.back(); } catch (e) { /* nothing to go back to */ } }
@@ -868,11 +872,12 @@
     if (draft && e.target.matches && e.target.matches('[data-al-time]')) { const m = minutesOf(e.target.value); if (m != null) { draft.times[+e.target.dataset.alTime] = hhmmOf(m); draft.preset = ''; } }
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
-  window.addEventListener('popstate', () => { if (view && !A) { view = ''; draft = null; draw(); schedule(); } });
+  window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
 
   root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice, appBack };
   schedule();
   if (openedBy) doseOpened(openedBy);
-  // inside the app the alarm sheet IS the screen (the page behind it is only there for his link and his usual medicines)
-  if (A) { open(); mirrorAlarms(); }
+  // inside the app (owner 2026-11-18: «ب طبعا»: one app, the store itself) the store comes first like on the site; the alarm sheet opens by itself only when the app was opened FROM the site's
+  // alarm button (the link carries ?sheet=1 and his alarms)
+  if (A) { mirrorAlarms(); if (/[?&]sheet=1(&|$)/.test(String((root.location && root.location.search) || ''))) open(); }
 })(typeof window === 'undefined' ? globalThis : window);

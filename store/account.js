@@ -263,7 +263,9 @@
   if (token && !/^[0-9a-f]{64}$/.test(token)) { keep.set(null); token = null; }
   // (no jump to «حسابي» on a plain open any more: inside the installed bot that took the owner's store away; the customer's
   // own icon starts on his link anyway)
-  const standalone = () => !!((root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
+  // the Android app «صيدلية عسكر» (alarm-android/: this same store inside a WebView, owner 2026-11-18 «ب طبعا») is the installed app too: no install box inside it, an account is asked there like in the installed site
+  const inAndroidApp = () => { try { return !!(root.AskerAndroid && typeof root.AskerAndroid.setAlarms === 'function'); } catch (e) { return false; } };
+  const standalone = () => !!((root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true || inAndroidApp());
   // his own manifest: installing from this phone makes an icon that opens on his account
   const manifestLink = document.querySelector('link[rel="manifest"]');
   const storeManifest = manifestLink && manifestLink.getAttribute('href');
