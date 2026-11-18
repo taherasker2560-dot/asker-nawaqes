@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- the debug build (CI only): http for the test's own page server (10.0.2.2 = the CI machine), and the receiver the test uses to set an alarm. The customer's build has neither. -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic">
+        <receiver android:name="com.askerpharmacy.alarm.DebugReceiver" android:exported="true" />
+    </application>
+</manifest>

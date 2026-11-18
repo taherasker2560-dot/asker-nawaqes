@@ -49,6 +49,16 @@
     notifTest: '🔔 جرّب الإشعار',
     notifTestTitle: '🔔 تجربة منبه الدوا',
     notifTestBody: 'لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.',
+    // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
+    getApp: '📲 نزّل تطبيق المنبه',
+    getAppWhy: 'التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو الموبايل مقفول والمتصفح مقفول (المتصفح مش بيقدر يعمل كده).',
+    getAppSteps: 'بعد ما الملف ينزل: افتحه واضغط «تثبيت». لو الموبايل سألك عن «السماح بالتثبيت من المتصفح» اسمح. وبعدها ارجع هنا واضغط الزرار تاني، هيفتح التطبيق بمنبهاتك.',
+    hintApp: 'اختار الدوا وحدد المواعيد. التطبيق بيرنّ وينطق اسم الدوا في ميعاده حتى لو التطبيق مقفول.',
+    appOn: '✓ التطبيق شغّال: بيرنّ وينطق اسم الدوا في ميعاده حتى لو التطبيق مقفول.',
+    appTest: '🔔 جرّب المنبه',
+    appNotifOff: 'الإشعارات مقفولة للتطبيق، فالمنبه مش هيظهر. اضغط وشغّلها.',
+    appFsOff: 'عشان كارت المنبه يظهر على شاشة القفل، اسمح له من الإعدادات.',
+    appFix: 'افتح الإعدادات',
     notifSound: 'لو الإشعار جه من غير صوت: اتأكد إن الموبايل مش على الصامت، وافتح إعدادات الموبايل ← التطبيقات ← المتصفح ← الإشعارات ← صيدلية عسكر وشغّل الصوت.',
     which: 'أي دوا؟',
     fromUsual: '(من اللي بتاخده دايمًا)',
@@ -173,11 +183,17 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   // the pharmacy's own phone = the bot is signed in here: a look only (kept for this tab, never rings)
   const pharmacy = (() => { try { return Object.keys(localStorage).some((k) => /^sb-[a-z0-9]+-auth-token$/.test(k)); } catch (e) { return false; } })();
+  // inside the customer's Android app «منبه الدوا» (alarm-android/, a WebView that shows this very page): the APP rings (with the app closed, the phone locked or restarted), this page only edits the alarms
+  const A = (() => { try { const a = root.AskerAndroid; return a && typeof a.setAlarms === 'function' ? a : null; } catch (e) { return null; } })();
+  const APK_URL = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk';
+  const isAndroidBrowser = () => !A && /Android/i.test(String((root.navigator && root.navigator.userAgent) || ''));
   const box = () => root.localStorage;
   const read = (k) => { try { return JSON.parse(box().getItem(k) || 'null'); } catch (e) { return null; } };
   const write = (k, v) => { try { box().setItem(k, JSON.stringify(v)); } catch (e) { /* private window: it stays until the page is closed */ } };
   // his own alarms (on his phone); on the pharmacy's phone `data` holds the alarms of the customer being looked at, saved to the server
   let data = pharmacy ? clean(null) : clean(read(KEY));
+  // the alarms he made in the browser before installing the app come with the app's first open (the link's «alarms» part): taken over once, when the app has none of its own yet
+  if (A && !pharmacy && !read(KEY)) { try { const s = A.seed(); if (s) { data = clean(JSON.parse(s)); write(KEY, data); } } catch (e) { /* no seed */ } }
   // the alarms the PHARMACY set for this customer: they live on the server, are cached here so they ring offline, and he can only switch them on / off
   const PH_KEY = 'asker_dose_pharmacy';
   let ph = pharmacy ? { items: [], off: {} } : (() => { const o = read(PH_KEY) || {}; return { items: clean({ items: o.items }).items.map((x) => ({ ...x, ph: true })), off: o.off && typeof o.off === 'object' ? o.off : {} }; })();
@@ -250,10 +266,11 @@
   }
   // from the function; {blob} or {error: why} (the why is written on the check page)
   async function fetchVoice(n, ms) {
-    if (!client || !client.functions) return { error: 'no-client' };
+    const vc = client || (A ? adminClient() : null);   // in the app there may be no customer link yet: the voice function is public, a visitor's client is enough
+    if (!vc || !vc.functions) return { error: 'no-client' };
     const gaveUp = new Promise((ok) => setTimeout(() => ok({ error: 'timeout' }), ms || 12000));
     try {
-      const r = await Promise.race([client.functions.invoke('asker-dose', { body: { action: 'voice', name: spokenName(n) } }), gaveUp]);
+      const r = await Promise.race([vc.functions.invoke('asker-dose', { body: { action: 'voice', name: spokenName(n) } }), gaveUp]);
       if (r && r.error && typeof r.error === 'string') return r;
       if (r && r.error) {
         let why = String(r.error.message || r.error);
@@ -286,8 +303,36 @@
   }
   // The dose notification carries the medicine's name (owner 2026-11-18: «من غير ما يكون الابليكيشن مفتوح» → «أمشي عليه»: the way with no second program). The server's push stays empty, so the worker
   // (store/dose/sw.js) writes the name from THIS copy: only the enabled alarms, the name as it is said and the times. It stays on this phone (IndexedDB); a change of the alarms updates it.
+  // The sentences' sound files go to the app (it plays them with the app closed): asked from the server once per name (kept in the page's cache too), handed over, never asked twice
+  const blobBase64 = (b) => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = () => no(r.error); r.readAsDataURL(b); });
+  let giving = false, givingAgain = false;
+  async function giveVoices() {
+    if (!A) return;
+    if (giving) { givingAgain = true; return; }
+    giving = true;
+    try {
+      do {
+        givingAgain = false;
+        const names = [...new Set(all().items.filter((x) => x.on).map((x) => spokenName(x.say || x.name)).concat([TEXTS.testName]))];
+        for (const n of names) {
+          let has = true; try { has = A.hasVoice(n); } catch (e) { has = true; }
+          if (has) continue;
+          const g = await voiceBlob(n, 25000);
+          if (g.blob) { try { A.saveVoice(n, await blobBase64(g.blob)); } catch (e) { /* the phone's own voice stays the second way */ } }
+        }
+      } while (givingAgain);
+    } catch (e) { /* the next open asks again */ }
+    giving = false;
+  }
   async function mirrorAlarms() {
-    if (pharmacy || !root.indexedDB) return;
+    if (pharmacy) return;
+    // inside the app: the app is the one that rings, so it gets the alarms that are on (the name as it is said + the times) and, after them, the sound files
+    if (A) {
+      try { A.setAlarms(JSON.stringify({ speak: data.speak, items: all().items.filter((x) => x.on).map((x) => ({ id: x.id, spoken: spokenName(x.say || x.name), times: x.times })) })); } catch (e) { /* the app keeps the last list */ }
+      giveVoices();
+      return;
+    }
+    if (!root.indexedDB) return;
     try {
       const items = all().items.filter((x) => x.on).map((x) => ({ id: x.id, spoken: spokenName(x.say || x.name), times: x.times }));
       await new Promise((ok) => {
@@ -360,7 +405,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118c'); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118e'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -469,7 +514,7 @@
   const notified = new Set();
   // forced = he came from the dose notification (a worker message or ?dose=1): the alarms that notification was for ring now, even if they already «rang» in a hidden page, up to OPEN_LATE_MIN late
   function tick(now, forced) {
-    if (pharmacy) return [];
+    if (pharmacy || A) return [];   // in the app the app rings
     const n = now || new Date();
     data = clean(read(KEY) || data);   // another tab may have changed it
     const due = dueNow(all(), n, forced === true ? {} : firedMap(), forced === true ? OPEN_LATE_MIN : LATE_MIN);
@@ -490,11 +535,11 @@
   }
   function schedule() {
     clearInterval(timer); timer = null;
-    if (pharmacy || !onCount(all())) return;
+    if (pharmacy || A || !onCount(all())) return;
     timer = setInterval(() => tick(), CHECK_MS);
     tick();
   }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); if (A && view) draw(); } });   // (back from the phone's settings: what the app needs is read again)
   window.addEventListener('storage', (e) => { if (e.key === KEY) { data = clean(read(KEY)); schedule(); } });
 
   function drawRing() {
@@ -513,7 +558,7 @@
   // The server gets ONLY: this phone's push address and the clock times of the alarms that are on (Cairo time). No name, no customer (migration 202611172300, function asker-dose).
   const VAPID = 'BEz67xiIZZubLNtifD1Ryqxc6p2j509IsWF6o-YUe5M1BvyWIlUm4NwaRKUP-potwMmyN9_qxqNC2qfn1s5ozwg';   // the public half of the web-push key (the same one store/chat.js uses)
   const keyBytes = (s) => { const p = '='.repeat((4 - (s.length % 4)) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
-  const canPush = () => !pharmacy && !!root.navigator && 'serviceWorker' in root.navigator && 'PushManager' in root && !!root.Notification;
+  const canPush = () => !pharmacy && !A && !!root.navigator && 'serviceWorker' in root.navigator && 'PushManager' in root && !!root.Notification;
   const serverTimes = () => normTimes([].concat(...all().items.filter((x) => x.on).map((x) => x.times)).map((t) => cairoTime(t)));
   async function activeRegistration() {
     const reg = await root.navigator.serviceWorker.register('store/dose/sw.js', { scope: 'store/dose/' });
@@ -618,19 +663,36 @@
   function listHtml() {
     const cards = all().items.map((it) => `<div class="al-card${it.on ? '' : ' off'}">${it.ph ? `<div class="al-card-main"><b class="notr" dir="auto">${esc(it.name)}</b> <span class="al-badge">${esc(TEXTS.fromPharmacy)}</span><span class="al-times">${it.times.map(chip).join('')}</span></div>` : `<button type="button" class="al-card-main" data-al-edit="${esc(it.id)}"><b class="notr" dir="auto">${esc(it.name)}</b><span class="al-times">${it.times.map(chip).join('')}</span></button>`}` +
       `<button type="button" class="al-tg${it.on ? ' on' : ''}" role="switch" aria-checked="${it.on}" aria-label="${esc(it.on ? TEXTS.on : TEXTS.off)}" data-al-toggle="${esc(it.id)}"></button></div>`).join('');
-    const notif = pharmacy ? '' : root.Notification
+    const notif = pharmacy || A ? '' : root.Notification
       ? (root.Notification.permission === 'granted' ? `<p class="rg-hint">${esc(TEXTS.notifDone)}</p><button type="button" class="al-line" data-al-notiftest><span>${esc(TEXTS.notifTest)}</span></button><p class="rg-hint">${esc(TEXTS.notifSound)}</p>`
         : root.Notification.permission === 'denied' ? `<p class="rg-hint">${esc(TEXTS.notifNo)}</p>`
           : `<button type="button" class="al-line" data-al-notif><span>${esc(TEXTS.notifOn)}</span></button><p class="rg-hint">${esc(TEXTS.notifWhy)}</p>`) : '';
-    const voice = !pharmacy ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
+    // inside the app: the switch for the voice, the test ring and what the app still needs from the phone (the notifications, the card over the lock screen)
+    const appBox = A ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
+      `<button type="button" class="al-line" data-al-apptest><span>${esc(TEXTS.appTest)}</span></button>` + appNeeds() + `<p class="rg-hint">${esc(TEXTS.appOn)}</p>` : '';
+    // in the browser on an Android phone: one button, «افتح في التطبيق» if it is installed, else its download (the intent's fallback address), carrying his link and his alarms
+    const getApp = isAndroidBrowser() && !pharmacy ? `<div class="al-app"><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.getApp)}</span></a><p class="rg-hint">${esc(TEXTS.getAppWhy)}</p><p class="rg-hint">${esc(TEXTS.getAppSteps)}</p></div>` : '';
+    const voice = A ? appBox : !pharmacy ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
       `<div class="al-line"><span>${esc(TEXTS.tryVoice.replace(/^▶\s*/, ''))}</span><button type="button" class="al-try" data-al-try>${esc(TEXTS.tryVoice)}</button></div>` +
       (voiceNote ? `<p class="rg-hint al-note" role="status">${esc(voiceNote)}</p>` : '') +
       (voiceOk === false ? `<p class="al-warn">${esc(TEXTS.noVoice)}</p>` : '') +
       `<div class="al-line"><span>${esc(diagBusy ? TEXTS.diagBusy : TEXTS.diag)}</span><button type="button" class="al-try" data-al-diag${diagBusy ? ' disabled' : ''}>${esc(diagBusy ? '…' : '▶')}</button></div>` +
       (diag && diag.length ? `<pre class="al-diag notr" dir="ltr" translate="no">${esc(diag.join('\n'))}</pre><button type="button" class="al-line" data-al-diagcopy><span>${esc(diagCopied ? TEXTS.diagCopied : TEXTS.diagCopy)}</span></button>` : '') : '';
     const note = pharmacy && adminNote ? `<p class="${adminNote === 'saved' ? 'rg-hint al-note' : 'al-warn'}" role="status">${esc(adminNote === 'saved' ? TEXTS.adminSaved : TEXTS.adminFail)}</p>` : '';
-    return `<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
-      (pharmacy ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
+    return `<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : A ? TEXTS.hintApp : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${getApp}${voice}${notif}` +
+      (pharmacy || A ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
+  }
+  // the link of the button (an Android intent: link): opens the app with the customer's link (?me=) and the alarms he made here; with no app on the phone Chrome goes to the download instead
+  function appLink() {
+    const acc = root.AskerStoreAccount, t = acc && acc.token ? acc.token() : '';
+    const mine = data.items.length ? 'S.alarms=' + encodeURIComponent(JSON.stringify({ v: 1, speak: data.speak, items: data.items })) + ';' : '';
+    return 'intent://alarm' + (t ? '?me=' + t : '') + '#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;' + mine + 'S.browser_fallback_url=' + encodeURIComponent(APK_URL) + ';end';
+  }
+  // what the app asks the phone for: notifications on, and the card over the lock screen (Android 14+)
+  function appNeeds() {
+    let s = {}; try { s = JSON.parse(A.status() || '{}'); } catch (e) { s = {}; }
+    const need = (t, k) => `<button type="button" class="al-line" data-al-ask="${k}"><span>${esc(t)}</span><span>${esc(TEXTS.appFix)}</span></button>`;
+    return (s.notifications === false ? need(TEXTS.appNotifOff, 'notifications') : '') + (s.fullScreen === false ? need(TEXTS.appFsOff, 'fullScreen') : '');
   }
   // the names he usually takes (store/regular.js), for the quick pick
   const usual = () => (root.AskerStoreRegular && root.AskerStoreRegular.names ? root.AskerStoreRegular.names() : []);
@@ -665,11 +727,14 @@
   function redrawTile() { const t = document.querySelector('.ac-al-tile'); if (t) t.outerHTML = tileHtml(); }
   function open() {
     view = 'list'; error = '';
-    try { history.pushState({ asAlarm: 1 }, '', location.href); } catch (e) { /* the close button still works */ }
+    if (!A) { try { history.pushState({ asAlarm: 1 }, '', location.href); } catch (e) { /* the close button still works */ } }   // (the app's own back button asks appBack)
     draw();
   }
+  // the app's back button: the editor goes back to the list (true); from the list the app closes itself (false)
+  function appBack() { if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); return true; } return false; }
   function close(quiet) {
     if (!view) return;
+    if (A) { try { A.close(); } catch (e) { /* the app stays */ } return; }
     view = ''; draft = null; error = '';
     draw(); schedule();
     if (!quiet) { try { if (history.state && history.state.asAlarm) history.back(); } catch (e) { /* nothing to go back to */ } }
@@ -696,6 +761,9 @@
     if (t.closest('[data-al-hear]')) { if (ring) speakDue(ring.due); return; }
     if (t.closest('[data-al-snooze]')) { snooze(); return; }
     if (!view) return;
+    // inside the app: what it still needs from the phone, and a real test ring
+    const ask = t.closest('[data-al-ask]'); if (ask) { try { A.ask(ask.dataset.alAsk); } catch (err) { /* no settings page */ } return; }
+    if (t.closest('[data-al-apptest]')) { try { A.testRing(); } catch (err) { /* no app */ } return; }
     if (t.closest('[data-al-close]')) { if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); } else close(); return; }
     if (t.closest('[data-al-new]')) { draft = newDraft(null); view = 'edit'; error = ''; draw(); return; }
     const ed = t.closest('[data-al-edit]'); if (ed) { const it = data.items.find((x) => x.id === ed.dataset.alEdit); if (it) { draft = newDraft(it); view = 'edit'; error = ''; draw(); } return; }
@@ -723,9 +791,11 @@
     if (draft && e.target.matches && e.target.matches('[data-al-time]')) { const m = minutesOf(e.target.value); if (m != null) { draft.times[+e.target.dataset.alTime] = hhmmOf(m); draft.preset = ''; } }
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && view) close(); });
-  window.addEventListener('popstate', () => { if (view) { view = ''; draft = null; draw(); schedule(); } });
+  window.addEventListener('popstate', () => { if (view && !A) { view = ''; draft = null; draw(); schedule(); } });
 
-  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice };
+  root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice, appBack };
   schedule();
   if (openedBy) doseOpened(openedBy);
+  // inside the app the alarm sheet IS the screen (the page behind it is only there for his link and his usual medicines)
+  if (A) { open(); mirrorAlarms(); }
 })(typeof window === 'undefined' ? globalThis : window);
