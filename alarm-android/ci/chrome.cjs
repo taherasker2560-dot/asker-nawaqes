@@ -12,6 +12,7 @@ const server = http.createServer((q, r) => {
   r.writeHead(404); r.end();
 });
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+setTimeout(() => { console.error('CHROME HANDOFF NOT PROVEN: it took too long (Chrome could not be driven on this emulator)'); process.exit(1); }, 140000).unref();
 (async () => {
   await new Promise((ok) => server.listen(8124, '0.0.0.0', ok));
   const [device] = await android.devices();
