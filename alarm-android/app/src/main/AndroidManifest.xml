@@ -21,7 +21,8 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
@@ -37,7 +38,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- the page's button «افتح في تطبيق المنبه» (an intent: link) opens the app with the customer's link and his alarms -->
+            <!-- the page's alarm button «نزّل تطبيق صيدلية عسكر» (an intent: link) opens the app with the customer's link and his alarms -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
