@@ -267,8 +267,8 @@ html.night .su-chip.gone { background: rgba(255, 255, 255, 0.1); color: #cbd0d8;
 .su-l1 strong { flex: 1 1 auto; font-size: 14.5px; }
 .su-kind { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; color: var(--muted); }
 .su-st { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.su-st.st-ok { background: #e6f5ec; color: #23824a; }
-.su-st.st-quiet { background: #fbf1df; color: #9a6514; }
+.su-st.st-ok { background: #f9efeb; color: #86391d; }
+.su-st.st-quiet { background: #f3f1ee; color: #5b6475; }
 .su-st.st-away { background: #fbe7e5; color: #b1342a; }
 .su-st.st-gone { background: #ececec; color: #3f3f3f; }
 .su-st.st-never { background: #f3f1ee; color: #6b7280; }
