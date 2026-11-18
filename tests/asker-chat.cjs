@@ -12,7 +12,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   const env = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'g',
     VAPID_PRIVATE_JWK: JSON.stringify(privateKey.export({ format: 'jwk' })), VAPID_PUBLIC_KEY: pubRaw, VAPID_SUBJECT: 'https://taherasker2560-dot.github.io/asker-nawaqes/' };
   function fake({ me = OWNER, staff = [], subs = [], msg = null } = {}) {
-    const calls = [], deleted = [], patched = [], pushes = [];
+    const calls = [], deleted = [], patched = [], pushes = [], gones = [];
     const f = async (url, o = {}) => {
       calls.push({ url, o });
       const u = new URL(url);
@@ -28,7 +28,8 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
       }
       if (u.pathname === '/auth/v1/user') return new Response(JSON.stringify(me ? { id: me } : {}), { status: me ? 200 : 401 });
       if (u.pathname === '/rest/v1/ar_staff') return new Response(JSON.stringify(staff.filter((s) => 'eq.' + s.user_id === u.searchParams.get('user_id'))));
-      if (u.pathname === '/rest/v1/ar_chat_push' && o.method === 'DELETE') { deleted.push(decodeURIComponent(u.searchParams.get('endpoint'))); return new Response(null, { status: 204 }); }
+      if (u.pathname === '/rest/v1/ar_chat_push' && o.method === 'DELETE') { const ep = decodeURIComponent(u.searchParams.get('endpoint')); deleted.push(ep); return /representation/.test(o.headers.Prefer || '') ? new Response(JSON.stringify([{ endpoint: ep.slice(3), chat_id: CHAT }])) : new Response(null, { status: 204 }); }
+      if (u.pathname === '/rest/v1/ar_push_gone' && o.method === 'POST') { gones.push(JSON.parse(o.body)); return new Response(null, { status: 201 }); }
       if (u.pathname === '/rest/v1/ar_chat_push') return new Response(JSON.stringify(u.searchParams.get('chat_id') === 'eq.' + CHAT ? subs.map((e) => ({ endpoint: e })) : []));
       if (u.pathname === '/rest/v1/ar_chats') return new Response(JSON.stringify(u.searchParams.get('secret') === 'eq.' + SECRET ? [{ id: CHAT }] : []));
       if (u.pathname === '/rest/v1/ar_chat_messages' && o.method === 'PATCH') { patched.push({ q: u.search, body: JSON.parse(o.body) }); return new Response(null, { status: 204 }); }
@@ -36,7 +37,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
       if (u.pathname === '/storage/v1/object/ar-chat/' + (msg && msg.media)) return new Response(Buffer.from('RIFFfake'));
       throw Error('unexpected ' + url);
     };
-    Object.assign(f, { calls, deleted, patched, pushes });
+    Object.assign(f, { calls, deleted, patched, pushes, gones });
     return f;
   }
   const req = (body, auth = 'Bearer jwt', origin = ORIGIN) => new Request('https://p.supabase.co/functions/v1/asker-chat', { method: 'POST', headers: { origin, 'content-type': 'application/json', ...(auth ? { authorization: auth } : {}) }, body: JSON.stringify(body) });
@@ -46,6 +47,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   let r = await F.handle(req({ action: 'push', chat_id: CHAT }), env, f), b = await r.json();
   assert.equal(r.status, 200); assert.deepEqual(b, { ok: true, sent: 1, gone: 1, failed: 0, codes: [201, 410] });
   assert.deepEqual(f.deleted, ['eq.https://gone.example/b2']);
+  assert.deepEqual(f.gones, [[{ chat_id: CHAT }]], 'the dead address of a person\'s chat is written down (ar_push_gone): the owner\'s «👥 المستخدمين» shows it');
   const h = f.pushes[0].headers;
   assert.equal(h.TTL, '86400'); assert.equal(h['Content-Length'], undefined, 'the fetch sets the length itself');
   assert.equal(f.calls.find((c) => c.url === 'https://push.example/a1').o.body.length, 0, 'nothing in the push');

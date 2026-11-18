@@ -252,5 +252,38 @@ html.night .su-note, html.night .su-pw { background: rgba(255, 255, 255, 0.08); 
 html.night .su-chip { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
 html.night .su-chip.gone { background: rgba(255, 255, 255, 0.1); color: #cbd0d8; }
 .su-meta span + span::before { content: ' · '; }
+/* «👥 المستخدمين» (ar/site-users.js, 2026-11-18): four numbers, a search, filters, one card per person */
+.su-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+.su-tile { padding: 10px 12px; border-radius: 20px; background: var(--card); box-shadow: var(--sh-1); font-size: 12.5px; color: var(--muted); }
+.su-tile b { display: block; margin: 2px 0; font: 700 26px var(--head); color: var(--ink); }
+.su-tile small { display: block; font-size: 11.5px; line-height: 1.5; }
+.su-tile.main { background: var(--dark); color: #fff; }
+.su-tile.main b, .su-tile.main small { color: #fff; }
+.su-search { width: 100%; box-sizing: border-box; margin: 4px 0 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); font-size: 14px; color: var(--ink); }
+.su-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
+.su-chips .chip { flex: 0 0 auto; }
+.su-person { margin: 8px 0; padding: 10px 12px; border-radius: 20px; background: var(--card); box-shadow: var(--sh-1); }
+.su-l1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.su-l1 strong { flex: 1 1 auto; font-size: 14.5px; }
+.su-kind { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; color: var(--muted); }
+.su-st { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.su-st.st-ok { background: #e6f5ec; color: #23824a; }
+.su-st.st-quiet { background: #fbf1df; color: #9a6514; }
+.su-st.st-away { background: #fbe7e5; color: #b1342a; }
+.su-st.st-gone { background: #ececec; color: #3f3f3f; }
+.su-st.st-never { background: #f3f1ee; color: #6b7280; }
+.su-l2 { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; font-size: 12.5px; color: var(--muted); }
+.su-inst { padding: 1px 8px; border-radius: 10px; background: #f3f1ee; font-size: 12px; color: #6b7280; }
+.su-inst.yes { background: var(--tint-2); color: var(--ink); }
+.su-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.su-act { text-decoration: none; }
+.su-del { color: #b1342a; }
+.su-person .su-pw { margin-top: 8px; }
+.su-note b, .su-note span { display: block; }
+html.night .su-tile, html.night .su-person, html.night .su-search { background: rgba(255, 255, 255, 0.06); color: inherit; }
+html.night .su-tile b { color: inherit; }
+html.night .su-inst { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
+html.night .su-inst.yes { background: rgba(255, 255, 255, 0.16); color: inherit; }
+html.night .su-st.st-ok, html.night .su-st.st-quiet, html.night .su-st.st-away, html.night .su-st.st-gone, html.night .su-st.st-never { background: rgba(255, 255, 255, 0.1); }
 /* «👁 شوف صفحته» in a customer's statement (2026-11-17, ar/customers.js viewPage) */
 button.cu-view { width: 100%; margin: 8px 0 0; font-weight: 700; }

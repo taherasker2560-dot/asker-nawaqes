@@ -119,3 +119,30 @@ run('Site account: not asked in the browser, a customer with his link, or the ph
  assert.equal(await page.$('#siteGate'),null,'the pharmacy\'s own phone is never asked');
  await page.evaluate(()=>localStorage.removeItem('sb-abc123-auth-token'));
 },{home:true});
+
+// «منبه الدوا» on this phone (owner 2026-11-18: «عايز أشوف الناس اللي بتنزل الأبليكيشن»): once the app opened from the site's button (store/alarm.js keeps asker_dose_app = 1),
+// the server is told who has it with his own secret only (here a site account's session), at most once every 12 hours, never from the pharmacy's own phone
+run('«منبه الدوا» on this phone is told to the server once (his own session), not again within 12 hours, never from the pharmacy phone',async({page,base})=>{
+ await reset(page);await setup(page,{standalone:false});
+ await page.addInitScript(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_app_seen:(a)=>{const d=JSON.parse(localStorage.getItem('__su')||'{"users":[],"sessions":{},"calls":[]}');d.calls.push({n:'app_seen',a});localStorage.setItem('__su',JSON.stringify(d));return {ok:true}}})});
+ const T='e'.repeat(64);
+ await page.evaluate((T)=>{localStorage.setItem('__su',JSON.stringify({users:[{id:1,name:'كريم حسن',phone:'01112345678',pw:'secret1'}],sessions:{[T]:1},calls:[]}));localStorage.setItem('asker_store_user',JSON.stringify({t:T,name:'كريم حسن'}));localStorage.removeItem('asker_app_seen_at');localStorage.removeItem('asker_dose_app')},T);
+ // no app on this phone: nothing is said
+ await page.goto(base+'store.html?a=1');await page.waitForSelector('.tabbar');await page.waitForTimeout(800);
+ assert.deepEqual((await calls(page)).filter(c=>c.n==='app_seen'),[]);
+ // the app opened from the button once: the next open says it, with the session only
+ await page.evaluate(()=>localStorage.setItem('asker_dose_app','1'));
+ await page.goto(base+'store.html?a=2');await page.waitForSelector('.tabbar');
+ await page.waitForFunction(()=>JSON.parse(localStorage.getItem('__su')).calls.some(c=>c.n==='app_seen'));
+ assert.deepEqual((await calls(page)).filter(c=>c.n==='app_seen').map(c=>c.a),[{p_token:null,p_site_token:T}]);
+ assert.ok(Number(await page.evaluate(()=>localStorage.getItem('asker_app_seen_at')))>Date.now()-60e3);
+ // not again within 12 hours (another open, a return to the page)
+ await page.goto(base+'store.html?a=3');await page.waitForSelector('.tabbar');await page.waitForTimeout(800);
+ await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForTimeout(400);
+ assert.equal((await calls(page)).filter(c=>c.n==='app_seen').length,1);
+ // the pharmacy's own phone (the system signed in): never
+ await page.evaluate(()=>{localStorage.removeItem('asker_app_seen_at');localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"fake":true}')});
+ await page.goto(base+'store.html?a=4');await page.waitForSelector('.tabbar');await page.waitForTimeout(900);
+ assert.equal((await calls(page)).filter(c=>c.n==='app_seen').length,1,'nothing from the pharmacy phone');
+ await reset(page);await page.evaluate(()=>{localStorage.removeItem('asker_dose_app');localStorage.removeItem('asker_app_seen_at')});
+},{home:true});

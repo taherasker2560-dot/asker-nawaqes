@@ -96,7 +96,14 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
         codes.push(r.status);
         if (r.status === 404 || r.status === 410) {
           gone++;
-          await call(`/rest/v1/${table}?endpoint=eq.` + encodeURIComponent(ep), { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
+          // a customer's / a house member's chat: the dead address is written down (ar_push_gone, migration 202611190030) = the hard sign that he removed the site
+          // or turned its notifications off, shown on the owner's «👥 المستخدمين»; best effort, it never stops the push round
+          const del = await call(`/rest/v1/${table}?endpoint=eq.` + encodeURIComponent(ep), { method: 'DELETE', headers: { ...sh, Prefer: table === 'ar_chat_push' ? 'return=representation' : 'return=minimal' } }).catch(() => null);
+          if (table === 'ar_chat_push' && del && del.ok) {
+            const was = await del.json().catch(() => []) as { chat_id?: string }[];
+            const chats = [...new Set((Array.isArray(was) ? was : []).map((x) => x && x.chat_id).filter((x): x is string => typeof x === 'string'))];
+            if (chats.length) await call('/rest/v1/ar_push_gone', { method: 'POST', headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(chats.map((chat_id) => ({ chat_id }))) }).catch(() => null);
+          }
         } else if (r.ok) sent++;
         else { failed++; console.log('asker-chat push', host, r.status, (await r.text().catch(() => '')).slice(0, 300)); }
       } catch (e) {
