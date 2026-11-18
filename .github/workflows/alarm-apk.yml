@@ -81,6 +81,21 @@ jobs:
         with:
           name: alarm-apk-debug
           path: alarm-android/app/build/outputs/apk/debug/app-debug.apk
+      # the app's own update check reads this file (asker-alarm.json, next to the APK): the version, the size and the sha-256 of THIS release file
+      - name: Version file for the app's own update
+        run: |
+          APK=alarm-android/app/build/outputs/apk/release/app-release.apk
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          BADGE=$("$BT/aapt2" dump badging "$APK" | grep -E "^package")
+          CODE=$(echo "$BADGE" | sed -E "s/.*versionCode='([0-9]+)'.*/\1/")
+          NAME=$(echo "$BADGE" | sed -E "s/.*versionName='([^']+)'.*/\1/")
+          SIZE=$(stat -c %s "$APK")
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          printf '{"code":%s,"name":"%s","size":%s,"sha256":"%s"}\n' "$CODE" "$NAME" "$SIZE" "$SHA" | tee asker-alarm.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alarm-apk-info
+          path: asker-alarm.json
   # a real phone (an emulator): the alarm must fire with the app CLOSED and start the ring
   smoke:
     needs: build
@@ -116,6 +131,7 @@ jobs:
             node alarm-android/ci/webview.cjs
             node alarm-android/ci/handoff.cjs
             timeout 150 node alarm-android/ci/chrome.cjs || echo "CHROME HANDOFF: not proven on this emulator (see the lines above; this line never fails the run)"
+            bash alarm-android/ci/gate.sh
   publish:
     needs: [build, smoke]
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
@@ -125,6 +141,10 @@ jobs:
         with:
           name: alarm-apk-release
           path: apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: alarm-apk-info
+          path: info
       - name: Attach to the pre-release «alarm-build»
         env:
           GH_TOKEN: ${{ github.token }}
@@ -133,3 +153,6 @@ jobs:
           sha256sum asker-alarm.apk
           gh release view alarm-build --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create alarm-build --repo "$GITHUB_REPOSITORY" --prerelease --title "Medicine alarm app" --notes "The customer's Android app «منبه الدوا». Built and tested by the alarm-apk workflow; the asset is replaced by each build."
           gh release upload alarm-build asker-alarm.apk --clobber --repo "$GITHUB_REPOSITORY"
+          # the version file goes AFTER the APK: a phone never reads a new version number before its file is there
+          cat info/asker-alarm.json
+          gh release upload alarm-build info/asker-alarm.json --clobber --repo "$GITHUB_REPOSITORY"
