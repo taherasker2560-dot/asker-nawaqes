@@ -263,9 +263,11 @@
   if (token && !/^[0-9a-f]{64}$/.test(token)) { keep.set(null); token = null; }
   // (no jump to «حسابي» on a plain open any more: inside the installed bot that took the owner's store away; the customer's
   // own icon starts on his link anyway)
-  // the Android app «صيدلية عسكر» (alarm-android/: this same store inside a WebView, owner 2026-11-18 «ب طبعا») is the installed app too: no install box inside it, an account is asked there like in the installed site
+  const standalone = () => !!((root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
+  // the Android app «صيدلية عسكر» (alarm-android/: this same store inside a WebView, owner 2026-11-18 «ب طبعا») is an installed app too: no «install» box or button inside it.
+  // (It is NOT «standalone» for store/siteuser.js: the account gate there is for the installed site; a credit customer reaches the app with his link from the site's app button.)
   const inAndroidApp = () => { try { return !!(root.AskerAndroid && typeof root.AskerAndroid.setAlarms === 'function'); } catch (e) { return false; } };
-  const standalone = () => !!((root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true || inAndroidApp());
+  const installed = () => standalone() || inAndroidApp();
   // his own manifest: installing from this phone makes an icon that opens on his account
   const manifestLink = document.querySelector('link[rel="manifest"]');
   const storeManifest = manifestLink && manifestLink.getAttribute('href');
@@ -314,7 +316,7 @@
   function homeInstall() {
     const box = $('installBox');
     if (!box) return;
-    const show = !pharmacyPhone && !standalone() && !token && (touchy() || !!installEvt);
+    const show = !pharmacyPhone && !installed() && !token && (touchy() || !!installEvt);
     box.hidden = !show;
     if (!show) return;
     const again = handedOff && !installNote, btn = $('installBtn'), note = $('installNote');
@@ -442,7 +444,7 @@
     if (pharmacyPhone) {
       // the owner (or staff) looking at a customer's account: back to the bot, nothing installed or kept
       html += `<a class="ac-btn ac-back" href="asker-nawaqes-arabic.html">${esc(TEXTS.backBot)}</a><p class="hint-sm center ac-install-why">${esc(TEXTS.preview)}</p>`;
-    } else if (!standalone()) {
+    } else if (!installed()) {
       // one button, one tap (owner: «يا اما تثبت التطبيق يا اما تاخده للسكة اللي هيثبت بها التطبيق مباشر … فلاحين»)
       const again = handedOff && !installNote;
       installHtml = `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
