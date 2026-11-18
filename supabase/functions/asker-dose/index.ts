@@ -55,15 +55,22 @@ export const BUCKET = 'ar-dose-voice', MAX_NAME = 40, VOICE_DAILY = 150, VOICE_H
 // ---- the promo voice (owner 2026-11-18: «صوت ترويجي بأسلوب مذيع حماسي يسوّق للصيدلية، والموسيقى تحته وصوته أعلى منها حاجة بسيطة») ----
 //   POST {action:'promo', voice?}  -> the WAV of ONE fixed advert text written HERE (PROMO_TEXT): not a text-to-speech door, nobody sends words. `voice` only picks one of PROMO_VOICES
 //   (so at most six files ever exist); the file is made once and kept in the same private bucket. It is a warm narrator of his own: never an imitation of a real person's voice.
-export const PROMO_TEXT = [
+const PROMO_LINES = [
   'صحتك مش بتستنّى... وصيدلية عسكر مش هتخلّيك تستنّى.',
   'من موبايلك، اطلب دواك في ثواني... ابعت الروشتة بصورة... وكرّر علاجك المعتاد بلمسة واحدة.',
-  'وأهم حاجة... منبّه الدوا: بيفكّرك بميعاد كل جرعة، باسم دواك، في وقتها بالظبط.',
+  'وأهم حاجة... منبّه الدوا، بيفكّرك بميعاد كل جرعة، باسم دواك، في وقتها بالظبط.',
   'تتابع حسابك... وتدفع من مكانك... وأهل بيتك كلّهم في مكان واحد.',
   'صيدلية عسكر... أمان في الدوا، وراحة في البال.',
   'افتح التطبيق دلوقتي... وسيب الباقي علينا.',
-].join(' ');
+];
+export const PROMO_TEXT = PROMO_LINES.join(' ');
 export const PROMO_STYLE = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer: calm and unhurried, a little slower than normal speech, friendly and engaging but never loud or pushy, a clear short pause at every "...", and a gentle smile on the last line:';
+// A speech model sometimes answers 200 with NO sound (2026-11-18: the calmer style line + the stressed alarm line did, twice). The advert is made once and kept, so it may try again:
+// the same words once more, then the style line the owner first heard, then the first wording he heard (his samples); the kept file is named after the FIRST one.
+const PROMO_STYLE_FIRST = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer selling something people love: engaging and exciting but never shouting, a clear steady rhythm, a short pause at every "...", and a smile on the last line:';
+const PROMO_TEXT_FIRST = [PROMO_LINES[0], PROMO_LINES[1], 'وعلشان ماتفوتش جرعة، منبّه الدوا بيفكّرك بميعاد كل دوا باسمه.', PROMO_LINES[3], PROMO_LINES[4], PROMO_LINES[5]].join(' ');
+export const PROMO_ATTEMPTS = [`${PROMO_STYLE} ${PROMO_TEXT}`, `${PROMO_STYLE} ${PROMO_TEXT}`, `${PROMO_STYLE_FIRST} ${PROMO_TEXT}`, `${PROMO_STYLE_FIRST} ${PROMO_TEXT_FIRST}`];
+const PROMO_BUDGET_MS = 100000;   // no new attempt after this long (the function may run about 150 s)
 export const PROMO_VOICES = ['Orus', 'Charon', 'Fenrir', 'Puck', 'Algenib', 'Kore'], PROMO_DEFAULT_VOICE = 'Orus', PROMO_TEMPERATURE = 0.6;   // Orus = the owner's pick (2026-11-18)
 export function promoVoice(v: unknown, env: Env): string {
   const pick = typeof v === 'string' ? PROMO_VOICES.find((x) => x.toLowerCase() === v.trim().toLowerCase()) : undefined;
@@ -120,21 +127,30 @@ async function voice(body: { name?: unknown; voice?: unknown }, headers: Record<
   const today = Array.isArray(listed) ? listed.filter((o: { created_at?: string }) => o && o.created_at && now.getTime() - Date.parse(o.created_at) < 86400000).length : 0;
   if (today >= VOICE_DAILY) return reply(429, { error: 'busy' }, headers);
   // 3) Gemini (every speech model has its own daily quota: the next one is tried when one is out of quota or down)
-  let g: Response | null = null, why = '';
-  for (const m of [model, ...FALLBACK_MODELS.filter((x) => x !== model)]) {
-    g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(promo ? GEMINI_TIMEOUT_MS + 25000 : GEMINI_TIMEOUT_MS),
-      body: JSON.stringify({ contents: [{ parts: [{ text: spoken }] }], generationConfig: { responseModalities: ['AUDIO'], temperature: promo ? PROMO_TEMPERATURE : TEMPERATURE, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } }),
-    }).catch(() => null);
-    if (g && g.status !== 429 && g.status < 500) break;
-    if (g) why = (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+  type GemOut = { candidates?: { finishReason?: string; content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[]; promptFeedback?: { blockReason?: string } };
+  const t0 = Date.now();
+  let part: { inlineData?: { data?: string; mimeType?: string } } | undefined;
+  for (const [n, text] of (promo ? PROMO_ATTEMPTS : [spoken]).entries()) {
+    if (n > 0 && Date.now() - t0 > PROMO_BUDGET_MS) break;
+    let g: Response | null = null, why = '';
+    for (const m of [model, ...FALLBACK_MODELS.filter((x) => x !== model)]) {
+      g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(promo ? GEMINI_TIMEOUT_MS + 25000 : GEMINI_TIMEOUT_MS),
+        body: JSON.stringify({ contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ['AUDIO'], temperature: promo ? PROMO_TEMPERATURE : TEMPERATURE, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } }),
+      }).catch(() => null);
+      if (g && g.status !== 429 && g.status < 500) break;
+      if (g) why = (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
+    }
+    if (!g) return reply(504, { error: 'gemini-timeout' }, headers);
+    if (g.status === 429) return reply(429, { error: 'gemini-busy' }, headers);
+    if (g.status >= 500) { console.log('asker-dose voice gemini', g.status, why); return reply(502, { error: 'gemini', status: g.status }, headers); }
+    const j = g.ok ? await g.json().catch(() => null) as GemOut | null : null;
+    part = j?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
+    if (part?.inlineData?.data) break;
+    console.log('asker-dose voice gemini no audio', g.status, promo ? `try ${n + 1}` : '', j?.candidates?.[0]?.finishReason || '', j?.promptFeedback?.blockReason || '');
+    if (!promo) return reply(502, { error: 'gemini', status: g.status }, headers);
   }
-  if (!g) return reply(504, { error: 'gemini-timeout' }, headers);
-  if (g.status === 429) return reply(429, { error: 'gemini-busy' }, headers);
-  if (g.status >= 500) { console.log('asker-dose voice gemini', g.status, why); return reply(502, { error: 'gemini', status: g.status }, headers); }
-  const j = g.ok ? await g.json().catch(() => null) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] } | null : null;
-  const part = j?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-  if (!part?.inlineData?.data) { console.log('asker-dose voice gemini no audio', g.status); return reply(502, { error: 'gemini', status: g.status }, headers); }
+  if (!part?.inlineData?.data) return reply(502, { error: 'gemini', status: 200 }, headers);
   const rate = Number(/rate=(\d{4,6})/.exec(String(part.inlineData.mimeType || ''))?.[1] || 24000);
   const pcm = unb64(part.inlineData.data);
   if (pcm.length < 2000) return reply(502, { error: 'empty' }, headers);

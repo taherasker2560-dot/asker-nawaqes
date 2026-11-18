@@ -149,6 +149,18 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   vf = vfake(); await F.handle(vreq({ action: 'promo', voice: 'Puck' }, { ip: '10.0.4.3' }), venv, vf, now); assert.notEqual(vf.puts[0].url, p1, 'another voice = another file');
   vf = vfake(); await F.handle(vreq({ action: 'voice', name: 'فيموجيسال ق' }, { ip: '10.0.4.4' }), venv, vf, now); assert.notEqual(vf.puts[0].url, p1);
   vf = vfake({ stored: new Uint8Array(w) }); r = await F.handle(vreq({ action: 'promo' }, { ip: '10.0.4.5' }), venv, vf, now); assert.equal(r.headers.get('x-voice'), 'cache'); assert.equal(vf.gem.length, 0, 'made before: no Gemini');
+  // a speech model that answers 200 with no sound (it did, 2026-11-18): the same words once more, then the first style line, then the first wording; the kept file is named after the first
+  const noAudio = () => new Response(JSON.stringify({ candidates: [{ finishReason: 'OTHER' }] }));
+  vf = vfake({ gemini: [noAudio, geminiOk] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.4.8' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.gem.length, 2, 'tried again after a silent answer'); assert.equal(vf.puts[0].url, p1, 'the file is named after the first attempt, so the next visit finds it');
+  vf = vfake({ gemini: [noAudio, noAudio, geminiOk] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.4.9' }), venv, vf, now);
+  assert.equal(r.status, 200); assert.equal(vf.gem.length, 3);
+  const texts = vf.gem.map((c) => JSON.parse(c.o.body).contents[0].parts[0].text); assert.equal(texts[0], texts[1], 'the same words again first'); assert.notEqual(texts[2], texts[1], 'then the other style line');
+  assert.ok(F.PROMO_ATTEMPTS.length === 4 && F.PROMO_ATTEMPTS[3].includes('وعلشان ماتفوتش جرعة'), 'the last resort is the wording he first heard');
+  vf = vfake({ gemini: [noAudio] }); r = await F.handle(vreq({ action: 'promo', voice: 'Orus' }, { ip: '10.0.4.10' }), venv, vf, now);
+  assert.equal(r.status, 502); assert.equal(vf.gem.length, 4, 'four attempts, then it gives up'); assert.equal(vf.puts.length, 0, 'nothing silent is kept');
+  vf = vfake({ gemini: [noAudio] }); r = await F.handle(vreq({ action: 'voice', name: 'اوميز' }, { ip: '10.0.4.11' }), venv, vf, now);
+  assert.equal(r.status, 502); assert.equal(vf.gem.length, 1, 'the dose voice is not retried (a name is cheap to ask again)');
   assert.equal((await F.handle(vreq({ action: 'promo' }, { origin: 'https://evil.example', ip: '10.0.4.6' }), venv, vfake(), now)).status, 403);
   assert.equal((await F.handle(vreq({ action: 'promo' }, { ip: '10.0.4.7' }), env, vfake(), now)).status, 503, 'no Gemini key');
   // the push side does not need the speech key, and the voice does not need the push keys
