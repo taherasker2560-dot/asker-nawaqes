@@ -80,6 +80,7 @@ class MainActivity : Activity() {
         super.onResume()
         Scheduler.reschedule(this)   // whatever happened while the app was closed, the next alarm is set
         VoiceJob.schedule(this)      // and any sentence sound that is still missing is asked for
+        AppPing.kick(this)           // and, once a day, the pharmacy's server is told a phone has the app (a random id + the version, nothing else)
     }
 
     /** the link that opened the app may carry the customer's personal link (?me=) and the alarms he made in the browser: kept for the page to take over once */

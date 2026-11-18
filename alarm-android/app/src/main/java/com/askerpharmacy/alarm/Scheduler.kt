@@ -54,5 +54,6 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Scheduler.reschedule(context)
         VoiceJob.schedule(context)
+        PingJob.schedule(context)   // the daily «this phone has the app» job (an app update can drop it)
     }
 }
