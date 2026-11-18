@@ -355,6 +355,8 @@
         if (root.AskerStoreFamily) root.AskerStoreFamily.attach(client, token, st.me.role !== 'member', draw);
         if (root.AskerStoreRegular) root.AskerStoreRegular.load(client, token, { moves: () => st.moves, redraw: draw });   // his regular items (store/regular.js); the buttons appear when they arrive
         if (root.AskerStoreAlarm && root.AskerStoreAlarm.attach) root.AskerStoreAlarm.attach(client);   // the dose alarm's push (store/alarm.js, stage 2)
+        // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): only the owner of the account, never the pharmacy's own phone
+        if (root.AskerStoreAcctPush) root.AskerStoreAcctPush.attach(client, token, st.me.role !== 'member' && !pharmacyPhone);
         const ph = $('cPhone');
         if (ph && !ph.value && data.phone) ph.value = /^20\d{10}$/.test(data.phone) ? '0' + data.phone.slice(2) : data.phone;
         drawPay();
@@ -465,6 +467,9 @@
     html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
     // «⏰ منبه الدوا» (2026-11-17, store/alarm.js): the customer's own dose reminders, kept on his phone
     html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
+    // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): a phone notification when a new movement reaches his account («فيه حركة جديدة على حسابك», no amounts); nothing for a person of his house
+    const pushTile = root.AskerStoreAcctPush ? root.AskerStoreAcctPush.tileHtml() : '';
+    html += pushTile ? `<div class="ac-al-wrap">${pushTile}</div>` : '';
     // «📋 ابعت الروشتة» (2026-11-18, owner: «مكان مخصص للعميل يبعت الروشتة على الصفحة عشان القراءة الأوتوماتيك»; WhatsApp later): a page of its own that sends the photos as an order the pharmacy reads (in the pharmacy's look it shows too, but sends nothing)
     const rxTile = root.AskerStoreRx ? root.AskerStoreRx.tileHtml() : '';
     html += rxTile ? `<div class="ac-al-wrap">${rxTile}</div>` : '';
