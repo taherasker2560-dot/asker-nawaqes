@@ -208,8 +208,10 @@ run('Store music: the score tool still renders in a real browser (all eight piec
 // ---- the promo voice (owner 2026-11-18: a spoken advert over the music, voice Orus, soft; once, then not again for a few days) ----
 // The function asker-dose is answered by the test (a small made-up WAV); the audio fakes are the ones above, plus a note of every gain the page makes.
 const makeWav=()=>{const n=24000,pcm=Buffer.alloc(n*2);for(let i=0;i<n;i++)pcm.writeInt16LE(Math.round(3000*Math.sin(i/20)),i*2);const h=Buffer.alloc(44);h.write('RIFF',0);h.writeUInt32LE(36+pcm.length,4);h.write('WAVEfmt ',8);h.writeUInt32LE(16,16);h.writeUInt16LE(1,20);h.writeUInt16LE(1,22);h.writeUInt32LE(24000,24);h.writeUInt32LE(48000,28);h.writeUInt16LE(2,32);h.writeUInt16LE(16,34);h.write('data',36);h.writeUInt32LE(pcm.length,40);return Buffer.concat([h,pcm])};
+const WAV=makeWav(),WAV_AB=WAV.buffer.slice(WAV.byteOffset,WAV.byteOffset+WAV.byteLength),MUSIC=require(path.join(__dirname,'..','..','store','music.js'));
+const EXPECTED_GAIN=MUSIC.promoGain(MUSIC.wavRms(WAV_AB),MUSIC.PROMO.targetDb,MUSIC.PROMO.gain);
 const NOTE_GAINS=()=>{const o=window.AudioContext.prototype.createGain;window.__gains=[];window.AudioContext.prototype.createGain=function(){const g=o.call(this);window.__gains.push(g);return g}};
-const serveAdvert=async(page,{status=200}={})=>{const asked=[],cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST, OPTIONS'},wav=makeWav();
+const serveAdvert=async(page,{status=200}={})=>{const asked=[],cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'POST, OPTIONS'},wav=WAV;
  await page.route('**/functions/v1/asker-dose',route=>{const q=route.request();if(q.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});asked.push(JSON.parse(q.postData()));
   return status===200?route.fulfill({status:200,headers:{...cors,'content-type':'application/octet-stream'},body:wav}):route.fulfill({status,headers:cors,body:'{"error":"x"}'})});return asked};
 const promo=page=>page.evaluate(()=>window.AskerStoreMusic.promoState());
@@ -223,7 +225,7 @@ run('Store music: the promo voice — a few seconds after the music, soft, once;
  await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing);
  assert.deepEqual(asked,[{action:'promo',voice:'Orus'}],'it asks the function for the Orus advert and sends nothing else');
  assert.equal(await sounding(page),true,'the music goes on under it');
- const gains=await page.evaluate(()=>window.__gains.map(g=>g.gain.value));assert.ok(gains.includes(0.21),'the voice is played through its own soft gain: '+gains);
+ const gains=await page.evaluate(()=>window.__gains.map(g=>g.gain.value));assert.ok(EXPECTED_GAIN>0.3&&EXPECTED_GAIN<1,'sanity: '+EXPECTED_GAIN);assert.ok(gains.some(x=>Math.abs(x-EXPECTED_GAIN)<0.005),'the voice is played through its own gain, set from how loud the advert itself is (to -27 dBFS): '+gains+' expected '+EXPECTED_GAIN);
  const pe=await page.evaluate(()=>({el:window.__audio.madeEl,attr:window.__audio.el.getAttribute('data-music'),src:window.__audio.el.src.slice(0,5),paused:window.__audio.el.paused}));
  assert.deepEqual(pe,{el:2,attr:'promo',src:'blob:',paused:false},'a second audio element, marked as ours (the music does not step aside for it)');
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_promo_day')),await page.evaluate(()=>window.AskerStoreMusic.dayKey()),'counted for today once it really started');

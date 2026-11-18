@@ -151,4 +151,15 @@ assert.equal(M.promoDue('2026-11-15','2026-11-18',3),true,'three days ago: due a
 assert.equal(M.promoDue('2026-10-31','2026-11-02',3),false,'across a month end');
 assert.equal(M.promoDue('2026-10-29','2026-11-02',3),true);
 assert.equal(M.promoDue('2026-11-20','2026-11-18',3),true,'a clock set back: due, never stuck');
+// the advert's own loudness decides its gain (a new render comes out louder or quieter): speech at -27 dBFS, never louder than the file, never nearly silent
+const wav16=(amp,n=24000)=>{const b=Buffer.alloc(44+n*2);for(let i=0;i<n;i++)b.writeInt16LE(Math.round(amp*Math.sin(i/20)),44+i*2);return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)};
+const r1=M.wavRms(wav16(3000));assert.ok(r1>0.06&&r1<0.075,'a sine of 3000 has an RMS near 0.065: '+r1);
+assert.ok(M.wavRms(wav16(9000))>2.5*r1,'louder speech measures louder');
+assert.equal(M.wavRms(null),0);assert.equal(M.wavRms(new ArrayBuffer(100)),0,'too short to be a WAV');assert.equal(M.wavRms(wav16(0)),0,'silence');
+assert.ok(Math.abs(M.promoGain(Math.pow(10,-27/20),-27,0.3)-1)<1e-9,'speech already at the target: gain 1');
+assert.ok(Math.abs(M.promoGain(0.1,-27,0.3)-0.4467)<0.001,'speech at -20 dBFS: down by 7 dB');
+assert.equal(M.promoGain(0,-27,0.3),0.3,'the level is unknown: the fallback');
+assert.equal(M.promoGain(0.001,-27,0.3),1,'a very quiet file is never boosted past the file itself');
+assert.equal(M.promoGain(5,-27,0.3),0.05,'and never made nearly silent');
+assert.equal(M.PROMO.targetDb,-27);
 console.log('store-music ok');
