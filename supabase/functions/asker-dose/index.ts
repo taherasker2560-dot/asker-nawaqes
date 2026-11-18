@@ -52,6 +52,23 @@ export function cairoMinute(now: Date): { hhmm: string; day: string } {
 //   the sentence, so the same medicine costs one call for everybody and answers at once afterwards. Limits: a name of at most 40 letters; 150 NEW sentences a day for everyone; 30 an hour for one address.
 //   The answer is `application/octet-stream` so supabase-js hands the page a Blob. The phone keeps it in its own cache, ready for the alarm.
 export const BUCKET = 'ar-dose-voice', MAX_NAME = 40, VOICE_DAILY = 150, VOICE_HOURLY_PER_IP = 30, DEFAULT_VOICE = 'Charon', TEMPERATURE = 0.4;
+// ---- the promo voice (owner 2026-11-18: «صوت ترويجي بأسلوب مذيع حماسي يسوّق للصيدلية، والموسيقى تحته وصوته أعلى منها حاجة بسيطة») ----
+//   POST {action:'promo', voice?}  -> the WAV of ONE fixed advert text written HERE (PROMO_TEXT): not a text-to-speech door, nobody sends words. `voice` only picks one of PROMO_VOICES
+//   (so at most six files ever exist); the file is made once and kept in the same private bucket. It is a warm narrator of his own: never an imitation of a real person's voice.
+export const PROMO_TEXT = [
+  'صحتك مش بتستنّى... وصيدلية عسكر مش هتخلّيك تستنّى.',
+  'من موبايلك، اطلب دواك في ثواني... ابعت الروشتة بصورة... وكرّر علاجك المعتاد بلمسة واحدة.',
+  'وعلشان ماتفوتش جرعة، منبّه الدوا بيفكّرك بميعاد كل دوا باسمه.',
+  'تتابع حسابك... وتدفع من مكانك... وأهل بيتك كلّهم في مكان واحد.',
+  'صيدلية عسكر... أمان في الدوا، وراحة في البال.',
+  'افتح التطبيق دلوقتي... وسيب الباقي علينا.',
+].join(' ');
+export const PROMO_STYLE = 'Say this in Egyptian Arabic like a warm, deep, confident radio announcer selling something people love: engaging and exciting but never shouting, a clear steady rhythm, a short pause at every "...", and a smile on the last line:';
+export const PROMO_VOICES = ['Fenrir', 'Charon', 'Orus', 'Puck', 'Algenib', 'Kore'], PROMO_DEFAULT_VOICE = 'Fenrir', PROMO_TEMPERATURE = 0.7;
+export function promoVoice(v: unknown, env: Env): string {
+  const pick = typeof v === 'string' ? PROMO_VOICES.find((x) => x.toLowerCase() === v.trim().toLowerCase()) : undefined;
+  return pick || PROMO_VOICES.find((x) => x === String(env.PROMO_VOICE || '').trim()) || PROMO_DEFAULT_VOICE;
+}
 const DEFAULT_MODEL = 'gemini-2.5-flash-preview-tts';
 export const FALLBACK_MODELS = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview'];
 const GEMINI_TIMEOUT_MS = 40000;
@@ -83,13 +100,14 @@ function tooManyFromIp(ip: string, now: number): boolean {
   if (seenIp.size > 200) for (const k of seenIp.keys()) { if (k !== ip) seenIp.delete(k); }
   return list.length > VOICE_HOURLY_PER_IP;
 }
-async function voice(body: { name?: unknown }, headers: Record<string, string>, req: Request, env: Env, fetchImpl: typeof fetch, now: Date): Promise<Response> {
+async function voice(body: { name?: unknown; voice?: unknown }, headers: Record<string, string>, req: Request, env: Env, fetchImpl: typeof fetch, now: Date, promo = false): Promise<Response> {
   if (!env.GEMINI_API_KEY) return reply(503, { error: 'not-configured' }, headers);
-  const sentence = voiceSentence(body.name);
+  const sentence = promo ? PROMO_TEXT : voiceSentence(body.name);
   if (!sentence) return reply(400, { error: 'name' }, headers);
   const base = String(env.SUPABASE_URL).replace(/\/$/, ''), sh = serviceHeaders(env.SUPABASE_SERVICE_ROLE_KEY || '');
-  const voiceName = (env.DOSE_VOICE || DEFAULT_VOICE).trim(), model = (env.GEMINI_TTS_MODEL || DEFAULT_MODEL).trim();
-  const file = `${(await sha256hex(sentence + '|' + voiceName)).slice(0, 40)}.wav`;
+  const voiceName = promo ? promoVoice(body.voice, env) : (env.DOSE_VOICE || DEFAULT_VOICE).trim(), model = (env.GEMINI_TTS_MODEL || DEFAULT_MODEL).trim();
+  const spoken = promo ? `${PROMO_STYLE} ${sentence}` : sentence;   // the file name follows what is said (the style line too): another text or style = another file
+  const file = `${(await sha256hex(spoken + '|' + voiceName)).slice(0, 40)}.wav`;
   const out = (bytes: ArrayBuffer | Uint8Array, how: string) => new Response(bytes, { status: 200, headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Cache-Control': 'public, max-age=86400', 'X-Voice': how } });
   // 1) made before: the same bytes for everybody
   const hit = await fetchImpl(`${base}/storage/v1/object/authenticated/${BUCKET}/${file}`, { headers: sh, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
@@ -105,8 +123,8 @@ async function voice(body: { name?: unknown }, headers: Record<string, string>, 
   let g: Response | null = null, why = '';
   for (const m of [model, ...FALLBACK_MODELS.filter((x) => x !== model)]) {
     g = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
-      body: JSON.stringify({ contents: [{ parts: [{ text: sentence }] }], generationConfig: { responseModalities: ['AUDIO'], temperature: TEMPERATURE, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } }),
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY }, signal: AbortSignal.timeout(promo ? GEMINI_TIMEOUT_MS + 25000 : GEMINI_TIMEOUT_MS),
+      body: JSON.stringify({ contents: [{ parts: [{ text: spoken }] }], generationConfig: { responseModalities: ['AUDIO'], temperature: promo ? PROMO_TEMPERATURE : TEMPERATURE, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } } }),
     }).catch(() => null);
     if (g && g.status !== 429 && g.status < 500) break;
     if (g) why = (await g.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300);
@@ -139,9 +157,10 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch, no
   if (!headers['Access-Control-Allow-Origin']) return reply(403, { error: 'origin' }, headers);
   const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
   if (!env.SUPABASE_URL || !service) return reply(503, { error: 'not-configured' }, headers);
-  let body: { action?: unknown; name?: unknown };
+  let body: { action?: unknown; name?: unknown; voice?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body' }, headers); }
   if (body.action === 'voice') return voice(body, headers, req, env, fetchImpl, now);
+  if (body.action === 'promo') return voice(body, headers, req, env, fetchImpl, now, true);
   if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
   if (body.action !== 'tick') return reply(400, { error: 'action' }, headers);
   const base = env.SUPABASE_URL.replace(/\/$/, ''), sh = serviceHeaders(service);
