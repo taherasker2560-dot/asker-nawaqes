@@ -12,7 +12,9 @@ adb shell appops set "$PKG" USE_FULL_SCREEN_INTENT allow || true
 adb shell am start -n "$PKG/.MainActivity" >/dev/null
 sleep 10
 
-read -r H M < <(adb shell date +"%H %M" | tr -d '\r')
+NOW=$(adb shell date +%H:%M | tr -d '\r')
+H=${NOW%%:*}
+M=${NOW##*:}
 TOT=$(( (10#$H * 60 + 10#$M + 2) % 1440 ))
 T=$(printf '%02d:%02d' $((TOT / 60)) $((TOT % 60)))
 echo "device clock $H:$M, alarm set for $T"
