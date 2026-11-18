@@ -43,6 +43,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val ids = Plan.due(alarms, snoozes, at, TimeZone.getDefault())
         st.setSnoozes(snoozes.filter { it.at > at + 1000 })
         Scheduler.reschedule(ctx, at)
+        st.log(if (ids.isEmpty()) "المنبه ضرب بس مفيش دوا مستحق" else "المنبه ضرب: ${ids.size} دوا")
         if (ids.isEmpty()) return
         Ring.start(ctx, alarms.filter { it.id in ids }.map { it.spoken }.distinct(), ids)
     }

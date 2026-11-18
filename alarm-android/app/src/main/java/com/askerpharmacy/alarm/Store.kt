@@ -65,6 +65,19 @@ class Store(context: Context) {
         get() = p.getString("seed", "") ?: ""
         set(v) { p.edit().putString("seed", v).apply() }
 
+    // ---- what happened at the last rings (the page's «🔍 فحص المنبه» shows it in plain Arabic: the facts instead of guesses) ----
+    fun log(msg: String) {
+        try {
+            val old = ringLog()
+            val line = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date()) + " " + msg.replace("\n", " ").take(90)
+            p.edit().putString("ringlog", (old + line).takeLast(16).joinToString("\n")).apply()
+        } catch (e: Exception) {
+            // a log must never stop a ring
+        }
+    }
+
+    fun ringLog(): List<String> = (p.getString("ringlog", "") ?: "").split("\n").filter { it.isNotEmpty() }
+
     // ---- the sentence sounds (made by the server, handed over by the page) ----
     private fun voiceDir(): File = File(ctx.filesDir, "voice").also { it.mkdirs() }
 

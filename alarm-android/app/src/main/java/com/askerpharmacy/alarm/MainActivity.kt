@@ -1,8 +1,13 @@
 package com.askerpharmacy.alarm
 
 import android.app.Activity
+import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioManager
+import android.os.PowerManager
+import org.json.JSONArray
+import java.util.TimeZone
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
@@ -162,7 +167,64 @@ class Bridge(private val act: Activity) {
 
     /** «جرّب المنبه»: a real ring now, the same one a dose time makes */
     @JavascriptInterface fun testRing() {
+        Store(act).log("جرّبت المنبه من الشاشة")
         Ring.start(act, listOf("تجربة المنبه"), listOf("test"))
+    }
+
+    /** the test ring (or any ring) can be stopped from the page: «⏹ وقّف الرنين» */
+    @JavascriptInterface fun stopRing() {
+        act.startService(Intent(act, RingService::class.java).setAction(Ring.ACTION_TOOK).putStringArrayListExtra("ids", ArrayList(RingService.ringIds)))
+    }
+
+    @JavascriptInterface fun ringing(): Boolean = RingService.running
+
+    /** the phone's battery list for this app: a phone that «optimizes» the app may hold its alarms back */
+    @JavascriptInterface fun openBattery() {
+        act.runOnUiThread {
+            try {
+                act.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (e: Exception) {
+                try { act.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + act.packageName))) } catch (x: Exception) { /* no settings page */ }
+            }
+        }
+    }
+
+    /** «🔍 فحص المنبه»: what this phone says about everything the ring needs (read by the page and written in plain Arabic) */
+    @JavascriptInterface fun diag(): String {
+        val ctx = act.applicationContext
+        val o = JSONObject()
+        try {
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val au = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val pm = ctx.getSystemService(Context.POWER_SERVICE) as PowerManager
+            val st = Store(ctx)
+            val alarms = st.alarms()
+            val next = Plan.next(alarms, st.snoozes(), System.currentTimeMillis(), TimeZone.getDefault())
+            val names = alarms.map { it.spoken }.distinct()
+            o.put("version", ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName)
+            o.put("sdk", Build.VERSION.SDK_INT)
+            o.put("model", Build.MANUFACTURER + " " + Build.MODEL)
+            o.put("now", System.currentTimeMillis())
+            o.put("notifications", nm.areNotificationsEnabled())
+            o.put("exact", if (Build.VERSION.SDK_INT >= 31) am.canScheduleExactAlarms() else true)
+            o.put("alarms", alarms.size)
+            o.put("nextOurs", next?.at ?: 0L)
+            o.put("nextSystem", am.nextAlarmClock?.triggerTime ?: 0L)
+            o.put("alarmVol", au.getStreamVolume(AudioManager.STREAM_ALARM))
+            o.put("alarmMax", au.getStreamMaxVolume(AudioManager.STREAM_ALARM))
+            o.put("musicVol", au.getStreamVolume(AudioManager.STREAM_MUSIC))
+            o.put("ringer", au.ringerMode)
+            o.put("dnd", nm.currentInterruptionFilter)
+            o.put("battery", pm.isIgnoringBatteryOptimizations(ctx.packageName))
+            o.put("speak", st.speak)
+            o.put("names", names.size)
+            o.put("voices", names.count { st.hasVoice(it) })
+            o.put("log", JSONArray(st.ringLog()))
+        } catch (e: Exception) {
+            o.put("error", e.javaClass.simpleName)
+        }
+        return o.toString()
     }
 
     @JavascriptInterface fun close() {
