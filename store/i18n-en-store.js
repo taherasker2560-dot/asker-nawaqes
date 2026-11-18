@@ -442,6 +442,8 @@ window.AskerEN = {
   "افتح تطبيق إنستا باي، واختار «تحويل»، والصق العنوان والمبلغ.": "Open the InstaPay app, choose “Transfer”, and paste the address and the amount.",
   "١) دوس «انسخ المبلغ»  ٢) افتح إنستا باي  ٣) الصق المبلغ في خانة المبلغ": "1) Tap “Copy the amount”  2) Open InstaPay  3) Paste the amount in the amount box",
   "ادفع حسابك": "Pay your balance",
+  "ادفع للصيدلية": "Pay the pharmacy",
+  "فودافون كاش أو إنستا باي، من غير ما تسأل عن الرقم": "Vodafone Cash or InstaPay, without asking for the number",
   "المبلغ (تقدر تعدّله)": "Amount (you can change it)",
   "💳 ادفع حسابك": "💳 Pay your balance",
   "الدفع بتحويل فودافون كاش. بعد التحويل ابعت صورته على واتساب.": "Pay by Vodafone Cash transfer. After transferring, send a photo of the transfer on WhatsApp.",

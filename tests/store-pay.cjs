@@ -96,4 +96,10 @@ assert.equal(A.installPlan(UA.samsung,'Linux armv81',5,true,false),'chrome','Sam
 assert.equal(A.installPlan(UA.firefox,'Linux armv81',5,false,false),'chrome');
 assert.equal(A.installPlan(UA.firefox,'Linux armv81',5,false,true),'steps','back from the hand-off with no Chrome: the steps');
 assert.equal(A.installPlan(UA.ios,'iPhone',5,false,false),'guide');
+// «ادفع للصيدلية» for anyone (owner 2026-11-19): the direct link store.html#pay / #pay=250
+assert.deepEqual(P.parsePayHash('#pay'),{amount:0});
+assert.deepEqual(P.parsePayHash('#pay=250'),{amount:250});
+assert.deepEqual(P.parsePayHash('#pay=1'),{amount:1});
+for(const bad of ['','#','#pay=','#pay=abc','#pay=-5','#pay=1234567','#pay=25.5','#payment','#pay=250&x=1','#cart','pay',null,undefined])assert.equal(P.parsePayHash(bad),null,String(bad));
+assert.ok(P.TEXTS.sheetTitleAny&&P.TEXTS.sheetTitleAny!==P.TEXTS.sheetTitle,'its own title: «ادفع للصيدلية»');
 console.log('store-pay ok');

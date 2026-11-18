@@ -23,7 +23,7 @@
     <!-- colors and night look: the bot's 25 colors (ar/settings.js), the store's own choice (store/theme.js) -->
     <script src="ar/settings.js?v=calm-20261117a"></script>
     <!-- English (owner 2026-11-12): the bot's engine (ar/i18n.js) with the store's dictionary; Arabic = nothing runs -->
-    <script src="store/i18n-en-store.js?v=tap-20261118m"></script>
+    <script src="store/i18n-en-store.js?v=pay-20261119a"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
     <script src="store/theme.js?v=calm-20261117a"></script>
   </head>
@@ -100,6 +100,13 @@
       <a href="#scan" class="home-card scan-card" id="scanCard">
         <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" /><path d="M7 12h10M7 9v6M10 9v6M13.5 9v6M17 9v6" /></svg></span>
         <span class="hc-text"><strong>كرّر دواك بالباركود</strong><span>عدّي باركود الصيدلية الملزوق على الصنف، أو اكتب الكود أو الاسم</span></span>
+        <span class="hc-go">افتح</span>
+      </a>
+      <!-- ادفع للصيدلية (store/pay.js; owner 2026-11-19: «رابط الدفع ظاهر في الموقع، مش شرط يكون شاري حاجة … يبعت لي منه إنستا أو فودافون بسهولة من غير ما يقول لي الرقم»):
+           لأي حد، عميل أو زائر؛ ما بيظهرش إلا لو الأرقام متسجّلة. الرابط المباشر: store.html#pay أو store.html#pay=250 -->
+      <a href="#pay" class="home-card pay-home" id="payCard" hidden>
+        <span class="hc-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5" /><path d="M3 10h18M7 15h3" /></svg></span>
+        <span class="hc-text"><strong>ادفع للصيدلية</strong><span>فودافون كاش أو إنستا باي، من غير ما تسأل عن الرقم</span></span>
         <span class="hc-go">افتح</span>
       </a>
       <div id="installBox" class="install" hidden>
@@ -392,7 +399,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>
     <script src="ar/statement-pdf.js?v=blue-20261117a"></script>
-    <script src="store/pay.js?v=pay-20261117b"></script>
+    <script src="store/pay.js?v=pay-20261119a"></script>
     <script src="store/regular.js?v=regular-20261117b"></script>
     <script src="store/alarm.js?v=tap-20261118m"></script>
     <script src="store/family.js?v=family-20261118a"></script>
