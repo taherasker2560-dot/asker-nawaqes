@@ -40,10 +40,11 @@
   };
   // The promo voice (owner 2026-11-18: «صوت ترويجي بأسلوب مذيع يسوّق للصيدلية، والموسيقى تفضل تحته وصوته أعلى منها حاجة بسيطة»; picked the voice Orus; «أوطى شوية، ما يبقاش مزعج»).
   // ONE spoken advert from the function asker-dose (action 'promo': a fixed text kept on the server), played over the music `delay` seconds after the music is sounding, then not again for
-  // `everyDays` days on that phone. The voice is meant to sit about 6 dB above the music: the file's speech is about -13.5 dBFS, the music at VOLUME about -33, so `gain` 0.21 lands the voice near
-  // -27 dBFS (soft on purpose; the owner heard the first samples much louder and asked for quieter). It never plays on the pharmacy's phone, nor when the customer stopped the music; the same
-  // button stops both. `file` names the kept copy: change it when the advert's text changes on the server.
-  const PROMO = { on: true, voice: 'Orus', delay: 12, everyDays: 3, gain: 0.21, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v1-orus' };
+  // `everyDays` days on that phone. The voice is meant to sit about 5 dB above the music (the music at VOLUME is about -32 dBFS): the page measures how loud the advert's speech is (a new render
+  // comes out louder or quieter: -13.5 dBFS once, -17.6 another time) and plays it at `targetDb` -27 dBFS (soft on purpose; the owner heard the first samples much louder and asked for quieter);
+  // `gain` is only the fallback when the level cannot be read. It never plays on the pharmacy's phone, nor when the customer stopped the music; the same button stops both.
+  // `file` names the kept copy: change it when the advert's text changes on the server.
+  const PROMO = { on: true, voice: 'Orus', delay: 12, everyDays: 3, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v1-orus' };
   const dayKey = (d) => { const x = d || new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
   // is the advert due: never heard on this phone, or the last time was `every` days ago or more (a clock set back counts as due)
   function promoDue(last, today, every) {
@@ -51,6 +52,19 @@
     const t = (s) => { const p = String(s).split('-').map(Number); return Date.UTC(p[0], p[1] - 1, p[2]) / 86400000; };
     const gap = t(today) - t(last);
     return !(gap >= 0 && gap < every);
+  }
+  // the loudness (RMS, 0..1) of the speaking parts of a 16-bit mono WAV (the function's own files: a 44-byte header); 0 when it is not one
+  function wavRms(buf) {
+    if (!buf || buf.byteLength < 2000) return 0;
+    const n = (buf.byteLength - 44) >> 1, v = new DataView(buf);
+    let acc = 0, k = 0;
+    for (let i = 0; i < n; i += 2) { const s = v.getInt16(44 + 2 * i, true) / 32768; if (Math.abs(s) > 0.01) { acc += s * s; k++; } }
+    return k > 50 ? Math.sqrt(acc / k) : 0;
+  }
+  // the gain that puts speech of loudness `rms` at `targetDb` dBFS (never louder than the file itself, never nearly silent); the fallback when the level is unknown
+  function promoGain(rms, targetDb, fallback) {
+    if (!(rms > 0)) return fallback;
+    return Math.min(1, Math.max(0.05, Math.pow(10, (targetDb - 20 * Math.log10(rms)) / 20)));
   }
 
   // ---------- pure logic (tests/store-music.cjs) ----------
@@ -71,7 +85,7 @@
     return a;
   }
 
-  const api = { isPharmacyPhone, modeOf, wanted, nextRound, promoDue, dayKey, PROMO, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE };
+  const api = { isPharmacyPhone, modeOf, wanted, nextRound, promoDue, dayKey, wavRms, promoGain, PROMO, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -123,11 +137,13 @@
     if (!ok()) { pArmed = false; return; }   // the music went quiet meanwhile: the next time it plays, it is armed again
     const blob = await promoBlob();
     if (!blob) { pDone = true; pArmed = false; return; }   // no network / no advert: no retry in this visit
+    let gain = PROMO.gain;
+    try { gain = promoGain(wavRms(await blob.arrayBuffer()), PROMO.targetDb, PROMO.gain); } catch (e) { /* the fallback */ }
     if (!ok()) { if (run === pRun) pArmed = false; return; }
     try {
       const a = new root.Audio(); a.setAttribute('data-music', 'promo');   // our own sound: the music does not step aside for it, and the voice-note rule does not count it
       pUrl = URL.createObjectURL(blob); a.src = pUrl;
-      const g = ctx.createGain(); g.gain.value = PROMO.gain;
+      const g = ctx.createGain(); g.gain.value = gain;
       ctx.createMediaElementSource(a).connect(g); g.connect(ctx.destination);
       a.addEventListener('playing', () => { pDone = true; store((ls) => ls.setItem(PROMO.key, dayKey())); });   // counted once it really starts
       a.addEventListener('ended', promoStop);
