@@ -79,6 +79,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Scheduler.reschedule(this)   // whatever happened while the app was closed, the next alarm is set
+        VoiceJob.schedule(this)      // and any sentence sound that is still missing is asked for
     }
 
     /** the link that opened the app may carry the customer's personal link (?me=) and the alarms he made in the browser: kept for the page to take over once */
@@ -92,16 +93,13 @@ class MainActivity : Activity() {
             base = other
             baseHost = Uri.parse(other).host ?: HOST
         }
-        // the site's alarm button opens the app on the alarm sheet (sheet=1); a plain open of the app is the store, like the site
-        val sheet = i?.getStringExtra("sheet") == "1" || !alarms.isNullOrEmpty()
-        val query = listOfNotNull(if (me != null) "me=$me" else null, if (sheet) "sheet=1" else null)
-        if (first || other != null || me != null || sheet) web.loadUrl(base + (if (query.isEmpty()) "" else "?" + query.joinToString("&")))
+        if (first || other != null || me != null || !alarms.isNullOrEmpty()) web.loadUrl(base + (if (me != null) "?me=$me" else ""))
     }
 
     private fun offline() {
         web.loadDataWithBaseURL(
             null,
-            "<html dir='rtl'><body style='font-family:sans-serif;text-align:center;padding:48px 20px;color:#222'><h2 style='color:#C0522A'>صيدلية عسكر</h2>" +
+            "<html dir='rtl'><body style='font-family:sans-serif;text-align:center;padding:48px 20px;color:#222'><h2 style='color:#C0522A'>⏰ منبه الدوا</h2>" +
                 "<p>مفيش إنترنت دلوقتي. المنبهات اللي ضبطتها قبل كده <b>بترن عادي</b> حتى من غير نت.</p>" +
                 "<p>عشان تضيف أو تعدّل منبه، اتصل بالنت وبعدين:</p><p><a href='$base' style='color:#C0522A;font-size:20px'>جرّب تاني</a></p></body></html>",
             "text/html", "utf-8", null,
@@ -110,10 +108,9 @@ class MainActivity : Activity() {
 
     @Deprecated("the system's back button")
     override fun onBackPressed() {
-        // the alarm sheet (its editor, then the sheet) takes the back first; then the store's own pages go back one by one; from the first page the app closes
+        // the page closes its editor first; a back on its list leaves the app
         web.evaluateJavascript("(window.AskerStoreAlarm&&window.AskerStoreAlarm.appBack&&window.AskerStoreAlarm.appBack())?'1':'0'") { r ->
-            if (r == "\"1\"") return@evaluateJavascript
-            if (web.canGoBack()) web.goBack() else finish()
+            if (r != "\"1\"") finish()
         }
     }
 }
@@ -130,6 +127,7 @@ class Bridge(private val act: Activity) {
         if (ok) {
             st.seed = ""
             Scheduler.reschedule(act)
+            VoiceJob.schedule(act)
         }
         return ok
     }

@@ -43,7 +43,7 @@ run('Install for anyone: the home box shows to a visitor on every phone and does
  await page.goto(base+'store.html?x=2');
  await page.waitForSelector('#installBox:not([hidden])');
 },{home:true});
-run('Install for anyone: Firefox gets its steps back from the hand-off, Android Chrome gets the pharmacy\'s app, a customer has his own button, a computer needs an offer',async({page,base})=>{
+run('Install for anyone: Firefox gets its steps back from the hand-off, Chrome installs on its offer, a customer has his own button, a computer needs an offer',async({page,base})=>{
  await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua});window.__fakeRpcs={ar_store_pay_info:()=>null}});
  // Firefox arriving with ?install=1 (Chrome was not on the phone): the steps show in the box
  await page.evaluate(([ua])=>sessionStorage.setItem('__ua',ua),[UAS.firefox]);
@@ -51,19 +51,14 @@ run('Install for anyone: Firefox gets its steps back from the hand-off, Android 
  await page.waitForSelector('#installBox:not([hidden]) #installNote:not([hidden])');
  assert.match(await text(page,'#installNote'),/في فايرفوكس: دوس ⋮/);
  assert.equal(await page.evaluate(()=>location.search),'','?install=1 leaves the address');
- // Android Chrome: the pharmacy's APP (this store + the dose alarm), not the installed page and not the browser's own install (owner 2026-11-18)
+ // Chrome: its offer, one tap
  await page.evaluate(([ua])=>sessionStorage.setItem('__ua',ua),[UAS.chrome]);
  await page.goto(base+'store.html?x=5');
  await page.waitForSelector('#installBox:not([hidden])');
  await page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
- await page.evaluate(()=>{window.__appHref='';document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^="intent://"]');if(a){window.__appHref=a.getAttribute('href');e.preventDefault()}},true)});
  await page.click('#installBtn');
- await page.waitForFunction(()=>!!window.__appHref,null,{timeout:8000});
- const href=await page.evaluate(()=>window.__appHref);
- assert.ok(href.startsWith('intent://alarm#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;')&&!href.includes('S.sheet=1'),'the app opens on the store: '+href);
- assert.ok(href.includes('S.browser_fallback_url='+encodeURIComponent('https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk')),'with no app on the phone: its download');
- assert.equal(await page.evaluate(()=>window.__prompted),false,'the browser\'s own install is not used');
- await page.waitForFunction(()=>/افتحه واضغط «تثبيت»/.test(document.getElementById('installNote').textContent),null,{timeout:5000});
+ await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
+ await page.waitForFunction(()=>/اتنزّل/.test(document.getElementById('installNote').textContent),null,{timeout:5000});
  // a customer with his link: the account has the install button first thing, so the home box is not shown
  await seedCustomer(page);
  await page.goto(base+'store.html#me='+tok);

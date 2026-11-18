@@ -91,8 +91,7 @@ const tok='c'.repeat(64);
 assert.ok(A.chromeIntent(base,tok).includes('?me='+tok+'&install=1#Intent'),'a customer: unchanged');
 // a visitor's plan on each browser (the same rules as a customer's)
 const UA={samsung:'Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36',firefox:'Mozilla/5.0 (Android 14; Mobile; rv:130.0) Gecko/130.0 Firefox/130.0',chrome:'Mozilla/5.0 (Linux; Android 14; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',ios:'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'};
-assert.equal(A.installPlan(UA.chrome,'Linux armv81',5,true,false),'app','Android Chrome: the pharmacy\'s app (this store + the dose alarm), not the installed page (owner 2026-11-18)');
-assert.equal(A.installPlan('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.0.0 Safari/537.36','Win32',0,true,false),'prompt','a computer: the browser\'s own install as before');
+assert.equal(A.installPlan(UA.chrome,'Linux armv81',5,true,false),'prompt');
 assert.equal(A.installPlan(UA.samsung,'Linux armv81',5,true,false),'chrome','Samsung: never its own install');
 assert.equal(A.installPlan(UA.firefox,'Linux armv81',5,false,false),'chrome');
 assert.equal(A.installPlan(UA.firefox,'Linux armv81',5,false,true),'steps','back from the hand-off with no Chrome: the steps');

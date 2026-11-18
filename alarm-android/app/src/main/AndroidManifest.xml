@@ -21,8 +21,7 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
@@ -38,14 +37,36 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- the page's alarm button «نزّل تطبيق صيدلية عسكر» (an intent: link) opens the app with the customer's link and his alarms -->
+            <!-- the page's button «افتح في تطبيق المنبه» (an intent: link) opens the app with the customer's link and his alarms -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="askeralarm" />
+                <data android:scheme="askeralarm" android:host="alarm" />
             </intent-filter>
         </activity>
+
+        <!-- the website hands its alarms over on every save (askeralarm://handoff): no screen, takes them and ends at once -->
+        <activity
+            android:name=".HandoffActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="askeralarm" android:host="handoff" />
+            </intent-filter>
+        </activity>
+
+        <!-- gets the missing sentence sound files when there is a network -->
+        <service
+            android:name=".VoiceJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <!-- the ring card over the lock screen -->
         <activity
