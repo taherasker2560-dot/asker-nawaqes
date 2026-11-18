@@ -805,7 +805,7 @@
   // for store/edit.js (the owner's «✏️ عدّل»)
   root.AskerStore = {
     client, SUPABASE_URL, SUPABASE_KEY, EDIT_IMG,
-    edits: () => edits, picSrc, descOf, pics: () => pics,
+    edits: () => edits, picSrc, descOf, pics: () => pics, sendRx: (files, phone, note) => sendRxOnly(files, phone, note), MAX_RX, MAX_RX_BYTES,
     setEdit(id, row) { if (row) edits[id] = row; else delete edits[id]; drawList(!$('more').hidden); if (sheetItem) drawSheet(); },
   };
   function sheetAdd() {
@@ -885,10 +885,11 @@
     if (crypto.randomUUID) return crypto.randomUUID();
     return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
   }
-  async function uploadRx() {
+  const uploadRx = () => uploadFiles(rxFiles.map((r) => r.file));
+  async function uploadFiles(list) {
     const day = new Date().toISOString().slice(0, 10), paths = [];
-    for (const r of rxFiles) {
-      const f = await shrink(r.file);
+    for (const orig of list) {
+      const f = await shrink(orig);
       if (f.size > MAX_RX_BYTES) throw new Error('rx_big');
       const path = rxPath(day, uuid(), rxExt(f.type, f.name));
       const up = await client.storage.from('ar-store-rx').upload(path, f, { contentType: f.type || 'image/jpeg', upsert: false });
@@ -1015,6 +1016,35 @@
       say(errorText(), true);
     } finally {
       sending = false; $('sendBtn').disabled = settings.is_open === false || overLimit(cart, limits).length > 0;
+    }
+  }
+
+  // «📋 ابعت الروشتة» from a customer's account (store/rx.js, owner 2026-11-18): the photos only, as an order the pharmacy reads and prices. The same upload and the same server function as the cart's
+  // prescription panel; the customer's link says who he is (his own, or a person of his house), and «طلباتي» shows it as «طلب بالروشتة». Returns {ok, id} or {ok:false, error: <the words>}.
+  async function sendRxOnly(files, phone, note) {
+    const link = acct && acct.active();
+    if (!link) return { ok: false, error: errorText('link') };
+    const ph = normPhone(phone);
+    if (!ph) return { ok: false, error: errorText('bad_phone') };
+    if (!files || !files.length) return { ok: false, error: errorText('bad_items') };
+    let rx;
+    try { rx = await uploadFiles(files); } catch (err) { return { ok: false, error: errorText(err.message) }; }
+    const text = String(note || '').trim().slice(0, 450);
+    try {
+      const { data, error } = await client.rpc('ar_customer_place_order', { p_token: link.token, p_phone: ph, p_address: PICKUP, p_notes: '📋 روشتة' + (text ? ': ' + text : ''), p_items: [], p_rx: rx, p_pay: link.pay });
+      if (error) throw error;
+      if (!data || !data.ok) {
+        if (data && data.error === 'stopped') acct.stoppedNow();
+        if (data && data.error === 'member_cash') acct.memberCashNow();
+        if (data && data.error === 'link') acct.linkGone();
+        return { ok: false, error: errorText(data && data.error) };
+      }
+      store.set('asker_store_me', { name: (store.get('asker_store_me') || {}).name || '', phone: ph });
+      myOrders = rememberOrder(myOrders, { id: data.order_id, phone: ph, at: new Date().toISOString(), total: 0, status: 'new', items: [] });
+      store.set('asker_store_orders', myOrders);
+      return { ok: true, id: data.order_id };
+    } catch (err) {
+      return { ok: false, error: errorText() };
     }
   }
 

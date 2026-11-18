@@ -171,7 +171,9 @@ run('Pay by transfer, a customer with his link: «ادفع حسابك» with the
  await page.goto(base+'store.html#me='+tok);
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
  await page.waitForSelector('[data-acct-paysheet]');
- assert.equal(await text(page,'[data-acct-paysheet]'),'💳 ادفع حسابك');
+ assert.equal(await text(page,'[data-acct-paysheet] b'),'💳 ادفع حسابك');
+ assert.equal(await text(page,'[data-acct-paysheet] small'),'فودافون كاش · إنستا باي','the ways to pay, under it (2026-11-18)');
+ assert.equal(await page.evaluate(()=>document.querySelector('[data-acct-paysheet]').closest('.ac-bal')!==null),true,'right under the amount he owes, inside the balance card');
  await page.click('[data-acct-paysheet]');
  await page.waitForSelector('.pay-sheet #payAmount');
  assert.equal(await page.inputValue('#payAmount'),'7175','what he owes, in whole pounds');
