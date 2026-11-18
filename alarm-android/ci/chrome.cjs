@@ -32,7 +32,7 @@ setTimeout(() => { console.error('CHROME HANDOFF NOT PROVEN: it took too long (C
   await page.click('[data-al-pick="other"]');
   await page.fill('[data-al-name]', 'Chromedose');
   await page.click('[data-al-preset="once"]');
-  await page.click('[data-al-save]');
+  await page.click('[data-al-save]', { noWaitAfter: true });   // (the tap starts the intent navigation that leaves the page: do not wait for it to «finish»)
   let prefs = '';
   for (let k = 0; k < 40; k++) { prefs = await sh(`run-as ${PKG} cat shared_prefs/asker_alarm.xml`); if (/Chromedose/.test(prefs)) break; await sleep(500); }
   console.log(prefs.slice(0, 600));
