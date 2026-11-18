@@ -44,14 +44,15 @@
   // comes out louder or quieter: -13.5 dBFS once, -17.6 another time) and plays it at `targetDb` -27 dBFS (soft on purpose; the owner heard the first samples much louder and asked for quieter);
   // `gain` is only the fallback when the level cannot be read. It never plays on the pharmacy's phone, nor when the customer stopped the music; the same button stops both.
   // `file` names the kept copy: change it when the advert's text changes on the server.
+  // FREQUENCY (2026-11-18): everyDays is 0 = every visit, because the owner is testing on his family's phones («عايز لما أفتح التطبيق عند مراتي الإعلان يشتغل»): set it back to 3 (once every 3 days) when he says.
   // `file` v3 (2026-11-18): phones kept renders made while the advert was still changing (v1: a 102 s one; v2: a 52 s one in which the model READ THE ENGLISH STYLE LINE out loud, the owner heard it): v3 makes every phone fetch the clean one.
   // A TEST LINK: store.html?promo=1 plays the advert 3 s after the music sounds, whatever the 3-day rule says, and does not count as heard (the owner tests on a phone that already heard it).
-  const PROMO = { on: true, voice: 'Orus', delay: 12, everyDays: 3, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v3-orus' };
+  const PROMO = { on: true, voice: 'Orus', delay: 8, everyDays: 0, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v3-orus' };
   const FORCE = (() => { try { return /[?&]promo=1(&|#|$)/.test(String(root.location && root.location.search)); } catch (e) { return false; } })();
   const dayKey = (d) => { const x = d || new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
   // is the advert due: never heard on this phone, or the last time was `every` days ago or more (a clock set back counts as due)
   function promoDue(last, today, every) {
-    if (!last || !/^\d{4}-\d{2}-\d{2}$/.test(String(last))) return true;
+    if (!(every > 0) || !last || !/^\d{4}-\d{2}-\d{2}$/.test(String(last))) return true;   // every <= 0: every visit
     const t = (s) => { const p = String(s).split('-').map(Number); return Date.UTC(p[0], p[1] - 1, p[2]) / 86400000; };
     const gap = t(today) - t(last);
     return !(gap >= 0 && gap < every);

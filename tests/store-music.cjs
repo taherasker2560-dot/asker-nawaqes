@@ -140,7 +140,8 @@ assert.deepEqual(M.nextRound(()=>0.5,-1,1),[0],'one piece: just that one');
 // ---- the promo voice (owner 2026-11-18): once, then not again for a few days ----
 assert.equal(M.PROMO.voice,'Orus','the owner picked Orus');
 assert.ok(M.PROMO.delay>=5&&M.PROMO.delay<=30,'it comes a few seconds after the music is sounding: '+M.PROMO.delay);
-assert.ok(M.PROMO.everyDays>=1&&M.PROMO.everyDays<=7,'not every visit: '+M.PROMO.everyDays);
+assert.ok(M.PROMO.everyDays>=0&&M.PROMO.everyDays<=7,'0 = every visit (testing), else a few days: '+M.PROMO.everyDays);
+assert.equal(M.promoDue('2026-11-18','2026-11-18',0),true,'every visit (0): due even if heard today');assert.equal(M.promoDue('2026-11-18','2026-11-18',3),false,'the 3-day rule still works when it is set');
 assert.ok(M.PROMO.gain>0.1&&M.PROMO.gain<0.35,'soft on purpose («أوطى شوية، ما يبقاش مزعج»): '+M.PROMO.gain);
 assert.equal(M.dayKey(new Date(2026,10,5)),'2026-11-05','a day is the phone\'s own date');
 assert.equal(M.promoDue(null,'2026-11-18',3),true,'never heard here: due');
