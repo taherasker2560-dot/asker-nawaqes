@@ -11,3 +11,5 @@ A small app so the dose alarm **rings and says the medicine's name with the app 
 Built, tested and published by `.github/workflows/alarm-apk.yml` (JUnit, a signed release, an emulator test that sets an alarm, closes the app and waits for it, and another that drives the page inside the app's WebView). The release APK is `asker-alarm.apk` on the pre-release `alarm-build`; the alarm sheet's button links to it. The signing key lives in the Actions cache (a weekly run keeps it alive): never rebuild with a new key, customers could not update in place.
 
 A debug build (CI only) has a receiver to set an alarm from `adb` and can be pointed at another page address with `--es base <url>`; the release build has neither.
+
+Inside the app the store's «install the app» box is hidden, and the site's account gate (for the installed site) is NOT asked: a credit customer reaches the app with his personal link from the site's app button (the intent link carries ?me= and sheet=1).
