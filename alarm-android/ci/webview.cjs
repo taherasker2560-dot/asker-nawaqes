@@ -77,6 +77,20 @@ const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
   await sleep(2500);
   const audio = await sh('dumpsys audio');
   console.log('players:', (audio.split('\n').filter((l) => /AudioPlaybackConfiguration|USAGE_ALARM|state:started|piid/i.test(l) && /askerpharmacy|ALARM|started/i.test(l)).slice(0, 8).join('\n') || '(none shown)'));
+  // the button turned into «⏹ وقّف الرنين»: it stops the ring from the page (the owner's real phone «hung» with no way to close it)
+  assert.match(await page.textContent('[data-al-apptest]'), /وقّف الرنين/);
+  await page.click('[data-al-apptest]');
+  await sleep(1500);
+  // «🔍 فحص المنبه»: the app's own answers (the real bridge: notifications, exact alarms, volume, battery, the log of the rings) in plain Arabic
+  await page.click('[data-al-appdiag]');
+  await page.waitForSelector('#alarmSheet .al-diag-sum');
+  const sum = await page.$$eval('#alarmSheet .al-diag-sum p', (els) => els.map((e) => e.textContent));
+  console.log('app check:\n' + sum.join('\n'));
+  assert.ok(sum.some((l) => /إصدار التطبيق 1\.2/.test(l)), 'the version');
+  assert.ok(sum.some((l) => /صوت المنبه/.test(l)), 'the alarm volume line');
+  assert.ok(sum.some((l) => /البطارية/.test(l)), 'the battery line');
+  assert.ok(sum.some((l) => /الرنين بدأ: تجربة المنبه/.test(l)), 'the ring log says the test ring started');
+  assert.ok(sum.some((l) => /اتقفل/.test(l)), 'the ring log says it was stopped from the page');
   // the back button of the app leaves it (the page answers false on the list)
   assert.equal(await page.evaluate(() => window.AskerStoreAlarm.appBack()), false);
   await sh(`am force-stop ${PKG}`);

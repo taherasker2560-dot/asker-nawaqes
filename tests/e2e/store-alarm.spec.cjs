@@ -351,9 +351,9 @@ run('Dose alarm: the page keeps a copy of the alarms that are ON (the name as it
 
 // ---- 2026-11-18 (owner: «مش موافق عالحل ده … لو بتينا APK ينزل من الموقع»): the customer's Android app «منبه الدوا» (alarm-android/) is a WebView that shows THIS page; the app is what rings ----
 const APPFAKE=()=>{
- window.__app={sets:[],voices:{},asks:[],tests:0,closed:0,seed:localStorage.getItem('__seed')||'',notif:true,fs:true};window.__invoked=[];
+ window.__app={sets:[],voices:{},asks:[],tests:0,stops:0,batt:0,ringing:false,diagData:{},closed:0,seed:localStorage.getItem('__seed')||'',notif:true,fs:true};window.__invoked=[];
  window.AskerAndroid={setAlarms:(j)=>{window.__app.sets.push(JSON.parse(j));window.__app.seed='';return true},seed:()=>window.__app.seed,hasVoice:(n)=>!!window.__app.voices[n],saveVoice:(n,b)=>{window.__app.voices[n]=b.length;return true},
-  status:()=>JSON.stringify({v:1,notifications:window.__app.notif,fullScreen:window.__app.fs}),ask:(k)=>{window.__app.asks.push(k)},testRing:()=>{window.__app.tests++},close:()=>{window.__app.closed++},version:()=>'1'};
+  status:()=>JSON.stringify({v:1,notifications:window.__app.notif,fullScreen:window.__app.fs}),ask:(k)=>{window.__app.asks.push(k)},testRing:()=>{window.__app.tests++;window.__app.ringing=true},stopRing:()=>{window.__app.stops++;window.__app.ringing=false},ringing:()=>window.__app.ringing,openBattery:()=>{window.__app.batt++},diag:()=>JSON.stringify(window.__app.diagData),close:()=>{window.__app.closed++},version:()=>'1'};
  window.__fakeInvokes={'asker-dose':async(b)=>{window.__invoked.push(b&&b.name);return {data:new Blob([new Uint8Array(3000)],{type:'audio/wav'}),error:null}}};
 };
 run('Dose alarm inside the Android app: the alarm sheet is the screen, the alarms that are ON (his own, the browser\'s seed, the pharmacy\'s) are handed to the app, the page never rings or asks for notifications, the sound files are handed over once, the app\'s needs and test ring work, back and close leave through the app',async({page,base})=>{
@@ -390,6 +390,19 @@ run('Dose alarm inside the Android app: the alarm sheet is the screen, the alarm
  assert.deepEqual(await page.evaluate(()=>window.__app.asks),['notifications','fullScreen']);
  // the test ring is the app's
  await page.click('[data-al-apptest]');assert.equal(await page.evaluate(()=>window.__app.tests),1);
+ // while it rings the button says «⏹ وقّف الرنين» and stops it (a ring that «hangs» with no way to close it was the owner's first real-phone report)
+ assert.equal(await text(page,'[data-al-apptest]'),'⏹ وقّف الرنين');
+ await page.click('[data-al-apptest]');assert.equal(await page.evaluate(()=>window.__app.stops),1);assert.equal(await text(page,'[data-al-apptest]'),'🔔 جرّب المنبه');
+ // «🔍 فحص المنبه»: what the phone answers, in plain Arabic (volume zero, do-not-disturb, the battery rule, the sound files, the last rings)
+ await page.evaluate(()=>{const at=new Date(2026,10,18,11,45).getTime();window.__app.diagData={version:'1.1',model:'samsung SM-A525F',notifications:true,exact:true,alarms:2,nextOurs:at,nextSystem:at,alarmVol:0,alarmMax:7,musicVol:5,ringer:1,dnd:3,battery:false,speak:true,names:2,voices:1,log:['11:45:00 المنبه ضرب: 1 دوا','11:45:01 الرنين بدأ: فيموجيسال']}});
+ await page.click('[data-al-appdiag]');await page.waitForSelector('#alarmSheet .al-diag-sum');
+ assert.deepEqual(await page.$$eval('#alarmSheet .al-diag-sum p',els=>els.map(e=>e.textContent)),['✓ الإشعارات شغالة','✓ المنبه الجاي الساعة 11:45 ومتسجل في نظام الموبايل','✗ صوت المنبه على الموبايل صفر: ارفعه (زرار الصوت وإنت في التطبيق)','ℹ️ الموبايل على الصامت أو الاهتزاز (المنبه المفروض يرنّ برضه)','✗ «عدم الإزعاج» شغال على «ولا حاجة» وبيمنع المنبه','ℹ️ البطارية بتحسّن التطبيق: لو المنبه ما رنّش خلّيه من غير قيود','ℹ️ صوت الصيدلية جاهز لـ 1 من 2 دوا (الباقي بصوت الموبايل أو بنغمة)','ℹ️ إصدار التطبيق 1.1 · samsung SM-A525F','آخر الأحداث:','11:45:00 المنبه ضرب: 1 دوا','11:45:01 الرنين بدأ: فيموجيسال']);
+ await page.click('[data-al-battery]');assert.equal(await page.evaluate(()=>window.__app.batt),1);
+ // the system alarm that is NOT registered, and nothing saved, are said too
+ await page.evaluate(()=>{window.__app.diagData={version:'1.1',model:'x',notifications:false,exact:false,alarms:0,nextOurs:0,nextSystem:0,alarmVol:3,alarmMax:7,ringer:2,dnd:1,battery:true,names:0,voices:0,log:[]}});
+ await page.click('[data-al-appdiag]');
+ assert.deepEqual((await page.$$eval('#alarmSheet .al-diag-sum p',els=>els.map(e=>e.textContent))).slice(0,6),['✗ الإشعارات مقفولة للتطبيق (من إعدادات الموبايل)','✗ «المنبهات والتذكيرات» مش مسموحة للتطبيق (إعدادات الموبايل ← التطبيقات ← منبه الدوا)','✗ مفيش منبه شغال محفوظ في التطبيق','✓ صوت المنبه 3 من 7','✓ البطارية: من غير قيود على التطبيق','ℹ️ إصدار التطبيق 1.1 · x']);
+ assert.equal(await page.$('[data-al-battery]'),null,'no battery button when the app has no limits');
  // back: the editor goes back to the list through the app's back button; from the list the app is asked to leave
  await page.click('[data-al-new]');await page.waitForSelector('[data-al-save]');
  assert.equal(await page.evaluate(()=>window.AskerStoreAlarm.appBack()),true);await page.waitForSelector('[data-al-new]');

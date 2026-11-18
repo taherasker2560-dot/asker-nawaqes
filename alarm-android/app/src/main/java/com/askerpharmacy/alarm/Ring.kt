@@ -54,6 +54,7 @@ object Ring {
             ctx.startForegroundService(i)
         } catch (e: Exception) {
             // the phone refused the service (a battery rule): the notification itself must then make the sound, and the card starts the voice when it opens
+            Store(ctx).log("الموبايل رفض الخدمة: ${e.javaClass.simpleName}")
             if (!fromCard) Notifier.post(ctx, names, ids, ongoing = false, loud = true)   // from the card it would only re-open the card
         }
     }
@@ -110,6 +111,7 @@ object Notifier {
             .setOngoing(ongoing)
             .setAutoCancel(!ongoing)
             .setContentIntent(card)
+            .setDeleteIntent(took)          // swiping the notification away ends the ring too (it must never go on «hanging» with no way to close it)
             .setFullScreenIntent(card, true)
             .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stat_alarm), "✓ خدته", took).build())
             .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stat_alarm), "بعد ${Plan.SNOOZE_MIN} دقايق", snooze).build())
@@ -174,11 +176,13 @@ class RingService : Service() {
             if (Build.VERSION.SDK_INT >= 29) startForeground(Ring.NOTIF_ID, note, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK) else startForeground(Ring.NOTIF_ID, note)
         } catch (e: Exception) {
             // the phone would not let this service run in front: a notification that makes the alarm sound by itself, and the service ends (an unanswered start would crash the app)
+            Store(this).log("الموبايل منع الخدمة: ${e.javaClass.simpleName}")
             Notifier.post(this, names.toList(), ids.toList(), ongoing = false, loud = true)
             running = false
             stopSelf()
             return
         }
+        Store(this).log("الرنين بدأ: " + names.joinToString("، "))
         // a new ring (or one more medicine at the same minute) starts the whole cycle again
         seq++
         says = 0
@@ -216,9 +220,10 @@ class RingService : Service() {
         if (says >= 3) return
         says++
         val st = Store(this)
-        if (!st.speak) { playTone(mine); return }
+        if (!st.speak) { st.log("النطق مقفول: نغمة"); playTone(mine); return }
         val files = names.map { st.voiceFile(it) }
-        if (files.all { it.isFile && it.length() > 1000 }) playFiles(files, 0, mine) { speakTts(mine) } else speakTts(mine)
+        if (files.all { it.isFile && it.length() > 1000 }) { st.log("بشغّل ملف صوت الصيدلية"); playFiles(files, 0, mine) { st.log("ملف الصوت فشل: صوت الموبايل"); speakTts(mine) } }
+        else { st.log("مفيش ملف صوت جاهز: صوت الموبايل"); speakTts(mine) }
     }
 
     private fun afterSpeech(mine: Int) {
@@ -235,8 +240,8 @@ class RingService : Service() {
             mp.setAudioAttributes(alarmAttrs())
             mp.setDataSource(files[i].absolutePath)
             mp.setOnCompletionListener { playFiles(files, i + 1, mine, onFail) }
-            mp.setOnErrorListener { _, _, _ -> onFail(); true }
-            mp.setOnPreparedListener { it.start() }
+            mp.setOnErrorListener { _, what, extra -> Store(this).log("المشغّل غلط ($what/$extra)"); onFail(); true }
+            mp.setOnPreparedListener { it.start(); Store(this).log("الملف بيتشغّل") }
             player = mp
             mp.prepareAsync()
         } catch (e: Exception) {
@@ -251,11 +256,13 @@ class RingService : Service() {
             mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
             mp.setDataSource(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM))
             mp.isLooping = true
-            mp.setOnPreparedListener { if (mine == seq) it.start() }
+            mp.setOnPreparedListener { if (mine == seq) { it.start(); Store(this).log("النغمة بتتشغّل") } }
+            mp.setOnErrorListener { _, what, extra -> Store(this).log("النغمة غلط ($what/$extra)"); true }
             player = mp
             mp.prepareAsync()
         } catch (e: Exception) {
             // vibration and the notification remain
+            Store(this).log("النغمة فشلت: ${e.javaClass.simpleName}")
         }
     }
 
@@ -273,16 +280,16 @@ class RingService : Service() {
                 h.post {
                     val t = tts
                     // no speech engine, or none with Arabic (a Samsung phone's own engine has none): the phone's alarm tone rings instead, so there is always a sound at the dose time
-                    if (status != TextToSpeech.SUCCESS || t == null) { playTone(mine); return@post }
+                    if (status != TextToSpeech.SUCCESS || t == null) { Store(this).log("محرك النطق ما اشتغلش: نغمة"); playTone(mine); return@post }
                     try {
                         t.setAudioAttributes(alarmAttrs())
                         val arabic = t.setLanguage(Locale("ar", "EG")) >= 0 || t.setLanguage(Locale("ar")) >= 0
-                        if (!arabic) { playTone(mine); return@post }
+                        if (!arabic) { Store(this).log("الموبايل مفيهوش نطق عربي: نغمة"); playTone(mine); return@post }
                         t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                            override fun onStart(utteranceId: String?) {}
+                            override fun onStart(utteranceId: String?) { Store(this@RingService).log("النطق بدأ") }
                             override fun onDone(utteranceId: String?) { h.post { afterSpeech(seq) } }
                             @Deprecated("the engine's own error callback")
-                            override fun onError(utteranceId: String?) { h.post { playTone(seq) } }
+                            override fun onError(utteranceId: String?) { Store(this@RingService).log("النطق فشل: نغمة"); h.post { playTone(seq) } }
                         })
                     } catch (e: Exception) {
                         // the engine speaks with its own settings
@@ -292,6 +299,7 @@ class RingService : Service() {
                 }
             }
         } catch (e: Exception) {
+            Store(this).log("محرك النطق فشل: ${e.javaClass.simpleName}")
             playTone(mine)
         }
     }
@@ -321,6 +329,7 @@ class RingService : Service() {
     private fun giveUp() {
         val n = names.toList()
         val i = ids.toList()
+        Store(this).log("100 ثانية من غير رد: الرنين وقف")
         stopAll()
         stopForeground(STOP_FOREGROUND_DETACH)
         Notifier.post(this, n, i, ongoing = false)
@@ -331,6 +340,7 @@ class RingService : Service() {
     /** «خدته» / «بعد 10 دقايق» (the ids come with the button, so it works even when the ring itself could not start) */
     private fun end(snooze: Boolean, idsFromButton: List<String>?) {
         val which = (idsFromButton ?: emptyList()) + ids
+        Store(this).log(if (snooze) "اتأجّل 10 دقايق" else "اتقفل (خدته أو الإشعار اتشال)")
         stopAll()
         if (snooze) {
             val st = Store(this)

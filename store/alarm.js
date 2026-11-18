@@ -60,6 +60,28 @@
     appNotifOff: 'الإشعارات مقفولة للتطبيق، فالمنبه مش هيظهر. اضغط وشغّلها.',
     appFsOff: 'عشان كارت المنبه يظهر على شاشة القفل، اسمح له من الإعدادات.',
     appFix: 'افتح الإعدادات',
+    appStop: '⏹ وقّف الرنين',
+    // «🔍 فحص المنبه» inside the app: the phone's own answers in plain Arabic (owner 2026-11-18: the first real phone rang nothing and nobody knew why)
+    adRow: '🔍 فحص المنبه',
+    adNotifOk: '✓ الإشعارات شغالة',
+    adNotifNo: '✗ الإشعارات مقفولة للتطبيق (من إعدادات الموبايل)',
+    adExactNo: '✗ «المنبهات والتذكيرات» مش مسموحة للتطبيق (إعدادات الموبايل ← التطبيقات ← منبه الدوا)',
+    adNone: '✗ مفيش منبه شغال محفوظ في التطبيق',
+    adNextOk: '✓ المنبه الجاي الساعة {t} ومتسجل في نظام الموبايل',
+    adNextNo: '✗ المنبه الجاي الساعة {t} مش متسجل في نظام الموبايل',
+    adVolNo: '✗ صوت المنبه على الموبايل صفر: ارفعه (زرار الصوت وإنت في التطبيق)',
+    adVolOk: '✓ صوت المنبه {v} من {m}',
+    adSilent: 'ℹ️ الموبايل على الصامت أو الاهتزاز (المنبه المفروض يرنّ برضه)',
+    adDndNo: '✗ «عدم الإزعاج» شغال على «ولا حاجة» وبيمنع المنبه',
+    adDnd: 'ℹ️ «عدم الإزعاج» شغال (المنبهات مسموحة عادة)',
+    adBattOk: '✓ البطارية: من غير قيود على التطبيق',
+    adBattNo: 'ℹ️ البطارية بتحسّن التطبيق: لو المنبه ما رنّش خلّيه من غير قيود',
+    adBattBtn: 'افتح إعدادات البطارية',
+    adVoicesOk: '✓ صوت الصيدلية جاهز لـ {v} من {n} دوا',
+    adVoicesSome: 'ℹ️ صوت الصيدلية جاهز لـ {v} من {n} دوا (الباقي بصوت الموبايل أو بنغمة)',
+    adVer: 'ℹ️ إصدار التطبيق {v} · {m}',
+    adLog: 'آخر الأحداث:',
+    adNoLog: 'مفيش رنين اتسجّل لسه',
     notifSound: 'لو الإشعار جه من غير صوت: اتأكد إن الموبايل مش على الصامت، وافتح إعدادات الموبايل ← التطبيقات ← المتصفح ← الإشعارات ← صيدلية عسكر وشغّل الصوت.',
     which: 'أي دوا؟',
     fromUsual: '(من اللي بتاخده دايمًا)',
@@ -211,7 +233,7 @@
   const all = () => ({ ...data, items: data.items.concat(ph.items.map((x) => ({ ...x, ph: true, on: x.on !== false && !ph.off[x.id] }))) });
   let token = null, adminTimer = null;
   const save = () => { if (pharmacy) { adminSave(); return; } write(KEY, data); write(PH_KEY, { items: ph.items, off: ph.off }); syncServer(); prefetchVoices(); mirrorAlarms(); };
-  let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
+  let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], appRinging = false, appRingTimer = null, appBatt = false, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
   const synth = () => (root.speechSynthesis && root.SpeechSynthesisUtterance ? root.speechSynthesis : null);
@@ -416,7 +438,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118f'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118g'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -678,6 +700,10 @@
     return `<button type="button" class="ac-reg-btn ac-al-tile" data-al-open><b>${esc(TEXTS.tile)}</b><small>${esc(n ? countText(n) : TEXTS.tileHint)}</small></button>`;
   }
   const chip = (t) => `<span class="al-chip">${esc(timeText(t))}</span>`;
+  // the check's answer (the website's «🔍 فحص الصوت» and the app's «🔍 فحص المنبه»): the plain lines, the technical ones folded, a copy button
+  const diagHtml = () => (diag && diag.length
+    ? `${diagSum.length ? `<div class="al-diag-sum" role="status">${diagSum.map((x) => { const o = typeof x === 'string' ? { s: x } : x; return `<p${o.nt ? ' class="notr" translate="no"' : ''}>${esc(o.s)}</p>`; }).join('')}</div>` : ''}<details class="al-diag-more"><summary>${esc(TEXTS.dsDetails)}</summary><pre class="al-diag notr" dir="ltr" translate="no">${esc(diag.join('\n'))}</pre></details><button type="button" class="al-line" data-al-diagcopy><span>${esc(diagCopied ? TEXTS.diagCopied : TEXTS.diagCopy)}</span></button>`
+    : '');
   function listHtml() {
     const cards = all().items.map((it) => `<div class="al-card${it.on ? '' : ' off'}">${it.ph ? `<div class="al-card-main"><b class="notr" dir="auto">${esc(it.name)}</b> <span class="al-badge">${esc(TEXTS.fromPharmacy)}</span><span class="al-times">${it.times.map(chip).join('')}</span></div>` : `<button type="button" class="al-card-main" data-al-edit="${esc(it.id)}"><b class="notr" dir="auto">${esc(it.name)}</b><span class="al-times">${it.times.map(chip).join('')}</span></button>`}` +
       `<button type="button" class="al-tg${it.on ? ' on' : ''}" role="switch" aria-checked="${it.on}" aria-label="${esc(it.on ? TEXTS.on : TEXTS.off)}" data-al-toggle="${esc(it.id)}"></button></div>`).join('');
@@ -687,7 +713,9 @@
           : `<button type="button" class="al-line" data-al-notif><span>${esc(TEXTS.notifOn)}</span></button><p class="rg-hint">${esc(TEXTS.notifWhy)}</p>`) : '';
     // inside the app: the switch for the voice, the test ring and what the app still needs from the phone (the notifications, the card over the lock screen)
     const appBox = A ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
-      `<button type="button" class="al-line" data-al-apptest><span>${esc(TEXTS.appTest)}</span></button>` + appNeeds() + `<p class="rg-hint">${esc(TEXTS.appOn)}</p>` : '';
+      `<button type="button" class="al-line" data-al-apptest><span>${esc(appRinging ? TEXTS.appStop : TEXTS.appTest)}</span></button>` + appNeeds() + `<p class="rg-hint">${esc(TEXTS.appOn)}</p>` +
+      `<div class="al-line"><span>${esc(TEXTS.adRow)}</span><button type="button" class="al-try" data-al-appdiag>▶</button></div>` + diagHtml() +
+      (appBatt ? `<button type="button" class="al-line" data-al-battery><span>${esc(TEXTS.adBattBtn)}</span></button>` : '') : '';
     // in the browser on an Android phone: one button, «افتح في التطبيق» if it is installed, else its download (the intent's fallback address), carrying his link and his alarms
     const getApp = isAndroidBrowser() && !pharmacy ? `<div class="al-app"><p class="al-app-head">${esc(TEXTS.getAppHead)}</p><a class="al-line" data-al-getapp href="${esc(appLink())}"><span>${esc(TEXTS.getApp)}</span></a><p class="rg-hint">${esc(TEXTS.getAppWhy)}</p><p class="rg-hint">${esc(TEXTS.getAppSteps)}</p></div>` : '';
     const voice = A ? appBox : !pharmacy ? `<div class="al-line"><span>${esc(TEXTS.speak)}</span><button type="button" class="al-tg${data.speak ? ' on' : ''}" role="switch" aria-checked="${data.speak}" aria-label="${esc(TEXTS.speak)}" data-al-speak></button></div>` +
@@ -695,7 +723,7 @@
       (voiceNote ? `<p class="rg-hint al-note" role="status">${esc(voiceNote)}</p>` : '') +
       (voiceOk === false ? `<p class="al-warn">${esc(TEXTS.noVoice)}</p>` : '') +
       `<div class="al-line"><span>${esc(diagBusy ? TEXTS.diagBusy : TEXTS.diag)}</span><button type="button" class="al-try" data-al-diag${diagBusy ? ' disabled' : ''}>${esc(diagBusy ? '…' : '▶')}</button></div>` +
-      (diag && diag.length ? `${diagSum.length ? `<div class="al-diag-sum" role="status">${diagSum.map((x) => `<p>${esc(x)}</p>`).join('')}</div>` : ''}<details class="al-diag-more"><summary>${esc(TEXTS.dsDetails)}</summary><pre class="al-diag notr" dir="ltr" translate="no">${esc(diag.join('\n'))}</pre></details><button type="button" class="al-line" data-al-diagcopy><span>${esc(diagCopied ? TEXTS.diagCopied : TEXTS.diagCopy)}</span></button>` : '') : '';
+      diagHtml() : '';
     const note = pharmacy && adminNote ? `<p class="${adminNote === 'saved' ? 'rg-hint al-note' : 'al-warn'}" role="status">${esc(adminNote === 'saved' ? TEXTS.adminSaved : TEXTS.adminFail)}</p>` : '';
     return `${getApp}<p class="rg-hint">${esc(pharmacy ? fill(TEXTS.forCustomer, { n: customerName() }) : A ? TEXTS.hintApp : TEXTS.hint)}</p>${note}${cards || `<p class="rg-hint">${esc(TEXTS.empty)}</p>`}<button type="button" class="al-add" data-al-new>${esc(TEXTS.add)}</button>${voice}${notif}` +
       (pharmacy || A ? '' : `<div class="rg-warn">${esc(TEXTS.open)}</div>`);
@@ -705,6 +733,35 @@
     const acc = root.AskerStoreAccount, t = acc && acc.token ? acc.token() : '';
     const mine = data.items.length ? 'S.alarms=' + encodeURIComponent(JSON.stringify({ v: 1, speak: data.speak, items: data.items })) + ';' : '';
     return 'intent://alarm' + (t ? '?me=' + t : '') + '#Intent;scheme=askeralarm;package=com.askerpharmacy.alarm;' + mine + 'S.browser_fallback_url=' + encodeURIComponent(APK_URL) + ';end';
+  }
+  // «🔍 فحص المنبه»: the app answers what the phone says (notifications, the exact-alarm permission, the alarm volume, do-not-disturb, the battery rule, the sound files, the last rings), written in plain Arabic
+  function appDiag() {
+    let d = {}; try { d = JSON.parse(A.diag() || '{}'); } catch (e) { d = { error: 'parse' }; }
+    const pad = (n) => String(n).padStart(2, '0'), hm = (ms) => { const x = new Date(ms); return pad(x.getHours()) + ':' + pad(x.getMinutes()); };
+    const L = [d.notifications === false ? TEXTS.adNotifNo : TEXTS.adNotifOk];
+    if (d.exact === false) L.push(TEXTS.adExactNo);
+    if (!d.alarms) L.push(TEXTS.adNone);
+    else if (d.nextOurs) L.push(fill(Math.abs((d.nextSystem || 0) - d.nextOurs) < 1500 ? TEXTS.adNextOk : TEXTS.adNextNo, { t: hm(d.nextOurs) }));
+    L.push(d.alarmVol === 0 ? TEXTS.adVolNo : fill(TEXTS.adVolOk, { v: d.alarmVol, m: d.alarmMax }));
+    if (d.ringer !== 2) L.push(TEXTS.adSilent);
+    if (d.dnd === 3) L.push(TEXTS.adDndNo); else if (d.dnd === 2) L.push(TEXTS.adDnd);
+    L.push(d.battery ? TEXTS.adBattOk : TEXTS.adBattNo);
+    appBatt = d.battery === false;
+    if (d.names) L.push(fill(d.voices >= d.names ? TEXTS.adVoicesOk : TEXTS.adVoicesSome, { v: d.voices, n: d.names }));
+    const log = Array.isArray(d.log) ? d.log : [];
+    // the version and the log lines are the phone's own words: never translated
+    diagSum = L.concat([{ s: fill(TEXTS.adVer, { v: d.version || '?', m: d.model || '' }), nt: true }, TEXTS.adLog], log.length ? log.slice(-8).map((s) => ({ s, nt: true })) : [TEXTS.adNoLog]);
+    diag = Object.keys(d).filter((k) => k !== 'log').map((k) => k + ': ' + d[k]).concat(['log:'], log);
+    if (view) draw();
+  }
+  // the test ring can be stopped from the page (the button turns into «⏹ وقّف الرنين» while it rings)
+  function watchAppRing() {
+    clearInterval(appRingTimer);
+    const t0 = Date.now();
+    appRingTimer = setInterval(() => {
+      let on = false; try { on = !!A.ringing(); } catch (e) { on = false; }
+      if (!on && Date.now() - t0 > 3000) { appRinging = false; clearInterval(appRingTimer); if (view) draw(); }
+    }, 1000);
   }
   // what the app asks the phone for: notifications on, and the card over the lock screen (Android 14+)
   function appNeeds() {
@@ -781,7 +838,9 @@
     if (!view) return;
     // inside the app: what it still needs from the phone, and a real test ring
     const ask = t.closest('[data-al-ask]'); if (ask) { try { A.ask(ask.dataset.alAsk); } catch (err) { /* no settings page */ } return; }
-    if (t.closest('[data-al-apptest]')) { try { A.testRing(); } catch (err) { /* no app */ } return; }
+    if (t.closest('[data-al-apptest]')) { try { if (appRinging) { A.stopRing(); appRinging = false; clearInterval(appRingTimer); } else { A.testRing(); appRinging = true; watchAppRing(); } } catch (err) { /* no app */ } draw(); return; }
+    if (t.closest('[data-al-appdiag]')) { appDiag(); return; }
+    if (t.closest('[data-al-battery]')) { try { A.openBattery(); } catch (err) { /* no settings page */ } return; }
     if (t.closest('[data-al-close]')) { if (view === 'edit') { view = 'list'; draft = null; error = ''; draw(); } else close(); return; }
     if (t.closest('[data-al-new]')) { draft = newDraft(null); view = 'edit'; error = ''; draw(); return; }
     const ed = t.closest('[data-al-edit]'); if (ed) { const it = data.items.find((x) => x.id === ed.dataset.alEdit); if (it) { draft = newDraft(it); view = 'edit'; error = ''; draw(); } return; }
