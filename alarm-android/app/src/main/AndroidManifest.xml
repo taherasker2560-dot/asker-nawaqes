@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- «اضغط وبعدين سماح»: the system's own question that lets the alarm keep working in the background (the customer taps once) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- the app updates itself (Update.kt): it hands the new file to Android's installer; the customer allows this once and confirms each update -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
         <intent>
@@ -75,6 +77,9 @@
             android:name=".PingJob"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Android's answer about an update's install (the confirm screen to show, a cancel, a failure) -->
+        <receiver android:name=".InstallReceiver" android:exported="false" />
 
         <!-- the ring card over the lock screen -->
         <activity

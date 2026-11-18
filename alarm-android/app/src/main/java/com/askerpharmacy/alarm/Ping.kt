@@ -109,6 +109,7 @@ class PingJob : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         Thread {
             val done = try { AppPing.pingIfDue(applicationContext) } catch (e: Exception) { false }
+            try { AppUpdate.checkIfDue(applicationContext) } catch (e: Exception) { /* the next open reads the version file again */ }   // the newest version is known before he opens the app
             jobFinished(params, !done)
         }.start()
         return true

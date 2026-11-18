@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Base64
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -35,6 +36,11 @@ class MainActivity : Activity() {
     }
 
     private lateinit var web: WebView
+    // «لازم تحدّث»: the full screen over the page while a newer version is published (the alarms keep ringing without the page)
+    private lateinit var gate: UpdateGate
+    private var updating = false
+    private var installing = false
+    private var wantInstall = false
     // the page's address: always the pharmacy's own; only a debug build (the CI test) may be pointed somewhere else, with --es base <url>
     private var base = BASE
     private var baseHost = HOST
@@ -45,6 +51,11 @@ class MainActivity : Activity() {
         if (debuggable) WebView.setWebContentsDebuggingEnabled(true)
         web = WebView(this)
         setContentView(web)
+        gate = UpdateGate(this)
+        addContentView(gate.view, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        gate.onTap = { startUpdate() }
+        gate.onBrowser = { try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdate.APK_URL))) } catch (e: Exception) { /* no browser */ } }
+        AppUpdate.listener = { runOnUiThread { updating = false; installing = false; gate.busy(false); gate.status(AppUpdate.errorText("install")) } }
         val s = web.settings
         s.javaScriptEnabled = true
         s.domStorageEnabled = true
@@ -81,6 +92,51 @@ class MainActivity : Activity() {
         Scheduler.reschedule(this)   // whatever happened while the app was closed, the next alarm is set
         VoiceJob.schedule(this)      // and any sentence sound that is still missing is asked for
         AppPing.kick(this)           // and, once a day, the pharmacy's server is told a phone has the app (a random id + the version, nothing else)
+        if (installing) { installing = false; updating = false; gate.busy(false); gate.status("") }   // back from Android's confirm screen without the app being replaced: the button is there again
+        gateRefresh()                // a newer version already known: the screen covers the page at once
+        AppUpdate.kick(this) { runOnUiThread { gateRefresh() } }   // and the published version file is read again when it is time
+        if (wantInstall && AppUpdate.canInstall(this)) { wantInstall = false; startUpdate() }   // back from «allow installs from this app»
+    }
+
+    override fun onDestroy() {
+        AppUpdate.listener = null
+        super.onDestroy()
+    }
+
+    private fun gateRefresh() {
+        gate.show(AppUpdate.required(this), Store(this).latestName)
+    }
+
+    /** the big button: download the file, check it, hand it to Android's installer (its own confirm screen); the first time Android's «allow from this app» page comes first */
+    private fun startUpdate() {
+        if (updating) return
+        if (!AppUpdate.canInstall(this)) {
+            wantInstall = true
+            gate.status("أندرويد هيسألك مرة واحدة: اسمح بالتثبيت من التطبيق ده، وبعدها ارجع واضغط «حدّث دلوقتي» تاني.")
+            AppUpdate.openInstallSettings(this)
+            return
+        }
+        updating = true
+        gate.busy(true)
+        gate.status("جاري التنزيل…")
+        val ctx = applicationContext
+        Thread {
+            val file = AppUpdate.download(ctx) { pct -> runOnUiThread { gate.status("جاري التنزيل… $pct%") } }
+            runOnUiThread {
+                if (file == null) {
+                    updating = false
+                    gate.busy(false)
+                    gate.status(AppUpdate.errorText(AppUpdate.lastError))
+                } else if (AppUpdate.install(this, file)) {
+                    installing = true
+                    gate.status("أكّد التحديث في شاشة أندرويد.")
+                } else {
+                    updating = false
+                    gate.busy(false)
+                    gate.status(AppUpdate.errorText("install"))
+                }
+            }
+        }.start()
     }
 
     /** the link that opened the app may carry the customer's personal link (?me=) and the alarms he made in the browser: kept for the page to take over once */
@@ -93,6 +149,13 @@ class MainActivity : Activity() {
         if (other != null) {
             base = other
             baseHost = Uri.parse(other).host ?: HOST
+        }
+        if (debuggable) {   // CI only: `--ei fake_latest N` says «the newest published version is N» (the test reads no network), 0 = nothing newer
+            val fake = i?.getIntExtra("fake_latest", -1) ?: -1
+            if (fake >= 0) {
+                Store(this).latestCode = fake
+                gateRefresh()
+            }
         }
         if (first || other != null || me != null || !alarms.isNullOrEmpty()) web.loadUrl(base + (if (me != null) "?me=$me" else ""))
     }
@@ -109,6 +172,7 @@ class MainActivity : Activity() {
 
     @Deprecated("the system's back button")
     override fun onBackPressed() {
+        if (gate.visible) { finish(); return }   // the update screen is on top: back leaves the app
         // the page closes its editor first; a back on its list leaves the app
         web.evaluateJavascript("(window.AskerStoreAlarm&&window.AskerStoreAlarm.appBack&&window.AskerStoreAlarm.appBack())?'1':'0'") { r ->
             if (r != "\"1\"") finish()
@@ -222,6 +286,7 @@ class Bridge(private val act: Activity) {
             val next = Plan.next(alarms, st.snoozes(), System.currentTimeMillis(), TimeZone.getDefault())
             val names = alarms.map { it.spoken }.distinct()
             o.put("version", ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName)
+            o.put("latest", st.latestCode)
             o.put("sdk", Build.VERSION.SDK_INT)
             o.put("model", Build.MANUFACTURER + " " + Build.MODEL)
             o.put("now", System.currentTimeMillis())
