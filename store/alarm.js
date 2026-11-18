@@ -52,6 +52,9 @@
     // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
     getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:',
     getAppIos: '⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.',
+    homeTitle: '⏰ منبه الدوا',
+    homeSub: 'تطبيق أندرويد بيرنّ وينطق اسم الدوا في ميعاده والموبايل مقفول.',
+    homeLinked: '✓ متوصّل: المنبهات اللي بتظبطها هنا بتروح له لوحدها.',
     appLinked: '✓ تطبيق «منبه الدوا» متوصّل: أي منبه تظبطه هنا بيروح له لوحده وهو اللي بيرنّ وينطق (هتشوف وميض سريع لحظة الحفظ).',
     appOpen: '📲 افتح منبه الدوا',
     appUnlink: 'مش متثبّت؟ شيل التوصيل',
@@ -258,8 +261,20 @@
   }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (appTapAt && Date.now() - appTapAt < 4000 && !appLinked()) write(APP_KEY, 1); }   // the app opened from the button: it is there
-    else { appTapAt = 0; if (view) draw(); }
+    else { appTapAt = 0; if (view) draw(); drawHomeBox(); }
   });
+  // the pharmacy app's home card (owner 2026-11-18: «المفروض المنبه ينزل من جوه التطبيق»): the place where the alarm app is downloaded, for every Android phone, with «⚠️ ده لأندرويد بس، ومش بيشتغل
+  // على الآيفون» under it; an iPhone sees the card with that note and no button. Not on a computer, not inside the app, not on the pharmacy's own phone (the system is signed in there).
+  const isIos = () => { const u = String((root.navigator && root.navigator.userAgent) || ''); return /iPhone|iPad|iPod/i.test(u) || (/Macintosh/i.test(u) && ((root.navigator && root.navigator.maxTouchPoints) || 0) > 1); };
+  function drawHomeBox() {
+    const box = document.getElementById('alarmAppBox'); if (!box) return;
+    const android = isAndroidBrowser(), show = !A && !pharmacy && (android || isIos());
+    box.hidden = !show;
+    if (!show) { box.innerHTML = ''; return; }
+    const linked = android && appLinked();
+    box.innerHTML = `<span class="al-home-ico" aria-hidden="true">⏰</span><div><strong>${esc(TEXTS.homeTitle)}</strong><span>${esc(linked ? TEXTS.homeLinked : TEXTS.homeSub)}</span><span class="al-home-warn">${esc(TEXTS.getAppIos)}</span></div>` +
+      (android ? `<a class="al-home-btn" data-al-getapp href="${esc(appLink())}">${esc(linked ? TEXTS.appOpen : TEXTS.getApp)}</a>` : '');
+  }
   let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], appRinging = false, appRingTimer = null, appBatt = false, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
 
   // ---------- the voice: the phone's own speech engine (Google's on Android) ----------
@@ -465,7 +480,7 @@
     const add = (s) => { L.push(s); diag = L.slice(); if (view) draw(); };
     diag = []; diagSum = []; add('...');
     L.length = 0;
-    add('version: ' + 'tap-20261118j'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
+    add('version: ' + 'tap-20261118k'); add('app: ' + (A ? 'yes' : 'no')); add('ua: ' + String((root.navigator && root.navigator.userAgent) || '').replace(/^Mozilla\/5\.0 /, '').slice(0, 110));
     const ua = root.navigator && root.navigator.userActivation;
     add('active: ' + (ua ? 'now=' + ua.isActive + ' ever=' + ua.hasBeenActive : 'n/a') + ' · online=' + (root.navigator && root.navigator.onLine) + ' · hidden=' + document.hidden);
     // 1) a plain beep through an audio element: does this phone play a sound from the page at all (volume, silent mode, blocked)?
@@ -860,8 +875,9 @@
 
   document.addEventListener('click', (e) => {
     const t = e.target;
-    if (t.closest('[data-al-getapp]')) { appTapAt = Date.now(); return; }   // (the link itself opens the app, or downloads it: see the visibilitychange above)
-    if (t.closest('[data-al-appoff]')) { write(APP_KEY, 0); draw(); return; }
+    const gapp = t.closest('[data-al-getapp]');
+    if (gapp) { appTapAt = Date.now(); if (gapp.tagName === 'A') gapp.setAttribute('href', appLink()); return; }   // (the link itself opens the app, or downloads it: see the visibilitychange above; his link is read now, the account may have come after the page drew)
+    if (t.closest('[data-al-appoff]')) { write(APP_KEY, 0); draw(); drawHomeBox(); return; }
     if (t.closest('[data-al-open]')) { open(); return; }
     if (t.closest('[data-al-took]')) { stopRing(); return; }
     if (t.closest('[data-al-hear]')) { if (ring) speakDue(ring.due); return; }
@@ -903,6 +919,7 @@
 
   root.AskerStoreAlarm = { tileHtml, open, close, tick, say, doseOpened, count: () => onCount(all()), data: () => data, pharmacy: () => pharmacy, serverTimes, all, attach(c) { client = c; syncServer(); loadPharmacy(); prefetchVoices(); mirrorAlarms(); }, speakDue, voiceBlob, runDiag, tryVoice, appBack };
   schedule();
+  drawHomeBox();
   if (openedBy) doseOpened(openedBy);
   // inside the app the alarm sheet IS the screen (the page behind it is only there for his link and his usual medicines)
   if (A) { open(); mirrorAlarms(); }

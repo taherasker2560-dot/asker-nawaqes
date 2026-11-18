@@ -570,6 +570,8 @@ window.AskerEN = {
   "لو الإشعار جه من غير صوت: اتأكد إن الموبايل مش على الصامت، وافتح إعدادات الموبايل ← التطبيقات ← المتصفح ← الإشعارات ← صيدلية عسكر وشغّل الصوت.": "If the notification came without a sound: make sure the phone is not on silent, and open the phone's settings → Apps → the browser → Notifications → Asker Pharmacy and turn the sound on.",
   "🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:": "🔔 The website alone only sends you a notification. For the alarm to ring and say the medicine's name while the phone is locked, get the “Medicine alarm” app:",
   "⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.": "⚠️ Android only: it does not work on iPhone.",
+  "تطبيق أندرويد بيرنّ وينطق اسم الدوا في ميعاده والموبايل مقفول.": "An Android app that rings and says the medicine's name at its time even when the phone is locked.",
+  "✓ متوصّل: المنبهات اللي بتظبطها هنا بتروح له لوحدها.": "✓ Connected: the alarms you set here go to it by themselves.",
   "✓ تطبيق «منبه الدوا» متوصّل: أي منبه تظبطه هنا بيروح له لوحده وهو اللي بيرنّ وينطق (هتشوف وميض سريع لحظة الحفظ).": "✓ The “Medicine alarm” app is connected: any alarm you set here goes to it by itself, and it is the one that rings and speaks (you will see a quick flash when you save).",
   "📲 افتح منبه الدوا": "📲 Open Medicine alarm",
   "مش متثبّت؟ شيل التوصيل": "Not installed? Remove the connection",
