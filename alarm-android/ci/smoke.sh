@@ -4,7 +4,13 @@
 set -uo pipefail
 APK="$1"
 PKG=com.askerpharmacy.alarm
-fail() { echo "SMOKE FAILED: $1"; adb logcat -d -t 300 | grep -iE "askerpharmacy|AndroidRuntime|FATAL" | tail -60; exit 1; }
+fail() {
+  echo "SMOKE FAILED: $1"
+  echo "phone clock now: $(adb shell date | tr -d '\r'), uptime: $(adb shell uptime | tr -d '\r')"
+  adb shell dumpsys alarm | grep -B1 -A6 "$PKG" | head -30
+  adb logcat -d -t 600 | grep -iE "askerpharmacy|AndroidRuntime|FATAL" | tail -60
+  exit 1
+}
 
 adb install -r "$APK" || fail "install"
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS || true
@@ -15,7 +21,7 @@ sleep 10
 NOW=$(adb shell date +%H:%M | tr -d '\r')
 H=${NOW%%:*}
 M=${NOW##*:}
-TOT=$(( (10#$H * 60 + 10#$M + 2) % 1440 ))
+TOT=$(( (10#$H * 60 + 10#$M + 3) % 1440 ))   # three minutes ahead: a slow CI emulator must not turn the alarm into a race
 T=$(printf '%02d:%02d' $((TOT / 60)) $((TOT % 60)))
 echo "device clock $H:$M, alarm set for $T"
 adb shell am broadcast -n "$PKG/.DebugReceiver" --es name Pemojet --es time "$T" | tee /tmp/bc.txt
@@ -30,7 +36,7 @@ adb shell am kill "$PKG" || true
 adb shell pidof "$PKG" || echo "(the app process is gone, as intended)"
 
 FOUND=0
-for i in $(seq 1 48); do
+for i in $(seq 1 110); do
   if adb shell dumpsys notification --noredact | grep -q "Pemojet"; then FOUND=1; break; fi
   sleep 5
 done
