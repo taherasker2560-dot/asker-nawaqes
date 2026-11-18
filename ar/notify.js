@@ -30,6 +30,8 @@
     { key: 'care', group: 'care', tab: 'care', sound: 'pop', title: 'رسالة جديدة من عميل', body: (n) => `${n} عميل مستني رد في الرسايل` },
     // «الحقائب» (ar/alerts.js, owner 2026-11-15): rings when an item of the other bags passes 7 days short in a row
     { key: 'bags', group: 'purchases', tab: 'bags', sound: 'ding', title: 'صنف ناقص من أكتر من 7 أيام', body: (n) => `${n} صنف في الحقائب التانية ناقصين من أكتر من 7 أيام` },
+    // «💸 المدفوعات» (ar/pay.js, owner 2026-11-19): an order whose PharmaFly move differs, or approved and not there after 2 hours
+    { key: 'pay', group: 'accounts', tab: 'pay', sound: 'alert', title: 'أمر دفع محتاج نظرة', body: (n) => `${n} أمر دفع فيه فرق أو لسه ما ظهرش في فارمافلاي` },
   ];
   // which numbers went up since the last time they were seen (the first time only remembers, it does not ring)
   function rises(prev, now) {
@@ -59,7 +61,7 @@
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const SEEN = 'asker-notify-seen', PICK = 'asker-notify-sounds', ON = 'asker-notify-on';
-  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب' };
+  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب', pay: 'المدفوعات' };
   let counts = {}, timer = null, ctx = null, busy = false;
 
   const picks = () => { try { return JSON.parse(read(PICK, '{}')) || {}; } catch (e) { return {}; } };
@@ -106,16 +108,25 @@
       return error ? null : { n: (data || []).length, amount: (data || []).reduce((s, r) => s + (Number(r.balance) || 0), 0), days };
     } catch (e) { return null; }
   }
+  // the open payment orders (owner only: anyone else reads none, so nothing shows)
+  async function payOrders(c) {
+    try {
+      const { data, error } = await c.from('ar_pay_orders').select('status,approved_at').in('status', ['waiting', 'approved', 'mismatch']).limit(500);
+      if (error || !root.AskerPayLib) return null;
+      return root.AskerPayLib.needs(data || []);
+    } catch (e) { return null; }
+  }
   let ticks = 0;
   async function measure() {
     const c = db();
     if (!c) return null;
     if (ticks++ > 0 && $('inboxRefresh')) { $('inboxRefresh').click(); await new Promise((r) => setTimeout(r, 1200)); }
-    const [docs, store, care, od] = await Promise.all([
+    const [docs, store, care, od, pay] = await Promise.all([
       count(c.from('ar_documents').select('id').eq('status', 'new')),
       count(c.from('ar_store_orders').select('id').eq('status', 'new')),
       count(c.from('ar_chats').select('id').gte('waiting', 1)),
       oldDebts(c, oldDays()),
+      payOrders(c),
     ]);
     const a = root.AskerAlerts && root.AskerAlerts.data();
     const today = (l) => (l || []).filter((x) => Number(x.today) > 0).length;
@@ -125,6 +136,8 @@
     if (docs != null) out.docs = docs;
     if (store != null) out.store = store;
     if (care != null) out.care = care;
+    // «💸 المدفوعات» (owner 2026-11-19): a difference or late = the red number and the ring; waiting for his yes = a home row only
+    if (pay) { out.pay = pay.look; out.payWait = pay.wait; }
     if (od) { out.oldN = od.n; out.oldAmt = Math.round(od.amount); out.oldDays = od.days; }
     // «قبل الموسم» (owner 2026-11-16): the seasonal items that repeated in both years and are short now (the card itself lists them all)
     if (root.AskerSeason) { try { await root.AskerSeason.load(false); out.seasonN = root.AskerSeason.count(); } catch (e) { /* no seasonal file yet */ } }
@@ -165,6 +178,8 @@
     // the old debts: N customers, the total after the sentence (not translated: digits), a tap opens «العملاء» on that list
     if (counts.oldN) rows.push({ tab: 'customers', view: 'old', n: counts.oldN, text: `عميل عليهم فلوس من أكتر من ${counts.oldDays || 60} يوم`, name: `${Number(counts.oldAmt || 0).toLocaleString('en-US')} ج` });
     if (counts.returnsN) rows.push({ tab: 'vendors', n: counts.returnsN, text: 'مرتجع لسه ما راحش للشركات', name: `${Number(counts.returnsAmt || 0).toLocaleString('en-US')} ج` });
+    if (counts.pay) rows.push({ tab: 'pay', n: counts.pay, text: 'أمر دفع فيه فرق أو لسه ما ظهرش في فارمافلاي' });
+    if (counts.payWait) rows.push({ tab: 'pay', n: counts.payWait, text: 'أمر دفع مستني موافقتك' });
     if (counts.repN) rows.push({ tab: 'drafts', n: counts.repN, text: 'فاتورة مندوب فيها تنبيهات' });
     if (counts.chronicN) rows.push({ tab: 'customers', view: 'chronic', n: counts.chronicN, text: 'عميل ميعاد أدويتهم الدايمة عدّى' });
     if (counts.seasonN) rows.push({ tab: 'short', view: 'season', n: counts.seasonN, text: 'صنف موسمي رصيده أقل من اللي هيتباع الشهر الجاي' });
