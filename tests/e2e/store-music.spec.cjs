@@ -215,7 +215,7 @@ const serveAdvert=async(page,{status=200}={})=>{const asked=[],cors={'access-con
  await page.route('**/functions/v1/asker-dose',route=>{const q=route.request();if(q.method()==='OPTIONS')return route.fulfill({status:204,headers:cors});asked.push(JSON.parse(q.postData()));
   return status===200?route.fulfill({status:200,headers:{...cors,'content-type':'application/octet-stream'},body:wav}):route.fulfill({status,headers:cors,body:'{"error":"x"}'})});return asked};
 const promo=page=>page.evaluate(()=>window.AskerStoreMusic.promoState());
-const fast=(page,s)=>page.evaluate(s=>{window.AskerStoreMusic.PROMO.delay=s},s);
+const fast=(page,s)=>page.evaluate(s=>{window.AskerStoreMusic.PROMO.delay=s;window.AskerStoreMusic.PROMO.everyDays=3},s);   // the tests run the 3-day rule (the page ships with 0 = every visit while the owner tests)
 
 run('Store music: the promo voice — a few seconds after the music, soft, once; the same phone does not hear it again for days; it comes back from the phone\'s own copy when due',async({page,base})=>{
  await page.addInitScript(FAKE);await page.addInitScript(NOTE_GAINS);const asked=await serveAdvert(page);
@@ -278,7 +278,7 @@ run('Store music: the promo voice — never on the pharmacy\'s own phone',async(
 run('Store music: the promo voice — the test link ?promo=1 plays it 3 s after the music, even on a phone that heard it yesterday, and does not count as heard',async({page,base})=>{
  await page.addInitScript(FAKE);const asked=await serveAdvert(page);
  await page.addInitScript(()=>{try{const d=new Date();d.setDate(d.getDate()-1);localStorage.setItem('asker_store_promo_day',d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}catch(e){}});
- await open(page,base,'?promo=1');
+ await open(page,base,'?promo=1');await page.evaluate(()=>{window.AskerStoreMusic.PROMO.everyDays=3});
  const yesterday=await page.evaluate(()=>localStorage.getItem('asker_store_promo_day'));
  await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
  await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing,null,{timeout:9000});
@@ -293,4 +293,14 @@ run('Store music: without ?promo=1 a phone that heard the advert yesterday does 
  await open(page,base);await fast(page,0.4);
  await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());await page.waitForTimeout(1200);
  assert.equal(asked.length,0);assert.equal((await promo(page)).playing,false);
+},{home:true});
+run('Store music: the promo voice — as shipped (every visit while the owner tests) a phone that already heard it today gets it again, 8 s after the music, no link needed',async({page,base})=>{
+ await page.addInitScript(FAKE);const asked=await serveAdvert(page);
+ await page.addInitScript(()=>{try{const d=new Date();localStorage.setItem('asker_store_promo_day',d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))}catch(e){}});
+ await open(page,base);
+ const cfg=await page.evaluate(()=>({every:window.AskerStoreMusic.PROMO.everyDays,delay:window.AskerStoreMusic.PROMO.delay}));assert.deepEqual(cfg,{every:0,delay:8},'the shipped settings');
+ await page.evaluate(()=>{window.AskerStoreMusic.PROMO.delay=0.4});
+ await page.mouse.click(190,420);await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ await page.waitForFunction(()=>window.AskerStoreMusic.promoState().playing,null,{timeout:6000});
+ assert.deepEqual(asked,[{action:'promo',voice:'Orus'}]);
 },{home:true});
