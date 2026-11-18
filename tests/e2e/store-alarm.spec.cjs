@@ -29,6 +29,9 @@ const openAccount=async(page,base)=>{await page.setViewportSize({width:375,heigh
 const when=(h,m,d=17)=>`new Date(2026,10,${d},${h},${m},20)`;
 const tick=(page,h,m,d)=>page.evaluate(`window.AskerStoreAlarm.tick(${when(h,m,d)}).length`);
 const chips=(page)=>page.$$eval('#alarmSheet .al-card .al-chip',e=>e.map(x=>x.textContent));
+// the copy of the alarms that are ON that the page keeps in this phone's IndexedDB for the notification's worker (asker-dose / kv / alarms); null = nothing there
+const idbCopy=(page)=>page.evaluate(()=>new Promise((ok)=>{const r=indexedDB.open('asker-dose',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onerror=()=>ok(null);
+ r.onsuccess=()=>{const g=r.result.transaction('kv').objectStore('kv').get('alarms');g.onsuccess=()=>{r.result.close();ok(g.result||null)};g.onerror=()=>ok(null)}}));
 
 run('Dose alarm: the tile under the two buttons, a new alarm from his usual medicines, the list, the toggle, edit and delete; the times stay on his phone',async({page,base})=>{
  await setup(page);
@@ -173,6 +176,7 @@ run('Dose alarm: the owner\'s look sets THIS customer\'s alarms from the pharmac
  assert.deepEqual(sent.map(i=>[i.name,i.times,i.on]),[['لاكتيفينور ٣٥ قرص',['08:00','20:00'],true]],'saved for the customer on the server');assert.match(sent[0].id,/^p/);
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_dose_alarms')),null,'nothing kept on the pharmacy phone');
  assert.equal(await tick(page,8,0),0,'never rings there');assert.equal(await page.$('#alarmRing'),null);
+ assert.equal(await idbCopy(page),null,'and no copy of the names is written for the notification worker (it is not his phone)');
  // a change, a switch-off and a delete are saved too
  await page.click('#alarmSheet .al-card:nth-of-type(1) [data-al-toggle]');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('__ph'))[0].on===false);
  await page.click('#alarmSheet .al-card:nth-of-type(1) [data-al-edit]');await page.click('[data-al-del]');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('__ph')).length===0);
@@ -304,6 +308,45 @@ run('Dose alarm: the alarms the PHARMACY set show on his phone marked «من ا�
  await page.click('[data-al-notiftest]');await page.waitForFunction(()=>window.__shown&&window.__shown.length===1);
  assert.deepEqual(await page.evaluate(()=>window.__shown[0]),['🔔 تجربة منبه الدوا','لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.','asker-dose-test']);
  assert.equal(await page.evaluate(()=>window.__shownData[0].kind),'test','the worker knows this one is the test: a tap on it rings the demo');
+},{home:true});
+
+run('Dose alarm: the page keeps a copy of the alarms that are ON (the name as it is said + the times) in this phone\'s IndexedDB for the notification\'s worker, it follows every change, and the REAL worker file reads it and writes «⏰ ميعاد <الاسم> الآن» on the notification',async({page,base})=>{
+ await setup(page,'granted');
+ await seed(page);
+ // the pharmacy set one for him, he has one that is on and one that is off
+ await page.evaluate(()=>localStorage.setItem('__ph',JSON.stringify([{id:'p1',name:'زانبرازان ٢٠ قرص',say:'',times:['20:00','08:00'],on:true}])));
+ await openAccount(page,base);
+ await page.waitForFunction(()=>window.AskerStoreAlarm.all().items.length===1);
+ await page.evaluate(()=>localStorage.setItem('asker_dose_alarms',JSON.stringify({v:1,speak:true,items:[{id:'a1',name:'فيموجيسال ق',say:'',times:['20:00','08:00'],on:true},{id:'a2',name:'دوا واقف',say:'',times:['14:00'],on:false}],snoozes:[]})));
+ await page.reload();await page.waitForSelector('.ac-al-tile');
+ const names=async()=>((await idbCopy(page))||{items:[]}).items.map((i)=>[i.spoken,i.times]);
+ const until=async(want,why)=>{for(let k=0;k<60;k++){if(JSON.stringify(await names())===JSON.stringify(want))return;await page.waitForTimeout(100)}assert.deepEqual(await names(),want,why)};
+ // only the alarms that are on, the name as it is SAID («فيموجيسال ق» → «فيموجيسال»), the times in the order of the day; the pharmacy's one too; the one that is off is not there
+ await until([['فيموجيسال',['08:00','20:00']],['زانبرازان',['08:00','20:00']]],'the alarms that are on, own + pharmacy\'s');
+ const c=await idbCopy(page);
+ assert.deepEqual(c.items.map((i)=>i.id),['a1','p1']);assert.equal(typeof c.at,'number');
+ assert.doesNotMatch(JSON.stringify(c),/دوا واقف|ar_dose|endpoint/,'the stopped one is not copied, and nothing but name + times');
+ // the REAL worker file (store/dose/sw.js) on this page's real IndexedDB, with a fixed phone clock: 08:00 → both names, 08:10 → the plain one
+ const push=(h,m)=>page.evaluate(async([h,m])=>{
+  const src=await (await fetch('store/dose/sw.js')).text(),L={},out=[];
+  const self={indexedDB:window.indexedDB,registration:{scope:location.origin+'/store/dose/',showNotification:async(t,o)=>{out.push([t,o.body,o.tag])}},skipWaiting(){},clients:{claim(){},matchAll:async()=>[]},addEventListener:(t,f)=>{L[t]=f}};
+  class FD extends Date{constructor(...a){a.length?super(...a):super(2026,10,18,h,m,20)}}
+  new Function('self','Date',src)(self,FD);
+  let p;L.push({waitUntil:(x)=>{p=x}});await p;return out;
+ },[h,m]);
+ assert.deepEqual(await push(8,0),[['⏰ ميعاد فيموجيسال، وزانبرازان الآن','خدمة مقدمة من صيدلية عسكر. دوس عشان تسمع الاسم وتاخده','asker-dose']]);
+ assert.deepEqual(await push(14,0),[['⏰ ميعاد دواك','دوس عشان تسمع اسم الدوا وتاخده','asker-dose']],'14:00 is the one that is OFF: the plain notification');
+ assert.equal((await push(8,10))[0][0],'⏰ ميعاد دواك','10 minutes after the time: not this dose any more');
+ // every change follows: he switches his first one off, a new one by hand comes in, he switches the pharmacy's one off
+ await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet .al-card');
+ await page.click('[data-al-toggle="a1"]');
+ await until([['زانبرازان',['08:00','20:00']]],'his alarm switched off leaves the copy');
+ await page.click('[data-al-new]');await page.click('[data-al-pick="other"]');await page.fill('[data-al-name]','فيتامين د');await page.click('[data-al-preset="once"]');await page.click('[data-al-save]');await page.waitForSelector('#alarmSheet .al-card');
+ await until([['فيتامين د',['08:00']],['زانبرازان',['08:00','20:00']]],'a new one comes in');
+ assert.equal((await push(8,0))[0][0],'⏰ ميعاد فيتامين د، وزانبرازان الآن','the worker names the two that are on');
+ await page.click('[data-al-toggle="p1"]');
+ await until([['فيتامين د',['08:00']]],'the pharmacy\'s alarm switched off by him leaves the copy');
+ assert.equal((await push(20,0))[0][0],'⏰ ميعاد دواك','nothing on at 20:00 any more');
 },{home:true});
 
 run('Dose alarm: a hidden page does not use the alarm up; a tap on the dose notification rings it and asks for the first tap (an open page by the worker\'s message, a new window by ?dose=1); the test notification rings a made-up «تجربة المنبه»',async({page,base})=>{

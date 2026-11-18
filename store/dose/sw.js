@@ -4,10 +4,40 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 const PAGE = () => new URL('../../store.html#account', self.registration.scope).href;
+// ---- the medicine's name in the notification (owner 2026-11-18: «من غير ما يكون الابليكيشن مفتوح»; then «أمشي عليه» to the way that needs no second program) ----
+// The server's push is still EMPTY. The page keeps the enabled alarms (the name as it is said, and the times on THIS phone's clock) in IndexedDB; at the push the worker reads them, finds the ones whose time is now
+// (the push comes at the minute; up to 3 minutes late is still the same dose) and writes the name on the notification: «⏰ ميعاد فيموجيسال الآن». The names never leave the phone. Nothing found = the plain «ميعاد دواك».
+const IDB = 'asker-dose', STORE = 'kv', KEY = 'alarms', LATE = 3;
+function readAlarms() {
+  return new Promise((ok) => {
+    try {
+      const r = self.indexedDB.open(IDB, 1);
+      r.onupgradeneeded = () => { try { r.result.createObjectStore(STORE); } catch (err) { /* made already */ } };
+      r.onerror = () => ok([]);
+      r.onsuccess = () => {
+        try {
+          const g = r.result.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
+          g.onsuccess = () => { try { r.result.close(); } catch (err) { /* closed */ } ok(g.result && Array.isArray(g.result.items) ? g.result.items : []); };
+          g.onerror = () => ok([]);
+        } catch (err) { ok([]); }
+      };
+    } catch (err) { ok([]); }
+  });
+}
+const minutesOf = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '')); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; };
+async function dueNames(now) {
+  const list = await readAlarms(), nowMin = now.getHours() * 60 + now.getMinutes(), out = [];
+  for (const a of list) {
+    if (!a || !a.spoken || !Array.isArray(a.times)) continue;
+    if (a.times.some((t) => { const m = minutesOf(t); return m != null && nowMin - m >= 0 && nowMin - m <= LATE; })) out.push(String(a.spoken).replace(/\s+/g, ' ').trim().slice(0, 60));
+  }
+  return [...new Set(out.filter(Boolean))].slice(0, 4);
+}
 self.addEventListener('push', (e) => {
   e.waitUntil((async () => {
-  await self.registration.showNotification('⏰ ميعاد دواك', {
-    body: 'دوس عشان تسمع اسم الدوا وتاخده',
+  const names = await dueNames(new Date());
+  await self.registration.showNotification(names.length ? `⏰ ميعاد ${names.join('، و')} الآن` : '⏰ ميعاد دواك', {
+    body: names.length ? 'خدمة مقدمة من صيدلية عسكر. دوس عشان تسمع الاسم وتاخده' : 'دوس عشان تسمع اسم الدوا وتاخده',
     icon: '../../icons/arabic-192.png?v=logo2',
     badge: '../../icons/arabic-192.png?v=logo2',
     tag: 'asker-dose',
