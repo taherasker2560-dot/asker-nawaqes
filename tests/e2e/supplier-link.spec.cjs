@@ -186,7 +186,7 @@ const SLOW=['07-dreamy.mp3','05-smooth.mp3','03-chill-pop.mp3','01-bossa.mp3'];
 const sounding=page=>page.evaluate(()=>window.AskerStoreMusic&&window.AskerStoreMusic.sounding());
 const lastRamp=page=>page.evaluate(()=>window.__audio.ramps[window.__audio.ramps.length-1]);
 
-run('Supplier link: quiet calm music only — slow pieces, soft, no spoken advert, a button that stops it and is remembered, the owner\'s phone hears it too',async({page,base})=>{
+run('Supplier link: calm music only — slow pieces, medium level with a volume option, no spoken advert, a button that stops it and is remembered, the owner\'s phone hears it too',async({page,base})=>{
  await seed(page);
  await page.addInitScript(AUDIO);
  await open(page,base+'supplier.html#v='+TOK);
@@ -194,15 +194,26 @@ run('Supplier link: quiet calm music only — slow pieces, soft, no spoken adver
  await page.waitForFunction(()=>window.AskerStoreMusic);
  assert.equal(await page.isVisible('.mus-btn'),true,'the quiet button is there');
  assert.equal(await sounding(page),false,'nothing before a touch (the browser would refuse)');
- // the first tap anywhere starts it: a slow piece, at about a third less than the store's level, and NO advert is even waiting
+ // the first tap anywhere starts it: a slow piece at the medium level (the store's own 0.18), and NO advert is even waiting
  await page.click('#spBal');
  await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
- assert.equal(await lastRamp(page),0.11,'softer than the store (0.18)');
+ assert.equal(await lastRamp(page),0.18,'medium: the store\'s own level');
  const src=await page.evaluate(()=>window.__audio.srcs[0]);
  assert.ok(SLOW.some(f=>src.includes('store/music/'+f)),'one of the four slow pieces: '+src);
  assert.deepEqual(await page.evaluate(()=>window.AskerStoreMusic.promoState()),{armed:false,playing:false,done:false},'no spoken advert');
  await page.waitForTimeout(1500);
  assert.equal((await page.evaluate(()=>window.__fetches)).some(u=>/asker-dose/.test(u)),false,'the voice function is never asked');
+ // the volume option (owner: «اعمل أوبشن برضو للتعلية والتوطية»): a second quiet button opens a slider; moving it is heard at once and remembered on that phone
+ await page.waitForSelector('#spVol');
+ assert.equal(await page.isVisible('#spVolPop'),false);
+ await page.click('#spVol');await page.waitForSelector('#spVolPop',{state:'visible'});
+ assert.deepEqual(await page.$eval('#spVolRange',e=>[e.min,e.max,e.value]),['10','100','60']);
+ await page.$eval('#spVolRange',e=>{e.value='30';e.dispatchEvent(new Event('input',{bubbles:true}))});
+ assert.equal(await lastRamp(page),0.045,'lower: heard at once');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_music_vol')),'30');
+ await page.$eval('#spVolRange',e=>{e.value='80';e.dispatchEvent(new Event('input',{bubbles:true}))});
+ assert.equal(await lastRamp(page),0.32,'and higher');
+ await page.click('#spBal');await page.waitForSelector('#spVolPop',{state:'hidden'});
  // the button stops it, and his own memory (not the store\'s) keeps it stopped
  await page.click('.mus-btn');
  await page.waitForFunction(()=>!window.AskerStoreMusic.sounding());
@@ -214,6 +225,7 @@ run('Supplier link: quiet calm music only — slow pieces, soft, no spoken adver
  assert.equal(await sounding(page),false,'stopped once: it does not start by itself again');
  await page.click('.mus-btn');
  await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ assert.equal(await lastRamp(page),0.32,'it starts again at the level he chose (remembered on the phone)');
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_music_off')),null);
  // the pharmacy\'s own phone (the bot is signed in there) hears it too: it is his look at the page
  await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"x":1}'));
@@ -221,6 +233,7 @@ run('Supplier link: quiet calm music only — slow pieces, soft, no spoken adver
  await page.waitForSelector('#spBody:not([hidden]) .mv');await page.waitForFunction(()=>window.AskerStoreMusic);
  assert.equal(await page.isVisible('#spPreview'),true);
  assert.equal(await page.isVisible('.mus-btn'),true,'the owner hears what the supplier hears');
+ assert.equal(await page.isVisible('#spVol'),true,'and can turn it up or down');
  await page.click('#spBal');
  await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
  // the button is not printed and not in the way of the page's own buttons

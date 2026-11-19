@@ -105,13 +105,21 @@
   const store = (fn) => { try { return fn(root.localStorage); } catch (e) { return null; } }; // a private window or blocked storage: nothing remembered
   let mode = modeOf({ pharmacy: !OPT.pharmacyToo && store((ls) => isPharmacyPhone(Object.keys(ls))), off: store((ls) => ls.getItem(KEY) === '1'), supported: !!AC && typeof root.Audio === 'function' });
   api.mode = () => mode;
-  if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = () => {}; root.AskerStoreMusic = api; return; }
+  if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = api.setGain = () => {}; root.AskerStoreMusic = api; return; }
 
   let ctx = null, gain = null, el = null, queue = [], last = -1, firstTrack = true, failed = 0, broken = false, target = 0, suspendTimer = null, btn = null;
   const holds = new Set();
   const sounding = () => !!ctx && ctx.state === 'running' && target > 0 && !!el && !el.paused;
   api.sounding = sounding;
   api.track = () => last;
+  // the level the music plays at (a page with a volume option moves it, the suppliers' page does): heard at once when the music is playing (a short ramp, no click), else at the next start
+  let vol = VOLUME;
+  api.setGain = (g) => {
+    const n = Number(g);
+    if (!(n > 0 && n <= 1)) return;
+    vol = n;
+    if (ctx && gain && target > 0) { target = vol; ramp(vol, 0.15); }
+  };
 
   // ---------- the promo voice ----------
   let pTimer = null, pEl = null, pUrl = null, pRun = 0, pArmed = false, pDone = false;   // pDone: heard (or failed) in this page's life: never twice
@@ -216,7 +224,7 @@
       if (!ensure()) { draw(); return; }
       if (el.paused) play();   // inside the tap that asked for it: the browser allows it
       if (ctx.state !== 'running') { const p = ctx.resume(); if (p && p.catch) p.catch(() => { /* the browser wants a tap first: the next one starts it */ }); draw(); return; }
-      if (target !== VOLUME) { target = VOLUME; ramp(VOLUME, FADE_IN); }
+      if (target !== vol) { target = vol; ramp(vol, FADE_IN); }
     } else if (ctx) {
       promoStop();   // the music is going quiet: the advert goes with it
       if (target !== 0) { target = 0; if (ctx.state === 'running') ramp(0, document.hidden ? 0.05 : FADE_OUT); }

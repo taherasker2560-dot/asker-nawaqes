@@ -111,12 +111,24 @@
     return TEXTS.installOther;
   }
   // The quiet music (store/music.js, loaded after this file; owner 2026-11-19: «موسيقى بصوت هادي شويه، ضعيف وهادي، اهدى، حاجة ما تبقاش مزعجة وبس … مش عايز لا بيع ولا طلب الدواء ولا الكلام ده كله»):
-  // only the four slowest pieces (84-96 bpm, soft keys and vibes), about a third quieter than the store's, NO spoken advert, its own «stopped» memory, and the owner's phone hears it too (his look).
-  const MUSIC = { volume: 0.11, tracks: ['07-dreamy.mp3', '05-smooth.mp3', '03-chill-pop.mp3', '01-bossa.mp3'], key: 'asker_vendor_music_off', promo: false, pharmacyToo: true };
-  const api = { KEY, tokenFromHash, tokenFromSearch, money, balanceWords, afterText, parseAt, dayLabel, expText, codeText, qtyText, lineValue, shownAmount, rangeArgs, picOf, manifestFor, isIos, installSteps, TEXTS, KIND, MUSIC };
+  // only the four slowest pieces (84-96 bpm, soft keys and vibes), NO spoken advert, its own «stopped» memory, and the owner's phone hears it too (his look).
+  // The level (owner 2026-11-19: «خليها متوسطة … واعمل أوبشن برضو للتعلية والتوطية»): medium = the store's own level (60 on the slider = gain 0.18), and a volume option like the system's own (ar/music.js):
+  // a slider 10..100 squared (so the low half has fine steps), remembered ON THAT PHONE under its own key.
+  const LEVEL_KEY = 'asker_vendor_music_vol', LEVEL_MIN = 10, LEVEL_MAX = 100, LEVEL_DEFAULT = 60, GAIN_MAX = 0.5, VOL_TEXT = 'صوت الموسيقى';
+  function cleanLevel(v) {
+    if (v == null || v === '') return LEVEL_DEFAULT;
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(LEVEL_MAX, Math.max(LEVEL_MIN, n)) : LEVEL_DEFAULT;
+  }
+  function levelGain(p) { const x = cleanLevel(p) / 100; return Math.round(GAIN_MAX * x * x * 1e4) / 1e4; }
+  const MUSIC = { volume: levelGain(LEVEL_DEFAULT), tracks: ['07-dreamy.mp3', '05-smooth.mp3', '03-chill-pop.mp3', '01-bossa.mp3'], key: 'asker_vendor_music_off', promo: false, pharmacyToo: true };
+  const api = { KEY, tokenFromHash, tokenFromSearch, money, balanceWords, afterText, parseAt, dayLabel, expText, codeText, qtyText, lineValue, shownAmount, rangeArgs, picOf, manifestFor, isIos, installSteps, TEXTS, KIND, MUSIC, cleanLevel, levelGain, LEVEL_KEY, LEVEL_MIN, LEVEL_MAX, LEVEL_DEFAULT, VOL_TEXT };
   root.AskerSupplierLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
+  let level = LEVEL_DEFAULT;
+  try { level = cleanLevel(root.localStorage.getItem(LEVEL_KEY)); } catch (e) { /* private mode: the medium level */ }
+  MUSIC.volume = levelGain(level);
   root.AskerStore = Object.assign(root.AskerStore || {}, { music: MUSIC });
 
   // ---------- the page ----------
@@ -277,6 +289,37 @@
     guide.textContent = installSteps(nav.userAgent, nav.platform, nav.maxTouchPoints);
     guide.hidden = false;
   }
+  // ---------- the volume option (a second quiet button next to the music's own, a small slider that folds away by itself) ----------
+  const ICON_VOL = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 8h4M13 8h8M3 16h9M18 16h3" /><circle cx="10" cy="8" r="2.6" /><circle cx="15" cy="16" r="2.6" /></svg>';
+  const ICON_LOW = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /></svg>';
+  const ICON_HIGH = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></svg>';
+  function volumeOption() {
+    const m = root.AskerStoreMusic;
+    if (!m || typeof m.setGain !== 'function' || (m.mode && m.mode() === 'none')) return;   // no sound engine: nothing to lower
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'mus-btn mus-vol-btn noprint'; btn.id = 'spVol'; btn.innerHTML = ICON_VOL;
+    btn.setAttribute('aria-label', VOL_TEXT); btn.setAttribute('title', VOL_TEXT); btn.setAttribute('aria-expanded', 'false');
+    const pop = document.createElement('div');
+    pop.className = 'mus-pop noprint'; pop.id = 'spVolPop'; pop.hidden = true; pop.setAttribute('dir', 'ltr');   // low -> high from left to right
+    pop.innerHTML = ICON_LOW + `<input type="range" id="spVolRange" min="${LEVEL_MIN}" max="${LEVEL_MAX}" step="5" aria-label="${VOL_TEXT}">` + ICON_HIGH;
+    const range = pop.querySelector('input'); range.value = String(level);
+    let timer = null;
+    const close = () => { clearTimeout(timer); timer = null; pop.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    const kick = () => { clearTimeout(timer); timer = setTimeout(close, 6000); };
+    btn.addEventListener('click', () => { if (pop.hidden) { range.value = String(level); pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); kick(); } else close(); });
+    range.addEventListener('input', () => {
+      level = cleanLevel(Number(range.value));
+      store.set(LEVEL_KEY, String(level));
+      m.setGain(levelGain(level));
+      kick();
+    });
+    document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    document.body.appendChild(btn); document.body.appendChild(pop);
+  }
+  // store/music.js runs right after this file and builds its own button; the option goes next to it once the page has loaded
+  if (document.readyState === 'complete') volumeOption(); else root.addEventListener('load', volumeOption);
+
   // ---------- wiring ----------
   document.addEventListener('click', (e) => {
     const k = e.target.closest('[data-sp-kind]');

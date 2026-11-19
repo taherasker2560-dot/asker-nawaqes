@@ -56,10 +56,15 @@ body { margin: 0; background: #f4f5f8; color: var(--ink); font-family: "Segoe UI
 .mus-btn::before { content: ''; position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 1px solid var(--line); }
 .mus-btn svg { position: relative; width: 15px; height: 15px; fill: none; stroke: var(--mut); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mus-btn:hover, .mus-btn:focus-visible { opacity: 0.95; }
+.mus-vol-btn { bottom: calc(50px + env(safe-area-inset-bottom, 0px)); }
+.mus-pop { position: fixed; z-index: 9; inset-inline-start: 52px; bottom: calc(44px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.mus-pop[hidden] { display: none; }
+.mus-pop svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--mut); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mus-pop input[type=range] { width: 150px; margin: 0; accent-color: var(--o); }
 [hidden] { display: none !important; }
 @media print {
   body { background: #fff; }
-  .noprint, .mus-btn { display: none !important; }
+  .noprint, .mus-btn, .mus-pop { display: none !important; }
   .sp { max-width: none; }
   .sp-head { background: #fff; color: #000; border-bottom: 2px solid var(--o); }
   .mv { break-inside: avoid; }
