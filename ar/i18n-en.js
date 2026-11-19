@@ -4,6 +4,8 @@
 window.AskerEN = {
  "exact": {
  "دعم من صاحب المنشأة": "Support from the owner",
+"اتصلّح بدعم": "Corrected with owner support",
+"الأمر كان": "the order was",
  "لصاحب المنشأة": "To the owner",
  "لصاحب المنشأة (30 يوم)": "To the owner (30 days)",
  "{0} مرة": "{0} times",
