@@ -70,6 +70,25 @@ assert.equal(S.LEVEL_KEY, 'asker_vendor_music_vol', 'its own key, not the system
 assert.equal(S.MUSIC.promo, false, 'no spoken advert, no selling');
 assert.equal(S.MUSIC.pharmacyToo, true);
 assert.equal(S.MUSIC.key, 'asker_vendor_music_off', 'not the store\'s «stopped» memory');
+// the install box (owner 2026-11-19: «ليه ما عملتش لما ابعت الصفحة فيها مكان لتثبيت الابلكيشن»): one tap, as on the customers' account
+const CHROME = 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36';
+const SAMSUNG = 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 SamsungBrowser/23.0 Chrome/115.0 Mobile Safari/537.36';
+const FIREFOX = 'Mozilla/5.0 (Android 13; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0';
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1';
+assert.equal(S.installPlan(CHROME, 'Linux armv8l', 5, true, false), 'prompt', 'Chrome offers it: one tap installs');
+assert.equal(S.installPlan(CHROME, 'Linux armv8l', 5, false, false), 'steps', 'Chrome with no offer: the written steps');
+assert.equal(S.installPlan(FIREFOX, 'Linux armv8l', 5, false, false), 'chrome', 'another Android browser: the page opens in Chrome');
+assert.equal(S.installPlan(FIREFOX, 'Linux armv8l', 5, false, true), 'steps', 'already handed over and still no Chrome offer: the steps');
+assert.equal(S.installPlan(SAMSUNG, 'Linux armv8l', 5, true, false), 'chrome', 'Samsung Internet\'s own install is blocked by Play Protect: always Chrome');
+assert.equal(S.installPlan(IPHONE, 'iPhone', 5, false, false), 'guide', 'an iPhone: the big guide');
+assert.equal(S.offerChrome(FIREFOX) && S.offerChrome(SAMSUNG) && !S.offerChrome(CHROME) && !S.offerChrome(IPHONE), true);
+const intent = S.chromeIntent('https://pharmacy.example/app/supplier.html#v=' + TOKEN, TOKEN);
+assert.ok(intent.startsWith('intent://pharmacy.example/app/supplier.html?v=' + TOKEN + '&install=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url='), intent);
+assert.ok(decodeURIComponent(intent.split('S.browser_fallback_url=')[1]).startsWith('https://pharmacy.example/app/supplier.html?v=' + TOKEN + '&install=1;end'));
+assert.equal(S.dropParams('?v=' + TOKEN + '&install=1'), '');
+assert.equal(S.dropParams('?x=1&v=' + TOKEN + '&install=1'), '?x=1');
+assert.equal(S.dropParams(''), '');
+assert.equal(S.tokenFromSearch('?v=' + TOKEN + '&install=1'), TOKEN);
 // the page's own words never say «بوت»
 for (const t of Object.values(S.TEXTS)) assert.doesNotMatch(t, /بوت/);
 
