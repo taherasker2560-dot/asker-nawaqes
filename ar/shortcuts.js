@@ -280,7 +280,14 @@
       `<p class="hint">اللي هنا ظاهر في الرئيسية بالترتيب ده: الأسهم بترتّبهم، و✕ بيشيل الزرار. وفي الرئيسية نفسها دوس دوسة طويلة على أي زرار واسحبه لمكانه.</p>` +
       (onRows || '<p class="hint">مفيش زراير في الرئيسية. ضيف من تحت.</p>') +
       (rest ? `<h3 class="qa-more">ضيف من الأقسام</h3>` + (full ? `<p class="hint">الرئيسية فيها ${MAX} زرار. شيل واحد الأول عشان تضيف.</p>` : '') + rest : '') +
+      keyRow() +
       `<div class="bg-sheet-btns"><button type="button" id="qaDone">تمام</button><button type="button" class="secondary" id="qaReset">رجّع الأصلي</button></div></div>`;
+  }
+  // «مفتاح التطبيقات» (ar/work-apps.js, apps-android/): the one-tap helper for the work apps, Android only
+  function keyRow() {
+    const W = root.AskerWorkApps;
+    if (!W || !W.android()) return '';
+    return `<p class="hint qa-key">${esc(W.TEXTS.keyHint)} <a id="qaKeyApk" href="${esc(W.KEY_APK)}" rel="noopener">${esc(W.TEXTS.keyLink)}</a></p>`;
   }
   function openSheet() { drawSheet(); $('qaSheet').classList.remove('hidden'); }
   function closeSheet() { $('qaSheet')?.classList.add('hidden'); }

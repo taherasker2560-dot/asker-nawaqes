@@ -4,8 +4,9 @@
    - Inside the work the app opens with the thing ready ON THE CLIPBOARD: an order «انسخ وافتح ابن سينا / فارما», an item «دراج آي» / «الجرعات»
      (its name), a payment «إنستا باي» (the amount). Any element with data-app="<id>" (and data-copy="<text>") does it.
    - How it opens, on Android (the owner's phone): a page cannot start another app's own screen (Chrome only starts links an app agreed to take), so
-     an app that takes a link (WhatsApp Business: whatsapp://send) opens straight; any other app opens on its Google Play page, where Android's own
-     «فتح» button starts it (and «تثبيت» when it is not on the phone). The phone's own check of each app (adb) is in the PR.
+     an app that takes a link (WhatsApp Business: whatsapp://send) opens straight; any other app is handed to «مفتاح التطبيقات» (apps-android/, the
+     owner's small app, «أ، اعمله» 2026-11-19), which starts it: one tap. A phone without that app follows the link's fallback: the app's Google Play
+     page, whose «فتح» starts it. The sheet «✏️ عدّل الزراير» has its download link (Android only).
    - On a computer the apps are not there: WhatsApp Business opens WhatsApp Web; the others say so in one line.
    Nothing here reads inside those apps, pays, orders or sends anything: it opens them and hands them text. */
 (function (root) {
@@ -28,7 +29,10 @@
     copied: '✅ اتنسخ {what}.',
     paste: 'الصق جوه التطبيق.',
     opened: '{app} اتفتح.',
-    store: '{app} بيفتح من صفحته في جوجل بلاي: دوس «فتح».',
+    // through «مفتاح التطبيقات» (one tap) or, on a phone without it, its Google Play page (then «فتح»): the page cannot tell which
+    store: '{app} بيفتح.',
+    keyHint: '🔑 عشان كل تطبيق يفتح بدوسة واحدة، نزّل «مفتاح التطبيقات» مرة واحدة على موبايلك (أندرويد بس). من غيره التطبيق بيفتح من صفحته في جوجل بلاي وتدوس «فتح».',
+    keyLink: 'نزّل «مفتاح التطبيقات»',
     noCopy: 'مقدرتش أنسخ، انسخ بإيدك.',
   };
   const fill = (t, o) => t.replace(/\{(\w+)\}/g, (_, k) => String(o[k] == null ? '' : o[k]));
@@ -37,12 +41,15 @@
   const PKG = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i;
   // the link that opens an app on Android: straight when it takes a link, otherwise its Google Play page (Android's «فتح» starts it)
   const storeWeb = (pkg) => 'https://play.google.com/store/apps/details?id=' + pkg;
+  // «مفتاح التطبيقات» (apps-android/, owner 2026-11-19 «أ، اعمله»): the owner's small Android app that starts any app it is asked for, so one tap opens it
+  const KEY_PKG = 'com.askerpharmacy.apps';
+  const KEY_APK = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk';
   function intentFor(app) {
     if (!app || !PKG.test(app.pkg || '')) return '';
     const m = /^([a-z][a-z0-9+.-]*):\/\/(.*)$/i.exec(app.link || '');
     if (m) return `intent://${m[2]}#Intent;scheme=${m[1]};package=${app.pkg};S.browser_fallback_url=${encodeURIComponent(storeWeb(app.pkg))};end`;
-    // the app's own page in the Play Store app (market://details, which the store takes from a page): its «فتح» opens it, «تثبيت» when it is missing
-    return `intent://details?id=${app.pkg}#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=${encodeURIComponent(storeWeb(app.pkg))};end`;
+    // «مفتاح التطبيقات» starts the app itself (one tap); a phone without it follows the fallback: the app's Google Play page, whose «فتح» opens it
+    return `intent://open?pkg=${app.pkg}#Intent;scheme=askerapps;package=${KEY_PKG};S.browser_fallback_url=${encodeURIComponent(storeWeb(app.pkg))};end`;
   }
   // what a tap does on this device: { url } to go to, or { say } when there is nothing to open here
   function plan(id, android) {
@@ -71,7 +78,7 @@
   }
   // the apps a supplier's order can be pasted into (ar/order-drafts.js supplier ids)
   const ORDER_APP = { IBNSINA: 'ibnsina', PHARMA: 'pharma' };
-  const api = { APPS, BY_ID, TEXTS, ORDER_APP, intentFor, plan, note, brandOf, fill };
+  const api = { APPS, BY_ID, TEXTS, ORDER_APP, KEY_PKG, KEY_APK, intentFor, plan, note, brandOf, fill };
   root.AskerWorkAppsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -112,5 +119,5 @@
     open(b.dataset.app, b.dataset.copy || '', b.dataset.copyWhat || '');
   });
   // go = how an Android link is followed (inside the tap; the browser tests put a recorder here)
-  root.AskerWorkApps = { open, android: isAndroid, brandOf, ORDER_APP, go: (url) => { root.location.href = url; }, plan: (id) => plan(id, isAndroid()), label: (id) => (BY_ID[id] ? BY_ID[id].label : '') };
+  root.AskerWorkApps = { open, android: isAndroid, brandOf, ORDER_APP, TEXTS, KEY_APK, go:(url) => { root.location.href = url; }, plan: (id) => plan(id, isAndroid()), label: (id) => (BY_ID[id] ? BY_ID[id].label : '') };
 })(typeof window === 'undefined' ? globalThis : window);
