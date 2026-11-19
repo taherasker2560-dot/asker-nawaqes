@@ -159,6 +159,8 @@
         chunked('ar_vendors', 'id,name,short', found.map((x) => x.vendor_id)),
         chunked('ar_store_items', 'id,name,arabic_name', found.map((x) => x.item)),
       ]);
+      // the lines he already marked «return» (ar/return-marks.js): read before the list is drawn, never a reason for the list to fail
+      try { await root.AskerReturnMarks?.ensure?.(); } catch (e) { /* the list stays without marks */ }
       if (my !== seq) return;
       vendors = new Map(vs.map((v) => [String(v.id), v])); items = new Map(its.map((x) => [String(x.id), x]));
       rows = { list: found, invoices: (p.data || []).length, stockKnown }; loadedAt = Date.now();
@@ -167,13 +169,34 @@
       rows = null; failed = missing(e) ? 'الموردين لسه مش متاحين على السيرفر.' : 'مقدرتش أجيب الفواتير: ' + (e && e.message);
     } finally { if (my === seq) { loading = false; draw(); } }
   }
+  // the line a tap on «↩️ إرجاع» belongs to (its key = invoice + item + expiry), what is typed in the box, the message under it
+  const retKey = (q) => `${q.move}:${q.item}:${q.x || ''}`;
+  const lineOf = (key) => (rows && rows.list.find((q) => retKey(q) === key)) || null;
+  let retOpen = '', retQty = '', retNote = '';
+  // «↩️ إرجاع» (the owner only, ar/return-marks.js): the button, the box that asks how many boxes, or the mark that is already on the line
+  function retBlock(q) {
+    const RM = root.AskerReturnMarks, L = root.AskerReturnMarksLib;
+    if (!RM || !RM.canMark()) return '';
+    const key = retKey(q), m = RM.markOf(q);
+    if (m) {
+      const prepared = m.status === 'prepared';
+      return `<div class="sd-ret"><span class="rm-chip ${prepared ? 'prepared' : 'marked'}">${prepared ? '✓ اتجهّز للإرجاع' : '↩️ مطلوب إرجاعه'} · ${esc(L.boxesText(m.units, m.k))}</span>` +
+        `<button type="button" class="secondary" data-sd-unmark="${esc(m.id)}">شيل العلامة</button></div>`;
+    }
+    if (retOpen === key) {
+      return `<div class="sd-ret"><label>كام علبة؟ <input type="text" inputmode="decimal" dir="ltr" size="4" value="${esc(retQty)}" data-sd-qty></label>` +
+        `<button type="button" data-sd-ret-ok="${esc(key)}">علّم للإرجاع</button><button type="button" class="secondary" data-sd-ret-x>إلغاء</button>` +
+        (retNote ? `<span class="status bad">${esc(retNote)}</span>` : '') + '</div>';
+    }
+    return `<div class="sd-ret"><button type="button" class="secondary" data-sd-ret="${esc(key)}">↩️ إرجاع</button></div>`;
+  }
   function row(q) {
     const it = items.get(String(q.item)) || {}, v = vendors.get(String(q.vendor_id));
     const cls = q.months < 6 ? ' red' : q.months < 12 ? ' amber' : '';
     return `<div class="sd-row${cls}"><div class="sd-main"><span class="sd-name notr" dir="auto">${esc(it.arabic_name || it.name || '#' + q.item)}</span>` +
       (it.arabic_name && it.name ? `<small class="notr" dir="ltr">${esc(it.name)}</small>` : '') +
       // what he needs to send it back: the supplier, the supplier's invoice number and the day the item was entered (with the year)
-      `<small class="sd-doc">${v ? `<bdi class="notr">${esc(v.short || v.name)}</bdi> · ` : ''}${q.code ? `<span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invoiceNo(q.code))}</bdi> · ` : ''}<span>اتدخلت</span> <bdi class="notr" dir="ltr">${esc(fullDayText(q.at))}</bdi></small></div>` +
+      `<small class="sd-doc">${v ? `<bdi class="notr">${esc(v.short || v.name)}</bdi> · ` : ''}${q.code ? `<span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invoiceNo(q.code))}</bdi> · ` : ''}<span>اتدخلت</span> <bdi class="notr" dir="ltr">${esc(fullDayText(q.at))}</bdi></small>${retBlock(q)}</div>` +
       `<div class="sd-exp"><b dir="ltr">${esc(expText(q.x))}</b><small>${esc(monthsText(q.months))}</small><small>${esc(leftText(q))}</small></div></div>`;
   }
   function draw() {
@@ -189,18 +212,34 @@
         `<p class="hint">حوالي ${Math.round(packs)} علبة في ${rows.list.length} سطر.</p>`;
     }
     const warn = rows && rows.stockKnown === false ? '<p class="status bad">مقدرتش أقرأ المخزون دلوقتي، فالقايمة ممكن يكون فيها صنف اتباع.</p>' : '';
-    box.innerHTML = '<p class="hint">الأصناف اللي دخلت فواتير الشرا (يعني وافقت عليها) ومارجعتهاش للمورد، وصلاحيتها أقل من سنة وست شهور، الأقصر صلاحية الأول. اللي اترجع للمورد أو اتباع أو جه بعده نفس الصنف بتاريخ أبعد بيتشال من هنا، واللي اتباع منه جزء بيظهر اللي فاضل.</p>' + warn + chips + body;
+    box.innerHTML = '<p class="hint">الأصناف اللي دخلت فواتير الشرا (يعني وافقت عليها) ومارجعتهاش للمورد، وصلاحيتها أقل من سنة وست شهور، الأقصر صلاحية الأول. اللي اترجع للمورد أو اتباع أو جه بعده نفس الصنف بتاريخ أبعد بيتشال من هنا، واللي اتباع منه جزء بيظهر اللي فاضل. وتقدر تعلّم أي صنف «↩️ إرجاع» عشان يروح لبيان المرتجعات.</p>' + warn + chips + body;
   }
   // called by ar/alerts.js when the view «قصيرة» is the open one
   function show(el) {
     box = el;
     if (!box.dataset.sdBound) {
       box.dataset.sdBound = '1';
-      box.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-sd-period]');
-        if (!b) return;
-        period = b.dataset.sdPeriod; load();
+      box.addEventListener('click', async (e) => {
+        const t = e.target, b = t.closest('[data-sd-period]'), op = t.closest('[data-sd-ret]'), ok = t.closest('[data-sd-ret-ok]'), no = t.closest('[data-sd-ret-x]'), un = t.closest('[data-sd-unmark]');
+        const RM = root.AskerReturnMarks;
+        if (b) { period = b.dataset.sdPeriod; load(); return; }
+        // «↩️ إرجاع»: ask how many boxes (what is left by default), then mark the lot (ar/return-marks.js, the owner only)
+        if (op) { const q = lineOf(op.dataset.sdRet); retOpen = op.dataset.sdRet; retQty = q ? String(Math.round(q.left / q.k * 100) / 100) : ''; retNote = ''; draw(); return; }
+        if (no) { retOpen = ''; retNote = ''; draw(); return; }
+        if (ok && RM) {
+          const q = lineOf(ok.dataset.sdRetOk);
+          const boxes = Number(String(retQty).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(',', '.').replace('٫', '.'));
+          if (!q) return;
+          if (!(boxes > 0)) { retNote = 'اكتب عدد العلب اللي هترجعها.'; draw(); return; }
+          const units = Math.round(boxes * q.k * 100) / 100;
+          if (units > q.left + 0.001) { retNote = 'أكبر من اللي فاضل.'; draw(); return; }
+          const res = await RM.mark(q, units);
+          if (res.ok) { retOpen = ''; retNote = ''; } else retNote = RM.errText(res.error);
+          draw(); return;
+        }
+        if (un && RM) { const res = await RM.unmark(un.dataset.sdUnmark); retNote = res.ok ? '' : RM.errText(res.error); draw(); }
       });
+      box.addEventListener('input', (e) => { if (e.target.matches('[data-sd-qty]')) retQty = e.target.value; });
     }
     if (!loading && (!rows || Date.now() - loadedAt > 120000)) load(); else draw();
   }
