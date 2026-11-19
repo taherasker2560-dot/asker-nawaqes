@@ -10,7 +10,9 @@
    6) the list of what a button can open also has the new screens that live inside a section (المستخدمين، إعدادات الموقع، أصناف جديدة، مقارنة الطلبيات، فاتورة المندوب، كشف المرتجعات):
       such a button opens the section and scrolls to that screen.
    7) the work apps on his phone (owner 2026-11-19, ar/work-apps.js: واتساب بيزنس، الكاميرات، ابن سينا، فارما، دراج آي، الجرعات، إنستا باي) are buttons too:
-      their button carries data-app (the app opens) instead of data-go (a section). */
+      their button carries data-app (the app opens) instead of data-go (a section).
+   8) «ألوان الأقسام» (owner 2026-11-19, ar/look.css): each button carries data-sec (the section it belongs to: purchases / accounts / home / sales / care) and wears that
+      section's shade of the system color; a work app has a thick border in the shade of the section it serves. */
 (function (root) {
   'use strict';
   const MAX = 30;
@@ -70,6 +72,10 @@
   // a work app on the phone (ar/work-apps.js opens it): the button carries data-app instead of a section
   const APP_OF = Object.fromEntries(ALL.filter((x) => x[6]).map((x) => [x[0], x[6]]));
   const GROUPS = [...new Set(ALL.map((x) => x[2]))];
+  // «ألوان الأقسام» (owner 2026-11-19, ar/look.css): the section a button belongs to decides its shade of the system color; a work app wears the shade of the section it serves
+  const SEC_OF_GROUP = { 'المشتريات': 'purchases', 'الحسابات': 'accounts', 'المبيعات': 'sales', 'خدمة العملاء': 'care', 'الرئيسية': 'home' };
+  const APP_SEC = { wab: 'care', cams: 'home', ibnsina: 'purchases', pharma: 'purchases', drugeye: 'home', doses: 'home', instapay: 'accounts' };
+  const SEC = Object.fromEntries(ALL.map((x) => [x[0], x[6] ? APP_SEC[x[6]] || 'home' : SEC_OF_GROUP[x[2]] || 'home']));
 
   // ---------- pure helpers (tests/home-shortcuts.cjs) ----------
   // known sections only, each once, at most 30
@@ -98,7 +104,7 @@
     [out[i], out[j]] = [out[j], out[i]];
     return out;
   }
-  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, clean, parse, toggle, move };
+  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, SEC, APP_SEC, clean, parse, toggle, move };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -117,7 +123,7 @@
     const box = document.querySelector('#homePanel .qa');
     if (!box) return;
     // data-go = the section it opens, data-qa = which button it is (the order after a drag is read from these), data-anchor = the block to scroll to
-    box.innerHTML = mine.map((t) => `<button type="button" ${APP_OF[t] ? `data-app="${APP_OF[t]}" class="qa-app"` : `data-go="${TAB_OF[t]}"`} data-qa="${t}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
+    box.innerHTML = mine.map((t) => `<button type="button" ${APP_OF[t] ? `data-app="${APP_OF[t]}" class="qa-app"` : `data-go="${TAB_OF[t]}"`} data-qa="${t}" data-sec="${SEC[t]}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
     box.classList.toggle('qa-none', !mine.length);
   }
 
@@ -137,7 +143,7 @@
     const r = p.el.getBoundingClientRect();
     const ghost = p.el.cloneNode(true);
     ghost.classList.add('qa-ghost');
-    ['data-go', 'data-qa', 'data-anchor', 'data-app'].forEach((a) => ghost.removeAttribute(a));
+    ['data-go', 'data-qa', 'data-anchor', 'data-app'].forEach((a) => ghost.removeAttribute(a)); // (data-sec stays: the copy keeps its color)
     ghost.setAttribute('aria-hidden', 'true');
     ghost.tabIndex = -1;
     ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:60;pointer-events:none`;

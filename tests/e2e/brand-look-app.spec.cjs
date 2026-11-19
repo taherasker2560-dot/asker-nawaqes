@@ -26,8 +26,9 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);
  assert.equal(look.navBg,'rgb(255, 255, 255)');assert.equal(look.navPos,'fixed');assert.equal(look.navBottom,'0px','the bar is docked');
  assert.equal(look.navRadius,'0px','and flat');
- assert.equal(look.onGroup,'home');assert.equal(look.onBg,'rgba(0, 0, 0, 0)','the section you are in is not a filled pill');
- assert.ok(contrast(look.onColor,'rgb(255, 255, 255)')>=4.5,'and it reads in the accent: '+look.onColor);
+ // since 2026-11-19 (owner: five shades of the system color, tests/e2e/section-colors.spec.cjs) every section of the bar is a filled segment of its own shade; «الرئيسية» is the system color itself
+ assert.equal(look.onGroup,'home');assert.notEqual(look.onBg,'rgba(0, 0, 0, 0)','the section you are in is a filled segment of its shade');
+ assert.ok(contrast(look.onColor,look.onBg)>=4.5,'and its white words read on it: '+look.onColor+' on '+look.onBg);
  assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'999px','and they stay oval (owner 2026-11-17)');
  assert.equal(look.card,'2px');
  assert.equal(look.accent,'#c0522a','the calm orange by default');
