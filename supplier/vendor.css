@@ -51,10 +51,15 @@ body { margin: 0; background: #f4f5f8; color: var(--ink); font-family: "Segoe UI
 .sp-btn { flex: 1; text-align: center; padding: 10px 6px; border-radius: 12px; border: 1.5px solid var(--o); color: var(--o2); font: inherit; font-weight: 700; font-size: 13px; background: #fff; cursor: pointer; }
 .sp-btn.fill { background: var(--o); color: #fff; }
 .sp-btn:disabled { opacity: .6; }
+/* the quiet music's button (store/music.js builds it): small, see-through, in the corner; it stops / starts the music and the phone remembers */
+.mus-btn { position: fixed; z-index: 8; inset-inline-start: 6px; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; padding: 0; border: 0; background: none; opacity: 0.45; cursor: pointer; display: grid; place-items: center; -webkit-tap-highlight-color: transparent; transition: opacity 0.2s; }
+.mus-btn::before { content: ''; position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 1px solid var(--line); }
+.mus-btn svg { position: relative; width: 15px; height: 15px; fill: none; stroke: var(--mut); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mus-btn:hover, .mus-btn:focus-visible { opacity: 0.95; }
 [hidden] { display: none !important; }
 @media print {
   body { background: #fff; }
-  .noprint { display: none !important; }
+  .noprint, .mus-btn { display: none !important; }
   .sp { max-width: none; }
   .sp-head { background: #fff; color: #000; border-bottom: 2px solid var(--o); }
   .mv { break-inside: avoid; }

@@ -163,4 +163,19 @@ assert.equal(M.promoGain(0,-27,0.3),0.3,'the level is unknown: the fallback');
 assert.equal(M.promoGain(0.001,-27,0.3),1,'a very quiet file is never boosted past the file itself');
 assert.equal(M.promoGain(5,-27,0.3),0.05,'and never made nearly silent');
 assert.equal(M.PROMO.targetDb,-27);
+// a page's own mix (the suppliers' page, owner 2026-11-19): read once when the file loads, from window.AskerStore.music; the store passes nothing and stays as it was
+{
+ const file=require.resolve('../store/music.js'),kept=globalThis.AskerStore;
+ delete require.cache[file];
+ globalThis.AskerStore={music:{volume:0.11,tracks:['07-dreamy.mp3','nothing.mp3','05-smooth.mp3'],key:'k_off',promo:false,pharmacyToo:true}};
+ const X=require('../store/music.js');
+ assert.equal(X.VOLUME,0.11);assert.deepEqual(X.TRACKS.map(t=>t.file),['07-dreamy.mp3','05-smooth.mp3'],'its own pieces in its order, unknown names ignored');
+ assert.equal(X.KEY,'k_off');assert.equal(X.PROMO.on,false,'no spoken advert');
+ delete require.cache[file];globalThis.AskerStore={music:{volume:5,tracks:['x.mp3'],key:''}};
+ const Y=require('../store/music.js');
+ assert.equal(Y.VOLUME,0.18,'a bad volume falls back');assert.equal(Y.TRACKS.length,8,'no known piece asked: all eight');assert.equal(Y.KEY,'asker_store_music_off');assert.equal(Y.PROMO.on,true);
+ delete require.cache[file];delete globalThis.AskerStore;
+ const Z=require('../store/music.js');assert.equal(Z.VOLUME,0.18);assert.equal(Z.TRACKS.length,8);assert.equal(Z.PROMO.on,true);assert.equal(Z.KEY,'asker_store_music_off');
+ if(kept!==undefined)globalThis.AskerStore=kept;
+}
 console.log('store-music ok');

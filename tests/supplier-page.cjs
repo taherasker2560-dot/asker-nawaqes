@@ -53,6 +53,19 @@ assert.ok(man.icons.every((i) => i.src.startsWith('https://pharmacy.example/app/
 assert.match(S.installSteps('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', 'iPhone', 5), /زرار المشاركة/);
 assert.match(S.installSteps('Mozilla/5.0 (Linux; Android 13) Chrome/120.0 Mobile Safari/537.36', 'Linux armv8l', 5), /تثبيت التطبيق/);
 assert.match(S.installSteps('Mozilla/5.0 (Android 13; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0', 'Linux armv8l', 5), /تثبيت/);
+// the quiet music (owner 2026-11-19: «موسيقى بصوت هادي شويه، ضعيف وهادي، اهدى … مش عايز لا بيع ولا طلب الدواء ولا الكلام»): the four SLOWEST pieces, softer than the store's, no spoken advert,
+// its own «stopped» memory, and the owner's phone hears it too
+const fs = require('node:fs'), path = require('node:path');
+const score = fs.readFileSync(path.join(__dirname, '..', 'tools', 'music', 'score.js'), 'utf8');
+const bpmOf = Object.fromEntries([...score.matchAll(/name: '([a-z ]+)', bpm: (\d+)/g)].map((m) => [m[1].replace(/ /g, '-'), +m[2]]));
+const index = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'store', 'music', 'index.json'), 'utf8'));
+const slowest = index.slice().sort((a, b) => bpmOf[a.id] - bpmOf[b.id]).slice(0, 4).map((p) => p.file).sort();
+assert.deepEqual(S.MUSIC.tracks.slice().sort(), slowest, 'the four slowest pieces: ' + slowest.join(', '));
+assert.ok(Math.max(...S.MUSIC.tracks.map((f) => bpmOf[index.find((p) => p.file === f).id])) <= 96, 'none faster than 96 bpm');
+assert.ok(S.MUSIC.volume > 0.05 && S.MUSIC.volume < 0.18, 'quieter than the store (0.18) but not silent: ' + S.MUSIC.volume);
+assert.equal(S.MUSIC.promo, false, 'no spoken advert, no selling');
+assert.equal(S.MUSIC.pharmacyToo, true);
+assert.equal(S.MUSIC.key, 'asker_vendor_music_off', 'not the store\'s «stopped» memory');
 // the page's own words never say «بوت»
 for (const t of Object.values(S.TEXTS)) assert.doesNotMatch(t, /بوت/);
 

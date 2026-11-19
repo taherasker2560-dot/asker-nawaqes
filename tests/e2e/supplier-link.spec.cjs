@@ -163,3 +163,66 @@ run('Supplier link: a dead link, no link, the owner\'s own look, many moves (old
  assert.equal(await page.$$eval('#spMoves .mv',x=>x.length),40);
  assert.equal(await page.$$eval('#spMoves .mv .lines',x=>x.length),40,'every invoice is open when printed');
 });
+
+// The quiet music on his page (owner 2026-11-19: «موسيقى بصوت هادي شويه، ضعيف وهادي، اهدى، حاجة ما تبقاش مزعجة وبس … مش عايز لا بيع ولا طلب الدواء ولا الكلام ده كله»).
+// The sound engine and the audio element are small fakes that, like Chrome, refuse to start before a touch (as in store-music.spec.cjs): what is tested is OUR logic.
+const AUDIO=()=>{
+ let gesture=false;
+ ['pointerdown','touchend','click','keydown'].forEach(n=>addEventListener(n,()=>{gesture=true},true));
+ window.__audio={ramps:[],srcs:[],plays:0};window.__fetches=[];
+ const f=window.fetch.bind(window);window.fetch=(...a)=>{window.__fetches.push(String(a[0]&&a[0].url||a[0]));return f(...a)};
+ class P{constructor(v){this.value=v||0}setValueAtTime(v){this.value=v}linearRampToValueAtTime(v){window.__audio.ramps.push(v)}cancelScheduledValues(){}}
+ window.AudioContext=class{constructor(){this.state='suspended';this.currentTime=0;this.destination={}}createGain(){return {connect(){},gain:new P(1)}}createMediaElementSource(){return {connect(){}}}
+  resume(){if(!gesture)return new Promise(()=>{});if(this.state!=='running'){this.state='running';Promise.resolve().then(()=>this.onstatechange&&this.onstatechange())}return Promise.resolve()}
+  suspend(){this.state='suspended';Promise.resolve().then(()=>this.onstatechange&&this.onstatechange());return Promise.resolve()}};
+ window.Audio=class extends EventTarget{constructor(){super();this.paused=true;this._a={};this._src='';this._t=0}
+  setAttribute(k,v){this._a[k]=v}getAttribute(k){return this._a[k]==null?null:this._a[k]}
+  set src(v){this._src=v;window.__audio.srcs.push(v);Promise.resolve().then(()=>this.dispatchEvent(new Event('loadedmetadata')))}get src(){return this._src}
+  set currentTime(v){this._t=v}get currentTime(){return this._t}
+  play(){window.__audio.plays++;if(!gesture)return Promise.reject(new DOMException('needs a tap first','NotAllowedError'));if(this.paused){this.paused=false;Promise.resolve().then(()=>{this.dispatchEvent(new Event('play'));this.dispatchEvent(new Event('playing'))})}return Promise.resolve()}
+  pause(){if(!this.paused){this.paused=true;Promise.resolve().then(()=>this.dispatchEvent(new Event('pause')))}}};
+};
+const SLOW=['07-dreamy.mp3','05-smooth.mp3','03-chill-pop.mp3','01-bossa.mp3'];
+const sounding=page=>page.evaluate(()=>window.AskerStoreMusic&&window.AskerStoreMusic.sounding());
+const lastRamp=page=>page.evaluate(()=>window.__audio.ramps[window.__audio.ramps.length-1]);
+
+run('Supplier link: quiet calm music only — slow pieces, soft, no spoken advert, a button that stops it and is remembered, the owner\'s phone hears it too',async({page,base})=>{
+ await seed(page);
+ await page.addInitScript(AUDIO);
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ await page.waitForFunction(()=>window.AskerStoreMusic);
+ assert.equal(await page.isVisible('.mus-btn'),true,'the quiet button is there');
+ assert.equal(await sounding(page),false,'nothing before a touch (the browser would refuse)');
+ // the first tap anywhere starts it: a slow piece, at about a third less than the store's level, and NO advert is even waiting
+ await page.click('#spBal');
+ await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ assert.equal(await lastRamp(page),0.11,'softer than the store (0.18)');
+ const src=await page.evaluate(()=>window.__audio.srcs[0]);
+ assert.ok(SLOW.some(f=>src.includes('store/music/'+f)),'one of the four slow pieces: '+src);
+ assert.deepEqual(await page.evaluate(()=>window.AskerStoreMusic.promoState()),{armed:false,playing:false,done:false},'no spoken advert');
+ await page.waitForTimeout(1500);
+ assert.equal((await page.evaluate(()=>window.__fetches)).some(u=>/asker-dose/.test(u)),false,'the voice function is never asked');
+ // the button stops it, and his own memory (not the store\'s) keeps it stopped
+ await page.click('.mus-btn');
+ await page.waitForFunction(()=>!window.AskerStoreMusic.sounding());
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_music_off')),'1');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_music_off')),null,'the store\'s memory is untouched');
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');await page.waitForFunction(()=>window.AskerStoreMusic);
+ await page.click('#spBal');
+ assert.equal(await sounding(page),false,'stopped once: it does not start by itself again');
+ await page.click('.mus-btn');
+ await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_music_off')),null);
+ // the pharmacy\'s own phone (the bot is signed in there) hears it too: it is his look at the page
+ await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"x":1}'));
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');await page.waitForFunction(()=>window.AskerStoreMusic);
+ assert.equal(await page.isVisible('#spPreview'),true);
+ assert.equal(await page.isVisible('.mus-btn'),true,'the owner hears what the supplier hears');
+ await page.click('#spBal');
+ await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
+ // the button is not printed and not in the way of the page's own buttons
+ assert.equal(await page.$eval('.mus-btn',e=>getComputedStyle(e).position),'fixed');
+});
