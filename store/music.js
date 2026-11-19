@@ -19,12 +19,16 @@
 (function (root) {
   'use strict';
 
-  const KEY = 'asker_store_music_off';
-  const VOLUME = 0.18; // of the file's level: «موجودة ومش موجودة» (owner 2026-11-17: lower than the first sample, but 0.13 was heard as nothing on a phone speaker, so 0.18; the files keep the old level)
+  // A page may ask for its own mix before this file loads: window.AskerStore.music = { volume, tracks: [files], key, promo: false, pharmacyToo: true }. The suppliers' page does (owner 2026-11-19:
+  // «الموسيقى بصوت هادي شويه، ضعيف وهادي، اهدى، حاجة ما تبقاش مزعجة وبس … مش عايز لا بيع ولا كلام»): slower pieces, quieter, no spoken advert, its own «stopped» memory, and the owner's phone hears it too.
+  // The store passes nothing, so it is exactly as it was.
+  const OPT = (root.AskerStore && root.AskerStore.music) || {};
+  const KEY = typeof OPT.key === 'string' && OPT.key ? OPT.key : 'asker_store_music_off';
+  const VOLUME = OPT.volume > 0 && OPT.volume <= 1 ? OPT.volume : 0.18; // of the file's level: «موجودة ومش موجودة» (owner 2026-11-17: lower than the first sample, but 0.13 was heard as nothing on a phone speaker, so 0.18; the files keep the old level)
   const FADE_IN = 3, FADE_OUT = 0.8; // seconds
   const BASE = 'store/music/', V = 'files-20261117a';
   // the pieces, in the order of tools/music/score.js; intro = the seconds of its quiet 8-bar intro that a visit skips (tests/store-music.cjs checks this against store/music/index.json)
-  const TRACKS = [
+  const ALL_TRACKS = [
     { file: '01-bossa.mp3', intro: 20 },
     { file: '02-soft-house.mp3', intro: 17.8 },
     { file: '03-chill-pop.mp3', intro: 20.9 },
@@ -34,6 +38,9 @@
     { file: '07-dreamy.mp3', intro: 22.9 },
     { file: '08-sunny.mp3', intro: 18.5 },
   ];
+  // a page's own pieces (by file name, in the order it lists them); anything unknown is ignored, none left = all eight
+  const picked = Array.isArray(OPT.tracks) ? OPT.tracks.map((f) => ALL_TRACKS.find((t) => t.file === f)).filter(Boolean) : [];
+  const TRACKS = picked.length ? picked : ALL_TRACKS;
   const TEXTS = {
     stop: 'وقّف الموسيقى الهادية',
     start: 'شغّل الموسيقى الهادية',
@@ -47,7 +54,7 @@
   // FREQUENCY (2026-11-18): everyDays is 0 = every visit, because the owner is testing on his family's phones («عايز لما أفتح التطبيق عند مراتي الإعلان يشتغل»): set it back to 3 (once every 3 days) when he says.
   // `file` v3 (2026-11-18): phones kept renders made while the advert was still changing (v1: a 102 s one; v2: a 52 s one in which the model READ THE ENGLISH STYLE LINE out loud, the owner heard it): v3 makes every phone fetch the clean one.
   // A TEST LINK: store.html?promo=1 plays the advert 3 s after the music sounds, whatever the 3-day rule says, and does not count as heard (the owner tests on a phone that already heard it).
-  const PROMO = { on: true, voice: 'Orus', delay: 8, everyDays: 0, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v3-orus' };
+  const PROMO = { on: OPT.promo !== false, voice: 'Orus', delay: 8, everyDays: 0, targetDb: -27, gain: 0.3, key: 'asker_store_promo_day', cache: 'asker-store-promo-v1', file: 'v3-orus' };
   const FORCE = (() => { try { return /[?&]promo=1(&|#|$)/.test(String(root.location && root.location.search)); } catch (e) { return false; } })();
   const dayKey = (d) => { const x = d || new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
   // is the advert due: never heard on this phone, or the last time was `every` days ago or more (a clock set back counts as due)
@@ -96,7 +103,7 @@
   // ---------- the player ----------
   const AC = root.AudioContext || root.webkitAudioContext;
   const store = (fn) => { try { return fn(root.localStorage); } catch (e) { return null; } }; // a private window or blocked storage: nothing remembered
-  let mode = modeOf({ pharmacy: store((ls) => isPharmacyPhone(Object.keys(ls))), off: store((ls) => ls.getItem(KEY) === '1'), supported: !!AC && typeof root.Audio === 'function' });
+  let mode = modeOf({ pharmacy: !OPT.pharmacyToo && store((ls) => isPharmacyPhone(Object.keys(ls))), off: store((ls) => ls.getItem(KEY) === '1'), supported: !!AC && typeof root.Audio === 'function' });
   api.mode = () => mode;
   if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = () => {}; root.AskerStoreMusic = api; return; }
 

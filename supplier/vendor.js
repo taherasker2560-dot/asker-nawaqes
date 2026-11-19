@@ -110,10 +110,14 @@
     if (/Chrome\//.test(u)) return TEXTS.installAndroid;
     return TEXTS.installOther;
   }
-  const api = { KEY, tokenFromHash, tokenFromSearch, money, balanceWords, afterText, parseAt, dayLabel, expText, codeText, qtyText, lineValue, shownAmount, rangeArgs, picOf, manifestFor, isIos, installSteps, TEXTS, KIND };
+  // The quiet music (store/music.js, loaded after this file; owner 2026-11-19: «موسيقى بصوت هادي شويه، ضعيف وهادي، اهدى، حاجة ما تبقاش مزعجة وبس … مش عايز لا بيع ولا طلب الدواء ولا الكلام ده كله»):
+  // only the four slowest pieces (84-96 bpm, soft keys and vibes), about a third quieter than the store's, NO spoken advert, its own «stopped» memory, and the owner's phone hears it too (his look).
+  const MUSIC = { volume: 0.11, tracks: ['07-dreamy.mp3', '05-smooth.mp3', '03-chill-pop.mp3', '01-bossa.mp3'], key: 'asker_vendor_music_off', promo: false, pharmacyToo: true };
+  const api = { KEY, tokenFromHash, tokenFromSearch, money, balanceWords, afterText, parseAt, dayLabel, expText, codeText, qtyText, lineValue, shownAmount, rangeArgs, picOf, manifestFor, isIos, installSteps, TEXTS, KIND, MUSIC };
   root.AskerSupplierLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
+  root.AskerStore = Object.assign(root.AskerStore || {}, { music: MUSIC });
 
   // ---------- the page ----------
   const $ = (id) => document.getElementById(id);
