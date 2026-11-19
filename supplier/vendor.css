@@ -1,17 +1,17 @@
-/* The supplier's statement page (supplier.html, owner 2026-11-19). One calm orange on white like the rest of the pharmacy's pages. */
-:root { --o: #c0522a; --o2: #a5421f; --soft: #fbeee7; --ink: #1d2433; --mut: #6b7280; --ok: #166534; --bad: #b91c1c; --line: #eceef3; }
+/* The supplier's statement page (supplier.html, owner 2026-11-19). One calm sky blue on white like the rest of the pharmacy's pages (2026-11-19 night: the airy look, a white header, color only in small touches). */
+:root { --o: #217bab; --o2: #175678; --soft: #ebf4f9; --ink: #1c2229; --mut: #5f6b76; --ok: #166534; --bad: #b91c1c; --line: #e1e8ee; }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: #f4f5f8; color: var(--ink); font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; line-height: 1.5; }
 .sp { max-width: 640px; margin: 0 auto; padding: 0 0 calc(24px + env(safe-area-inset-bottom)); background: #fff; min-height: 100vh; }
-.sp-head { display: flex; gap: 12px; align-items: center; background: var(--o); color: #fff; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
+.sp-head { display: flex; gap: 12px; align-items: center; background: #fff; color: var(--ink); border-bottom: 1px solid var(--line); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
 .sp-head img { border-radius: 10px; background: #fff; flex: none; }
 .sp-ph { font-size: 12.5px; opacity: .92; }
 .sp-head h1 { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.3; word-break: break-word; }
 .sp-status { margin: 14px 16px; color: var(--mut); font-size: 14px; }
 .sp-status.bad { color: var(--bad); font-weight: 700; }
 .sp-note { margin: 10px 16px 0; color: var(--mut); font-size: 12.5px; line-height: 1.8; }
-.sp-bal { margin: 12px 16px 0; background: var(--soft); border: 3px solid var(--o); border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sp-bal { margin: 12px 16px 0; background: var(--soft); border: 1px solid #cde0ea; border-radius: 14px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .sp-bal small { display: block; color: var(--mut); font-size: 12px; }
 .sp-bal b { font-size: 24px; color: var(--o2); direction: ltr; white-space: nowrap; }
 .sp-bal.ours b { color: var(--ok); }
@@ -40,7 +40,7 @@ body { margin: 0; background: #f4f5f8; color: var(--ink); font-family: "Segoe UI
 .n.pay { color: var(--ok); }
 .lines { margin-top: 6px; }
 .it { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #f0f1f4; }
-.ph { width: 46px; height: 46px; border-radius: 9px; flex: none; background: linear-gradient(135deg, #f6dccf, #efc5b2); display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden; }
+.ph { width: 46px; height: 46px; border-radius: 9px; flex: none; background: linear-gradient(135deg, #dcebf4, #c8dfee); display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden; }
 .ph img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .it .en { font-weight: 800; font-size: 13px; direction: ltr; text-align: right; word-break: break-word; }
 .it .an { color: var(--mut); font-size: 12px; }

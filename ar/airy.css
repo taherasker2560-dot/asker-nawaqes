@@ -1,0 +1,63 @@
+/* «الشكل الهادي» (owner 2026-11-19 night, the look session; mockups/home_airy_2026-11-19_sky.png, his words «هختار اللبني وعاوزك تمشي النمط ده حالا في كل تفاصيل المشروع»):
+   the page is white and has air; the color (the calm sky blue by default, ar/settings.js, whatever he picks) lives only in SMALL touches: the icons, the numbers, the main buttons,
+   the page you are on. No solid-color header, no solid-color greeting block, no five-color bar, no filled quick buttons («حاسس انه خنيق، مكلكح ومرزق»).
+   This file is the LAST stylesheet: it replaces the pieces of ar/look.css + capsule.css + brand.css that painted big blocks of color.
+   Night keeps its dark surfaces (the greeting, the bar) from the dark set; only the header, the home buttons and the marks follow this look at night too. */
+
+/* 0) cool neutrals by day (the warm beige / brown-gray of the orange days sat badly next to the blue): the lines, the quiet surfaces, the words */
+html:not(.night) { --soft-bg: #f4f7fa; --line: #e1e8ee; --muted: #55606b; --ink: #1c2229; --tint-2: #f1f6f9 !important; }
+
+/* 1) the header: white (the page's own surface), thin line, the name in ink, the icons quiet */
+html body .appbar { background: var(--card); color: var(--ink); border-bottom: 1px solid var(--line); box-shadow: none; padding-top: 8px; padding-bottom: 8px; }
+html body .appbar h1 { color: var(--ink); font-weight: 700; }
+html body .appbar p, html body .appbar .brand p { color: var(--muted); }
+html body .appbar .icon-btn { background: transparent; color: var(--muted); border: 0; box-shadow: none; }
+html body .appbar .mark { border: 0; box-shadow: none; }
+
+/* 2) the greeting: a very light tint of the color with a thin line and the ink on it (a dark surface only at night) */
+html:not(.night) body .hero, html:not(.night) body .card .hero { background: var(--rose) !important; border: 1px solid var(--rose-line); border-radius: 16px !important; box-shadow: none; }
+html:not(.night) body .hero .hello, html:not(.night) body .hero .since { color: var(--muted); opacity: 1; }
+html:not(.night) body .hero h2 { color: var(--ink); }
+html:not(.night) body .hero-link { background: var(--crimson); color: #fff; box-shadow: none; }
+html:not(.night) body .hero-link svg { color: #fff; stroke: #fff; }
+html:not(.night) body .hero-badge { box-shadow: none; }
+
+/* 3) the bottom bar: white, thin line, quiet icons; the page you are on = the color + a light pill behind its icon */
+html:not(.night) body .bottomnav { background: var(--card); border-top: 1px solid var(--line); box-shadow: none; }
+html:not(.night) body .bottomnav::before { display: none; }
+html:not(.night) body .bottomnav button, html:not(.night) body .bottomnav button.secondary { background: none; color: var(--muted); font-weight: 600; box-shadow: none; }
+html:not(.night) body .bottomnav button svg, html:not(.night) body .bottomnav:has(> button:nth-child(5)) button svg { box-sizing: content-box; width: 22px; height: 22px; padding: 3px 17px; border-radius: 999px; background: none; color: inherit; stroke: currentColor; }
+html:not(.night) body .bottomnav button:not(.secondary), html:not(.night):not(.cap-ind) body .bottomnav button:not(.secondary) { background: none; color: var(--crimson-ink); font-weight: 700; }
+html:not(.night) body .bottomnav button:not(.secondary) svg, html:not(.night) body .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg { background: var(--rose); color: var(--crimson); }
+html:not(.night) body .bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--card); }
+
+/* 4) the home's quick buttons: SOFT, a light tint of the color by section (the more important, the deeper: purchases, accounts, home, sales, care), a thin line, the words in ink,
+      the icon in the color; rounded rectangles (14px, not ovals: «مش هنعملها دواير»); a small mark on the top edge = the section's own icon of the bar (.qa-mk, ar/shortcuts.js:
+      «الحاجة اللي خاصة بالمشتريات تبقى عليها علامة المشتريات»). A work app leaves the system: white with a thicker line. */
+:root { --t-purchases: var(--rose); --t-accounts: var(--rose); --t-home: var(--rose); --t-sales: var(--rose); --t-care: var(--rose); --t-line: var(--rose-line); --t-line-2: var(--rose-line); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --t-purchases: color-mix(in srgb, var(--crimson) 16%, var(--card));
+    --t-accounts: color-mix(in srgb, var(--crimson) 13%, var(--card));
+    --t-home: color-mix(in srgb, var(--crimson) 10%, var(--card));
+    --t-sales: color-mix(in srgb, var(--crimson) 8%, var(--card));
+    --t-care: color-mix(in srgb, var(--crimson) 6%, var(--card));
+    --t-line: color-mix(in srgb, var(--crimson) 22%, var(--card));
+    --t-line-2: color-mix(in srgb, var(--crimson) 40%, var(--card));
+  }
+}
+[data-sec="purchases"] { --t: var(--t-purchases); }
+[data-sec="accounts"] { --t: var(--t-accounts); }
+[data-sec="home"] { --t: var(--t-home); }
+[data-sec="sales"] { --t: var(--t-sales); }
+[data-sec="care"] { --t: var(--t-care); }
+html body .card.home .qa { row-gap: 15px; padding-top: 8px; }
+html body .card.home .qa button[data-sec] { position: relative; min-height: 52px; background: var(--t); color: var(--ink); border: 1px solid var(--t-line); border-radius: 14px; padding: 3px 6px; box-shadow: none; font-weight: 600; }
+html body .card.home .qa button[data-sec] svg { color: var(--crimson); stroke: var(--crimson); }
+html body .card.home .qa button[data-sec]:active { filter: brightness(0.96); }
+html body .card.home .qa button.qa-app[data-sec] { background: var(--card); border: 2px solid var(--t-line-2); padding: 3px 5px; }
+html body .card.home .qa button[data-sec] .qa-mk { position: absolute; top: -8px; inset-inline-end: 10px; width: 22px; height: 22px; padding: 0; border-radius: 7px; background: var(--card); border: 1px solid var(--t-line-2); display: flex; align-items: center; justify-content: center; pointer-events: none; }
+html body .card.home .qa button[data-sec] .qa-mk svg { width: 13px; height: 13px; padding: 0; background: transparent; color: var(--crimson); stroke: var(--crimson); }
+html body .card.home .qa button[data-sec] .qa-mk path { stroke-width: 2.3; }
+html body .card.home .qa button.qa-ph[data-sec] { opacity: 0.4; outline: 2px dashed var(--crimson); outline-offset: -5px; }
+html body .card.home .qa button.qa-ghost[data-sec] { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22); }

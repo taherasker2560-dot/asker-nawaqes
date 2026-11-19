@@ -7,25 +7,27 @@
   'use strict';
   // «برتقالي فاقع» first and the DEFAULT (owner 2026-11-15: «عايز اللون الأساسي يبقى الأورنج الفاقع ده … يبقى عندهم هم الأوبشن يغيروا»): the bot's
   // color unless someone picks another one. «أزرق عسكر» (the blue of the round logo, the default 2026-11-12 to 11-15) is the second one.
+  // 2026-11-19 night (owner: «هختار اللبني وعاوزك تمشي النمط ده حالا في كل تفاصيل المشروع»): «لبني هادي» is the DEFAULT now (white pages, color only in small touches:
+  // ar/airy.css, store/airy.css, supplier/vendor.css); «برتقالي هادي» stays in the list.
   const PRESETS = [
-    ['terra', 'برتقالي هادي', '#c0522a'], ['flame', 'برتقالي فاقع', '#d84315'], ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
+    ['calmsky', 'لبني هادي', '#217bab'], ['terra', 'برتقالي هادي', '#c0522a'], ['flame', 'برتقالي فاقع', '#d84315'], ['asker', 'أزرق عسكر', '#0a4aa6'], ['crimson', 'عنابي', '#7d1028'], ['red', 'أحمر', '#b3261e'], ['rose', 'وردي', '#c2185b'], ['fuchsia', 'فوشيا', '#a3127a'],
     ['purple', 'بنفسجي', '#5b3a8c'], ['violet', 'موف غامق', '#4527a0'], ['indigo', 'نيلي', '#283593'], ['blue', 'أزرق', '#1d4f91'],
     ['sky', 'لبني', '#0277bd'], ['cyan', 'سماوي', '#00838f'], ['teal', 'تركواز', '#0e6b72'], ['emerald', 'زمردي', '#00796b'],
     ['green', 'أخضر', '#1d6f48'], ['leaf', 'أخضر زرعي', '#2e7d32'], ['olive', 'زيتوني', '#556b2f'], ['lime', 'ليموني غامق', '#827717'],
     ['gold', 'دهبي', '#9a7414'], ['orange', 'برتقالي', '#a8501a'], ['copper', 'نحاسي', '#8d4e2a'],
     ['brown', 'بني', '#5d4037'], ['gray', 'رمادي', '#3f4650'], ['slate', 'رصاصي', '#455a64'], ['charcoal', 'فحمي', '#263238'],
   ].map(([id, name, hex]) => ({ id, name, hex }));
-  const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'terra'; // the calm orange (owner 2026-11-17: «تهدي درجة الأورنج … مش فج ولا فاقع»); «برتقالي فاقع» stays in the list
+  const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'calmsky'; // the calm sky blue (owner 2026-11-19 night); the calm orange (2026-11-17) and «برتقالي فاقع» stay in the list
   // the dark surfaces of the new look (the bottom bar, the greeting, the balance card, the footer). Owner 2026-11-16: the navy was «مش حلو», then the aqua green
   // («أخضر مائي»); 2026-11-17: «عاوز استخدم ال calm orange بدل الأورانج والأخضر المائي في جميع المواضع»: the calm orange is the DEFAULT surface now (white text on it
   // reads, 4.7:1) and the aqua green is gone (a phone that kept it falls back to the default). Four sets, none of them blue or green, plus any color of his own;
   // each gives the surface, a lighter step of it and the near-black one for the night look.
   // The bot keeps its choice under asker-dark, the store under asker-store-dark (store/theme.js).
   const DARKS = [
-    ['terra', 'برتقالي هادي', '#c0522a', '#d0653a', '#3a190d'], ['warm', 'قهوة دافية', '#3a2018', '#5b3322', '#1c0e0a'],
+    ['calmsky', 'لبني هادي', '#217bab', '#3b8fbd', '#0d2631'], ['terra', 'برتقالي هادي', '#c0522a', '#d0653a', '#3a190d'], ['warm', 'قهوة دافية', '#3a2018', '#5b3322', '#1c0e0a'],
     ['charcoal', 'فحمي', '#25282c', '#3d434b', '#101214'], ['plum', 'برقوقي', '#3a1c33', '#5a2d4f', '#1a0c17'],
   ].map(([id, name, dark, dark2, deep]) => ({ id, name, dark, dark2, deep }));
-  const DARK_KEY = 'asker-dark', DARK_DEFAULT = 'terra';
+  const DARK_KEY = 'asker-dark', DARK_DEFAULT = 'calmsky';
   // «c:#rrggbb» = a color of his own: darkened until white text on it reads, with its lighter step and its near-black worked out
   function darkOf(id) {
     const own = /^c:(#[0-9a-f]{6})$/i.exec(String(id || ''));
@@ -99,6 +101,13 @@
       if (read(KEY, '') === 'flame') write(KEY, DEFAULT_ID);
       write('asker-calm', '1');
     }
+    // 2026-11-19 night: whoever is still on the calm orange (it was written as the default, nobody picked it on purpose) moves once to the calm sky blue;
+    // any other color somebody picked stays, and «برتقالي هادي» can still be picked again from the list.
+    if (read('asker-airy', '') !== '1') {
+      if (read(KEY, '') === 'terra') write(KEY, DEFAULT_ID);
+      if (read(DARK_KEY, '') === 'terra') write(DARK_KEY, DARK_DEFAULT);
+      write('asker-airy', '1');
+    }
     let a = read(KEY, DEFAULT_ID), night = read(NIGHT, '') === '1';
     if (a === 'night') { a = 'purple'; night = true; write(KEY, a); write(NIGHT, '1'); }
     const p = PRESETS.find((x) => x.id === a);
@@ -128,9 +137,9 @@
     s.setProperty('--glow', hexToRgb(t.main).join(', ')); // for soft colored shadows: rgba(var(--glow), .5)
     document.documentElement.dataset.accent = c.id;
     document.documentElement.classList.toggle('night', c.night);
-    // the phone's top bar = the top of the header (the main color); at night the dark page
+    // the phone's top bar = the top of the header: white by day (the header is white now, ar/airy.css), the dark page at night
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t.main); // the header is the accent now (ar/brand.css)
+    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff');
     return c;
   }
   root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice, DARKS, DARK_DEFAULT, darkOf, applyDark };

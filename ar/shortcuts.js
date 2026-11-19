@@ -12,7 +12,9 @@
    7) the work apps on his phone (owner 2026-11-19, ar/work-apps.js: واتساب بيزنس، الكاميرات، ابن سينا، فارما، دراج آي، الجرعات، إنستا باي) are buttons too:
       their button carries data-app (the app opens) instead of data-go (a section).
    8) «ألوان الأقسام» (owner 2026-11-19, ar/look.css): each button carries data-sec (the section it belongs to: purchases / accounts / home / sales / care) and wears that
-      section's shade of the system color; a work app has a thick border in the shade of the section it serves. */
+      section's shade of the system color; a work app has a thick border in the shade of the section it serves.
+   9) the same night, second round (owner: «زراير ملوّنة كاملة … والحاجة اللي خاصة بالمشتريات تبقى عليها علامة المشتريات»): the button is FILLED with the shade, and a small white mark
+      on its top edge (i.qa-mk) is the section's own icon of the bottom bar. */
 (function (root) {
   'use strict';
   const MAX = 30;
@@ -76,6 +78,15 @@
   const SEC_OF_GROUP = { 'المشتريات': 'purchases', 'الحسابات': 'accounts', 'المبيعات': 'sales', 'خدمة العملاء': 'care', 'الرئيسية': 'home' };
   const APP_SEC = { wab: 'care', cams: 'home', ibnsina: 'purchases', pharma: 'purchases', drugeye: 'home', doses: 'home', instapay: 'accounts' };
   const SEC = Object.fromEntries(ALL.map((x) => [x[0], x[6] ? APP_SEC[x[6]] || 'home' : SEC_OF_GROUP[x[2]] || 'home']));
+  // the small white mark on every button = its section's own icon of the bottom bar (owner 2026-11-19: «الحاجة اللي خاصة بالمشتريات تبقى عليها علامة المشتريات»);
+  // the same paths as the five buttons of the bar in asker-nawaqes-arabic.html
+  const SEC_ICON = {
+    purchases: 'M4 5h2l2 10h10l2-7H7M10 19a1 1 0 1 0 0 .01M17 19a1 1 0 1 0 0 .01',
+    accounts: 'M5 4h11l3 3v13H5zM9 9h6M9 13h6M9 17h4',
+    home: 'M4 11l8-6.5 8 6.5M6 9.5V19a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1V9.5',
+    sales: 'M4 19h16M7 16V10M12 16V6M17 16v-4',
+    care: 'M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-2v-6h4M4 13v4a2 2 0 0 0 2 2h2v-6H4',
+  };
 
   // ---------- pure helpers (tests/home-shortcuts.cjs) ----------
   // known sections only, each once, at most 30
@@ -123,7 +134,7 @@
     const box = document.querySelector('#homePanel .qa');
     if (!box) return;
     // data-go = the section it opens, data-qa = which button it is (the order after a drag is read from these), data-anchor = the block to scroll to
-    box.innerHTML = mine.map((t) => `<button type="button" ${APP_OF[t] ? `data-app="${APP_OF[t]}" class="qa-app"` : `data-go="${TAB_OF[t]}"`} data-qa="${t}" data-sec="${SEC[t]}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
+    box.innerHTML = mine.map((t) => `<button type="button" ${APP_OF[t] ? `data-app="${APP_OF[t]}" class="qa-app"` : `data-go="${TAB_OF[t]}"`} data-qa="${t}" data-sec="${SEC[t]}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span><i class="qa-mk" aria-hidden="true">${svg(SEC_ICON[SEC[t]] || SEC_ICON.home)}</i></button>`).join('');
     box.classList.toggle('qa-none', !mine.length);
   }
 

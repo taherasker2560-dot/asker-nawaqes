@@ -31,29 +31,29 @@ run('Brand look: the account — white page, no blessing strip, no wave, a quiet
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,0,'no blessing strip on the site (owner 2026-11-17: «شيل كلمة اللهم صل على النبي من الموقع»)');
  assert.equal(look.blessText,false,'and no blessing text anywhere on the page');
- assert.equal(look.topBg,'rgb(192, 82, 42)','the header is the calm orange');
+ assert.equal(look.topBg,'rgb(255, 255, 255)','the header is white (the airy look, 2026-11-19 night)');
  assert.equal(look.topRadius,'0px');
  assert.equal(look.wave,'none','no wave');
- assert.equal(look.balBg,'rgb(246, 244, 239)','a quiet balance card (no dark surface)');
+ assert.equal(look.balBg,'rgb(243, 247, 250)','a quiet balance card (no dark surface)');
  assert.equal(look.balRadius,'2px');
  assert.ok(contrast(look.big,look.balBg)>=4.5,'the big balance reads on the card: '+look.big);
  assert.equal(look.barPos,'fixed');assert.equal(look.barBottom,'0px','the bar is docked');
  assert.equal(look.barRadius,'0px','and flat');
  assert.equal(look.barBg,'rgb(255, 255, 255)');
- assert.equal(look.accent,'#c0522a','the calm orange by default (not the vivid one)');
+ assert.equal(look.accent,'#217bab','the calm sky blue by default');
  assert.ok(contrast(look.orderBg,'rgb(255, 255, 255)')>=4.5,'white text reads on the main button: '+look.orderBg);
  assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
- if(look.payBg){assert.equal(look.payBg,'rgb(138, 59, 30)','the deep step of the calm orange');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on it');}
- assert.equal(look.meta,'#c0522a','the phone\'s top bar is the orange');
+ if(look.payBg){assert.equal(look.payBg,'rgb(22, 83, 115)','the deep step of the calm sky blue');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on it');}
+ assert.equal(look.meta,'#ffffff','the phone\'s top bar is white (the header is white)');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours
  await page.click('.tabbar a[data-go="home"]');
  await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');
  const home=await page.evaluate(()=>{const cs=(e,p)=>getComputedStyle(e,p),hero=document.querySelector('[data-view="home"] .hero'),ft=document.querySelector('.ft');
   return {hero:cs(hero).backgroundColor,dir:cs(hero).flexDirection,radius:cs(hero).borderTopLeftRadius,badge:!!hero.querySelector('img.hero-badge'),tiles:document.querySelectorAll('.two-tiles .tile').length,perks:document.querySelectorAll('.trust li').length,
    secs:document.querySelectorAll('#sections .sec').length,ft:cs(ft).backgroundColor,hours:ft.textContent.replace(/\s+/g,' '),promo:!!document.querySelector('.promo')}});
- assert.equal(home.hero,'rgb(246, 244, 239)');assert.equal(home.dir,'row');assert.equal(home.radius,'2px');assert.ok(home.badge,'the round logo with 1981');
+ assert.equal(home.hero,'rgb(235, 244, 249)');assert.equal(home.dir,'row');assert.equal(home.radius,'16px');assert.ok(home.badge,'the round logo with 1981');
  assert.equal(home.tiles,2);assert.equal(home.perks,3);assert.equal(home.secs,6);assert.equal(home.promo,false);
- assert.equal(home.ft,'rgb(192, 82, 42)','the calm orange closes the page');
+ assert.equal(home.ft,'rgb(235, 244, 249)','a light tint of the calm sky blue closes the page (a dark surface only at night)');
  assert.match(home.hours,/كل يوم 9 ص – 12 بالليل/);assert.match(home.hours,/الجمعة 3 – 11 بالليل/);assert.match(home.hours,/© صيدلية عسكر · منذ 1981/);assert.doesNotMatch(home.hours,/اللهم|ﷺ/,'the footer has no blessing either');
 },{home:true});
 run('Brand look: night — the balance card, the bar and the footer stay readable',async({page,base})=>{
