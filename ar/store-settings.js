@@ -55,7 +55,15 @@
     }
     return { row };
   }
-  const api = { cleanPhone, cleanWallet, cleanInstapay, settingsRow };
+  // the most boxes one order may hold of an item (2026-11-19, ar_store_items.max_per_order): empty = no limit of his own; otherwise a whole number 1..20 (the site's own limit per line is 20)
+  function cleanMaxQty(v) {
+    const s = String(v == null ? '' : v).replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x0660)).trim();
+    if (s === '') return { value: null };
+    if (!/^\d{1,3}$/.test(s)) return { error: 'اكتب رقم صحيح من 1 لـ 20، أو سيبه فاضي لو مفيش حد' };
+    const n = Number(s);
+    return n >= 1 && n <= 20 ? { value: n } : { error: 'الحد لازم يكون من 1 لـ 20 علبة' };
+  }
+  const api = { cleanPhone, cleanWallet, cleanInstapay, settingsRow, cleanMaxQty };
   root.AskerStoreSettingsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -122,19 +130,24 @@
     }
   }
   function itemCard(it) {
+    // the maximum per order exists only after migration 202611190200 (the column comes back with select *)
+    const hasMax = 'max_per_order' in it;
     return `<div class="ss-item" data-item="${esc(it.id)}">
       <strong dir="ltr">${esc(it.name)}</strong>
-      <span class="hint">${it.status === 'available' ? 'متوفر · ' + esc(it.price) + ' ج' : it.status === 'on_order' ? 'بالطلب' : 'غير متوفر'}${it.hidden ? ' · <b>مخفي من الموقع</b>' : ''}</span>
+      <span class="hint">${it.status === 'available' ? 'متوفر · ' + esc(it.price) + ' ج' : it.status === 'on_order' ? 'بالطلب' : 'غير متوفر'}${it.hidden ? ' · <b>مخفي من الموقع</b>' : ''}${hasMax && it.max_per_order ? ' · <b>أقصى كمية في الطلب ' + esc(it.max_per_order) + '</b>' : ''}</span>
       <label class="ss-label" for="ar-${esc(it.id)}">الاسم العربي في الموقع</label>
       <div class="ss-row"><input id="ar-${esc(it.id)}" type="text" maxlength="250" value="${esc(it.arabic_name || '')}" placeholder="فاضي = تلقائي" />
         <button type="button" class="small" data-ar>احفظ الاسم</button></div>
+      ${hasMax ? `<label class="ss-label" for="mx-${esc(it.id)}">أقصى كمية في الطلب الواحد (علب)</label>
+      <div class="ss-row"><input id="mx-${esc(it.id)}" type="text" inputmode="numeric" maxlength="3" value="${it.max_per_order ? esc(it.max_per_order) : ''}" placeholder="فاضي = من غير حد" />
+        <button type="button" class="small" data-max>احفظ الحد</button></div>` : ''}
       <button type="button" class="secondary small" data-hide="${it.hidden ? '0' : '1'}">${it.hidden ? 'أظهره في الموقع' : 'اخفيه من الموقع'}</button>
     </div>`;
   }
   async function search() {
     const q = $('ssQ').value.trim().replace(/[^0-9A-Za-zء-ي ]+/g, ' ').trim();
     if (q.length < 2) return say('ssItemStatus', 'اكتب حرفين على الأقل', 'bad');
-    let req = db().from('ar_store_items').select('id,name,arabic_name,status,price,hidden');
+    let req = db().from('ar_store_items').select('*');
     for (const w of q.split(/\s+/).filter((x) => x.length >= 2).slice(0, 5)) req = req.or(`name.ilike.*${w}*,arabic_name.ilike.*${w}*`);
     const { data, error } = await req.eq('is_listed', true).order('status').order('name').limit(15);
     if (error) return say('ssItemStatus', 'مقدرتش أدوّر: ' + error.message, 'bad');
@@ -153,6 +166,23 @@
     } catch (e) {
       say('ssItemStatus', 'ماتحفظش: ' + e.message, 'bad');
     } finally { btn.disabled = false; }
+  }
+  // the owner's cap for one item: the site refuses more than this in one order (the smaller of it and the boxes in stock); empty clears it
+  async function setMax(id, btn) {
+    const c = cleanMaxQty($('mx-' + id).value);
+    if (c.error) return say('ssItemStatus', c.error, 'bad');
+    btn.disabled = true;
+    try {
+      const { error } = await db().from('ar_store_items').update({ max_per_order: c.value }).eq('id', Number(id));
+      if (error) throw error;
+      const it = found.find((x) => String(x.id) === String(id));
+      if (it) it.max_per_order = c.value;
+      $('ssItems').innerHTML = found.map(itemCard).join('');
+      say('ssItemStatus', c.value ? 'الحد اتحفظ: أقصى ' + c.value + ' في الطلب الواحد، وهيظهر في الموقع على طول' : 'الحد اتشال: الصنف رجع للموجود بس', 'good');
+    } catch (e) {
+      btn.disabled = false;
+      say('ssItemStatus', 'ماتحفظش: ' + e.message, 'bad');
+    }
   }
   async function setHidden(id, hidden, btn) {
     btn.disabled = true;
@@ -180,6 +210,8 @@
     if (!card) return;
     const ar = e.target.closest('[data-ar]');
     if (ar) return setArabic(card.dataset.item, ar);
+    const mx = e.target.closest('[data-max]');
+    if (mx) return setMax(card.dataset.item, mx);
     const h = e.target.closest('[data-hide]');
     if (h) return setHidden(card.dataset.item, h.dataset.hide === '1', h);
   });

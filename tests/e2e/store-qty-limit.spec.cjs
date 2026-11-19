@@ -24,7 +24,7 @@ run('Cart limit: a line above the boxes in stock is warned on the line, the plus
  await page.waitForSelector('.cart-over');
  assert.match(await text(page,'#cartItems .cart-line:nth-of-type(1) .cart-over'),/المتاح عندنا 3 علب بس/);
  assert.equal(await text(page,'#cartItems .cart-line:nth-of-type(1) [data-capq]'),'خليها 3');
- assert.deepEqual(await page.evaluate(()=>window.__asked),[[1,2]],'only the items with a price: the one on order has no limit to ask');
+ assert.deepEqual(await page.evaluate(()=>window.__asked),[[1,2,3]],'every item of the cart is asked (the one on order may have a cap of the owner\'s)');
  // blocked: the plus is off, the message is in the form, the send button is off
  assert.equal(await page.$eval('#cartItems .cart-line:nth-of-type(1) [data-qty][data-d="1"]',b=>b.disabled),true);
  assert.equal(await text(page,'#formMsg'),'في صنف طلبت منه أكتر من المتاح عندنا. عدّل الكمية وابعت تاني');
@@ -84,4 +84,57 @@ run('Cart limit: in English too, and a cart with nothing above the stock is not 
  await page.evaluate(()=>{const c=JSON.parse(localStorage.getItem('asker_store_cart'));c[0].qty=1;localStorage.setItem('asker_store_cart',JSON.stringify(c))});
  await page.reload();await page.waitForSelector('#cartItems .cart-line');await page.waitForTimeout(500);
  assert.equal(await page.$('.cart-over'),null);assert.equal(await page.$eval('#sendBtn',b=>b.disabled),false);
+},{home:true});
+
+run('Owner cap: «أقصى كمية في الطلب N» on the line (also for an item on order), the form says «المسموح في الطلب الواحد», the plus stops at the cap, «خليها N» fixes it and the order goes through',async({page,base})=>{
+ await seed(page);
+ // item 1: the owner capped it at 2 (the pharmacy has more); item 3 is on order and capped at 3; item 2 has no cap
+ await setup(page,{ok:true,max:{1:2,2:20,3:3},cap:{1:true,3:true}},OK);
+ await open(page,base);
+ await page.waitForSelector('.cart-over');
+ assert.equal(await page.$$eval('.cart-over',e=>e.length),2,'two lines are above the owner\'s cap: item 1 (5 > 2) and the one on order (4 > 3)');
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(1) .cart-over'),/أقصى كمية في الطلب علبتين/);
+ assert.doesNotMatch(await text(page,'#cartItems .cart-line:nth-of-type(1) .cart-over'),/المتاح عندنا/);
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(3) .cart-over'),/أقصى كمية في الطلب 3 علب/);
+ assert.equal(await text(page,'#formMsg'),'في صنف طلبت منه أكتر من المسموح في الطلب الواحد. عدّل الكمية وابعت تاني');
+ assert.equal(await page.$eval('#sendBtn',b=>b.disabled),true);
+ assert.equal(await page.$('#cartItems .cart-line:nth-of-type(2) .cart-over'),null,'an item with no cap and enough stock: no warning');
+ await page.click('[data-capq="1"]');
+ await page.waitForFunction(()=>document.querySelectorAll('.cart-over').length===1);
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(1)'),/ده أقصى كمية في الطلب الواحد/,'at the cap it says so (not «آخر المتاح»)');
+ assert.equal(await page.$eval('#cartItems .cart-line:nth-of-type(1) [data-qty][data-d="1"]',b=>b.disabled),true);
+ assert.equal(await page.$eval('#sendBtn',b=>b.disabled),true,'the one on order is still above its cap');
+ await page.click('[data-capq="3"]');
+ await page.waitForFunction(()=>!document.querySelector('.cart-over'));
+ assert.equal(await text(page,'#formMsg'),'');
+ assert.equal(await page.$eval('#sendBtn',b=>b.disabled),false);
+ await page.fill('#cName','Ahmed');await page.fill('#cPhone','01012345678');
+ await page.click('#sendBtn');await page.waitForFunction(()=>window.__placedArgs);
+ assert.deepEqual(await page.evaluate(()=>window.__placedArgs.p_items.map(i=>[i.id,i.qty])),[[1,2],[2,2],[3,3]]);
+},{home:true});
+
+run('Owner cap: one line is the pharmacy\'s stock and one is the owner\'s cap: the form says the stock words; the server\'s refusal with «cap» draws the cap words',async({page,base})=>{
+ await seed(page);
+ await setup(page,{ok:true,max:{1:3,2:1},cap:{2:true}},OK);
+ await open(page,base);
+ await page.waitForSelector('.cart-over');
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(1) .cart-over'),/المتاح عندنا 3 علب بس/);
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(2) .cart-over'),/أقصى كمية في الطلب علبة واحدة/);
+ assert.equal(await text(page,'#formMsg'),'في صنف طلبت منه أكتر من المتاح عندنا. عدّل الكمية وابعت تاني','mixed: the stock words');
+},{home:true});
+
+run('Owner cap: the server refuses an order above the cap (the page could not ask before): the line and the form show the cap words; English too',async({page,base})=>{
+ await seed(page);
+ await page.addInitScript(()=>{try{localStorage.setItem('asker-lang','en')}catch(e){}});
+ await setup(page,{ok:false},{ok:false,error:'qty',items:[{id:1,name:'PANADOL EXTRA 24 TAB',max:2,cap:true}]});
+ await open(page,base);
+ assert.equal(await page.$('.cart-over'),null,'no limits known: nothing is blocked on the page');
+ await page.fill('#cName','Ahmed');await page.fill('#cPhone','01012345678');
+ await page.click('#sendBtn');
+ await page.waitForSelector('.cart-over');
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(1) .cart-over'),/Maximum 2 packs per order/);
+ assert.equal(await text(page,'#formMsg'),'One item is above the maximum for one order. Change the quantity and send again');
+ assert.equal(await page.$eval('#sendBtn',b=>b.disabled),true);
+ await page.click('[data-capq="1"]');await page.waitForFunction(()=>!document.querySelector('.cart-over'));
+ assert.match(await text(page,'#cartItems .cart-line:nth-of-type(1)'),/That's the most for one order/);
 },{home:true});

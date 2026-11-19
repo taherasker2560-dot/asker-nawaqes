@@ -16,4 +16,8 @@ assert.deepEqual(S.settingsRow({is_open:true,whatsapp:'',theme_color:'teal',them
 assert.equal(S.settingsRow({is_open:true,whatsapp:'',theme_color:'c:#0A4AA6',theme_night:0}).row.theme_color,'c:#0a4aa6');
 assert.equal(S.settingsRow({is_open:true,whatsapp:'',theme_color:'red;drop'}).error,'اللون مش مظبوط');
 assert.ok(!('theme_color' in S.settingsRow({is_open:true,whatsapp:''}).row),'old database: no color fields');
+// the most boxes one order may hold of an item (2026-11-19): empty = no limit of his own, a whole number 1..20, Arabic digits read, anything else refused before saving
+assert.deepEqual(S.cleanMaxQty(''),{value:null});assert.deepEqual(S.cleanMaxQty(null),{value:null});assert.deepEqual(S.cleanMaxQty('   '),{value:null});
+assert.deepEqual(S.cleanMaxQty('5'),{value:5});assert.deepEqual(S.cleanMaxQty(' 20 '),{value:20});assert.deepEqual(S.cleanMaxQty('١'),{value:1});assert.deepEqual(S.cleanMaxQty(3),{value:3});
+for(const bad of ['0','21','-1','2.5','abc','1e1','٠'])assert.ok(S.cleanMaxQty(bad).error,'refused: '+bad);
 console.log('store-settings ok');
