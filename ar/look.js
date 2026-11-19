@@ -38,15 +38,29 @@
     if ($('kAge')) $('kAge').textContent = m ? m[1] + ' ' + m[2] : '—';
     if ($('kAgo')) $('kAgo').textContent = $('dataAgeAgo')?.textContent || 'آخر داتا';
   }
-  function go(tab) {
+  // `anchor`: a screen that lives inside the section (a home button of 2026-11-19: المستخدمين، أصناف جديدة …): open the section, then scroll to that block
+  // once it has had a moment to draw (it may still be hidden, then the section simply opens at its top)
+  function go(tab, anchor) {
     window.AskerApp?.showTab?.(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(where, 0);
+    if (!anchor) return;
+    // the block may still be loading (a screen that draws after its data arrives): look every quarter of a second, up to three seconds, and scroll once when it shows
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries++;
+      const el = $(anchor);
+      if (el && el.offsetParent !== null) {
+        clearInterval(timer);
+        el.style.scrollMarginTop = '76px'; // under the top bar
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (tries >= 12) clearInterval(timer); // never shows (nothing to show yet, or he went elsewhere): the section stays at its top
+    }, 250);
   }
   function bind() {
     document.addEventListener('click', (e) => {
       const b = e.target.closest('[data-go]');
-      if (b) return go(b.dataset.go);
+      if (b) return go(b.dataset.go, b.dataset.anchor);
       if (e.target.closest('[data-group],[data-tab],[data-pgroup]')) setTimeout(() => { where(); numbers(); }, 0);
     });
     // the page shows «الرئيسية» after the sign in; the numbers fill in as the lists arrive

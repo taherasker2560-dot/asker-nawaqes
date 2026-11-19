@@ -1,5 +1,5 @@
 // «الرئيسية»: his own buttons (ar/shortcuts.js, owner 2026-11-15: «اقدر من السيستم اشيل النواقص من الرئيسية، واحط اي حاجة تانية …
-// لحد 10 12 حاجه يبقوا في الوش»). Pure part only: what the phone kept, on/off, the order, at most 12.
+// لحد 10 12 حاجه يبقوا في الوش»). Pure part only: what the phone kept, on/off, the order, at most 30 (owner 2026-11-19, it was 12).
 const assert = require('node:assert/strict');
 global.window = global;
 const S = require('../ar/shortcuts.js');
@@ -17,22 +17,24 @@ const tabs = S.ALL.map((x) => x[0]);
 assert.equal(new Set(tabs).size, tabs.length);
 for (const t of ['short', 'read', 'translate', 'bags', 'drafts', 'docs', 'suppliers', 'stock', 'count', 'expiry', 'customers', 'vendors', 'ops', 'storeorders', 'sales', 'tempsale', 'care']) assert.ok(S.LABEL[t], t);
 assert.equal(S.LABEL.vendors, 'الموردين');
-// at most 12
-assert.equal(S.parse(JSON.stringify(tabs)).length, 12);
-assert.equal(S.MAX, 12);
+// at most 30 (owner 2026-11-19: «لحد 30»; it was 12), and a list saved under the old limit stays exactly as it was
+assert.equal(S.parse(JSON.stringify(tabs)).length, 30);
+assert.equal(S.MAX, 30);
+const old12 = ['short', 'read', 'translate', 'bags', 'drafts', 'docs', 'suppliers', 'stock', 'count', 'expiry', 'customers', 'vendors'];
+assert.deepEqual(S.parse(JSON.stringify(old12)), old12);
 
-// on → off, off → on at the end; the 13th is refused
+// on → off, off → on at the end; the 31st is refused
 let r = S.toggle(['short', 'read'], 'vendors');
 assert.deepEqual(r, { list: ['short', 'read', 'vendors'], changed: true, added: true });
 r = S.toggle(r.list, 'short');
 assert.deepEqual(r.list, ['read', 'vendors']);
 assert.equal(r.added, false);
-const twelve = tabs.slice(0, 12);
-r = S.toggle(twelve, tabs[12]);
+const full = tabs.slice(0, 30);
+r = S.toggle(full, tabs[30]);
 assert.equal(r.full, true);
 assert.equal(r.changed, false);
-assert.equal(r.list, twelve);
-assert.equal(S.toggle(twelve, twelve[0]).list.length, 11, 'taking one off a full home works');
+assert.equal(r.list, full);
+assert.equal(S.toggle(full, full[0]).list.length, 29, 'taking one off a full home works');
 assert.equal(S.toggle(['short'], 'nothing').changed, false);
 
 // the order: one place up or down; the ends stay
