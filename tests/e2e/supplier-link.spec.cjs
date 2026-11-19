@@ -75,7 +75,13 @@ run('Supplier link: he opens it and sees only his own account: invoices with ite
  await page.waitForSelector('#spBody:not([hidden]) .mv');
  assert.equal(await text(page,'#spTitle'),'كشف حساب A M group');
  // the maker's thin line (owner 2026-11-19: «تصميم شركة أجزا لبرمجة سوق الدواء بالذكاء الاصطناعي»): the very top, thin, small, plain text, above the pharmacy's header
- assert.equal(await text(page,'#spCredit'),'تصميم شركة أجزا · لبرمجة سوق الدواء بالذكاء الاصطناعي');
+ // «خليها اجزاء بالانجليزي، وعلامة التريد مارك … في دايرة رفيعة، وبعدها بمسافة اي اي كبير بحروف كبيرة» (2026-11-20): Agza, the trademark sign in a thin circle (TM, never ® because the name is not registered), a space, a big capital AI
+ assert.equal(await page.$eval('#spCredit .sp-agza',e=>e.textContent),'Agza');
+ assert.equal(await page.$eval('#spCredit .sp-tm',e=>e.textContent),'TM');
+ assert.equal(await page.$eval('#spCredit .sp-ai',e=>e.textContent),'AI');
+ assert.equal(await page.$eval('#spCredit',e=>e.textContent.replace(/\s+/g,' ').trim()),'تصميم شركة AgzaTM AI · لبرمجة سوق الدواء بالذكاء الاصطناعي');
+ assert.equal(await page.evaluate(()=>{const fs=s=>parseFloat(getComputedStyle(document.querySelector(s)).fontSize),tm=getComputedStyle(document.querySelector('#spCredit .sp-tm'));return fs('#spCredit .sp-ai')>fs('#spCredit .sp-agza')&&fs('#spCredit .sp-agza')>fs('#spCredit')&&tm.borderTopLeftRadius==='50%'&&parseFloat(tm.borderTopWidth)<=1&&parseFloat(tm.borderTopWidth)>0}),true,'AI bigger than the name, the name bigger than the line; the sign in a thin round outline');
+ assert.equal(await page.evaluate(()=>{const b=document.querySelector('#spCredit .sp-brand').getBoundingClientRect(),c=document.getElementById('spCredit').getBoundingClientRect();return b.left>=c.left&&b.right<=c.right}),true,'the whole line fits at phone width');
  assert.equal(await page.evaluate(()=>{const c=document.getElementById('spCredit').getBoundingClientRect(),h=document.querySelector('.sp-head').getBoundingClientRect();return c.top<=1&&c.bottom<=h.top+1&&c.height<40}),true,'the very top, thin, above the header');
  assert.equal(await page.$eval('#spCredit',e=>parseFloat(getComputedStyle(e).fontSize)<=12),true,'small: a margin, not a banner');
  assert.match(await text(page,'#spBal'),/مستحق لكم عندنا ?الرصيد الحالي ?3,120 ج/);

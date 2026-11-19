@@ -54,12 +54,15 @@ body { margin: 0; background: #f4f5f8; color: var(--ink); font-family: "Segoe UI
 /* the maker's thin line at the very top: small and calm, but it is the first thing the eye lands on; one soft shimmer runs through it once after the page opens and a hairline draws itself under it,
    then everything stays still (no motion for people who asked for none, and it prints as plain text) */
 .sp-credit { position: relative; overflow: hidden; text-align: center; padding: calc(6px + env(safe-area-inset-top)) 12px 6px; font-size: 11.5px; line-height: 1.6; letter-spacing: 0.02em; color: var(--mut); background: #fafbfd; border-bottom: 1px solid var(--line); }
-.sp-credit b { color: var(--o2); font-weight: 800; letter-spacing: 0.04em; }
+/* the name in Latin letters (owner 2026-11-20): «Agza», the trademark sign (TM in a thin circle: not ® because the name is not registered yet), then a space and a big capital «AI» */
+.sp-brand { display: inline-flex; align-items: baseline; gap: 0; unicode-bidi: isolate; white-space: nowrap; vertical-align: baseline; }
+.sp-agza { color: var(--o2); font-weight: 800; font-size: 13.5px; letter-spacing: 0.05em; }
+.sp-tm { display: inline-block; align-self: flex-start; margin: 1px 0 0 2px; width: 11px; height: 11px; border: 0.8px solid var(--o2); border-radius: 50%; color: var(--o2); font-size: 5.5px; line-height: 9.4px; font-weight: 700; letter-spacing: 0; text-align: center; transform: translateY(-1px); }
+.sp-ai { margin-left: 7px; color: var(--o2); font-weight: 900; font-size: 16px; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1; }
 .sp-credit::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; transform: translateX(-50%); background: linear-gradient(90deg, transparent, var(--o), transparent); animation: spDraw 1.4s 0.5s ease-out forwards; }
 @keyframes spDraw { to { width: 100%; } }
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .sp-credit-t { background: linear-gradient(100deg, var(--mut) 40%, var(--o) 50%, var(--mut) 60%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: spShine 2.4s 0.9s ease-in-out 1 forwards; }
-  .sp-credit-t b { -webkit-text-fill-color: var(--o2); }
 }
 @keyframes spShine { to { background-position: 100% 0; } }
 @media (prefers-reduced-motion: reduce) { .sp-credit::after { animation: none; width: 100%; } .sp-credit-t { animation: none; } }
