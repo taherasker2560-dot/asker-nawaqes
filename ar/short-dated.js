@@ -35,9 +35,20 @@
     const k = num(l.k) > 0 ? num(l.k) : 1;
     return (Math.abs(num(l.p)) + (withBonus ? Math.abs(num(l.b)) : 0)) * k + Math.abs(num(l.u));
   };
+  // what the pharmacy holds of an item now, from an ar_stock row {packs, units, parts, exp_near, other:[{packs, units}]}:
+  // {units (this store + the other stores), near (the nearest expiry in this store), other (some of it is in another store)}
+  function stockOf(row) {
+    const parts = num(row && row.parts) > 0 ? num(row.parts) : 1;
+    const other = Array.isArray(row && row.other) ? row.other : [];
+    const mine = num(row && row.packs) * parts + num(row && row.units);
+    const elsewhere = other.reduce((s, o) => s + num(o && o.packs) * parts + num(o && o.units), 0);
+    return { units: Math.max(0, mine + elsewhere), near: (row && row.exp_near) || null, other: elsewhere > 0 };
+  }
   /* purchases, returns: ar_vendor_moves rows ({id, vendor_id, at, code, lines:[{i,p,u,k,b,c,t,x}]}); returns the lines that are
-     still with us and short-dated: [{vendor_id, move, code, at, item, x, months, units, k, left}] shortest expiry first */
-  function shortLines(purchases, returns, now, limit) {
+     still with us and short-dated: [{vendor_id, move, code, at, item, x, months, units, k, left}] shortest expiry first.
+     stock (optional, Map item id → stockOf(row)): what is really on the shelves NOW. A lot that was sold, or that is nearer than the
+     nearest expiry still in stock (a farther-dated lot came in after it and the shortest went first), or beyond what is left, goes. */
+  function shortLines(purchases, returns, now, limit, stock) {
     const lim = limit == null ? LIMIT_MONTHS : limit;
     const recs = [];
     for (const m of purchases || []) {
@@ -53,16 +64,35 @@
     // then the oldest ones; only a purchase entered before the return (or the same moment) can be returned by it
     const rets = [...(returns || [])].sort((a, b) => String(a.at).localeCompare(String(b.at)));
     for (const r of rets) {
+      // PharmaFly names a return «~<the purchase's number>»: that purchase is the one it takes from first
+      const own = /^~/.test(String(r.code || '')) ? String(r.code).slice(1) : null;
       for (const l of Array.isArray(r.lines) ? r.lines : []) {
         const item = num(l.i);
         let need = unitsOf(l, false) || unitsOf(l, true);
         if (!item || need <= 0) continue;
         const pool = recs.filter((q) => q.item === item && String(q.vendor_id) === String(r.vendor_id) && String(q.at) <= String(r.at) && q.left > 0)
-          .sort((a, b) => (Number(b.x === (l.x || null)) - Number(a.x === (l.x || null))) || String(a.at).localeCompare(String(b.at)));
+          .sort((a, b) => (Number(own != null && b.code === own) - Number(own != null && a.code === own)) ||
+            (Number(b.x === (l.x || null)) - Number(a.x === (l.x || null))) || String(a.at).localeCompare(String(b.at)));
         for (const q of pool) {
           if (need <= 0) break;
           const take = Math.min(q.left, need);
           q.left -= take; need -= take;
+        }
+      }
+    }
+    if (stock) {
+      // the shelves now: sales took the SHORTEST expiry first, so what is still there belongs to the farthest-dated lots
+      const byItem = new Map();
+      for (const q of recs) if (q.left > 0) { if (!byItem.has(q.item)) byItem.set(q.item, []); byItem.get(q.item).push(q); }
+      for (const [item, lots] of byItem) {
+        const s = stock.get(item) || stock.get(String(item));
+        let rem = s ? s.units : 0;
+        lots.sort((a, b) => (b.x ? String(b.x) : '9999').localeCompare(a.x ? String(a.x) : '9999') || String(b.at).localeCompare(String(a.at)));
+        for (const q of lots) {
+          // nearer than the nearest expiry in this store = no longer in it (stock in another store keeps the doubt, so the lot stays)
+          const gone = !s || (s.near && !s.other && q.x && String(q.x).slice(0, 7) < String(s.near).slice(0, 7));
+          const take = gone ? 0 : Math.min(q.left, rem);
+          rem -= take; q.left = take;
         }
       }
     }
@@ -81,7 +111,7 @@
   const expText = (x) => { const e = parseDay(x); return e ? `${pad(e.m)}/${e.y}` : '—'; };
   const monthsText = (m) => (m < 0 ? 'منتهية' : m === 0 ? 'الشهر ده' : m === 1 ? 'باقي شهر' : m === 2 ? 'باقي شهرين' : m <= 10 ? `باقي ${m} شهور` : `باقي ${m} شهر`);
   const dayText = (at) => { const e = parseDay(at); return e ? `${pad(e.d)}/${pad(e.m)}` : ''; };
-  const api = { LIMIT_MONTHS, PERIODS, monthsLeft, sinceOf, shortLines, leftText, expText, monthsText, dayText };
+  const api = { LIMIT_MONTHS, PERIODS, monthsLeft, sinceOf, shortLines, stockOf, leftText, expText, monthsText, dayText };
   root.AskerShortDatedLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -91,11 +121,11 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   let period = '3', loadedAt = 0, rows = null, vendors = new Map(), items = new Map(), loading = false, failed = '', box = null, seq = 0;
   const missing = (e) => /schema cache|does not exist|Could not find/i.test(String(e && (e.message || e)));
-  async function chunked(table, cols, ids) {
+  async function chunked(table, cols, ids, key) {
     const out = [];
     const list = [...new Set(ids)];
     for (let i = 0; i < list.length; i += 100) {
-      const { data, error } = await db().from(table).select(cols).in('id', list.slice(i, i + 100));
+      const { data, error } = await db().from(table).select(cols).in(key || 'id', list.slice(i, i + 100));
       if (error) throw error;
       out.push(...(data || []));
     }
@@ -110,14 +140,25 @@
       const [p, r] = await Promise.all([q('purchase'), q('return')]);
       if (p.error) throw p.error;
       if (r.error) throw r.error;
-      const found = shortLines(p.data, r.data, new Date());
+      // the lines after the returns, then what is really on the shelves now (the pharmacy's stock rows only exist for items we hold)
+      const cand = shortLines(p.data, r.data, new Date());
+      let found, stockKnown = true;
+      try {
+        const st = await chunked('ar_stock', 'item_id,packs,units,parts,exp_near,other', cand.map((x) => x.item), 'item_id');
+        // a stock table that came back empty for a long list is a table not filled yet, not a pharmacy with nothing on its shelves
+        if (!st.length && cand.length >= 5) throw new Error('empty stock');
+        const stock = new Map(st.map((x) => [x.item_id, stockOf(x)]));
+        found = shortLines(p.data, r.data, new Date(), LIMIT_MONTHS, stock);
+      } catch (e) {
+        stockKnown = false; found = cand;
+      }
       const [vs, its] = await Promise.all([
         chunked('ar_vendors', 'id,name,short', found.map((x) => x.vendor_id)),
         chunked('ar_store_items', 'id,name,arabic_name', found.map((x) => x.item)),
       ]);
       if (my !== seq) return;
       vendors = new Map(vs.map((v) => [String(v.id), v])); items = new Map(its.map((x) => [String(x.id), x]));
-      rows = { list: found, invoices: (p.data || []).length }; loadedAt = Date.now();
+      rows = { list: found, invoices: (p.data || []).length, stockKnown }; loadedAt = Date.now();
     } catch (e) {
       if (my !== seq) return;
       rows = null; failed = missing(e) ? 'الموردين لسه مش متاحين على السيرفر.' : 'مقدرتش أجيب الفواتير: ' + (e && e.message);
@@ -143,7 +184,8 @@
       body = `<h3 class="al-h">صلاحيته أقل من سنة ونص <b class="al-n">${rows.list.length}</b></h3>` + rows.list.map(row).join('') +
         `<p class="hint">حوالي ${Math.round(packs)} علبة في ${rows.list.length} سطر.</p>`;
     }
-    box.innerHTML = '<p class="hint">الأصناف اللي دخلت فواتير الشرا (يعني وافقت عليها) ومارجعتهاش للمورد، وصلاحيتها أقل من سنة وست شهور، الأقصر صلاحية الأول. اللي اترجع للمورد بيتشال من هنا، والمرتجع الجزئي بيظهر اللي فاضل.</p>' + chips + body;
+    const warn = rows && rows.stockKnown === false ? '<p class="status bad">مقدرتش أقرأ المخزون دلوقتي، فالقايمة ممكن يكون فيها صنف اتباع.</p>' : '';
+    box.innerHTML = '<p class="hint">الأصناف اللي دخلت فواتير الشرا (يعني وافقت عليها) ومارجعتهاش للمورد، وصلاحيتها أقل من سنة وست شهور، الأقصر صلاحية الأول. اللي اترجع للمورد أو اتباع أو جه بعده نفس الصنف بتاريخ أبعد بيتشال من هنا، واللي اتباع منه جزء بيظهر اللي فاضل.</p>' + warn + chips + body;
   }
   // called by ar/alerts.js when the view «قصيرة» is the open one
   function show(el) {
