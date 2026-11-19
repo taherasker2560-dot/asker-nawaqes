@@ -41,9 +41,9 @@ run('Brand look: the account — white page, no blessing strip, no wave, a quiet
  assert.equal(look.barRadius,'0px','and flat');
  assert.equal(look.barBg,'rgb(255, 255, 255)');
  assert.equal(look.accent,'#217bab','the calm sky blue by default');
- assert.ok(contrast(look.orderBg,'rgb(255, 255, 255)')>=4.5,'white text reads on the main button: '+look.orderBg);
+ assert.equal(look.orderBg,'rgb(235, 244, 249)','the account\'s main button is a big one, so it is SOFT: the tint of the calm sky blue with a line in the color (owner 2026-11-19 night)');
  assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
- if(look.payBg){assert.equal(look.payBg,'rgb(22, 83, 115)','the deep step of the calm sky blue');assert.ok(contrast(look.payBg,'rgb(255, 255, 255)')>=4.5,'white reads on it');}
+ if(look.payBg){assert.equal(look.payBg,'rgb(235, 244, 249)','the pay button is a big one too: soft');}
  assert.equal(look.meta,'#ffffff','the phone\'s top bar is white (the header is white)');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours
  await page.click('.tabbar a[data-go="home"]');

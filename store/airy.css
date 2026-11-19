@@ -26,3 +26,6 @@ html:not(.night) .ft strong { color: var(--ink); }
 html:not(.night) .ft a { color: var(--accent-text); }
 html:not(.night) .ft-low { border-top-color: var(--accent-line); color: var(--muted); }
 html:not(.night) .ft .data-age { color: var(--muted); }
+
+/* the BIG buttons are soft like the home's tiles (the tint, a line in the color); the small ones stay solid (the color only in small touches) */
+html body #acctBox .ac-order, html body #chatBox .ch-start, html body .pay-main, html body #acctBox .ac-paybtn, html body .al-btn, html body .al-save, html body .scan-go { background: var(--accent-soft); color: var(--accent-text); border: 1.5px solid var(--accent); box-shadow: none; font-weight: 800; }

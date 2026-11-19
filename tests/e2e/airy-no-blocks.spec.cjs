@@ -21,8 +21,10 @@ const SCAN = () => {
   const px = (s) => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d', { willReadFrequently: true }); x.clearRect(0, 0, 1, 1); x.fillStyle = '#000'; x.fillStyle = s; x.fillRect(0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3]]; };
   const hsl = (r, g, b) => { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let h = 0, s = 0; if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; } return [h, s, l]; };
   for (const e of document.querySelectorAll('body *')) {
-    if (/^(BUTTON|A|INPUT|SELECT|TEXTAREA|IMG|svg|path|SPAN|I|B|SMALL|LABEL)$/i.test(e.tagName) && !/^(SPAN)$/i.test(e.tagName)) continue;
+    if (/^(INPUT|SELECT|TEXTAREA|IMG|svg|path|I|B|SMALL)$/i.test(e.tagName)) continue;
     const r = e.getBoundingClientRect(); if (r.width * r.height < 9000 || r.width < 60) continue;
+    // a small button / link / label keeps its solid color (the color only in small touches); a BIG one (full width: 200 px or more) is soft like the home's tiles
+    if (/^(BUTTON|A|LABEL|SPAN)$/i.test(e.tagName) && r.width < 200) continue;
     const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') continue;
     const layers = [cs.backgroundColor];
     for (const m of (cs.backgroundImage || '').matchAll(/(rgba?\([^)]*\)|color\([^)]*\))/g)) layers.push(m[1]);
