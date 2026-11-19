@@ -74,6 +74,10 @@ run('Supplier link: he opens it and sees only his own account: invoices with ite
  await open(page,base+'supplier.html#v='+TOK);
  await page.waitForSelector('#spBody:not([hidden]) .mv');
  assert.equal(await text(page,'#spTitle'),'كشف حساب A M group');
+ // the maker's thin line (owner 2026-11-19: «تصميم شركة أجزا لبرمجة سوق الدواء بالذكاء الاصطناعي»): the very top, thin, small, plain text, above the pharmacy's header
+ assert.equal(await text(page,'#spCredit'),'تصميم شركة أجزا · لبرمجة سوق الدواء بالذكاء الاصطناعي');
+ assert.equal(await page.evaluate(()=>{const c=document.getElementById('spCredit').getBoundingClientRect(),h=document.querySelector('.sp-head').getBoundingClientRect();return c.top<=1&&c.bottom<=h.top+1&&c.height<40}),true,'the very top, thin, above the header');
+ assert.equal(await page.$eval('#spCredit',e=>parseFloat(getComputedStyle(e).fontSize)<=12),true,'small: a margin, not a banner');
  assert.match(await text(page,'#spBal'),/مستحق لكم عندنا ?الرصيد الحالي ?3,120 ج/);
  // from the first dealing: all the sums with the opening and closing balance
  assert.match(await text(page,'#spSum'),/من أول تعامل \(.*\): فواتير 5,300 \(3\) · مرتجعات 180 \(1\) · مدفوعات 2,000 \(1\)/);
@@ -113,8 +117,13 @@ run('Supplier link: he opens it and sees only his own account: invoices with ite
  const man=await page.evaluate(async()=>JSON.parse(await (await fetch(document.querySelector('link[rel="manifest"]').href)).text()));
  assert.equal(man.start_url.endsWith('supplier.html#v='+TOK),true);
  // install: no browser prompt in this test, so the written steps for his browser
+ // the install box is the FIRST thing on the page, above the balance (owner 2026-11-19: «ليه ما عملتش لما ابعت الصفحة فيها مكان لتثبيت الابلكيشن»)
  assert.equal(await page.isVisible('#spInstall'),true);
+ assert.equal(await page.evaluate(()=>document.getElementById('spInstallBox').getBoundingClientRect().top<document.getElementById('spBal').getBoundingClientRect().top),true,'above the balance');
+ assert.equal(await page.evaluate(()=>document.getElementById('spInstallBox').getBoundingClientRect().top<400),true,'no scrolling to find it');
+ assert.equal(await text(page,'#spInstall'),'ثبّت التطبيق الآن');
  await page.click('#spInstall');
+ await page.waitForFunction(()=>!document.getElementById('spGuide').hidden);   // no browser offer in this test: after a moment, the written steps for his browser
  assert.match(await text(page,'#spGuide'),/تثبيت/);
  // the owner counted: he opened it once (the server saw the first page)
  assert.equal((await page.evaluate(()=>window.__tables.ar_vendor_links))[0].seen_count,1);
@@ -131,6 +140,7 @@ run('Supplier link: a dead link, no link, the owner\'s own look, many moves (old
  await open(page,base+'supplier.html');
  await page.waitForFunction(()=>/الرابط ده مبقاش شغال/.test(document.getElementById('spStatus').textContent));
  assert.equal(await page.isVisible('#spBody'),false);
+ assert.equal(await page.isVisible('#spCredit'),true,'the maker\'s line is there even on a dead link');
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_link')),null);
  // no link at all
  await open(page,base+'supplier.html');
@@ -140,7 +150,9 @@ run('Supplier link: a dead link, no link, the owner\'s own look, many moves (old
  await open(page,base+'supplier.html#v='+TOK);
  await page.waitForSelector('#spBody:not([hidden]) .mv');
  assert.equal(await page.isVisible('#spPreview'),true);
- assert.equal(await page.isVisible('#spInstall'),false);
+ assert.equal(await page.isVisible('#spInstallBox'),true,'the owner sees the box too');
+ assert.equal(await page.$eval('#spInstall',e=>e.disabled),true,'but on the pharmacy\'s phone it only looks');
+ assert.match(await text(page,'#spGuide'),/ده شكل التثبيت زي ما المورد هيشوفه/);
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_link')),null);
  assert.equal((await page.evaluate(()=>window.__tables.ar_vendor_links))[0].seen_count,0);
  await page.evaluate(()=>localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token'));
@@ -238,4 +250,58 @@ run('Supplier link: calm music only — slow pieces, medium level with a volume 
  await page.waitForFunction(()=>window.AskerStoreMusic.sounding());
  // the button is not printed and not in the way of the page's own buttons
  assert.equal(await page.$eval('.mus-btn',e=>getComputedStyle(e).position),'fixed');
+});
+// «ثبّت التطبيق»: one tap (Chrome's own offer), a hand-off to Chrome from another Android browser, the iPhone's big guide, and the hand-over arriving in Chrome (?v=…&install=1).
+const ua=(page,u,platform,touch)=>page.addInitScript(([u,p,t])=>{Object.defineProperty(navigator,'userAgent',{get:()=>u});Object.defineProperty(navigator,'platform',{get:()=>p});Object.defineProperty(navigator,'maxTouchPoints',{get:()=>t})},[u,platform,touch]);
+const SAMSUNG='Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 SamsungBrowser/23.0 Chrome/115.0 Mobile Safari/537.36';
+const IPHONE='Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1';
+const offer=page=>page.evaluate(()=>{window.__prompted=0;const e=new Event('beforeinstallprompt',{cancelable:true});e.prompt=()=>{window.__prompted++;return Promise.resolve()};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
+
+run('Supplier link: install in one tap — the browser\'s own offer, then the hand-over to Chrome, the iPhone\'s big guide',async({page,base})=>{
+ // Chrome offers it: one tap installs, and the page says where the icon is
+ await seed(page);
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ await offer(page);
+ await page.click('#spInstall');
+ await page.waitForFunction(()=>window.__prompted===1);
+ await page.waitForFunction(()=>/اتنزّل/.test(document.getElementById('spGuide').textContent));
+ // another Android browser (Samsung Internet): the page opens in Chrome with the secret riding in ?v=
+ await ua(page,SAMSUNG,'Linux armv8l',5);
+ await page.addInitScript(()=>{window.AskerSupplierGo=u=>{window.__went=u}});
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ await page.click('#spInstall');
+ await page.waitForFunction(()=>window.__went);
+ const went=await page.evaluate(()=>window.__went);
+ assert.ok(went.startsWith('intent://localhost:'),went);assert.ok(went.includes('package=com.android.chrome')&&went.includes('v='+TOK+'&install=1'),went);
+});
+
+run('Supplier link: the iPhone\'s guide, and the hand-over arriving in Chrome',async({page,base})=>{
+ // an iPhone: no browser installs by itself, so a big card points at the Share button; the address keeps his link meanwhile
+ await seed(page);
+ await ua(page,IPHONE,'iPhone',5);
+ await open(page,base+'supplier.html?v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ assert.equal(await page.evaluate(()=>location.search+'|'+location.hash),'|#v='+TOK,'the secret goes back into the hash at once');
+ assert.equal(await page.isVisible('#spGuideBig'),false);
+ await page.click('#spInstall');
+ await page.waitForSelector('#spGuideBig',{state:'visible'});
+ assert.deepEqual(await page.$$eval('#spGuideBig li',x=>x.map(e=>e.textContent)),['دوسوا زرار المشاركة ⬆️ اللي تحت','انزلوا واختاروا «إضافة إلى الشاشة الرئيسية»','دوسوا «إضافة» فوق']);
+ assert.match(await text(page,'#spGuide'),/زرار المشاركة/);
+ await page.click('#spGuideOk');
+ await page.waitForSelector('#spGuideBig',{state:'hidden'});
+});
+
+run('Supplier link: handed over to Chrome (?v=…&install=1): the address is cleaned, and the next tap installs',async({page,base})=>{
+ await seed(page);
+ await open(page,base+'supplier.html?v='+TOK+'&install=1');
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ assert.equal(await page.evaluate(()=>location.search+'|'+location.hash),'|#v='+TOK);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_link')),TOK);
+ assert.equal(await text(page,'#spInstall'),'ثبّت التطبيق الآن','no offer yet');
+ await offer(page);
+ assert.match(await text(page,'#spInstall'),/دوسة كمان ويتثبت/,'the offer came: one more tap');
+ await page.click('#spInstall');
+ await page.waitForFunction(()=>window.__prompted===1);
 });

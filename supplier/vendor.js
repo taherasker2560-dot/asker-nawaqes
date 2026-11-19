@@ -30,6 +30,12 @@
     installIos: 'على الآيفون: دوسوا زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقينها، افتحوا الرابط في سفاري.',
     installAndroid: 'دوسوا ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installOther: 'افتحوا قايمة المتصفح (⋮ أو ≡)، واختاروا «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
+    installBtn: 'ثبّت التطبيق الآن',
+    installAgain: '📲 دوسة كمان ويتثبت',
+    installWait: 'استنوا ثانية…',
+    installPreviewBtn: 'بيتثبت على موبايل المورد',
+    installPreview: 'ده شكل التثبيت زي ما المورد هيشوفه. على موبايل الصيدلية مابيتثبتش.',
+    installed: 'اتنزّل: هتلاقوا «حساب الشركة» على الشاشة الرئيسية، وبيفتح على حسابكم على طول.',
     foot: 'الكشف ده من حسابات الصيدلية وبيتحدّث كل نص ساعة تقريبًا. لو فيه أي فرق عن دفاتركم قولوا لنا عليه.',
   };
   function tokenFromHash(h) { const m = /^#?v=([0-9a-f]{64})$/.exec(String(h || '')); return m ? m[1] : null; }
@@ -110,6 +116,28 @@
     if (/Chrome\//.test(u)) return TEXTS.installAndroid;
     return TEXTS.installOther;
   }
+  // an Android browser other than Chrome (Firefox, Samsung, …): it can open the same page in Google Chrome, where the install is one tap (as on the customers' account)
+  const offerChrome = (ua) => /Android/i.test(String(ua || '')) && /Firefox|SamsungBrowser|OPR\/|Opera|EdgA\/|YaBrowser|UCBrowser|MiuiBrowser|HuaweiBrowser|HeyTap/.test(String(ua || ''));
+  // what the install button does: the browser's own prompt (Chrome and the like), a hand-off to Chrome, the iPhone guide, or the written steps.
+  // Samsung Internet makes its own app when it installs a web app and Google Play Protect blocks that one («Unsafe app blocked», a customer, 2026-11-16): there the page always goes to Chrome.
+  function installPlan(ua, platform, touch, hasPrompt, handedOff) {
+    if (hasPrompt && !/SamsungBrowser/.test(String(ua || ''))) return 'prompt';
+    if (offerChrome(ua) && !handedOff) return 'chrome';
+    if (isIos(ua, platform, touch)) return 'guide';
+    return 'steps';
+  }
+  // the link that opens this page in Chrome on Android (an intent: link cannot carry the #v= part, so the secret rides in ?v=, which the page takes out of the address at once);
+  // with no Chrome on the phone it opens here again with install=1
+  function chromeIntent(pageUrl, token) {
+    const page = new URL('supplier.html', String(pageUrl || '').replace(/[?#].*$/, ''));
+    const q = 'v=' + token + '&install=1';
+    return `intent://${page.host}${page.pathname}?${q}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(page.href + '?' + q)};end`;
+  }
+  // the address without ?v=… and install=1 (other parts kept)
+  function dropParams(s) {
+    const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^(v|install)=/.test(p));
+    return rest.length ? '?' + rest.join('&') : '';
+  }
   // The quiet music (store/music.js, loaded after this file; owner 2026-11-19: «موسيقى بصوت هادي شويه، ضعيف وهادي، اهدى، حاجة ما تبقاش مزعجة وبس … مش عايز لا بيع ولا طلب الدواء ولا الكلام ده كله»):
   // only the four slowest pieces (84-96 bpm, soft keys and vibes), NO spoken advert, its own «stopped» memory, and the owner's phone hears it too (his look).
   // The level (owner 2026-11-19: «خليها متوسطة … واعمل أوبشن برضو للتعلية والتوطية»): medium = the store's own level (60 on the slider = gain 0.18), and a volume option like the system's own (ar/music.js):
@@ -122,7 +150,7 @@
   }
   function levelGain(p) { const x = cleanLevel(p) / 100; return Math.round(GAIN_MAX * x * x * 1e4) / 1e4; }
   const MUSIC = { volume: levelGain(LEVEL_DEFAULT), tracks: ['07-dreamy.mp3', '05-smooth.mp3', '03-chill-pop.mp3', '01-bossa.mp3'], key: 'asker_vendor_music_off', promo: false, pharmacyToo: true };
-  const api = { KEY, tokenFromHash, tokenFromSearch, money, balanceWords, afterText, parseAt, dayLabel, expText, codeText, qtyText, lineValue, shownAmount, rangeArgs, picOf, manifestFor, isIos, installSteps, TEXTS, KIND, MUSIC, cleanLevel, levelGain, LEVEL_KEY, LEVEL_MIN, LEVEL_MAX, LEVEL_DEFAULT, VOL_TEXT };
+  const api = { KEY, tokenFromHash, tokenFromSearch, money, balanceWords, afterText, parseAt, dayLabel, expText, codeText, qtyText, lineValue, shownAmount, rangeArgs, picOf, manifestFor, isIos, installSteps, offerChrome, installPlan, chromeIntent, dropParams, TEXTS, KIND, MUSIC, cleanLevel, levelGain, LEVEL_KEY, LEVEL_MIN, LEVEL_MAX, LEVEL_DEFAULT, VOL_TEXT };
   root.AskerSupplierLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -139,6 +167,9 @@
   const preview = (() => { try { return Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k)); } catch (e) { return false; } })();
   let token = tokenFromHash(location.hash) || tokenFromSearch(location.search) || (preview ? null : store.get(KEY));
   if (token && !/^[0-9a-f]{64}$/.test(token)) token = null;
+  // handed over from another browser to Chrome (?v=…&install=1): the secret goes back into the hash at once, and the install button is ready to be tapped again
+  const handedOff = /[?&]install=1(&|$)/.test(location.search);
+  if (token && (tokenFromSearch(location.search) || handedOff)) { try { history.replaceState(null, '', location.pathname + dropParams(location.search) + '#v=' + token); } catch (e) { /* the manifest still has it */ } }
   const client = root.supabase ? root.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } }) : null;
   let index = null;
   const S = { kind: '', from: '', to: '', vendor: null, firstAt: null, dataAt: null, sum: null, moves: [], done: false, busy: false, seq: 0, open: new Set(), error: '' };
@@ -274,20 +305,47 @@
       link.setAttribute('href', manifestUrl);
     } catch (e) { /* the page's own manifest stays */ }
   }
+  // the install box is FIRST on the page (owner 2026-11-19: «ليه ما عملتش لما ابعت الصفحة فيها مكان لتثبيت الابلكيشن»). One tap, as on the customers' account: Chrome installs at once; another Android browser
+  // opens the same page in Chrome (one more tap there installs); an iPhone gets the big guide; a browser with neither shows its own steps. The pharmacy's own phone sees the box but it only looks.
+  let installBusy = false, installNote = '', guideOpen = false;
+  const waiters = [];
+  const waitOffer = (ms) => (installEvt ? Promise.resolve(true) : new Promise((ok) => {
+    const w = () => { clearTimeout(t); ok(true); };
+    const t = setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) waiters.splice(i, 1); ok(false); }, ms);
+    waiters.push(w);
+  }));
   const standalone = () => (root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || root.navigator.standalone === true;
-  function drawInstall() { $('spInstall').hidden = preview || standalone() || !token; }
-  root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; drawInstall(); });
-  root.addEventListener('appinstalled', () => { installEvt = null; $('spInstall').hidden = true; $('spGuide').hidden = true; });
+  function drawInstall() {
+    $('spInstallBox').hidden = standalone() || !token;
+    const btn = $('spInstall');
+    btn.disabled = preview || installBusy;
+    btn.textContent = preview ? TEXTS.installPreviewBtn : installBusy ? TEXTS.installWait : handedOff && installEvt ? TEXTS.installAgain : TEXTS.installBtn;
+    const note = $('spGuide'), words = preview ? TEXTS.installPreview : installNote;
+    note.textContent = words; note.hidden = !words;
+    $('spGuideBig').hidden = !guideOpen;
+  }
+  root.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; waiters.splice(0).forEach((w) => w()); drawInstall(); });
+  root.addEventListener('appinstalled', () => { installEvt = null; guideOpen = false; installNote = ''; $('spInstallBox').hidden = true; drawInstall(); });
   async function install() {
-    const guide = $('spGuide');
-    if (installEvt) {
-      try { installEvt.prompt(); await installEvt.userChoice; } catch (e) { /* closed */ }
+    if (preview || installBusy) return;
+    const nav = root.navigator, ua = nav.userAgent, ios = isIos(ua, nav.platform, nav.maxTouchPoints);
+    if (!installEvt && !ios && !offerChrome(ua)) { installBusy = true; drawInstall(); await waitOffer(2500); installBusy = false; }   // Chrome offers it a moment after the page opens
+    const plan = installPlan(ua, nav.platform, nav.maxTouchPoints, !!installEvt, handedOff);
+    if (plan === 'prompt') {
+      const e = installEvt;
       installEvt = null;
+      try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = installSteps(ua, nav.platform, nav.maxTouchPoints); }
+      drawInstall();
       return;
     }
-    const nav = root.navigator;
-    guide.textContent = installSteps(nav.userAgent, nav.platform, nav.maxTouchPoints);
-    guide.hidden = false;
+    if (plan === 'chrome') { (root.AskerSupplierGo || ((u) => { root.location.href = u; }))(chromeIntent(location.href, token)); return; }
+    if (ios) {
+      // Safari keeps the page's address, so the address carries the supplier's link while he adds it
+      try { history.replaceState(null, '', location.pathname + location.search + '#v=' + token); } catch (err) { /* the manifest still has it */ }
+      guideOpen = true;
+    }
+    installNote = installSteps(ua, nav.platform, nav.maxTouchPoints);
+    drawInstall();
   }
   // ---------- the volume option (a second quiet button next to the music's own, a small slider that folds away by itself) ----------
   const ICON_VOL = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 8h4M13 8h8M3 16h9M18 16h3" /><circle cx="10" cy="8" r="2.6" /><circle cx="15" cy="16" r="2.6" /></svg>';
@@ -328,7 +386,8 @@
     if (mv) { const id = mv.dataset.spMove; if (S.open.has(id)) S.open.delete(id); else S.open.add(id); draw(); return; }
     if (e.target.closest('#spMore')) { load(true); return; }
     if (e.target.closest('#spPrint')) { printAll(); return; }
-    if (e.target.closest('#spInstall')) install();
+    if (e.target.closest('#spInstall')) { install(); return; }
+    if (e.target.closest('#spGuideOk') || e.target.id === 'spGuideBig') { guideOpen = false; drawInstall(); }
   });
   document.addEventListener('keydown', (e) => {
     const mv = e.target.closest && e.target.closest('[data-sp-move]');

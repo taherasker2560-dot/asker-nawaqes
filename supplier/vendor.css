@@ -51,6 +51,30 @@ body { margin: 0; background: #f4f5f8; color: var(--ink); font-family: "Segoe UI
 .sp-btn { flex: 1; text-align: center; padding: 10px 6px; border-radius: 12px; border: 1.5px solid var(--o); color: var(--o2); font: inherit; font-weight: 700; font-size: 13px; background: #fff; cursor: pointer; }
 .sp-btn.fill { background: var(--o); color: #fff; }
 .sp-btn:disabled { opacity: .6; }
+/* the maker's thin line at the very top: small and calm, but it is the first thing the eye lands on; one soft shimmer runs through it once after the page opens and a hairline draws itself under it,
+   then everything stays still (no motion for people who asked for none, and it prints as plain text) */
+.sp-credit { position: relative; overflow: hidden; text-align: center; padding: calc(6px + env(safe-area-inset-top)) 12px 6px; font-size: 11.5px; line-height: 1.6; letter-spacing: 0.02em; color: var(--mut); background: #fafbfd; border-bottom: 1px solid var(--line); }
+.sp-credit b { color: var(--o2); font-weight: 800; letter-spacing: 0.04em; }
+.sp-credit::after { content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px; transform: translateX(-50%); background: linear-gradient(90deg, transparent, var(--o), transparent); animation: spDraw 1.4s 0.5s ease-out forwards; }
+@keyframes spDraw { to { width: 100%; } }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .sp-credit-t { background: linear-gradient(100deg, var(--mut) 40%, var(--o) 50%, var(--mut) 60%) 0 0 / 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: spShine 2.4s 0.9s ease-in-out 1 forwards; }
+  .sp-credit-t b { -webkit-text-fill-color: var(--o2); }
+}
+@keyframes spShine { to { background-position: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sp-credit::after { animation: none; width: 100%; } .sp-credit-t { animation: none; } }
+@media print { .sp-credit::after { animation: none; width: 100%; } .sp-credit-t { animation: none; background: none; -webkit-background-clip: border-box; background-clip: border-box; color: #444; } }
+/* the install box, first on the page; the iPhone's guide is a card over a dim sheet */
+.sp-install { margin: 12px 16px 0; background: var(--soft); border: 1px solid #cde0ea; border-radius: 14px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+.sp-install-t { flex: 1; min-width: 0; }
+.sp-install-t b { display: block; font-size: 14px; color: var(--o2); }
+.sp-install-t small { display: block; color: var(--mut); font-size: 12px; line-height: 1.6; margin-top: 2px; }
+.sp-install .sp-btn { flex: none; padding: 9px 12px; }
+.sp-guide-ov { position: fixed; inset: 0; z-index: 30; background: rgba(15, 23, 32, 0.55); display: flex; align-items: flex-end; justify-content: center; padding: 16px; }
+.sp-guide-ov[hidden] { display: none; }
+.sp-guide-card { width: 100%; max-width: 420px; background: #fff; border-radius: 18px; padding: 16px 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+.sp-guide-card h2 { margin: 0 0 8px; font-size: 16px; }
+.sp-guide-card ol { margin: 0 0 12px; padding-inline-start: 22px; font-size: 15px; line-height: 2; }
 /* the quiet music's button (store/music.js builds it): small, see-through, in the corner; it stops / starts the music and the phone remembers */
 .mus-btn { position: fixed; z-index: 8; inset-inline-start: 6px; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); width: 40px; height: 40px; padding: 0; border: 0; background: none; opacity: 0.45; cursor: pointer; display: grid; place-items: center; -webkit-tap-highlight-color: transparent; transition: opacity 0.2s; }
 .mus-btn::before { content: ''; position: absolute; width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 1px solid var(--line); }
