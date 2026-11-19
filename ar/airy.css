@@ -61,3 +61,15 @@ html body .card.home .qa button[data-sec] .qa-mk svg { width: 13px; height: 13px
 html body .card.home .qa button[data-sec] .qa-mk path { stroke-width: 2.3; }
 html body .card.home .qa button.qa-ph[data-sec] { opacity: 0.4; outline: 2px dashed var(--crimson); outline-offset: -5px; }
 html body .card.home .qa button.qa-ghost[data-sec] { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22); }
+
+/* 5) the other screens' big dark/solid blocks become LIGHT cards by day (the color only on their numbers); the main buttons stay solid but flat, with no colored glow.
+      (Found by scanning every screen of the system and the store for big solid blocks: the customers' net debt and the statement's balance capsule; the site users' big card and main tile
+      are the same kind.) Night keeps its dark surfaces. */
+:root { --sh-acc: none; }
+html:not(.night) .cu-net, html:not(.night) .su-dark, html:not(.night) .su-tile.main { background: var(--rose); color: var(--ink); border: 1px solid var(--rose-line); border-radius: 16px; box-shadow: none; }
+html:not(.night) .cu-net b, html:not(.night) .su-big, html:not(.night) .su-tile.main b { color: var(--crimson-ink); }
+html:not(.night) .su-tile.main small { color: var(--muted); }
+html:not(.night) .su-grid div { background: var(--card); border: 1px solid var(--rose-line); }
+html:not(.night) .cu-bal, html:not(.night) .cu-bal.owe, html:not(.night) .cu-bal.paid, html:not(.night) .cu-bal.zero { background: var(--rose); border: 1px solid var(--rose-line); border-radius: 16px; color: var(--crimson-ink); }
+html:not(.night) .cu-bal::before { display: none; }
+html body .ct-scan { background: var(--crimson); box-shadow: none; }
