@@ -97,4 +97,13 @@ assert.equal(S.monthsText(2), 'باقي شهرين');
 assert.equal(S.monthsText(7), 'باقي 7 شهور');
 assert.equal(S.monthsText(14), 'باقي 14 شهر');
 assert.equal(S.dayText('2026-11-14T10:00:00'), '14/11');
+assert.equal(S.fullDayText('2026-11-14T10:00:00'), '14/11/2026');
+assert.equal(S.fullDayText(null), '');
+// the supplier's own invoice number: PharmaFly's «11/26/» (month / year entered) is not part of it
+assert.equal(S.invoiceNo('11/26/474411'), '474411');
+assert.equal(S.invoiceNo('10/26/2026115794560'), '2026115794560');
+assert.equal(S.invoiceNo('~11/26/474411'), '474411');
+assert.equal(S.invoiceNo('11/26/8824200914'), '8824200914');
+assert.equal(S.invoiceNo('777'), '777');
+assert.equal(S.invoiceNo(null), '');
 console.log('short-dated: ok');

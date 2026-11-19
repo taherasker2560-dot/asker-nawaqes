@@ -111,7 +111,10 @@
   const expText = (x) => { const e = parseDay(x); return e ? `${pad(e.m)}/${e.y}` : '—'; };
   const monthsText = (m) => (m < 0 ? 'منتهية' : m === 0 ? 'الشهر ده' : m === 1 ? 'باقي شهر' : m === 2 ? 'باقي شهرين' : m <= 10 ? `باقي ${m} شهور` : `باقي ${m} شهر`);
   const dayText = (at) => { const e = parseDay(at); return e ? `${pad(e.d)}/${pad(e.m)}` : ''; };
-  const api = { LIMIT_MONTHS, PERIODS, monthsLeft, sinceOf, shortLines, stockOf, leftText, expText, monthsText, dayText };
+  const fullDayText = (at) => { const e = parseDay(at); return e ? `${pad(e.d)}/${pad(e.m)}/${e.y}` : ''; };
+  // PharmaFly's number «11/26/474411» = the month/year it was entered under + the supplier's own invoice number
+  const invoiceNo = (code) => String(code || '').replace(/^~/, '').replace(/^\d{1,2}\/\d{2}\//, '');
+  const api = { LIMIT_MONTHS, PERIODS, monthsLeft, sinceOf, shortLines, stockOf, leftText, expText, monthsText, dayText, fullDayText, invoiceNo };
   root.AskerShortDatedLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -169,7 +172,8 @@
     const cls = q.months < 6 ? ' red' : q.months < 12 ? ' amber' : '';
     return `<div class="sd-row${cls}"><div class="sd-main"><span class="sd-name notr" dir="auto">${esc(it.arabic_name || it.name || '#' + q.item)}</span>` +
       (it.arabic_name && it.name ? `<small class="notr" dir="ltr">${esc(it.name)}</small>` : '') +
-      `<small>${v ? `<bdi class="notr">${esc(v.short || v.name)}</bdi> · ` : ''}${q.code ? `<bdi class="notr" dir="ltr">${esc(q.code)}</bdi> · ` : ''}<span>دخلت</span> ${esc(dayText(q.at))}</small></div>` +
+      // what he needs to send it back: the supplier, the supplier's invoice number and the day the item was entered (with the year)
+      `<small class="sd-doc">${v ? `<bdi class="notr">${esc(v.short || v.name)}</bdi> · ` : ''}${q.code ? `<span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invoiceNo(q.code))}</bdi> · ` : ''}<span>اتدخلت</span> <bdi class="notr" dir="ltr">${esc(fullDayText(q.at))}</bdi></small></div>` +
       `<div class="sd-exp"><b dir="ltr">${esc(expText(q.x))}</b><small>${esc(monthsText(q.months))}</small><small>${esc(leftText(q))}</small></div></div>`;
   }
   function draw() {
