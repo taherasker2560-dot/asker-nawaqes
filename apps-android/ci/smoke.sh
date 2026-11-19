@@ -48,8 +48,10 @@ tap_node 'class="android.widget.EditText"' || fail "no search box"
 sleep 1
 adb shell input text "Settings"
 sleep 2
-has 'text="Settings"' || fail "the list does not show the apps on the phone (no Settings row after searching it)"
-tap_text "Settings" || fail "no Settings row to tap"
+# (the search box itself now says «Settings» too: only the row's TextView counts)
+ROW='text="Settings" resource-id="" class="android.widget.TextView"'
+has "$ROW" || fail "the list does not show the apps on the phone (no Settings row after searching it)"
+tap_node "$ROW" || fail "no Settings row to tap"
 wait_top "com.android.settings" || fail "Settings did not open after the choice"
 PREFS=$(adb shell run-as "$PKG" cat shared_prefs/apps.xml | tr -d '\r')
 echo "$PREFS"
