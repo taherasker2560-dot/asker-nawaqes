@@ -53,6 +53,23 @@ assert.equal(M.cleanLevel(500), M.LEVEL_MAX);
 assert.ok(M.levelGain(M.LEVEL_MIN) > 0 && M.levelGain(M.LEVEL_MIN) < 0.01, 'the lowest is a whisper');
 assert.ok(M.levelGain(M.LEVEL_MAX) > M.VOLUME && M.levelGain(M.LEVEL_MAX) <= 0.5, 'and it can go up a little too');
 let prev = -1; for (let p = M.LEVEL_MIN; p <= M.LEVEL_MAX; p += 5) { const g = M.levelGain(p); assert.ok(g > prev, 'each step is louder: ' + p); prev = g; }
+// the advert voice (owner 2026-11-19: «عايز صوت الإعلان على السيستم، برضو على المستخدمين بتوع السيستم»): the SAME advert as the store's (voice, file, cache, level), every open (no cap)
+for (const k of ['voice', 'delay', 'targetDb', 'gain', 'file']) assert.equal(M.PROMO[k], S.PROMO[k], 'the advert is the store\'s: ' + k);
+assert.equal(M.PROMO.cache, S.PROMO.cache, 'one phone copy for both pages (the same cache name)');
+assert.equal(S.PROMO.everyDays, 0, 'the store says it every open; the system does too, with no cap of its own');
+assert.ok(!/everyDays|promoDue/.test(src), 'no frequency cap in the system: every open');
+assert.equal(M.PROMO.voice, 'Orus');
+// its level: measured the same way as the store's; at the music's own level it is the store's gain, and a music turned down takes it down too
+const wav = (amp, n = 15000) => { const b = new ArrayBuffer(44 + n * 2), v = new DataView(b); for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.round(Math.sin(i / 9) * amp * 32767), true); return b; };
+for (const amp of [0.02, 0.1, 0.4, 0.9]) assert.equal(M.wavRms(wav(amp)), S.wavRms(wav(amp)), 'the same level reading: ' + amp);
+assert.equal(M.wavRms(new ArrayBuffer(100)), 0, 'not a file it knows: 0');
+for (const r of [0, 0.001, 0.05, 0.1, 5]) assert.equal(M.promoGain(r, -27, 0.3), S.promoGain(r, -27, 0.3), 'the same gain: ' + r);
+const rms = M.wavRms(wav(0.1));
+assert.equal(M.advertGain(rms, M.VOLUME), M.promoGain(rms, M.PROMO.targetDb, M.PROMO.gain), 'at the store\'s music level: the store\'s advert level');
+assert.ok(M.advertGain(rms, M.levelGain(20)) < M.advertGain(rms, M.VOLUME) * 0.5, 'the music turned down: the advert comes down with it');
+assert.ok(M.advertGain(rms, M.levelGain(M.LEVEL_MIN)) >= 0.02, 'never fully silent');
+assert.ok(M.advertGain(rms, M.levelGain(M.LEVEL_MAX)) <= 1, 'and never past the file itself');
+assert.equal(M.advertGain(0, M.VOLUME), M.PROMO.gain, 'a level it cannot read: the fallback');
 // English: the button's two words and the volume one
 global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
