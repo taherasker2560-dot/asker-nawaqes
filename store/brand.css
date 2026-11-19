@@ -160,7 +160,7 @@ html body .ac-bal { background: var(--soft-bg) !important; color: var(--ink) !im
 .wa-tile[hidden] { display: none; }
 .wa-tile .tile { background: var(--green-soft); }
 
-html.night .ft { background: var(--dark-deep, #3a190d); }
+html.night .ft { background: var(--dark-deep, #0d2631); }
 html.night .ac-bal .hint-sm, html.night .ac-two div { color: var(--muted); }
 
 /* no black buttons: the owner's editor and the chips use the accent */
@@ -191,7 +191,7 @@ textarea { resize: none; }
 /* the header and the footer reach the screen's edges also on a tablet or a computer, where the page itself is centered (max 1200 px) */
 html body .top, html body .bar { box-shadow: 0 0 0 100vmax var(--accent); clip-path: inset(0 -100vmax); }
 .ft { --ft-bg: var(--green); background: var(--ft-bg); box-shadow: 0 0 0 100vmax var(--ft-bg); clip-path: inset(0 -100vmax); }
-html.night .ft { --ft-bg: var(--dark-deep, #3a190d); background: var(--ft-bg); }
+html.night .ft { --ft-bg: var(--dark-deep, #0d2631); background: var(--ft-bg); }
 
 /* the search stays on a solid bar while the page scrolls under it */
 .top-search { margin: 0; max-width: none; padding: 10px max(16px, calc((100% - 760px) / 2)); background: var(--card); }

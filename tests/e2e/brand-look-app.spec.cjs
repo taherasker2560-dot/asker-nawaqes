@@ -20,21 +20,22 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,0,'no blessing strip in the bot (owner 2026-11-17: «شيل صلى عالنبى»)');
  assert.equal(look.blessText,false,'and no blessing text anywhere on the page');
- assert.equal(look.barBg,'rgb(192, 82, 42)','the header is the calm orange');
+ assert.equal(look.barBg,'rgb(255, 255, 255)','the header is white (the airy look, 2026-11-19 night)');
  assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
- assert.equal(look.hero,'rgb(192, 82, 42)','the greeting in the calm orange (no aqua green)');
- assert.equal(look.heroRadius,'2px');
+ assert.equal(look.hero,'rgb(235, 244, 249)','the greeting is a very light tint of the calm sky blue');
+ assert.equal(look.heroRadius,'16px');
  assert.ok(contrast(look.h2,look.hero)>=4.5,'the greeting reads');
- assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);
+ assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);assert.equal(look.linkBg,'rgb(33, 123, 171)','and it is the one solid button');
  assert.equal(look.navBg,'rgb(255, 255, 255)');assert.equal(look.navPos,'fixed');assert.equal(look.navBottom,'0px','the bar is docked');
  assert.equal(look.navRadius,'0px','and flat');
  // since 2026-11-19 (owner: five shades of the system color, tests/e2e/section-colors.spec.cjs) every section of the bar is a filled segment of its own shade; «الرئيسية» is the system color itself
- assert.equal(look.onGroup,'home');assert.notEqual(look.onBg,'rgba(0, 0, 0, 0)','the section you are in is a filled segment of its shade');
- assert.ok(contrast(look.onColor,look.onBg)>=4.5,'and its white words read on it: '+look.onColor+' on '+look.onBg);
- assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'999px','and they stay oval (owner 2026-11-17)');
+ assert.equal(look.onGroup,'home');assert.equal(look.onBg,'rgba(0, 0, 0, 0)','the section you are in has no colored segment: a light pill behind its icon (tests/e2e/section-colors.spec.cjs)');
+ assert.ok(contrast(look.onColor,'rgb(255, 255, 255)')>=4.5,'and its words read on the white bar: '+look.onColor);
+ // the home's quick buttons are soft rounded rectangles (owner 2026-11-19 night: «مش هنعملها دواير»; the other buttons of the system stay oval, owner 2026-11-17), words in ink
+ assert.equal(look.qaRadius,'14px','rounded rectangles on the home, no longer ovals');assert.ok(contrast(look.qaColor,'rgb(255, 255, 255)')>=7,'the words of a home button are ink: '+look.qaColor);
  assert.equal(look.card,'2px');
- assert.equal(look.accent,'#c0522a','the calm orange by default');
- assert.equal(look.meta,'#c0522a');
+ assert.equal(look.accent,'#217bab','the calm sky blue by default');
+ assert.equal(look.meta,'#ffffff','the phone bar is white (the header is white)');
  assert.match(await text(page,'.hero h2'),/صيدلية عسكر/);
  // the bar follows the section you open
  await page.click('[data-group="accounts"]');
@@ -47,7 +48,7 @@ run('Brand look (bot): night — the greeting, its link and the bar stay readabl
  assert.ok(await page.evaluate(()=>document.documentElement.classList.contains('night')));
  const n=await page.evaluate(()=>{const cs=e=>getComputedStyle(e),nav=document.querySelector('.bottomnav'),link=document.querySelector('.hero-link'),h2=document.querySelector('.hero h2'),hero=document.querySelector('.hero');
   return {nav:cs(nav).backgroundColor,link:cs(link).color,linkBg:cs(link).backgroundColor,h2:cs(h2).color,hero:cs(hero).backgroundColor,page:cs(document.body).backgroundColor}});
- assert.equal(n.nav,'rgb(58, 25, 13)');
+ assert.equal(n.nav,'rgb(13, 38, 49)');
  assert.ok(contrast(n.h2,n.hero)>=4.5,'the greeting reads at night');
  assert.ok(contrast(n.link,n.linkBg)>=4.5,'«الموقع» reads on the greeting at night: '+n.link+' on '+n.linkBg);
  assert.notEqual(n.page,'rgb(255, 255, 255)','the page is dark');
@@ -80,11 +81,11 @@ const navyScan=()=>{const out=[];for(const e of document.querySelectorAll('body 
   if(h>=205&&h<=265&&s>=0.25&&l<=0.45)out.push((e.id?'#'+e.id:e.tagName.toLowerCase()+'.'+String(e.className).split(' ')[0])+' '+p+' '+m[0])}}}
  return out.slice(0,8)};
 
-run('Brand look (bot): no navy anywhere on the home or at night; the calm orange is the default',async({page})=>{
+run('Brand look (bot): no navy anywhere on the home or at night; the calm sky blue is the default',async({page})=>{
  await ready(page);
  await page.waitForTimeout(400);
  assert.deepEqual(await page.evaluate(navyScan),[],'no navy on the home');
- assert.equal(await page.evaluate(()=>document.documentElement.dataset.accent),'terra','the calm orange is the default');
+ assert.equal(await page.evaluate(()=>document.documentElement.dataset.accent),'calmsky','the calm sky blue is the default');
  await page.evaluate(()=>localStorage.setItem('asker-night','1'));
  await page.reload();await ready(page);
  assert.deepEqual(await page.evaluate(navyScan),[],'no navy at night either');

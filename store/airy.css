@@ -1,0 +1,28 @@
+/* «الشكل الهادي» for the customers' app (owner 2026-11-19 night, the look session: «هختار اللبني وعاوزك تمشي النمط ده حالا في كل تفاصيل المشروع»; same look as ar/airy.css):
+   white pages with air, cool neutrals, the color (the calm sky blue by default, store/theme.js) only in small touches: the cart, the numbers, the main buttons, the page you are on.
+   No solid-color header, no solid-color footer. This file is the LAST stylesheet of store.html. */
+html:not(.night) { --soft-bg: #f3f7fa; --field: #f3f7fa; --line: #e1e8ee; --muted: #55606b; --ink: #1c2229; }
+
+/* the header: white with a thin line, the name in ink, the cart in the color */
+html body .top, html body .bar { background: var(--card) !important; color: var(--ink); border-bottom: 1px solid var(--line); box-shadow: 0 0 0 100vmax var(--card); }
+.brand img { border: 0; }
+.brand strong { color: var(--ink); font-weight: 700; }
+.brand span { color: var(--muted); }
+.top .cart-btn, .top .cart-btn.bot-btn { background: transparent; color: var(--ink); }
+.top .cart-btn svg { stroke: var(--accent); }
+.cart-n { background: var(--accent); color: #fff; }
+.bar h1, .bar .back { color: var(--ink); }
+.bar .back svg { stroke: var(--ink); }
+.top .acct-site { background: var(--accent-soft); color: var(--accent-text); }
+.rg-top { background: var(--card); color: var(--ink); border-bottom: 1px solid var(--line); }
+.rg-back { color: var(--ink); }
+
+/* the greeting: a very light tint of the color, a thin line, rounded */
+html body .hero { background: var(--accent-soft) !important; border: 1px solid var(--accent-line); border-radius: 16px; }
+
+/* the footer: light by day (the dark surface only at night), the words in ink, the links in the color */
+html:not(.night) .ft { --ft-bg: var(--accent-soft); background: var(--ft-bg); color: var(--muted); border-top: 1px solid var(--accent-line); }
+html:not(.night) .ft strong { color: var(--ink); }
+html:not(.night) .ft a { color: var(--accent-text); }
+html:not(.night) .ft-low { border-top-color: var(--accent-line); color: var(--muted); }
+html:not(.night) .ft .data-age { color: var(--muted); }

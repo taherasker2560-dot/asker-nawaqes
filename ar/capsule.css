@@ -10,9 +10,9 @@
 :root {
   /* the dark surfaces (the bar, the greeting): «قهوة دافية» unless chosen otherwise (ar/settings.js sets these from the choice; the owner
      disliked the navy that was here, 2026-11-16) */
-  --dark: #c0522a; /* the calm orange (owner 2026-11-17); the choice «برتقالي هادي» of the dark sets, ar/settings.js */
-  --dark-2: #d0653a;
-  --dark-deep: #3a190d;
+  --dark: #217bab; /* the calm orange (owner 2026-11-17); the choice «برتقالي هادي» of the dark sets, ar/settings.js */
+  --dark-2: #3b8fbd;
+  --dark-deep: #0d2631;
   --dark-rgb: 192, 82, 42;
   --head: 'Readex Pro', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
   --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -269,7 +269,7 @@ html.night .su-chip.gone { background: rgba(255, 255, 255, 0.1); color: #cbd0d8;
 .su-l1 strong { flex: 1 1 auto; font-size: 14.5px; }
 .su-kind { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; color: var(--muted); }
 .su-st { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
-.su-st.st-ok { background: #f9efeb; color: #86391d; }
+.su-st.st-ok { background: #ebf4f9; color: #175678; }
 .su-st.st-quiet { background: #f3f1ee; color: #5b6475; }
 .su-st.st-away { background: #fbe7e5; color: #b1342a; }
 .su-st.st-gone { background: #ececec; color: #3f3f3f; }

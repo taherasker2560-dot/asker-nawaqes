@@ -16,7 +16,10 @@
 
   function choice() {
     const o = owner(), mine = read(KEY, ''), nv = read(NIGHT, '');
-    const a = mine || o.color || S.DEFAULT_ID || 'flame';
+    // 2026-11-19 night: «terra» in the owner's row is the old default (written on 2026-11-17, nobody picked it on purpose): the calm sky blue replaces it for every customer;
+    // any other color he picks for the site (ar_store_settings.theme_color) is kept
+    const oc = o.color === 'terra' ? '' : o.color;
+    const a = mine || oc || S.DEFAULT_ID || 'flame';
     const p = S.PRESETS.find((x) => x.id === a);
     const hex = p ? p.hex : /^c:#[0-9a-f]{6}$/i.test(a) ? a.slice(2) : S.PRESETS[0].hex;
     return { id: p ? p.id : /^c:/.test(a) ? 'custom' : (S.DEFAULT_ID || 'flame'), hex, night: nv === '' ? !!o.night : nv === '1', own: !!mine || nv !== '' || read(DKEY, '') !== '' };
@@ -37,7 +40,7 @@
     el.classList.toggle('night', c.night);
     el.dataset.accent = c.id;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t.main); // the header is the accent now (store/brand.css)
+    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff'); // the header is white by day now (store/airy.css), the dark page at night
     return c;
   }
   // the owner's default (from ar_store_settings, read by store.js); kept on the phone so the next visit paints right away

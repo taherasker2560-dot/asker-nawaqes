@@ -57,7 +57,7 @@
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d');
     g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
-    g.fillStyle = '#8a3b1e'; // the QR in the deep step of the calm orange (owner 2026-11-17), 8:1 on white so every phone reads it
+    g.fillStyle = '#12557a'; // the QR in the deep step of the calm orange (owner 2026-11-17), 8:1 on white so every phone reads it
     for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(x0 + k * cell, pad + r * cell, cell, cell);
     const logo = await loadImg('icons/arabic-192.png?v=logo2');
     if (logo) {

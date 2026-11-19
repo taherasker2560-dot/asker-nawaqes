@@ -5,11 +5,11 @@
   --ink: #1a1c1b;
   --muted: #5f6461;
   --line: #e8e6e0;
-  --accent: #c0522a; /* the calm orange (owner 2026-11-17); store/theme.js sets these before the page paints */
-  --accent-deep: #8a3b1e;
-  --accent-soft: #f9efeb;
-  --accent-text: #86391d;
-  --accent-line: #ead5cd;
+  --accent: #217bab; /* the calm orange (owner 2026-11-17); store/theme.js sets these before the page paints */
+  --accent-deep: #165373;
+  --accent-soft: #ebf4f9;
+  --accent-text: #175678;
+  --accent-line: #cde0ea;
   --ok: var(--accent-text); /* available: the calm orange (no green) */
   --ok-bg: var(--accent-soft);
   --order: var(--muted); /* on order: a quiet gray, so it reads apart from «available» */

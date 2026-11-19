@@ -5,8 +5,8 @@
    The bottom bar is drawn down to the phone's edge (viewport-fit=cover), so on Chrome 135+ the strip under it (the phone's
    own bar) shows the bot's color and changes with it. */
 :root {
-  --tint: #fbf6f4;
-  --tint-2: #f4eae6;
+  --tint: #f4f8fb;
+  --tint-2: #e6eff4;
   --glow: 10, 74, 166;
   --card: #ffffff;
   --ink: #1d1b19;
@@ -2366,47 +2366,4 @@ html.night .py-fix { color: var(--ink); }
 /* «📱 تطبيقات الشغل» (ar/work-apps.js, owner 2026-11-19): an app button on the home is outlined (it leaves the system), the item / payment rows of app buttons */
 .hs-apps, .py-apps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .hs-apps .chip { margin: 0; }
-/* «ألوان الأقسام» (owner 2026-11-19: «الخمس أقسام الرئيسية بدرجات مختلفة من البرتقالي حسب الأهمية، وما يتبعها من أقسام يبقى زيها، وتظهر زراير الرئيسية بلون القسم بتاعه»;
-   mockups/section_colors_2026-11-19.png, «ا»). Five shades of the system color (--crimson, whatever he chose in the settings): the deeper, the more important:
-   المشتريات (deepest), الحسابات, الرئيسية (the system's own color), المبيعات, خدمة العملاء (the lightest). The bar's five segments, the small tabs of each section and the home
-   buttons wear their section's shade; a work app's button is white with a THICK border in the shade of the section it serves. */
-:root {
-  --sec-purchases: var(--crimson); --sec-accounts: var(--crimson); --sec-home: var(--crimson); --sec-sales: var(--crimson); --sec-care: var(--crimson);
-}
-@supports (color: color-mix(in srgb, red 50%, blue)) {
-  :root {
-    --sec-purchases: color-mix(in srgb, var(--crimson) 70%, #000);
-    --sec-accounts: color-mix(in srgb, var(--crimson) 86%, #000);
-    --sec-home: var(--crimson);
-    --sec-sales: color-mix(in srgb, var(--crimson) 86%, #fff);
-    --sec-care: color-mix(in srgb, var(--crimson) 74%, #fff);
-  }
-}
-[data-sec="purchases"], [data-group="purchases"], .subbar[data-for="purchases"] { --s: var(--sec-purchases); }
-[data-sec="accounts"], [data-group="accounts"], .subbar[data-for="accounts"] { --s: var(--sec-accounts); }
-[data-sec="home"], [data-group="home"] { --s: var(--sec-home); }
-[data-sec="sales"], [data-group="sales"], .subbar[data-for="sales"] { --s: var(--sec-sales); }
-[data-sec="care"], [data-group="care"] { --s: var(--sec-care); }
-/* 1) the bottom bar: five segments, edge to edge */
-html .bottomnav.bottomnav { padding: 0; overflow: hidden; }
-html .bottomnav.bottomnav button[data-group] { max-width: none; margin: 0; border-radius: 0; padding: 7px 0 var(--safe-b); background: var(--s); color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 1px rgba(0, 0, 0, 0.22); }
-html .bottomnav.bottomnav button[data-group] svg { background: rgba(255, 255, 255, 0.2); }
-html .bottomnav.bottomnav button[data-group]:not(.secondary) { color: #fff; }
-html .bottomnav.bottomnav button[data-group]:not(.secondary) svg { background: #fff; color: var(--s); }
-html.night .bottomnav.bottomnav button[data-group] { background: transparent; box-shadow: inset 0 3px 0 var(--s); text-shadow: none; }
-html.night .bottomnav.bottomnav button[data-group] svg { background: transparent; }
-html.night .bottomnav.bottomnav button[data-group]:not(.secondary) svg { background: var(--s); color: #fff; }
-/* 2) the small tabs of a section: its shade (the chosen one filled, the others outlined) */
-.subbar[data-for] .chips .chip:not(.on):not(.qa-pin), .subbar[data-for].chips .chip:not(.on):not(.qa-pin) { border: 1.5px solid var(--s); color: var(--s); }
-.subbar[data-for] .chips .chip.on, .subbar[data-for].chips .chip.on { background: var(--s); border-color: transparent; color: #fff; box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.4); }
-.subbar[data-for] .pgroups button.on { background: var(--s); color: #fff; }
-/* 3) the home's buttons (his words: «الزراير ليها برواز برتقالي رفيع، هتزود سمكه وتلونه»): the white tile of the brand look keeps its shape, its border gets THICK (3px) and the
-   section's shade, and its icon wears that shade; a work app has the same thick border over a light tint of it. (ar/brand.css makes the tiles white with a thin line: these win over it.) */
-html body .card.home .qa button[data-sec] { background: var(--card); color: var(--ink); border: 3px solid var(--s); padding: 3px 5px; box-shadow: none; }
-html body .card.home .qa button[data-sec] svg { color: var(--s); stroke: var(--s); }
-html body .card.home .qa button[data-sec]:active { background: var(--rose); }
-@supports (color: color-mix(in srgb, red 50%, blue)) {
-  html body .card.home .qa button.qa-app[data-sec] { background: color-mix(in srgb, var(--s) 12%, var(--card)); }
-}
-html body .card.home .qa button.qa-ph[data-sec] { opacity: 0.4; outline: 2px dashed var(--s); outline-offset: -5px; }
-html body .card.home .qa button.qa-ghost[data-sec] { box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3); }
+/* «ألوان الأقسام» (owner 2026-11-19) and the airy look that replaced it the same night: see ar/airy.css (the last stylesheet). */

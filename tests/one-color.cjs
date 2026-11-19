@@ -1,15 +1,16 @@
-// ONE brand color (owner 2026-11-17: «عاوز استخدم ال calm orange بدل الأورانج والأخضر المائي في جميع المواضع في جميع التصميمات»).
-// The pages' stylesheets and the designs the code draws (the statement PDF, the QR card, the manifests) hold no green, no other orange and no blue / purple / pink:
-// every color of those hues is the calm orange family below (the tokens), or a warm neutral / a dark brown / a red (errors) / a cool gray or near-black.
-// A new green, blue or vivid orange anywhere in them fails this test: use the tokens (var(--accent) / var(--crimson) and their soft, ink and line steps).
+// ONE brand color. 2026-11-17: the calm orange («عاوز استخدم ال calm orange بدل الأورانج والأخضر المائي في جميع المواضع في جميع التصميمات»); 2026-11-19 night, the look session:
+// the calm SKY BLUE («هختار اللبني وعاوزك تمشي النمط ده حالا في كل تفاصيل المشروع»), white pages with air (ar/airy.css, store/airy.css).
+// The pages' stylesheets and the designs the code draws (the statement PDF, the QR card, the manifests) hold no green, no orange (the old one included) and no other blue / purple / pink:
+// every color of those hues is the calm sky blue family below (the tokens), or a neutral / a dark brown / a red (errors) / a cool gray or near-black.
+// A new green, orange or other blue anywhere in them fails this test: use the tokens (var(--accent) / var(--crimson) and their soft, ink and line steps).
 // The bot never defines --accent or --brand: a `var(--accent, #blue)` there is the blue itself, so write var(--crimson) (the bot) / var(--accent) (the store).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 
-// the calm orange family: main, deep, ink, soft, line, its lighter step and the near-black one of the dark set
-const FAMILY = new Set(['#c0522a', '#8a3b1e', '#86391d', '#f9efeb', '#ead5cd', '#ead4cd', '#d0653a', '#3a190d', '#fbf6f4', '#f4eae6']);
+// the calm sky blue family: main, deep, ink, soft, line, its lighter step, the near-black one of the dark set, the two tints, the QR's deep step, the supplier photo gradient
+const FAMILY = new Set(['#217bab', '#165373', '#175678', '#ebf4f9', '#cde0ea', '#3b8fbd', '#0d2631', '#f4f8fb', '#e6eff4', '#12557a', '#dcebf4', '#c8dfee']);
 
 function toRgb(tok) {
   if (tok[0] === '#') { let x = tok.slice(1); if (x.length === 3 || x.length === 4) x = x.split('').map((c) => c + c).join(''); return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)]; }
@@ -62,13 +63,14 @@ const js = ['ar', 'store'].flatMap((d) => fs.readdirSync(path.join(root, d)).fil
 assert.ok(js.includes('ar/statement-pdf.js') && js.includes('ar/store-link.js') && js.includes('store/account.js'), 'the drawn designs are scanned');
 for (const f of [...js, 'store.html', 'asker-nawaqes-arabic.html', 'manifest-store.json', 'manifest-arabic.json']) bad = bad.concat(check(f));
 assert.deepEqual(bad, [], 'no green and no other orange in the designs (use the calm orange tokens):\n' + bad.join('\n'));
-// the colors the people can PICK (ar/settings.js PRESETS) are choices, not the design: the default is the calm orange and the dark default too
+// the colors the people can PICK (ar/settings.js PRESETS) are choices, not the design: the default is the calm sky blue and the dark default too
 global.window = global;
 require('../ar/settings.js');
 const S = global.AskerSettings;
-assert.equal(S.PRESETS[0].id, 'terra');
-assert.equal(S.PRESETS[0].hex, '#c0522a');
-assert.equal(S.DARK_DEFAULT, 'terra');
-for (const f of ['store.html', 'asker-nawaqes-arabic.html']) assert.match(fs.readFileSync(path.join(root, f), 'utf8'), /<meta name="theme-color" content="#c0522a"/, f + ': the phone bar is the calm orange');
-for (const f of ['manifest-store.json', 'manifest-arabic.json']) { const m = JSON.parse(fs.readFileSync(path.join(root, f), 'utf8')); assert.equal(m.theme_color, '#c0522a', f); assert.equal(m.background_color, '#ffffff', f); }
+assert.equal(S.PRESETS[0].id, 'calmsky');
+assert.equal(S.PRESETS[0].hex, '#217bab');
+assert.equal(S.DARK_DEFAULT, 'calmsky');
+assert.ok(S.PRESETS.some((p) => p.id === 'terra'), 'the calm orange stays in the list');
+for (const f of ['store.html', 'asker-nawaqes-arabic.html', 'supplier.html']) assert.match(fs.readFileSync(path.join(root, f), 'utf8'), /<meta name="theme-color" content="#ffffff"/, f + ': the phone bar is white (the airy header)');
+for (const f of ['manifest-store.json', 'manifest-arabic.json']) { const m = JSON.parse(fs.readFileSync(path.join(root, f), 'utf8')); assert.equal(m.theme_color, '#ffffff', f); assert.equal(m.background_color, '#ffffff', f); }
 console.log('one-color ok');
