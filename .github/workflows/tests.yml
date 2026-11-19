@@ -9,7 +9,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 25, not 15 (2026-11-19): the whole suite takes about 12 minutes and «playwright install --with-deps» alone took 6-8 minutes on some
+    # runs (apt), so good branches were cancelled at 15 minutes and had to be run again
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
