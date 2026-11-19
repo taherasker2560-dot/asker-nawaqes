@@ -138,9 +138,11 @@
     r.lang = 'ar-EG'; r.interimResults = false; r.maxAlternatives = 1;
     r.onresult = (ev) => { const t = clean(ev.results[0] && ev.results[0][0] && ev.results[0][0].transcript); if (t) inp.value = (inp.value ? inp.value + ' ' : '') + t; };
     r.onerror = (ev) => { say(ev && ev.error === 'not-allowed' ? 'اسمح للمتصفح بالميكروفون الأول.' : 'مسمعتكش، قول تاني.', true); };
-    r.onend = () => { listening = null; b && b.classList.remove('rec'); inp.focus(); };
-    listening = r; b && b.classList.add('rec'); say('', false);
-    try { r.start(); } catch (e) { listening = null; b && b.classList.remove('rec'); }
+    // the system's music steps aside while he dictates (ar/music.js, 2026-11-19): the phone's microphone would hear it
+    const musicOff = (on) => { try { if (root.AskerMusic) on ? root.AskerMusic.hold('rec') : root.AskerMusic.release('rec'); } catch (e) { /* no music */ } };
+    r.onend = () => { listening = null; b && b.classList.remove('rec'); musicOff(false); inp.focus(); };
+    listening = r; b && b.classList.add('rec'); say('', false); musicOff(true);
+    try { r.start(); } catch (e) { listening = null; b && b.classList.remove('rec'); musicOff(false); }
   }
   function bind() {
     const card = $('notesCard');
