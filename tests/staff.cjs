@@ -2,11 +2,14 @@
 const assert=require('node:assert/strict');
 const S=require('../ar/staff.js');
 assert.deepEqual(S.allowedTabs(['expiry','tempsale','return','search']),['expiry','tempsale'],'extras are not tabs');
+assert.deepEqual(S.allowedTabs(['returns']),['expiry'],'«returns» works inside الصلاحيات, so it opens that tab');
+assert.deepEqual(S.allowedTabs(['returns','expiry']),['expiry']);
+assert.equal(S.fixTab('expiry',['returns']),'expiry');assert.equal(S.fixTab('stock',['returns']),'expiry','another tab of the same section falls on the one he has');
 assert.equal(S.fixTab('short',['expiry','tempsale']),'expiry','another open tab of «المشتريات»');
 assert.equal(S.fixTab('customers',['expiry']),'home','nothing open in «الحسابات»: his home');
 assert.equal(S.fixTab('tempsale',['tempsale']),'tempsale');assert.equal(S.fixTab('home',[]),'home');
 // every section key the server knows has a switch, and the other way round
-const server=['short','read','translate','drafts','docs','suppliers','stock','count','expiry','customers','storeorders','tempsale','care','search','return','credit'];
+const server=['short','read','translate','drafts','docs','suppliers','stock','count','expiry','customers','storeorders','tempsale','care','search','return','credit','returns'];
 assert.deepEqual(S.SECTIONS.map(x=>x[0]).sort(),[...server].sort());
 // what he did
 assert.equal(S.activityText({tbl:'ar_temp_sales',op:'insert',info:{no:14,n:3,total:274.7}}),'سجّل بيعة مؤقتة (#14 · 3 صنف · 274.7 ج)');

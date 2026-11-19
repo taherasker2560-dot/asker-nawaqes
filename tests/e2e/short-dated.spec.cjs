@@ -26,7 +26,7 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
    {id:6,vendor_id:5,at:ago(1,9),kind:'purchase',code:'11/26/6',lines:[L(105,6,1,exp(5)),L(106,4,1,exp(6))]},
    {id:7,vendor_id:5,at:ago(0,0),kind:'purchase',code:'11/26/8',lines:[L(106,4,1,exp(26))]});};});
  await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');
- assert.deepEqual(await names(page,'#alViews [data-al-view]').then(a=>a.map(x=>x.replace(/\d+/,'').trim())),['النهارده','منتهية','قربت','فواتير']);
+ assert.deepEqual(await names(page,'#alViews [data-al-view]').then(a=>a.map(x=>x.replace(/\d+/,'').trim())),['النهارده','منتهية','قربت','فواتير','↩️ مرتجعات']);
  await page.click('#alViews [data-al-view="short"]');
  await page.waitForSelector('#alExpiry .sd-row');
  assert.match(await page.textContent('#alExpiry .hint'),/وافقت عليها/);

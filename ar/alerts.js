@@ -198,9 +198,16 @@
     const box = $('alExpiry');
     if (!box) return;
     const a = data;
+    // the views this person may open: the owner all of them; a staff member «الصلاحيات» (3 views) and/or «returns» (↩️ مرتجعات); «فواتير» reads the vendors' tables: owner only
+    const st = root.AskerStaff, staff = !!(st && st.isStaff && st.isStaff());
+    const okViews = staff ? [...(st.can('expiry') ? ['today', 'expired', 'soon'] : []), ...(st.can('returns') ? ['returns'] : [])] : ['today', 'expired', 'soon', 'short', 'returns'];
+    document.querySelectorAll('#alViews [data-al-view]').forEach((b) => b.classList.toggle('hidden', !okViews.includes(b.dataset.alView)));
+    if (okViews.length && !okViews.includes(view)) view = okViews[0];
     $('alAge').textContent = a ? ageText(a) : failed;
     $('alAge').className = 'status' + (failed && !a ? ' bad' : '');
     document.querySelectorAll('#alViews [data-al-view]').forEach((b) => b.classList.toggle('secondary', b.dataset.alView !== view));
+    // «↩️ مرتجعات» (owner 2026-11-19, ar/return-marks.js): what was marked «return it to the supplier», the statement, the tick «اتجهّز»
+    if (view === 'returns') { $('alAge').textContent = ''; $('alAge').className = 'status'; root.AskerReturnMarks?.show(box); return; }
     // «اتقبلت قصيرة» (owner 2026-11-15, ar/short-dated.js): the purchase invoices' short-dated items; it reads the vendors' tables, not the alerts file
     if (view === 'short') { alAge.textContent = ''; root.AskerShortDated?.show(box); return; }
     if (!a) { box.innerHTML = ''; return; }
