@@ -111,7 +111,26 @@ function salesRpc(name,a){const S=tables.ar_sales;if(!S)return undefined;const C
   return I.filter(it=>w.every(x=>(String(it.name)+' '+String(it.arabic_name||'')).toLowerCase().includes(x))).map(it=>({id:it.id,name:it.name,arabic_name:it.arabic_name||null,invoices:S.filter(s=>(s.lines||[]).some(l=>l.i===Number(it.id))).length})).sort((x,y)=>y.invoices-x.invoices).slice(0,a.p_limit||10)}
 }// «الموردين» (2026-11-14): ar_vendor_period / ar_vendor_item_moves / ar_vendor_item_summary / ar_vendor_find_items over
 // window.__tables.ar_vendor_moves (no table = not on the server yet)
-function vendorsRpc(name,a){const M=tables.ar_vendor_moves;if(!M)return undefined;const I=tables.ar_store_items||[];
+// the supplier's personal link (migration 202611192000): ar_vendor_link (the owner makes / renews the secret) and ar_vendor_view (his own statement by the secret)
+function vendorLinkRpc(name,a){const T=k=>tables[k]||(tables[k]=[]);const V=T('ar_vendors'),L=T('ar_vendor_links'),M=T('ar_vendor_moves'),I=T('ar_store_items'),E=T('ar_store_edits');
+ if(name==='ar_vendor_link'){const v=V.find(x=>x.id===a.p_vendor);if(!v)return {ok:false,error:'no_vendor'};let l=L.find(x=>x.vendor_id===a.p_vendor);
+  if(!l||a.p_new){const t=Array.from({length:64},()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');if(l)Object.assign(l,{token:t,last_seen_at:null,seen_count:0});else L.push(l={vendor_id:a.p_vendor,token:t,created_at:new Date().toISOString(),last_seen_at:null,seen_count:0})}
+  return {ok:true,token:l.token}}
+ if(!/^[0-9a-f]{64}$/.test(String(a.p_token||'')))return {ok:false,error:'link'};
+ const l=L.find(x=>x.token===a.p_token),v=l&&V.find(x=>x.id===l.vendor_id);if(!v)return {ok:false,error:'link'};
+ const kind=['purchase','return','payment'].includes(a.p_kind)?a.p_kind:null,day=s=>String(s).slice(0,10);
+ const inRange=m=>m.vendor_id===v.id&&(!a.p_from||day(m.at)>=a.p_from)&&(!a.p_to||day(m.at)<=a.p_to);
+ const lim=Math.min(Math.max(a.p_limit||25,1),60);
+ const before=m=>a.p_before_at==null||m.at<a.p_before_at||(m.at===a.p_before_at&&m.id<(a.p_before_id==null?Infinity:a.p_before_id));
+ const rows=M.filter(m=>inRange(m)&&(!kind||m.kind===kind)&&before(m)).sort((x,y)=>x.at<y.at?1:x.at>y.at?-1:y.id-x.id).slice(0,lim).map(m=>({id:m.id,at:m.at,kind:m.kind,code:m.code,inv_date:m.inv_date,amount:m.amount,total:m.total,balance:m.balance,
+  lines:m.kind==='payment'||!m.lines?null:m.lines.map(x=>{const it=I.find(i=>Number(i.id)===x.i)||{},ed=E.find(e=>Number(e.item_id)===x.i)||{};return Object.assign({},x,{n:it.name||null,an:it.arabic_name||null,img:ed.img||null,off:!!ed.img_off})})}));
+ let sum=null,first=null;
+ if(a.p_before_at==null){if(!a.p_look&&(!l.last_seen_at||Date.now()-Date.parse(l.last_seen_at)>3e5)){l.last_seen_at=new Date().toISOString();l.seen_count=(l.seen_count||0)+1}
+  const all=M.filter(inRange).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:x.id-y.id),s=k=>all.filter(m=>m.kind===k),sm=x=>x.reduce((t,m)=>t+m.amount,0);
+  sum={purchases:sm(s('purchase')),purchases_n:s('purchase').length,returns:sm(s('return')),returns_n:s('return').length,payments:sm(s('payment')),payments_n:s('payment').length,opening:all.length?all[0].balance-all[0].amount:null,closing:all.length?all[all.length-1].balance:null};
+  first=M.filter(m=>m.vendor_id===v.id&&m.at>='2005-01-01').map(m=>m.at).sort()[0]||null}
+ return {ok:true,vendor:{id:v.id,name:v.name,balance:v.balance},data_at:'2026-11-19T10:00:00Z',first_at:first,sum,moves:rows,more:rows.length===lim}}
+function vendorsRpc(name,a){if(name==='ar_vendor_link'||name==='ar_vendor_view')return vendorLinkRpc(name,a);const M=tables.ar_vendor_moves;if(!M)return undefined;const I=tables.ar_store_items||[];
  if(name==='ar_vendor_period'){const r=M.filter(m=>m.vendor_id===a.p_vendor&&m.at>=a.p_from&&m.at<a.p_to).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:x.id-y.id);const s=k=>r.filter(m=>m.kind===k);const sm=x=>x.reduce((t,m)=>t+m.amount,0);
   return {purchases:sm(s('purchase')),purchases_n:s('purchase').length,returns:sm(s('return')),returns_n:s('return').length,payments:sm(s('payment')),payments_n:s('payment').length,opening:r.length?r[0].balance-r[0].amount:null,closing:r.length?r[r.length-1].balance:null}}
  if(name==='ar_vendor_item_moves'){return M.filter(m=>m.kind!=='payment'&&(m.lines||[]).some(l=>l.i===a.p_item)&&(!a.p_kind||m.kind===a.p_kind)&&(a.p_before==null||m.id<a.p_before)).sort((x,y)=>y.id-x.id).slice(0,a.p_limit||100).map(m=>({id:m.id,vendor_id:m.vendor_id,at:m.at,kind:m.kind,code:m.code,line:m.lines.find(l=>l.i===a.p_item)}))}

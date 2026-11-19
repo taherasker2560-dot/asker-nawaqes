@@ -1,0 +1,19 @@
+{
+  "id": "supplier.html",
+  "name": "كشف حساب شركتكم · صيدلية عسكر",
+  "short_name": "حساب الشركة",
+  "description": "كشف حساب شركتكم عند صيدلية عسكر",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "supplier.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#c0522a",
+  "icons": [
+    { "src": "icons/arabic-192.png?v=logo2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/arabic-512.png?v=logo2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/arabic-maskable-192.png?v=logo2", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/arabic-maskable-512.png?v=logo2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
