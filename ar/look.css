@@ -2305,6 +2305,8 @@ html.night .py-pill { background: var(--tint-2, var(--rose)); color: var(--ink);
 .py-diff span { color: var(--muted); }
 .py-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .py-acts button { margin: 0; }
+.py-acts a.py-a { display: inline-block; margin: 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }
+.py-acts a.py-a.on { border-color: var(--crimson); background: var(--crimson); color: #fff; }
 .py-p { background: var(--crimson); color: #fff; border: 0; }
 .py-warn { background: var(--bad, #a3162f); color: #fff; border: 0; }
 .py-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; }
