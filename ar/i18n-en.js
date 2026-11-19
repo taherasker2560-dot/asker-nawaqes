@@ -1524,6 +1524,8 @@ window.AskerEN = {
   "الطلب ده مش موجود.": "This request does not exist.",
   "بحمّل…": "Loading…",
   "دوا وصل لعملاء مستنيينه: كلّمهم": "Medicine arrived for waiting customers: call them",
+  "وقّف الموسيقى الهادية": "Stop the quiet music",
+  "شغّل الموسيقى الهادية": "Play the quiet music",
   "دوا ميعاد رجوعه للمورد قرب (يومين أو أقل)": "A medicine's supplier-return deadline is near (2 days or less)",
   "الملف ناقص أعمدة:": "The file is missing columns:",
   "قايمة {1} بتاريخ {2} ({3} سطر)": "List {1} dated {2} ({3} lines)",
