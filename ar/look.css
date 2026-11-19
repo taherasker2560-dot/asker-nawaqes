@@ -2339,3 +2339,9 @@ html.night .py-pill { background: var(--tint-2, var(--rose)); color: var(--ink);
 .mus-btn::before { content: ''; position: absolute; width: 28px; height: 28px; border-radius: 50%; background: var(--card); border: 1px solid var(--line); }
 .mus-btn svg { position: relative; width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mus-btn:hover, .mus-btn:focus-visible { opacity: 0.95; }
+/* the volume option (owner 2026-11-19: «اعملي أوبشن أوطّي الصوت»): a second quiet button above the music one, and a small slider that opens beside it */
+.mus-vol-btn { bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+.mus-pop { position: fixed; z-index: 9; inset-inline-end: 48px; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); }
+.mus-pop[hidden] { display: none; }
+.mus-pop svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mus-pop input[type=range] { width: 150px; margin: 0; accent-color: var(--crimson); }

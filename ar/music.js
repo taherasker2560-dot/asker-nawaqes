@@ -8,6 +8,8 @@
      there until he presses the button. This key is the system's own: stopping the store's music (asker_store_music_off) does not touch it.
    - It steps aside while the page is hidden (phone locked, another tab), while any sound or video plays in the page (a voice note, a customer's voice), while the phone is speaking (the system reads out
      messages) and while a voice note is being recorded (the rest of the page asks with AskerMusic.hold('rec') / release('rec')).
+   - A SECOND small quiet button (owner 2026-11-19: «اعملي أوبشن أوطّي الصوت») opens a tiny slider for the volume of the system's music. It starts at the store's own level (60 on the slider = gain 0.18),
+     goes down to a whisper and up to about three times that; moving it changes the sound at once, and the level is remembered ON THAT PHONE (asker_system_music_vol, its own key). The store's music is untouched.
    Honest limits: on an iPhone the first tap is needed and the silent switch mutes Web Audio; any phone stops the music when it locks; a piece is about 2.4 MB, loaded as it plays (nothing at all when it
    was stopped, or when nobody is signed in). On mobile data that is about 35 MB an hour: the button is how to stop it. */
 (function (root) {
@@ -29,6 +31,9 @@
     { file: '08-sunny.mp3', intro: 18.5 },
   ];
   const TEXTS = { stop: 'وقّف الموسيقى الهادية', start: 'شغّل الموسيقى الهادية' };
+  // the volume option: a slider 10..100 (60 = the store's quiet level), squared so the low half has fine steps; its own key on the phone
+  const LEVEL_KEY = 'asker_system_music_vol', LEVEL_MIN = 10, LEVEL_MAX = 100, LEVEL_DEFAULT = 60, GAIN_MAX = 0.5;
+  const VOL_TEXT = 'صوت الموسيقى';
 
   // ---------- pure logic (tests/system-music.cjs) ----------
   // 'none' = no sound and no button (a browser with no Web Audio); 'auto' = plays by itself; 'stopped' = he stopped it: only his button starts it
@@ -46,7 +51,16 @@
     return a;
   }
 
-  const api = { modeOf, wanted, nextRound, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE };
+  // what is stored on the phone (or nothing / rubbish) -> a level between the ends; nothing stored = the store's own level
+  function cleanLevel(v) {
+    if (v == null || v === '') return LEVEL_DEFAULT;
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(LEVEL_MAX, Math.max(LEVEL_MIN, n)) : LEVEL_DEFAULT;
+  }
+  // the slider's level -> the Web Audio gain (60 = 0.18, the store's level)
+  function levelGain(p) { const x = cleanLevel(p) / 100; return Math.round(GAIN_MAX * x * x * 1e4) / 1e4; }
+
+  const api = { modeOf, wanted, nextRound, cleanLevel, levelGain, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE, LEVEL_KEY, LEVEL_MIN, LEVEL_MAX, LEVEL_DEFAULT, VOL_TEXT };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -55,8 +69,10 @@
   const store = (fn) => { try { return fn(root.localStorage); } catch (e) { return null; } }; // a private window or blocked storage: nothing remembered
   let mode = modeOf({ off: store((ls) => ls.getItem(KEY) === '1'), supported: !!AC && typeof root.Audio === 'function' });
   api.mode = () => mode;
-  if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = () => {}; root.AskerMusic = api; return; }
+  if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = api.setLevel = () => {}; api.level = () => LEVEL_DEFAULT; root.AskerMusic = api; return; }
 
+  let level = cleanLevel(store((ls) => ls.getItem(LEVEL_KEY)));
+  const gainNow = () => levelGain(level);
   let ctx = null, gain = null, el = null, queue = [], last = -1, firstTrack = true, failed = 0, broken = false, target = 0, suspendTimer = null, btn = null;
   const holds = new Set();
   const signedIn = () => { const a = document.getElementById('app'); return !!a && !a.classList.contains('hidden'); };
@@ -116,7 +132,7 @@
       if (!ensure()) { draw(); return; }
       if (el.paused) play();   // inside the tap that asked for it: the browser allows it
       if (ctx.state !== 'running') { const p = ctx.resume(); if (p && p.catch) p.catch(() => { /* the browser wants a tap first: the next one starts it */ }); draw(); return; }
-      if (target !== VOLUME) { target = VOLUME; ramp(VOLUME, FADE_IN); }
+      if (target !== gainNow()) { target = gainNow(); ramp(target, FADE_IN); }
     } else if (ctx) {
       if (target !== 0) { target = 0; if (ctx.state === 'running') ramp(0, document.hidden ? 0.05 : FADE_OUT); }
       if (!suspendTimer && (!el.paused || ctx.state === 'running')) {
@@ -132,10 +148,30 @@
   // ---------- the quiet button ----------
   const ICON_ON = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16.5 8.5a5 5 0 0 1 0 7" /></svg>';
   const ICON_OFF = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M17 9l5 6M22 9l-5 6" /></svg>';
+  // the volume option: a second quiet button that opens a small slider (shown while the music is not stopped; a stopped one has nothing to lower)
+  const ICON_VOL = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 8h4M13 8h8M3 16h9M18 16h3" /><circle cx="10" cy="8" r="2.6" /><circle cx="15" cy="16" r="2.6" /></svg>';
+  const ICON_LOW = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /></svg>';
+  const ICON_HIGH = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" /></svg>';
+  let volBtn = null, pop = null, range = null, popTimer = null;
+  function closePop() { clearTimeout(popTimer); popTimer = null; if (pop) pop.hidden = true; if (volBtn) volBtn.setAttribute('aria-expanded', 'false'); }
+  function openPop() {
+    if (!pop) return;
+    range.value = String(level); pop.hidden = false; volBtn.setAttribute('aria-expanded', 'true'); kick();
+  }
+  const kick = () => { clearTimeout(popTimer); popTimer = setTimeout(closePop, 6000); }; // the slider folds away by itself
+  // a new level: remembered on this phone, and heard at once when the music is playing (a short ramp, no click)
+  function setLevel(p) {
+    level = cleanLevel(p);
+    store((ls) => ls.setItem(LEVEL_KEY, String(level)));
+    if (ctx && target > 0 && gain) { target = gainNow(); ramp(target, 0.15); }
+  }
+  api.setLevel = setLevel;
+  api.level = () => level;
   function draw() {
     if (!btn) return;
     // shown only to somebody signed in (the sign-in screen has no music and no button)
     btn.hidden = !signedIn();
+    if (volBtn) { volBtn.hidden = !signedIn() || mode !== 'auto'; if (volBtn.hidden) closePop(); }
     const on = sounding(), label = on ? TEXTS.stop : TEXTS.start;
     btn.setAttribute('data-on', on ? '1' : '0');
     btn.setAttribute('aria-label', label); btn.setAttribute('title', label);
@@ -151,7 +187,20 @@
   function build() {
     btn = document.createElement('button');
     btn.type = 'button'; btn.className = 'mus-btn'; btn.id = 'sysMusic'; btn.addEventListener('click', press);
-    document.body.appendChild(btn); draw();
+    volBtn = document.createElement('button');
+    volBtn.type = 'button'; volBtn.className = 'mus-btn mus-vol-btn'; volBtn.id = 'sysMusicVol'; volBtn.hidden = true; volBtn.innerHTML = ICON_VOL;
+    volBtn.setAttribute('aria-label', VOL_TEXT); volBtn.setAttribute('title', VOL_TEXT); volBtn.setAttribute('aria-expanded', 'false');
+    volBtn.addEventListener('click', () => { if (pop.hidden) openPop(); else closePop(); });
+    pop = document.createElement('div');
+    pop.className = 'mus-pop'; pop.id = 'sysMusicPop'; pop.hidden = true; pop.setAttribute('dir', 'ltr'); // low -> high from left to right, whatever the language
+    pop.innerHTML = ICON_LOW + '<input type="range" id="sysMusicRange" min="' + LEVEL_MIN + '" max="' + LEVEL_MAX + '" step="5" aria-label="' + VOL_TEXT + '">' + ICON_HIGH;
+    range = pop.querySelector('input'); range.value = String(level);
+    range.addEventListener('input', () => { setLevel(Number(range.value)); kick(); });
+    // a tap anywhere else folds the slider away
+    document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !volBtn.contains(e.target)) closePop(); }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
+    document.body.appendChild(btn); document.body.appendChild(volBtn); document.body.appendChild(pop);
+    draw();
   }
 
   // ---------- when to be quiet, and the first touch ----------
@@ -173,7 +222,7 @@
   // a browser that refuses sound before a touch: the first tap / key press anywhere (but not on the music button itself) starts it
   const FIRST = ['pointerdown', 'touchend', 'click', 'keydown'];
   function onFirst(e) {
-    if (e.target && e.target.closest && e.target.closest('.mus-btn')) return;
+    if (e.target && e.target.closest && e.target.closest('#sysMusic')) return;
     sync();
     if (sounding()) FIRST.forEach((n) => document.removeEventListener(n, onFirst, true));
   }

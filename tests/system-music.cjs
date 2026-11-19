@@ -37,9 +37,26 @@ assert.equal(M.FADE_IN, S.FADE_IN);
 // the version of the files in the url is the store's too (one set of files)
 const src = fs.readFileSync(path.join(__dirname, '..', 'ar', 'music.js'), 'utf8'), st = fs.readFileSync(path.join(__dirname, '..', 'store', 'music.js'), 'utf8');
 assert.equal(/V = '([^']+)'/.exec(src)[1], /V = '([^']+)'/.exec(st)[1], 'one version of the music files');
-// English: the button's two words
+// the volume option (owner 2026-11-19: «اعملي أوبشن أوطّي الصوت»): the slider's level is its own key on the phone, 60 = the store's own quiet level, and it goes both lower and higher
+assert.equal(M.LEVEL_KEY, 'asker_system_music_vol');
+assert.notEqual(M.LEVEL_KEY, S.KEY); assert.notEqual(M.LEVEL_KEY, M.KEY);
+assert.equal(M.LEVEL_DEFAULT, 60);
+assert.equal(M.levelGain(M.LEVEL_DEFAULT), M.VOLUME, 'the slider starts at exactly the level the customers hear');
+assert.equal(M.cleanLevel(null), 60, 'nothing stored: the store\'s level');
+assert.equal(M.cleanLevel(''), 60);
+assert.equal(M.cleanLevel('abc'), 60, 'rubbish: the store\'s level');
+assert.equal(M.cleanLevel('35'), 35);
+assert.equal(M.cleanLevel(34.6), 35);
+assert.equal(M.cleanLevel(0), M.LEVEL_MIN, 'never fully silent from the slider (the other button stops it)');
+assert.equal(M.cleanLevel(-5), M.LEVEL_MIN);
+assert.equal(M.cleanLevel(500), M.LEVEL_MAX);
+assert.ok(M.levelGain(M.LEVEL_MIN) > 0 && M.levelGain(M.LEVEL_MIN) < 0.01, 'the lowest is a whisper');
+assert.ok(M.levelGain(M.LEVEL_MAX) > M.VOLUME && M.levelGain(M.LEVEL_MAX) <= 0.5, 'and it can go up a little too');
+let prev = -1; for (let p = M.LEVEL_MIN; p <= M.LEVEL_MAX; p += 5) { const g = M.levelGain(p); assert.ok(g > prev, 'each step is louder: ' + p); prev = g; }
+// English: the button's two words and the volume one
 global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
 assert.equal(I.translate(M.TEXTS.stop), 'Stop the quiet music');
 assert.equal(I.translate(M.TEXTS.start), 'Play the quiet music');
+assert.equal(I.translate(M.VOL_TEXT), 'Music volume');
 console.log('system-music ok');
