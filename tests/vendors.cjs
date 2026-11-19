@@ -11,6 +11,21 @@ assert.deepEqual(V.defaultRange(new Date(2026,0,10)),{from:'2025-12-01',to:'2026
 assert.deepEqual(V.rangeArgs({from:'2026-10-01',to:'2026-11-14'}),{from:'2026-10-01T00:00:00',to:'2026-11-15T00:00:00'});
 assert.deepEqual(V.rangeArgs({from:'2026-11-14',to:'2026-10-01'}),{from:'2026-10-01T00:00:00',to:'2026-11-15T00:00:00'},'either order');
 assert.equal(V.rangeArgs({from:'',to:'2026-11-14'}),null);
+// the dates kept on the phone (2026-11-19: an «until» saved as a fixed day froze there and hid the 3,500 invoice of 15/11): «until today» stays today
+const later=new Date(2026,10,19,9,0);
+assert.deepEqual(V.saveRange({from:'2026-10-01',to:'2026-11-14'},now),{from:'2026-10-01',to:'2026-11-14',open:true},'until today when saved');
+assert.deepEqual(V.saveRange({from:'2026-10-01',to:'2026-11-14'},later),{from:'2026-10-01',to:'2026-11-14',open:false},'a past day picked on purpose');
+assert.deepEqual(V.restoreRange({from:'2026-10-01',to:'2026-11-14',open:true},later),{from:'2026-10-01',to:'2026-11-19'},'follows today');
+assert.deepEqual(V.restoreRange({from:'2026-10-01',to:'2026-11-14'},later),{from:'2026-10-01',to:'2026-11-19'},'an old save has no mark: until today');
+assert.deepEqual(V.restoreRange({from:'2026-10-01',to:'2026-10-20',open:false},later),{from:'2026-10-01',to:'2026-10-20'},'a chosen past day stays');
+assert.equal(V.restoreRange(null,later),null);assert.equal(V.restoreRange({from:'2026-10-01'},later),null);
+// a supplier's last invoice after the dates shown is announced
+const rama={last_invoice_at:'2026-11-15 18:25:55'};
+assert.equal(V.lateInvoice(rama,{from:'2026-10-01',to:'2026-11-14'}),'2026-11-15');
+assert.equal(V.lateInvoice(rama,{from:'2026-11-14',to:'2026-10-01'}),'2026-11-15','either order');
+assert.equal(V.lateInvoice(rama,{from:'2026-10-01',to:'2026-11-15'}),null,'the day itself is inside');
+assert.equal(V.lateInvoice({last_invoice_at:null},{from:'2026-10-01',to:'2026-11-14'}),null);
+assert.equal(V.lateInvoice(null,{from:'2026-10-01',to:'2026-11-14'}),null);
 assert.equal(V.qtyText({p:10,u:0,b:1}),'10 + 1 بونص');assert.equal(V.qtyText({p:0,u:2,b:0}),'2 وحدة');assert.equal(V.qtyText({p:3,u:1}),'3 + 1 وحدة');
 assert.equal(Math.round(V.lineValue({p:10,u:0,k:1,c:8.71})*100)/100,87.1);assert.equal(V.lineValue({p:1,u:2,k:4,c:100}),150);
 assert.equal(V.expText('2029-03-28'),'03/2029');assert.equal(V.expText(null),'—');

@@ -224,6 +224,8 @@ window.AskerEN = {
  "فواتير": "Invoices",
  "الأصناف اللي دخلت فواتير الشرا (يعني وافقت عليها) ومارجعتهاش للمورد، وصلاحيتها أقل من سنة وست شهور، الأقصر صلاحية الأول. اللي اترجع للمورد أو اتباع أو جه بعده نفس الصنف بتاريخ أبعد بيتشال من هنا، واللي اتباع منه جزء بيظهر اللي فاضل. وتقدر تعلّم أي صنف «↩️ إرجاع» عشان يروح لبيان المرتجعات.": "Items on the purchase invoices (so you accepted them) that you did not return to the supplier and that expire in less than 18 months, shortest expiry first. What was returned to the supplier, sold, or followed by the same item with a farther date is taken off here, and a part that was sold shows what is left. You can mark any item «↩️ Return» so it goes to the returns statement.",
  "مقدرتش أقرأ المخزون دلوقتي، فالقايمة ممكن يكون فيها صنف اتباع.": "I could not read the stock right now, so the list may include an item that was sold.",
+ "آخر فاتورة للمورد ده بعد الفترة المختارة:": "This supplier's last invoice is after the chosen dates:",
+ "لحد النهارده": "Until today",
  "↩️ مرتجعات": "↩️ Returns",
  "↩️ إرجاع": "↩️ Return",
  "كام علبة؟": "How many boxes?",
