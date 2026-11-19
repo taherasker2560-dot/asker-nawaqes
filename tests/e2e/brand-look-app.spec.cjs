@@ -95,8 +95,8 @@ run('Other screens: the main action buttons are the bot\'s color (the yellow inv
  await page.click('[data-group="purchases"]');
  await page.evaluate(()=>document.querySelector('.subbar .chip[data-tab="docs"], [data-tab="docs"]').click());
  await page.waitForSelector('#dcPickLabel',{state:'visible'});
- const d=await page.evaluate(()=>{const probe=document.createElement('i');probe.style.background='var(--crimson)';document.body.appendChild(probe);const want=getComputedStyle(probe).backgroundColor;probe.remove();const cs=getComputedStyle(document.getElementById('dcPickLabel'));return {want,bg:cs.backgroundColor,r:cs.borderTopLeftRadius,fg:cs.color}});
- assert.equal(d.bg,d.want,'«صوّر فاتورة جديدة» is the bot\'s color, no longer yellow: '+d.bg);
+ const d=await page.evaluate(()=>{const probe=document.createElement('i');probe.style.background='var(--rose)';probe.style.color='var(--crimson)';document.body.appendChild(probe);const want=getComputedStyle(probe).backgroundColor,line=getComputedStyle(probe).color;probe.remove();const cs=getComputedStyle(document.getElementById('dcPickLabel'));return {want,line,bg:cs.backgroundColor,bc:cs.borderTopColor,r:cs.borderTopLeftRadius,fg:cs.color}});
+ assert.equal(d.bg,d.want,'«صوّر فاتورة جديدة» is a big button, so it is SOFT (the tint of the color, owner 2026-11-19 night: the inner pages follow the home): '+d.bg);assert.equal(d.bc,d.line,'with a line in the color');
  assert.equal(d.r,'999px','the buttons stay oval');
  assert.ok(contrast(d.fg,d.bg)>=4.5,'its text reads: '+d.fg+' on '+d.bg);
  assert.deepEqual(await page.evaluate(navyScan),[],'no navy on the invoices screen');

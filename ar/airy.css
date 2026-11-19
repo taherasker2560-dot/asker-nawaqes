@@ -73,3 +73,11 @@ html:not(.night) .su-grid div { background: var(--card); border: 1px solid var(-
 html:not(.night) .cu-bal, html:not(.night) .cu-bal.owe, html:not(.night) .cu-bal.paid, html:not(.night) .cu-bal.zero { background: var(--rose); border: 1px solid var(--rose-line); border-radius: 16px; color: var(--crimson-ink); }
 html:not(.night) .cu-bal::before { display: none; }
 html body .ct-scan { background: var(--crimson); box-shadow: none; }
+
+/* 6) the inner pages follow the home (the owner: «انت سبت السيستم نفسه بكل صفحاته ما اتغيرتش»): the BIG solid buttons of the screens (full width: «صوّر فاتورة جديدة»، «طلب مش موجود»،
+      «جرد عشوائي»، «دفع جديد»، «احفظ البيعة»، «احفظ وترجم») are SOFT like the home's tiles: the tint, a line in the color, the words in the ink of the color; the small buttons stay solid
+      (the color only in small touches). The purchases' three-way switch (نواقص / طلبيات / مخزون) is a row of light chips with the one you are on tinted, no shadow, no solid pill. */
+html body .pgroups { background: transparent; padding: 0; box-shadow: none; gap: 8px; }
+html body .pgroups button { min-height: 40px; background: var(--card); border: 1px solid var(--line); color: var(--muted); font-weight: 600; box-shadow: none; }
+html body .pgroups button.on { background: var(--rose); border-color: var(--crimson); color: var(--crimson-ink); font-weight: 700; box-shadow: none; }
+html body #niAdd, html body .dc-pick, html body .py-new, html body .ct-scan, html body .ts-save, html body button.cu-send { background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); box-shadow: none; font-weight: 800; }
