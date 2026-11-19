@@ -1,5 +1,6 @@
-// «📱 تطبيقات الشغل» (owner 2026-11-19, ar/work-apps.js): the links that open his work apps on Android, the computer's way, the trade name for an app's search,
-// the sentences under a tap, and that the home buttons (ar/shortcuts.js) and the order screen (ar/order-drafts.js) name the same apps.
+// «📱 تطبيقات الشغل» (owner 2026-11-19, ar/work-apps.js): the links that open his work apps on Android (through «مفتاح التطبيقات», which asks him once which app on his phone),
+// the computer's way, the trade name for an app's search, the sentences under a tap, and that the home buttons (ar/shortcuts.js) and the order screen (ar/order-drafts.js)
+// name the same apps. His 11-19 test: WhatsApp Business opened nothing (its link had no «/?») and Ibn Sina opened another app (a package guessed from the web): no package is guessed now.
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 global.window = global;
@@ -9,34 +10,42 @@ const S = require('../ar/shortcuts.js');
 // the seven apps he named, each once
 assert.deepEqual(W.APPS.map((a) => a.id), ['wab', 'cams', 'ibnsina', 'pharma', 'drugeye', 'doses', 'instapay']);
 assert.deepEqual(W.APPS.map((a) => a.label), ['واتساب بيزنس', 'الكاميرات', 'ابن سينا', 'فارما', 'دراج آي', 'الجرعات', 'إنستا باي']);
-for (const a of W.APPS) if (a.pkg) assert.match(a.pkg, /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i, 'a real package name: ' + a.id);
-// WhatsApp Business takes a link: it opens straight, and a phone without it goes to its store page
-assert.equal(W.intentFor(W.BY_ID.wab), 'intent://send#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.whatsapp.w4b;end');
-// an app that takes no link: its Google Play page (Android's own «فتح» starts it)
-assert.equal(W.intentFor(W.BY_ID.drugeye), 'intent://open?pkg=com.phycod.drugeye#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.phycod.drugeye;end');
-assert.equal(W.intentFor({ pkg: 'bad name' }), '', 'never a link from a broken package name');
-assert.equal(W.intentFor({ pkg: 'com.x.y', link: 'javascript:alert(1)' }), 'intent://open?pkg=com.x.y#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.x.y;end', 'only a scheme:// link is used');
-// what a tap does: on the phone a link; on a computer WhatsApp Web, the others «على الموبايل بس»; an app not known yet says so
-assert.deepEqual(W.plan('drugeye', true), { url: 'intent://open?pkg=com.phycod.drugeye#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.phycod.drugeye;end', straight: false });
-assert.equal(W.plan('wab', true).straight, true);
+// no package is guessed from the web: only WhatsApp Business's is certain; the rest is chosen on his phone
+assert.deepEqual(W.APPS.filter((a) => a.pkg).map((a) => [a.id, a.pkg]), [['wab', 'com.whatsapp.w4b']]);
+const fb = (u) => encodeURIComponent(u);
+// every app goes through the helper with its id and name; the helper's download is the fallback (a phone without it)
+const APK = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk';
+assert.equal(W.intentFor(W.BY_ID.ibnsina), `intent://open?app=ibnsina&name=${encodeURIComponent('ابن سينا')}#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=${fb(APK)};end`);
+assert.equal(W.intentFor(W.BY_ID.cams), `intent://open?app=cams&name=${encodeURIComponent('الكاميرات')}#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=${fb(APK)};end`);
+// WhatsApp Business: its certain package rides along (the first version of the helper opens it by that), and its store page is the fallback
+assert.equal(W.intentFor(W.BY_ID.wab), `intent://open?app=wab&name=${encodeURIComponent('واتساب بيزنس')}&pkg=com.whatsapp.w4b#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=${fb('https://play.google.com/store/apps/details?id=com.whatsapp.w4b')};end`);
+assert.equal(W.intentFor({ id: 'Bad Id', label: 'x' }), '', 'never a link from a broken id');
+assert.equal(W.intentFor(null), '');
+assert.ok(!/;end[^$]/.test(W.intentFor(W.BY_ID.drugeye)) && !/\s/.test(W.intentFor(W.BY_ID.drugeye)), 'no spaces in the link');
+// what a tap does: on the phone the link; on a computer WhatsApp Web, the others «على الموبايل بس»; an unknown id says so
+for (const a of W.APPS) assert.deepEqual(W.plan(a.id, true), { url: W.intentFor(a) }, 'every app opens on a phone: ' + a.id);
 assert.deepEqual(W.plan('wab', false), { url: 'https://web.whatsapp.com/', web: true });
 assert.deepEqual(W.plan('instapay', false), { say: W.TEXTS.phoneOnly });
 assert.deepEqual(W.plan('nope', true), { say: W.TEXTS.unknown });
-for (const a of W.APPS) if (!a.pkg) assert.deepEqual(W.plan(a.id, true), { say: W.TEXTS.unknown }, 'not known yet: ' + a.id);
 // the sentences under a tap (each its own sentence for the English engine)
 assert.deepEqual(W.note(W.plan('drugeye', true), true, 'اسم الصنف', 'دراج آي'), ['✅ اتنسخ اسم الصنف.', 'دراج آي بيفتح.', 'الصق جوه التطبيق.']);
-assert.deepEqual(W.note(W.plan('wab', true), null, '', 'واتساب بيزنس'), ['واتساب بيزنس اتفتح.']);
+assert.deepEqual(W.note(W.plan('wab', true), null, '', 'واتساب بيزنس'), ['واتساب بيزنس بيفتح.']);
 assert.deepEqual(W.note(W.plan('ibnsina', true), false, 'الطلبية', 'ابن سينا'), ['مقدرتش أنسخ، انسخ بإيدك.', 'ابن سينا بيفتح.']);
+assert.deepEqual(W.note(W.plan('wab', false), null, '', 'واتساب بيزنس'), ['واتساب بيزنس اتفتح.']);
 assert.deepEqual(W.note(W.plan('instapay', false), true, 'المبلغ', 'إنستا باي'), ['✅ اتنسخ المبلغ.', 'التطبيق ده على الموبايل بس.']);
-// «مفتاح التطبيقات» (apps-android/): the helper the non-link apps go through; its download is the workflow's release file; its package is the Android project's
+// «مفتاح التطبيقات» (apps-android/): its package, release and manifest agree with the page
 assert.equal(W.KEY_PKG, 'com.askerpharmacy.apps');
-assert.equal(W.KEY_APK, 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk');
+assert.equal(W.KEY_APK, APK);
 const gradle = fs.readFileSync(path.join(__dirname, '..', 'apps-android', 'app', 'build.gradle.kts'), 'utf8');
 assert.match(gradle, new RegExp('applicationId = "' + W.KEY_PKG.replace(/\./g, '\\.') + '"'));
 const wf = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'apps-apk.yml'), 'utf8');
 assert.match(wf, /gh release upload apps-build asker-apps\.apk/);
 const manifest = fs.readFileSync(path.join(__dirname, '..', 'apps-android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
 assert.match(manifest, /android:scheme="askerapps" android:host="open"/, 'the helper takes the link the page makes');
+assert.match(manifest, /\.PickActivity/, 'and asks which app, once');
+// the helper's own certain package is the same one the page sends
+const open = fs.readFileSync(path.join(__dirname, '..', 'apps-android', 'app', 'src', 'main', 'java', 'com', 'askerpharmacy', 'apps', 'Open.kt'), 'utf8');
+assert.match(open, /"wab" to listOf\("com\.whatsapp\.w4b"\)/);
 // the trade name for an app's search box
 assert.equal(W.brandOf('CONCOR 5MG 30TAB'), 'CONCOR');
 assert.equal(W.brandOf('MELLITOFIX TRIO 25/5/1000 TAB'), 'MELLITOFIX TRIO');
@@ -55,10 +64,9 @@ require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
 for (const a of W.APPS) assert.notEqual(I.translate(a.label), a.label, 'English: ' + a.label);
 assert.equal(I.translate('تطبيقات الشغل'), 'Work apps');
-for (const k of ['phoneOnly', 'unknown', 'paste', 'noCopy']) assert.notEqual(I.translate(W.TEXTS[k]), W.TEXTS[k], 'English: ' + k);
+for (const k of ['phoneOnly', 'unknown', 'paste', 'noCopy', 'keyHint']) assert.notEqual(I.translate(W.TEXTS[k]), W.TEXTS[k], 'English: ' + k);
+assert.equal(I.translate(W.TEXTS.keyLink), 'Download «Apps key»');
 assert.equal(I.translate('✅ اتنسخ المبلغ.'), '✅ Amount copied.');
 assert.equal(I.translate('دراج آي بيفتح.'), 'Drug Eye is opening.');
-assert.notEqual(I.translate(W.TEXTS.keyHint), W.TEXTS.keyHint);
-assert.equal(I.translate(W.TEXTS.keyLink), 'Download «Apps key»');
 for (const s of ['👁️ دراج آي', '🧮 الجرعات', '💳 انسخ المبلغ وافتح إنستا باي', '📋 انسخ وافتح تطبيق ابن سينا', '📋 انسخ وافتح تطبيق فارما']) assert.notEqual(I.translate(s), s, 'English: ' + s);
 console.log('work-apps ok');

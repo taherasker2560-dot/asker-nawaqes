@@ -3,6 +3,10 @@
 // name copied), a payment order «إنستا باي» (its amount copied), an Ibn Sina / Pharma order «انسخ وافتح» (the order copied). On a computer the phone-only
 // buttons are not drawn and WhatsApp Business opens WhatsApp Web. The phone's own way of following a link is replaced by a recorder (AskerWorkApps.go).
 const {run,assert}=require('./harness.cjs');
+const APK='https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk';
+// the link every app button follows on Android: the helper, with the app's id and name (it asks which app on the phone, once); the helper's download when it is missing
+const key=(id,label)=>`intent://open?app=${id}&name=${encodeURIComponent(label)}#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=${encodeURIComponent(APK)};end`;
+const WAB=`intent://open?app=wab&name=${encodeURIComponent('واتساب بيزنس')}&pkg=com.whatsapp.w4b#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.whatsapp.w4b;end`;
 const ANDROID=()=>{Object.defineProperty(Navigator.prototype,'userAgent',{configurable:true,get:()=>'Mozilla/5.0 (Linux; Android 14; SM-A525F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36'})};
 const CLIP=()=>{window.__clip=null;Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async(t)=>{window.__clip=t},readText:async()=>window.__clip||''}})};
 const ready=(page)=>page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
@@ -19,7 +23,7 @@ const openOrders=async(page)=>{await page.evaluate((d)=>{window.__storage['order
  await page.evaluate(()=>document.querySelectorAll('details.od-fold').forEach(d=>{d.open=true})); // the orders' folds (2026-11-17) start closed
  await page.waitForSelector('#odChips [data-sup="IBNSINA"]')};
 
-run('work apps on Android: home buttons open the apps (WhatsApp Business straight, the others by their store page), one not known yet says so, the sheet has the group',async({page})=>{
+run('work apps on Android: home buttons open every app through the helper (the id and the name in the link; WhatsApp Business with its certain package), the sheet has the group',async({page})=>{
  await page.addInitScript(ANDROID);await page.addInitScript(CLIP);
  await page.evaluate(()=>localStorage.setItem('asker-home-buttons',JSON.stringify(['short','app_wab','app_drugeye','app_cams'])));
  await page.reload();await ready(page);await rec(page);
@@ -29,23 +33,23 @@ run('work apps on Android: home buttons open the apps (WhatsApp Business straigh
  assert.ok(b[1].cls.includes('qa-app'),'an app button looks apart (it leaves the system)');
  await page.click('#homePanel [data-qa="app_wab"]');
  await page.waitForFunction(()=>window.__went.length===1);
- assert.equal(await page.evaluate(()=>window.__went[0]),'intent://send#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.whatsapp.w4b;end');
- assert.equal(await toast(page),'واتساب بيزنس اتفتح.');
+ assert.equal(await page.evaluate(()=>window.__went[0]),WAB);
+ assert.equal(await toast(page),'واتساب بيزنس بيفتح.');
  assert.ok(await page.isVisible('#homePanel'),'the system stays where it was');
  await page.click('#homePanel [data-qa="app_drugeye"]');
  await page.waitForFunction(()=>window.__went.length===2);
- assert.equal(await page.evaluate(()=>window.__went[1]),'intent://open?pkg=com.phycod.drugeye#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.phycod.drugeye;end');
+ assert.equal(await page.evaluate(()=>window.__went[1]),key('drugeye','دراج آي'));
  assert.equal(await toast(page),'دراج آي بيفتح.');
  await page.click('#homePanel [data-qa="app_cams"]');
- await page.waitForFunction(()=>/لسه ما عرفتش/.test(document.getElementById('appToast').textContent));
- assert.equal(await page.evaluate(()=>window.__went.length),2,'nothing is opened for an app not known yet');
+ await page.waitForFunction(()=>window.__went.length===3);
+ assert.equal(await page.evaluate(()=>window.__went[2]),key('cams','الكاميرات'),'an app the system does not know the package of goes to the helper too (it asks which one)');
  // the sheet: «تطبيقات الشغل», the ones not on the home yet are there to add
  await page.click('#qaEdit');
  assert.match(await page.textContent('#qaSheet'),/تطبيقات الشغل/);
  for(const t of['app_ibnsina','app_pharma','app_doses','app_instapay'])assert.ok(await page.isVisible(`#qaSheet [data-qa-flip="${t}"]`),'to add: '+t);
  // «مفتاح التطبيقات»: its download, on Android
  assert.equal(await page.getAttribute('#qaKeyApk','href'),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk');
- assert.match(await page.textContent('.qa-key'),/بدوسة واحدة/);
+ assert.match(await page.textContent('.qa-key'),/بيسألك تختاره/);
  await page.click('#qaSheet [data-qa-flip="app_instapay"]');await page.click('#qaDone');
  assert.equal(await page.getAttribute('#homePanel [data-qa="app_instapay"]','data-app'),'instapay');
 },{home:true});
@@ -70,7 +74,7 @@ run('work apps on Android: an item card has «دراج آي» / «الجرعات
  assert.equal(await page.getAttribute('.py-apps [data-app="instapay"]','data-copy'),'50000.5');
  await page.click('.py-apps [data-app="instapay"]');
  await page.waitForFunction(()=>window.__went.length===2);
- assert.equal(await page.evaluate(()=>window.__went[1]),'intent://open?pkg=com.egyptianbanks.instapay#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.egyptianbanks.instapay;end');
+ assert.equal(await page.evaluate(()=>window.__went[1]),key('instapay','إنستا باي'));
  assert.equal(await page.evaluate(()=>window.__clip),'50000.5');
  assert.equal(await page.evaluate(()=>window.__tables.ar_pay_orders[0].status),'approved','nothing paid or changed by it');
  // the Ibn Sina order: the order is copied and its app opens; another supplier has no app button
@@ -83,7 +87,7 @@ run('work apps on Android: an item card has «دراج آي» / «الجرعات
  assert.equal(await page.getAttribute('#odApp','data-copy'),msg);
  await page.click('#odApp');
  await page.waitForFunction(()=>window.__went.length===3);
- assert.equal(await page.evaluate(()=>window.__went[2]),'intent://open?pkg=com.ibnsina_pharma.selfservice#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.ibnsina_pharma.selfservice;end');
+ assert.equal(await page.evaluate(()=>window.__went[2]),key('ibnsina','ابن سينا'));
  assert.equal(await page.evaluate(()=>window.__clip),msg);
  assert.match(await toast(page),/^✅ اتنسخ الطلبية\. ابن سينا بيفتح/);
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_orders),[],'nothing marked as ordered by it');

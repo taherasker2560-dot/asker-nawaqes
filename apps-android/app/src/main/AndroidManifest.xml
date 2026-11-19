@@ -48,5 +48,11 @@
                 <data android:scheme="askerapps" android:host="open" />
             </intent-filter>
         </activity>
+
+        <!-- the list of his apps: «اختار تطبيق …» (the first time a system button is tapped; «غيّر» in the app's own screen) -->
+        <activity
+            android:name=".PickActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- the debug build (CI only): the door the test uses to «choose» an app as he would in the list. The owner's build has none. -->
+    <application>
+        <receiver android:name="com.askerpharmacy.apps.DebugReceiver" android:exported="true" />
+    </application>
+</manifest>
