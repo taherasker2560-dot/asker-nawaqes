@@ -9,6 +9,7 @@ const txt=(page,sel)=>page.$eval(sel,(x,f)=>new Function('x','return ('+f+')(x)'
 const seed=(page)=>page.evaluate(()=>{
  const iso=(d)=>new Date(Date.now()-d*864e5).toISOString();
  window.__tables.ar_store_items=[{id:5,name:'AUGMENTIN 1GM 14 TAB',arabic_name:'اوجمنتين',status:'available',price:160,is_listed:true},{id:7,name:'CATAFLAM 50MG 20 TAB',arabic_name:null,status:'available',price:85,is_listed:true}];
+ window.__tables.ar_waitlist=[{id:1,status:'waiting'}];   // somebody is waiting: only then the home asks the overview (the other specs have nobody, and the call is not made)
  const S=window.__wl={
   waiting:[{id:1,item_id:7,item:'CATAFLAM 50MG 20 TAB',qty:1,phone:'01055556666',who:'عميل مثال_01055556666',vendor_id:10,vendor:'المتحدة للأدوية',vkind:'warehouse',days:2},
            {id:2,item_id:null,item:'PHARMABILAST ORAL',qty:2,phone:'01099998888',who:null,vendor_id:null,vendor:null,vkind:null,days:0}],
@@ -170,4 +171,11 @@ run('Waiting list in English: no Arabic left on the screen except names, and the
  assert.deepEqual(left,[],'Arabic left: '+left.join(' | '));
  const all=await txt(page,'#waitPanel');
  for(const s of ['Waiting list','Call these','Waiting for the medicine','Return or keep','1 day left to return','Sold in the last year: 3.5 packs','Set the supplier kind to see the return deadline','Arrived 22 days ago','Asked 2 days ago','Put it on the waiting shelf','Is this supplier a warehouse or a distribution center? (once only)'])assert.ok(all.includes(s),'missing in English: '+s);
+});
+
+run('Waiting list: when nobody is waiting the home asks the server nothing (no call, nothing written)',async({page})=>{
+ await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_waitlist_overview:()=>({ok:true,waiting:[],call:[],leftover:[],vendors:[]})})});
+ await page.evaluate(()=>window.AskerNotify.tick());
+ await page.waitForTimeout(300);
+ assert.equal((await page.evaluate(()=>window.__fakeWrites)).filter(w=>w.rpc==='ar_waitlist_overview').length,0);
 });
