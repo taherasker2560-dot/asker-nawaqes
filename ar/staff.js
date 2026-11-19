@@ -12,7 +12,7 @@
   // [key, label, group]: every section of the bot that can be given, and the extras
   const SECTIONS = [
     ['tempsale', 'البيع المؤقت', 'المبيعات'], ['return', 'المرتجع (في البيع المؤقت)', 'المبيعات'], ['credit', 'البيع للعملاء الآجل', 'المبيعات'], ['storeorders', 'الموقع', 'المبيعات'],
-    ['stock', 'المخزون', 'المخزون'], ['count', 'جرد المخزون', 'المخزون'], ['expiry', 'الصلاحيات', 'المخزون'],
+    ['stock', 'المخزون', 'المخزون'], ['count', 'جرد المخزون', 'المخزون'], ['expiry', 'الصلاحيات', 'المخزون'], ['returns', 'تجهيز المرتجعات (جوه الصلاحيات)', 'المخزون'],
     ['short', 'النواقص', 'المشتريات'], ['read', 'الوارد', 'المشتريات'], ['translate', 'الترجمة', 'المشتريات'], ['drafts', 'الطلبيات', 'المشتريات'], ['docs', 'الفواتير', 'المشتريات'], ['suppliers', 'قوايم المخازن', 'المشتريات'],
     ['customers', 'العملاء', 'الحسابات'], ['care', 'رسايل العملاء', 'خدمة العملاء'], ['search', 'البحث اللي فوق الأقسام', 'عام'],
   ];
@@ -20,7 +20,8 @@
   const GROUP = { short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', customers: 'accounts', storeorders: 'sales', tempsale: 'sales', care: 'care' };
   const PGROUP = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const TABS = Object.keys(GROUP);
-  const allowedTabs = (perms) => TABS.filter((t) => (perms || []).includes(t));
+  // «returns» (preparing the returns statement) lives inside «الصلاحيات»: it opens that tab for him even when «الصلاحيات» itself is not open
+  const allowedTabs = (perms) => TABS.filter((t) => (perms || []).includes(t) || (t === 'expiry' && (perms || []).includes('returns')));
   // a tab that is not open for him becomes another open tab of the same section, or his home
   function fixTab(tab, perms) {
     if (tab === 'home' || (perms || []).includes(tab)) return tab;

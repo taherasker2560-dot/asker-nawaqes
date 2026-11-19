@@ -2079,6 +2079,16 @@ html.staff [data-al-view='short'] { display: none; }
 .sd-name { font-weight: 700; overflow-wrap: anywhere; }
 .sd-main small, .sd-exp small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .sd-main small.sd-doc { color: inherit; font-size: 13px; }
+/* «↩️ إرجاع» on a line and the view «↩️ مرتجعات» (ar/return-marks.js, owner 2026-11-19) */
+.sd-ret, .rm-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.sd-ret button, .rm-ctl button, .rm-actions button, .rm-actions a { padding: 4px 10px; font-size: 13px; min-height: 0; }
+.sd-ret label { font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+.sd-ret input { width: 3.8em; padding: 3px 6px; text-align: center; }
+.rm-chip { font-size: 12px; border: 1px solid var(--crimson); color: var(--crimson-ink); border-radius: 999px; padding: 2px 8px; }
+.rm-chip.prepared { background: var(--crimson); color: #fff; }
+.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.rm-group { margin-top: 10px; }
+.rm-statement textarea { width: 100%; box-sizing: border-box; min-height: 7em; font: inherit; font-size: 13px; line-height: 1.7; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: transparent; color: inherit; }
 .sd-exp { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: end; }
 .sd-exp b { font-size: 16px; }
 .sd-row.red .sd-exp b { color: #b42318; }
