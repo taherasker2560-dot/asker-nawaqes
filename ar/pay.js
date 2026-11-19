@@ -156,6 +156,10 @@
     if (o.status === 'mismatch') b.push(['accept', 'هي دي، اقفله', 'p'], ['skip', 'مش هي', '']);
     if (isOpen(o)) b.push(sure === String(o.id) ? ['cancel', 'متأكد؟ الغيه', 'warn'] : ['ask', o.status === 'mismatch' ? 'الغي الأمر' : 'الغي', '']);
     html += `<div class="py-acts">${b.map(([a, t, c]) => `<button type="button" class="${c === 'p' ? 'py-p' : c === 'warn' ? 'py-warn' : 'secondary'} small" data-py-act="${a}" data-py-id="${esc(o.id)}"${busy ? ' disabled' : ''}>${esc(t)}</button>`).join('')}</div>`;
+    // «إنستا باي» on the phone (owner 2026-11-19, ar/work-apps.js): the amount is copied and the app opens; the payment itself is his, in the app
+    if (isOpen(o) && root.AskerWorkApps && root.AskerWorkApps.android()) {
+      html += `<div class="py-apps"><button type="button" class="secondary small" data-app="instapay" data-copy="${esc(String(Math.round(num(o.amount) * 100) / 100))}" data-copy-what="المبلغ">💳 انسخ المبلغ وافتح إنستا باي</button></div>`;
+    }
     return html + '</div>';
   }
   function drawMain() {

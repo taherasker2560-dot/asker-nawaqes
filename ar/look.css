@@ -2353,3 +2353,8 @@ html.night .py-fix { color: var(--ink); }
 .mus-pop[hidden] { display: none; }
 .mus-pop svg { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .mus-pop input[type=range] { width: 150px; margin: 0; accent-color: var(--crimson); }
+/* «📱 تطبيقات الشغل» (ar/work-apps.js, owner 2026-11-19): an app button on the home is outlined (it leaves the system), the item / payment rows of app buttons */
+.card.home .qa button.qa-app { background: var(--card); color: var(--ink); border: 1.5px solid var(--crimson); box-shadow: none; }
+.card.home .qa button.qa-app svg { color: var(--crimson); }
+.hs-apps, .py-apps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.hs-apps .chip { margin: 0; }

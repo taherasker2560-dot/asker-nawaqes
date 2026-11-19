@@ -412,6 +412,14 @@
     if (!s) return;
     const p = picked(s, state(current)), to = toId(), priced = to !== s.id && knowsOffers(s);
     $('odMsg').value = buildMessageTo(s, state(current), to);
+    // the supplier's own app on the phone (owner 2026-11-19, ar/work-apps.js): the order is copied and ابن سينا / فارما opens (Android only)
+    const W = root.AskerWorkApps, app = W && W.ORDER_APP[to], ab = $('odApp');
+    if (ab) {
+      const on = !!(app && W.android() && p.length);
+      ab.classList.toggle('hidden', !on);
+      if (on) { ab.dataset.app = app; ab.dataset.copy = $('odMsg').value; ab.textContent = app === 'ibnsina' ? '📋 انسخ وافتح تطبيق ابن سينا' : '📋 انسخ وافتح تطبيق فارما'; }
+      else delete ab.dataset.app;
+    }
     $('odTotal').textContent = p.length
       ? `${p.length} من ${s.items.length} صنف في الطلب، حوالي ${money(priced ? totalAt(p, to, s.id) : totalOf(p))} ج ${priced ? 'بخصومات ' + labelOf(to) : 'بعد الخصم'}`
       : !s.items.length && (hiddenBy[current] || []).length ? 'كل أصناف الطلبية دي اتطلبت النهارده' : 'مفيش أصناف معلّم عليها في الطلب';
