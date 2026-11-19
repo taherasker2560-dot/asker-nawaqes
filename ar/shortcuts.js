@@ -3,10 +3,15 @@
    1) the grid under the numbers shows the sections he picked, up to 12, in his order (the first time: the six it always had);
    2) «✏️ عدّل الزراير» opens a sheet: the ones on the home in their order (▲ ▼ ✕), then every other section by group (+ ضيف);
    3) inside every section a 📌 at the end of its small tabs puts it on the home or takes it off (with «شيله» / «رجّعه»).
-   Kept on this phone (localStorage); writes nothing to the server. Staff never see this home (they have their own). */
+   Kept on this phone (localStorage); writes nothing to the server. Staff never see this home (they have their own).
+   2026-11-19 (owner: «ارتب التابات اللي في الرئيسية … دوسة طويلة على التاب وأسحبه لأي مكان في الترتيب … عدد التابات لحد 30 … وتزود القايمة بناء على الشغل الجديد»):
+   4) up to 30 buttons (was 12);
+   5) press and HOLD a button on the home (about half a second): it lifts, follows the finger, the others make room, let go where you want it; a quick tap still opens the section;
+   6) the list of what a button can open also has the new screens that live inside a section (المستخدمين، إعدادات الموقع، أصناف جديدة، مقارنة الطلبيات، فاتورة المندوب، كشف المرتجعات):
+      such a button opens the section and scrolls to that screen. */
 (function (root) {
   'use strict';
-  const MAX = 12;
+  const MAX = 30;
   const KEY = 'asker-home-buttons';
   const DEFAULT = ['short', 'read', 'drafts', 'docs', 'tempsale', 'stock'];
   // [tab, label, group, icon]: every section a button can open (the tabs of ar/app.js showTab)
@@ -31,13 +36,31 @@
     ['sales', 'حركة البيع', 'المبيعات', 'M4 19h16M7 16V10M12 16V6M17 16v-4'],
     ['tempsale', 'البيع المؤقت', 'المبيعات', 'M4 7h16v12H4zM8 7V5h8v2M8 12h8M8 15h5'],
     ['care', 'الرسايل', 'خدمة العملاء', 'M4 5h16v11H9l-5 4z'],
+    // the screens that live INSIDE a section (owner 2026-11-19): [id, label, group, icon, the section it opens, the block it scrolls to]
+    ['users', 'المستخدمين', 'المبيعات', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0', 'storeorders', 'siteUsers'],
+    ['sitesettings', 'إعدادات الموقع', 'المبيعات', 'M4 8h9M17 8h3M4 16h3M11 16h9M15 5v6M7 13v6', 'storeorders', 'storeSettings'],
+    ['newitems', 'أصناف جديدة', 'المشتريات', 'M5 4h14v16H5zM12 9v6M9 12h6', 'short', 'niBox'],
+    ['compare', 'مقارنة الطلبيات', 'المشتريات', 'M7 4v16M17 4v16M4 8l3-4 3 4M14 16l3 4 3-4', 'drafts', 'cmpBox'],
+    ['repinv', 'فاتورة المندوب', 'المشتريات', 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6', 'drafts', 'repBox'],
+    ['returns', 'كشف المرتجعات', 'الحسابات', 'M9 6L4 11l5 5M4 11h10a5 5 0 0 1 0 10h-2', 'vendors', 'rtBox'],
+    ['sitelink', 'رابط الموقع', 'المبيعات', 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1', 'storeorders', 'storeLink'],
+    ['sitepay', 'الدفع بتحويل', 'المبيعات', 'M3 8h18v10H3zM3 12h18M7 16h3', 'storeorders', 'ssPayBox'],
+    ['sitelook', 'شكل الموقع', 'المبيعات', 'M12 3a9 9 0 1 0 0 18c1.5 0 2-1 1.5-2.2-.6-1.4.2-2.8 1.8-2.8H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01', 'storeorders', 'ssThemeBox'],
+    ['ordneeds', 'محتاج قرارك', 'المشتريات', 'M12 8v5M12 17h.01M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', 'drafts', 'stBox'],
+    ['ordnew', 'جديد في أمر الشراء', 'المشتريات', 'M4 5h2l2 10h10l2-7H7M12 8v5M9.5 10.5h5', 'drafts', 'odNewBox'],
+    ['whofrom', 'الصنف جه من مين', 'الحسابات', 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M21 21l-4.3-4.3M11 8v3l2 1', 'vendors', 'veFindBox'],
+    ['todo', 'محتاج شغل', 'الرئيسية', 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h9', 'home', 'todoCard'],
+    ['notes', 'ملاحظاتي', 'الرئيسية', 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5', 'home', 'notesCard'],
   ];
   const LABEL = Object.fromEntries(ALL.map((x) => [x[0], x[1]]));
   const ICON = Object.fromEntries(ALL.map((x) => [x[0], x[3]]));
+  // what a button opens: its own section, or (for a screen inside a section) that section and the block to scroll to
+  const TAB_OF = Object.fromEntries(ALL.map((x) => [x[0], x[4] || x[0]]));
+  const ANCHOR_OF = Object.fromEntries(ALL.filter((x) => x[5]).map((x) => [x[0], x[5]]));
   const GROUPS = [...new Set(ALL.map((x) => x[2]))];
 
   // ---------- pure helpers (tests/home-shortcuts.cjs) ----------
-  // known sections only, each once, at most 12
+  // known sections only, each once, at most 30
   function clean(list) {
     const out = [];
     for (const t of Array.isArray(list) ? list : []) if (LABEL[t] && !out.includes(t) && out.length < MAX) out.push(t);
@@ -48,7 +71,7 @@
     if (raw == null || raw === '') return DEFAULT.slice();
     try { const v = JSON.parse(raw); return Array.isArray(v) ? clean(v) : DEFAULT.slice(); } catch (e) { return DEFAULT.slice(); }
   }
-  // on → off, off → on (at the end); a 13th is refused
+  // on → off, off → on (at the end); a 31st is refused
   function toggle(list, tab) {
     if (!LABEL[tab]) return { list, changed: false };
     if (list.includes(tab)) return { list: list.filter((t) => t !== tab), changed: true, added: false };
@@ -63,7 +86,7 @@
     [out[i], out[j]] = [out[j], out[i]];
     return out;
   }
-  const api = { MAX, KEY, DEFAULT, ALL, LABEL, clean, parse, toggle, move };
+  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, clean, parse, toggle, move };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -81,8 +104,92 @@
   function drawHome() {
     const box = document.querySelector('#homePanel .qa');
     if (!box) return;
-    box.innerHTML = mine.map((t) => `<button type="button" data-go="${t}">${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
+    // data-go = the section it opens, data-qa = which button it is (the order after a drag is read from these), data-anchor = the block to scroll to
+    box.innerHTML = mine.map((t) => `<button type="button" data-go="${TAB_OF[t]}" data-qa="${t}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
     box.classList.toggle('qa-none', !mine.length);
+  }
+
+  // ---------- press and hold, then drag a button where he wants it (owner 2026-11-19) ----------
+  // A quick tap opens the section as before. About half a second of holding (a finger that moves before that is only scrolling) lifts the button:
+  // a copy follows the finger, the real one stays as a dashed place-holder and moves between the others, the page scrolls itself near the top / bottom edge
+  // (thirty buttons are more than a screen), and where he lets go is the new order, kept on this phone.
+  const HOLD_MS = 450, SLOP = 9, EDGE = 90, BOTTOM = 160, STEP = 14;
+  let press = null, drag = null, swallowUntil = 0;
+  const homeBox = () => document.querySelector('#homePanel .qa');
+  const buttonsOf = (box) => [...box.querySelectorAll(':scope > button[data-qa]')].filter((b) => !b.classList.contains('qa-ghost'));
+  function endPress() { if (press) { clearTimeout(press.timer); press = null; } }
+  function lift() {
+    const p = press, box = homeBox();
+    press = null;
+    if (!p || !box || !p.el.isConnected) return;
+    const r = p.el.getBoundingClientRect();
+    const ghost = p.el.cloneNode(true);
+    ghost.classList.add('qa-ghost');
+    ['data-go', 'data-qa', 'data-anchor'].forEach((a) => ghost.removeAttribute(a));
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.tabIndex = -1;
+    ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:60;pointer-events:none`;
+    box.appendChild(ghost);
+    p.el.classList.add('qa-ph');
+    document.body.classList.add('qa-dragging');
+    drag = { el: p.el, ghost, pid: p.pid, dx: p.x - r.left, dy: p.y - r.top, x: p.x, y: p.y, scroller: setInterval(autoScroll, 16) };
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* no vibration here */ }
+  }
+  // the copy follows the finger; the place-holder takes the place of the button the finger is over (a swap, so it never flickers back and forth)
+  function place() {
+    const d = drag;
+    if (!d) return;
+    d.ghost.style.left = d.x - d.dx + 'px';
+    d.ghost.style.top = d.y - d.dy + 'px';
+    const under = document.elementFromPoint(d.x, d.y);
+    const t = under && under.closest ? under.closest('#homePanel .qa > button[data-qa]') : null;
+    if (!t || t === d.el || t.classList.contains('qa-ghost')) return;
+    const list = buttonsOf(d.el.parentNode);
+    if (list.indexOf(t) > list.indexOf(d.el)) t.after(d.el); else t.before(d.el);
+  }
+  function autoScroll() {
+    const d = drag;
+    if (!d) return;
+    const dy = d.y < EDGE ? -STEP : d.y > window.innerHeight - BOTTOM ? STEP : 0; // BOTTOM leaves room for the bar at the bottom
+    if (dy) { window.scrollBy(0, dy); place(); }
+  }
+  function drop() {
+    const d = drag;
+    drag = null;
+    if (!d) return;
+    clearInterval(d.scroller);
+    d.ghost.remove();
+    d.el.classList.remove('qa-ph');
+    document.body.classList.remove('qa-dragging');
+    const next = clean(buttonsOf(d.el.parentNode).map((b) => b.dataset.qa));
+    if (next.length === mine.length && next.some((t, i) => t !== mine[i])) { mine = next; save(); }
+    drawHome();
+    swallowUntil = Date.now() + 500; // the click that follows the let-go must not open the section
+  }
+  function onDown(e) {
+    if (drag || press || (e.button != null && e.button > 0)) return;
+    const b = e.target.closest ? e.target.closest('#homePanel .qa > button[data-qa]') : null;
+    if (!b) return;
+    press = { el: b, x: e.clientX, y: e.clientY, pid: e.pointerId, timer: setTimeout(lift, HOLD_MS) };
+  }
+  function onMove(e) {
+    if (press && e.pointerId === press.pid) {
+      if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > SLOP) endPress(); // moved before the hold: he is scrolling or sliding off, not holding
+      return;
+    }
+    if (drag && e.pointerId === drag.pid) { drag.x = e.clientX; drag.y = e.clientY; place(); }
+  }
+  function onUp() { endPress(); drop(); }
+  function bindDrag() {
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp); // whatever the phone does mid-drag, what is lifted is dropped where it is: nothing is lost
+    // a lifted button must not scroll the page under the finger (only the page's own edge scrolling moves it)
+    document.addEventListener('touchmove', (e) => { if (drag && e.cancelable) e.preventDefault(); }, { passive: false });
+    // the phone's long-press menu is not wanted on the buttons
+    document.addEventListener('contextmenu', (e) => { if ((press || drag) || (e.target.closest && e.target.closest('#homePanel .qa > button'))) e.preventDefault(); });
+    document.addEventListener('click', (e) => { if (Date.now() < swallowUntil) { swallowUntil = 0; e.stopPropagation(); e.preventDefault(); } }, true);
   }
 
   // 3) the 📌 at the end of each row of small tabs (and on top of «الرسايل», which has none)
@@ -126,7 +233,7 @@
   function flip(tab, fromPin) {
     const r = toggle(mine, tab);
     if (r.full) {
-      toast('<span>الرئيسية مليانة (12 زرار). شيل واحد الأول من «✏️ عدّل الزراير».</span>');
+      toast(`<span>الرئيسية مليانة (${MAX} زرار). شيل واحد الأول من «✏️ عدّل الزراير».</span>`);
       return;
     }
     if (!r.changed) return;
@@ -157,10 +264,10 @@
         `<button type="button" class="small qa-add" data-qa-flip="${t}"${full ? ' disabled' : ''}>+ ضيف</button></div>`).join('');
     }).join('');
     sh.innerHTML = `<div class="bg-sheet-in qa-sheet-in" role="dialog" aria-label="زراير الرئيسية">` +
-      `<h3><span>زراير الرئيسية</span> <small>${mine.length} من 12 زرار</small></h3>` +
-      `<p class="hint">اللي هنا ظاهر في الرئيسية بالترتيب ده: الأسهم بترتّبهم، و✕ بيشيل الزرار.</p>` +
+      `<h3><span>زراير الرئيسية</span> <small>${mine.length} من ${MAX} زرار</small></h3>` +
+      `<p class="hint">اللي هنا ظاهر في الرئيسية بالترتيب ده: الأسهم بترتّبهم، و✕ بيشيل الزرار. وفي الرئيسية نفسها دوس دوسة طويلة على أي زرار واسحبه لمكانه.</p>` +
       (onRows || '<p class="hint">مفيش زراير في الرئيسية. ضيف من تحت.</p>') +
-      (rest ? `<h3 class="qa-more">ضيف من الأقسام</h3>` + (full ? '<p class="hint">الرئيسية فيها 12 زرار. شيل واحد الأول عشان تضيف.</p>' : '') + rest : '') +
+      (rest ? `<h3 class="qa-more">ضيف من الأقسام</h3>` + (full ? `<p class="hint">الرئيسية فيها ${MAX} زرار. شيل واحد الأول عشان تضيف.</p>` : '') + rest : '') +
       `<div class="bg-sheet-btns"><button type="button" id="qaDone">تمام</button><button type="button" class="secondary" id="qaReset">رجّع الأصلي</button></div></div>`;
   }
   function openSheet() { drawSheet(); $('qaSheet').classList.remove('hidden'); }
@@ -188,6 +295,7 @@
     pinRows();
     drawPins();
     document.addEventListener('click', onClick);
+    bindDrag();
   }
   Object.assign(api, { onTab, open: openSheet, mine: () => mine.slice() });
   root.AskerShortcuts = api;
