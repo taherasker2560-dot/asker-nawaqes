@@ -26,7 +26,7 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
   T.ar_pay_orders=[
    {id:10,kind:'vendor',account_id:4,account_name:'احتياطى',vendor_id:2374,cat_id:null,who:'A M group',amount:10000,memo:null,status:'mismatch',created_at:iso(2),approved_at:iso(2),move_id:505,move:{id:505,at:loc(36e5),account_id:3,amount:-9500,who:'A M group'}},
    {id:11,kind:'vendor',account_id:4,account_name:'احتياطى',vendor_id:2495,cat_id:null,who:'IBN SINA 1',amount:50000,memo:null,status:'approved',created_at:iso(3),approved_at:iso(3),move_id:null,move:null},
-   {id:12,kind:'vendor',account_id:3,account_name:'محفظه فودافون',vendor_id:7,cat_id:null,who:'kemi pharm',amount:37750,memo:null,status:'matched',created_at:iso(50),approved_at:iso(50),move_id:501,move:null}];
+   {id:12,kind:'vendor',account_id:3,account_name:'محفظه فودافون',vendor_id:7,cat_id:null,who:'kemi pharm',amount:37000,memo:null,status:'matched',created_at:iso(50),approved_at:iso(50),move_id:501,move:{id:501,at:loc(2*864e5),account_id:3,amount:-37750,who:'kemi pharm',fix:750,fix_ids:[601]}}];
   // the server's functions, played
   let seq=100;const calls=window.__payCalls=[];
   window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{
@@ -59,7 +59,9 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
  assert.equal(paid.length,6);
  assert.match(paid.join('|'),/لصاحب المنشأة · طاهر 20,000 ج \d\d\/\d\d \d\d:\d\d · احتياطى اتدخلت في فارمافلاي/,'the owner\'s note is his name; no «undefined»');
  assert.match(paid[0],/A M group 9,500 ج .*اتدخلت في فارمافلاي/);
- assert.match(paid.join('|'),/kemi pharm 37,750 ج .*محفظه فودافون ✓ من أمر دفع/);
+ // paid 37,750 for an order of 37,000, then «دعم من صاحب المنشأة» 750 in that box (2026-11-19): closed by itself, and it says so
+ assert.match(paid.join('|'),/kemi pharm 37,750 ج .*محفظه فودافون ✓ من أمر دفع اتصلّح بدعم 750 ج · الأمر كان 37,000 ج/);
+ assert.equal(await page.$$eval('#pyMain .py-fix',x=>x.length),1,'only the corrected payment has the line');
  await page.click('[data-py-filter="expense"]');assert.deepEqual((await texts(page,'#pyMain .py-move')).length,1);
  await page.click('[data-py-filter="vendor"]');assert.deepEqual((await texts(page,'#pyMain .py-move')).length,4);
  await page.click('[data-py-filter="owner"]');assert.deepEqual((await texts(page,'#pyMain .py-move')).length,1);

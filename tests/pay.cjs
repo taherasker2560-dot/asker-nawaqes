@@ -34,6 +34,13 @@ const O = [
 assert.deepEqual(P.needs(O, now), { look: 2, wait: 2 }, 'a difference and a late one ring; two wait for his yes');
 assert.deepEqual(P.openOrders(O, now).map((o) => o.id), [3, 4, 7, 2, 1], 'difference, late, waiting (newest first), approved');
 assert.deepEqual(Object.keys(P.byMove(O)), ['77']);
+// paid more, corrected with «دعم من صاحب المنشأة» (2026-11-19): the total the server kept on the order's move; 0 otherwise
+assert.equal(P.fixOf({ status: 'matched', amount: 5, move: { id: 1, amount: -10, fix: 5 } }), 5);
+assert.equal(P.fixOf({ status: 'matched', amount: 249.9, move: { id: 1, amount: -534, fix: '284.10' } }), 284.1);
+assert.equal(P.fixOf({ status: 'matched', amount: 5, move: { id: 1, amount: -5 } }), 0, 'closed on the exact amount');
+assert.equal(P.fixOf({ status: 'matched', move: null }), 0);
+assert.equal(P.fixOf({ status: 'mismatch', move: { fix: 5 } }), 0, 'only a closed order');
+assert.equal(P.fixOf(undefined), 0);
 // the totals of the last 30 days (PharmaFly's local time) and the filters
 const pad = (n) => String(n).padStart(2, '0');
 const loc = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
