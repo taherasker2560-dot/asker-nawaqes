@@ -316,7 +316,9 @@
   }));
   const standalone = () => (root.matchMedia && root.matchMedia('(display-mode: standalone)').matches) || root.navigator.standalone === true;
   function drawInstall() {
-    $('spInstallBox').hidden = standalone() || !token;
+    // hidden only inside the supplier's OWN installed app. The pharmacy's phone opens this page inside the installed system app (the same site), which also reports «standalone»:
+    // there the box stays, so the owner sees what the supplier sees (owner 2026-11-20: «فين أيقونة تثبيت ابلكيشن الموردين؟»)
+    $('spInstallBox').hidden = (standalone() && !preview) || !token;
     const btn = $('spInstall');
     btn.disabled = preview || installBusy;
     btn.textContent = preview ? TEXTS.installPreviewBtn : installBusy ? TEXTS.installWait : handedOff && installEvt ? TEXTS.installAgain : TEXTS.installBtn;

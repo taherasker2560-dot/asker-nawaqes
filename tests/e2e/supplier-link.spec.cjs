@@ -311,3 +311,20 @@ run('Supplier link: handed over to Chrome (?v=…&install=1): the address is cle
  await page.click('#spInstall');
  await page.waitForFunction(()=>window.__prompted===1);
 });
+run('Supplier link: inside an installed app — the pharmacy\'s phone (the system app) still shows the install box; the supplier\'s own installed app does not',async({page,base})=>{
+ // the page reports «standalone» as it does inside any installed app on this site
+ await page.addInitScript(()=>{const mm=window.matchMedia.bind(window);window.matchMedia=q=>/display-mode:\s*standalone/.test(q)?{matches:true,media:q,addListener(){},removeListener(){},addEventListener(){},removeEventListener(){}}:mm(q)});
+ await seed(page);
+ // the owner's phone (the system is signed in): the box is there, it only looks (owner 2026-11-20: «فين أيقونة تثبيت ابلكيشن الموردين؟»)
+ await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{"x":1}'));
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ assert.equal(await page.isVisible('#spInstallBox'),true,'the owner sees the install box');
+ assert.equal(await page.$eval('#spInstall',e=>e.disabled),true);
+ assert.match(await text(page,'#spGuide'),/ده شكل التثبيت زي ما المورد هيشوفه/);
+ // the supplier's own installed app: already installed, no box
+ await page.evaluate(()=>localStorage.removeItem('sb-qwrzdjdgvanmhaicncuk-auth-token'));
+ await open(page,base+'supplier.html#v='+TOK);
+ await page.waitForSelector('#spBody:not([hidden]) .mv');
+ assert.equal(await page.isVisible('#spInstallBox'),false,'inside his own installed app there is nothing to install');
+});
