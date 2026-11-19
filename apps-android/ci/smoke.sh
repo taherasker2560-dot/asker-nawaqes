@@ -15,8 +15,11 @@ fail() {
   exit 1
 }
 top() { adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" | head -2 | tr -d '\r'; }
-wait_top() { for i in $(seq 1 20); do if top | grep -q "$1"; then return 0; fi; sleep 1; done; return 1; }
+# (a variable, not «| grep -q»: with pipefail the early exit of grep -q breaks the writer and fails the check)
+top_has() { local t; t=$(top); [[ "$t" == *"$1"* ]]; }
+wait_top() { for i in $(seq 1 20); do if top_has "$1"; then return 0; fi; sleep 1; done; return 1; }
 dump() { adb shell uiautomator dump /sdcard/u.xml >/dev/null 2>&1; adb shell cat /sdcard/u.xml | tr -d '\r'; }
+has() { local d; d=$(dump); [[ "$d" == *"$1"* ]]; }
 link() { adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$1" >/dev/null; }
 tap_text() {
   local b
@@ -33,8 +36,8 @@ sleep 2
 # 1) no choice yet: the list opens
 link "askerapps://open?app=drugeye&name=DrugEye"
 wait_top "$PKG/.PickActivity" || fail "the list of apps did not open for an app with no choice yet"
-dump | grep -q "DrugEye" || fail "the list does not say which app it asks for"
-dump | grep -q 'text="Settings"' || fail "the list does not show the apps on the phone (no Settings in it)"
+has "DrugEye" || fail "the list does not say which app it asks for"
+has 'text="Settings"' || fail "the list does not show the apps on the phone (no Settings in it)"
 echo "OK 1: the list opened and shows the phone's apps"
 
 # 2) he picks Settings (search, then tap the row): Settings opens and the choice is kept
@@ -42,7 +45,9 @@ adb shell input text "Settings"
 sleep 2
 tap_text "Settings" || fail "no Settings row to tap"
 wait_top "com.android.settings" || fail "Settings did not open after the choice"
-adb shell run-as "$PKG" cat shared_prefs/apps.xml | tr -d '\r' | grep -q 'pkg:drugeye">com.android.settings' || fail "the choice was not kept"
+PREFS=$(adb shell run-as "$PKG" cat shared_prefs/apps.xml | tr -d '\r')
+echo "$PREFS"
+[[ "$PREFS" == *'pkg:drugeye">com.android.settings'* ]] || fail "the choice was not kept"
 echo "OK 2: the choice was kept and the app opened"
 adb shell am force-stop com.android.settings
 adb shell input keyevent KEYCODE_HOME
@@ -50,7 +55,7 @@ sleep 1
 # the next tap opens it at once, with no list
 link "askerapps://open?app=drugeye&name=DrugEye"
 wait_top "com.android.settings" || fail "the second tap did not open the chosen app"
-top | grep -q "PickActivity" && fail "the list showed again after a choice"
+top_has "PickActivity" && fail "the list showed again after a choice"
 echo "OK 2b: the next tap opens it at once"
 adb shell am force-stop com.android.settings
 adb shell input keyevent KEYCODE_HOME
@@ -84,13 +89,13 @@ adb logcat -d | grep -E "FATAL EXCEPTION" && fail "the app crashed on a missing 
 link "askerapps://open?app=Bad-Id"
 sleep 2
 adb logcat -d | grep -E "FATAL EXCEPTION" && fail "the app crashed on a broken link"
-top | grep -q "com.android.settings" && fail "a broken link opened an app"
+top_has "com.android.settings" && fail "a broken link opened an app"
 echo "OK 4: old link, missing package, broken link"
 
 # 5) the app's own screen shows what he chose
 adb shell am start -W -n "$PKG/.MainActivity" >/dev/null
 sleep 2
-dump | grep -q "DrugEye" || fail "the app's own screen does not list his choice"
-dump | grep -q 'text="غيّر"' || fail "no «غيّر» button on the app's own screen"
-dump | grep -q 'content-desc="apps-version"' || fail "no version line"
+has "DrugEye" || fail "the app's own screen does not list his choice"
+has 'text="غيّر"' || fail "no «غيّر» button on the app's own screen"
+has 'content-desc="apps-version"' || fail "no version line"
 echo "SMOKE OK: asked once, kept, opened at once; removed and missing apps ask; old and broken links are quiet; the app's screen lists the choice"
