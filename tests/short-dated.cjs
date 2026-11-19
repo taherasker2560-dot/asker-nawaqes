@@ -55,6 +55,36 @@ assert.equal(S.leftText(q103), '1.5 علبة');
 // a return with another expiry text still takes from the supplier's oldest line of that item
 r = S.shortLines(purchases, [{ id: 16, vendor_id: 5, at: '2026-11-15T16:00:00', lines: [L(104, 5, 1, null)] }], now);
 assert.deepEqual(r.filter((q) => q.item === 104).map((q) => q.x), ['2027-08-31'], 'the oldest purchase line (the 02/2027 one) went back');
+// a return named «~<purchase number>» takes from THAT purchase first, not from the supplier's oldest line (found 2026-11-19)
+const two = [
+  { id: 20, vendor_id: 5, at: '2026-11-10T09:00:00', code: '11/26/20', lines: [L(105, 2, 1, '2027-06-30')] },
+  { id: 21, vendor_id: 5, at: '2026-11-12T09:00:00', code: '11/26/21', lines: [L(105, 2, 1, '2027-06-30')] },
+];
+r = S.shortLines(two, [{ id: 22, vendor_id: 5, at: '2026-11-12T09:05:00', code: '~11/26/21', lines: [L(105, 2, 1, '2027-06-30')] }], now);
+assert.deepEqual(r.map((q) => q.code), ['11/26/20'], 'the return of invoice 21 cleared invoice 21, not the older 20');
+r = S.shortLines(two, [{ id: 23, vendor_id: 5, at: '2026-11-12T09:05:00', code: null, lines: [L(105, 2, 1, '2027-06-30')] }], now);
+assert.deepEqual(r.map((q) => q.code), ['11/26/21'], 'a return with no number still takes the oldest');
+
+// what is on the shelves NOW (owner 2026-11-19: sold, or a farther-dated lot came in after, must not stay on the list)
+const SK = (rows) => new Map(Object.entries(rows).map(([i, row]) => [Number(i), S.stockOf(row)]));
+const lots = [
+  { id: 30, vendor_id: 5, at: '2026-11-14T10:00:00', code: '11/26/30', lines: [L(201, 5, 1, '2027-02-28'), L(202, 10, 1, '2027-02-28'), L(203, 6, 1, '2027-02-28'), L(204, 4, 1, '2027-02-28'), L(205, 3, 1, '2027-02-28')] },
+  { id: 31, vendor_id: 5, at: '2026-11-15T10:00:00', code: '11/26/31', lines: [L(202, 10, 1, '2029-02-28')] },
+];
+let sk = SK({
+  // 201: no stock row at all = sold out
+  202: { packs: 8, units: 0, parts: 1, exp_near: '2029-02-28', other: [] },     // 8 left, all from the farther lot: the short one went first
+  203: { packs: 4, units: 0, parts: 1, exp_near: '2027-02-28', other: [] },     // 4 of 6 left, the short lot is still the nearest
+  204: { packs: 4, units: 0, parts: 1, exp_near: '2028-09-28', other: [] },     // the nearest expiry now is later than the lot: gone
+  205: { packs: 0, units: 0, parts: 1, exp_near: '2028-09-28', other: [{ store: 'مخزن انتظار', packs: 3, units: 0 }] }, // it may sit in the other store
+});
+r = S.shortLines(lots, [], now, undefined, sk);
+assert.deepEqual(r.map((q) => [q.item, q.left]), [[203, 4], [205, 3]], '201 sold, 202 sold (a farther lot is what stays), 204 gone, 203 partly sold, 205 kept');
+// the same lots with no stock given: nothing is filtered (the stock could not be read)
+assert.deepEqual(S.shortLines(lots, [], now).map((q) => q.item), [201, 202, 203, 204, 205]);
+// loose units: parts per pack
+assert.deepEqual(S.stockOf({ packs: 2, units: 5, parts: 10, exp_near: null, other: [] }), { units: 25, near: null, other: false });
+assert.deepEqual(S.stockOf({ packs: '1.00', units: '0.00', parts: 3, exp_near: '2027-12-28', other: [{ packs: 1, units: 1 }] }), { units: 7, near: '2027-12-28', other: true });
 // nothing at all
 assert.deepEqual(S.shortLines(null, null, now), []);
 assert.deepEqual(S.shortLines([], [], now), []);

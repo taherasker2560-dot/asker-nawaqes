@@ -17,7 +17,14 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
    {id:1,vendor_id:5,at:ago(0,0),kind:'purchase',code:'11/26/1',lines:[L(101,10,1,exp(8)),L(102,5,1,exp(30)),L(103,2,1,exp(3))]},
    {id:2,vendor_id:6,at:ago(2,12),kind:'purchase',code:'11/26/7',lines:[L(104,3,1,exp(14))]},
    {id:3,vendor_id:5,at:ago(0,0),kind:'return',code:'~11/26/1',lines:[L(101,3,1,exp(8))]},
-   {id:4,vendor_id:5,at:ago(0,0),kind:'payment',code:null,lines:null}];});
+   {id:4,vendor_id:5,at:ago(0,0),kind:'payment',code:null,lines:null}];
+  // the shelves now (ar_stock only has rows for items we hold): 101 / 102 / 103 / 104 are there; 105 was sold out (no row); 106's short lot went
+  // first and a 26-month lot is what is left (added below)
+  const st=(id,packs,near)=>({item_id:id,packs,units:0,parts:1,exp_near:near,other:[]});
+  window.__tables.ar_stock=[st(101,7,exp(8)),st(102,5,exp(30)),st(103,2,exp(3)),st(104,3,exp(14)),st(106,4,exp(26))];
+  window.__soldMoves=()=>{window.__tables.ar_vendor_moves.push(
+   {id:6,vendor_id:5,at:ago(1,9),kind:'purchase',code:'11/26/6',lines:[L(105,6,1,exp(5)),L(106,4,1,exp(6))]},
+   {id:7,vendor_id:5,at:ago(0,0),kind:'purchase',code:'11/26/8',lines:[L(106,4,1,exp(26))]});};});
  await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');
  assert.deepEqual(await names(page,'#alViews [data-al-view]').then(a=>a.map(x=>x.replace(/\d+/,'').trim())),['النهارده','منتهية','قربت','فواتير']);
  await page.click('#alViews [data-al-view="short"]');
@@ -37,6 +44,13 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
  await page.click('#alExpiry [data-sd-period="today"]');
  await page.waitForFunction(()=>document.querySelectorAll('#alExpiry .sd-row').length===2);
  assert.ok(!(await names(page,'#alExpiry .sd-row')).join('|').includes('OLDER ONE'));
+ // sold out (105: no stock row) and a farther-dated lot that came in after (106): they were bought short but are not on the shelves now
+ await page.evaluate(()=>window.__soldMoves());
+ await page.click('#alExpiry [data-sd-period="7"]');
+ await page.waitForFunction(()=>document.querySelectorAll('#alExpiry .sd-row').length===3);
+ assert.ok(!(await names(page,'#alExpiry .sd-row')).join('|').match(/#105|#106/),'a sold item and a replaced-by-a-farther-lot item are off the list');
+ await page.click('#alExpiry [data-sd-period="today"]');
+ await page.waitForFunction(()=>document.querySelectorAll('#alExpiry .sd-row').length===2);
  // everything returned: the good-news line
  await page.evaluate(()=>{const p=n=>String(n).padStart(2,'0'),d=new Date(),here=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00`;   // «now» in the same local form as the others
   window.__tables.ar_vendor_moves.push({id:5,vendor_id:5,at:here,kind:'return',code:null,lines:[{i:101,p:7,u:0,k:1,b:0,x:window.__expX(8)},{i:103,p:2,u:0,k:1,b:0,x:window.__expX(3)}]})});
