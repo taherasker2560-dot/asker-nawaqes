@@ -2303,6 +2303,8 @@ html.night .py-card.py-look { background: var(--card); box-shadow: 0 0 0 1px var
 html.night .py-pill { background: var(--tint-2, var(--rose)); color: var(--ink); }
 .py-diff { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--card); color: var(--ink); border: 1px dashed var(--crimson); font-size: 13px; line-height: 1.8; }
 .py-diff span { color: var(--muted); }
+.py-fix { margin-top: 5px; font-size: 12.5px; color: var(--crimson-ink); }
+html.night .py-fix { color: var(--ink); }
 .py-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .py-acts button { margin: 0; }
 .py-acts a.py-a { display: inline-block; margin: 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }

@@ -10,7 +10,9 @@
       that closed an order says so. Three numbers on top: suppliers, expenses and the owner in the last 30 days.
    The owner (2026-11-19: «انت ازاى ما حسبتش الدفع لصاحب المنشاه … عمر الخزن ما هتظبط معاك من غيرها»): «👤 صاحب المنشأة» = PharmaFly's
    op 51 (kind 'owner'): a box, an amount and a note (for whom), no supplier or type (migration 202611190400).
-   The server closes an order by itself when the move with the same box, party and amount comes in (migration 202611190300).
+   The server closes an order by itself when the move with the same box, party and amount comes in (migration 202611190300), or a
+   bigger one followed by «دعم من صاحب المنشأة» in that box for the difference (his way of correcting a payment entered too big,
+   2026-11-19, migration 202611190930): that payment then says «اتصلّح بدعم X ج · الأمر كان Y ج».
    OWNER only (the database refuses everyone else). Nothing here writes to PharmaFly. */
 (function (root) {
   'use strict';
@@ -82,6 +84,9 @@
     for (const o of orders || []) if (o.status === 'matched' && o.move_id != null) out[String(o.move_id)] = o;
     return out;
   }
+  // paid more than the order, then corrected with «دعم من صاحب المنشأة» (op 50): the server keeps their total on the order's move
+  // (migration 202611190930); 0 when the order closed on the exact amount
+  const fixOf = (o) => (o && o.status === 'matched' && o.move && num(o.move.fix) > 0 ? Math.round(num(o.move.fix) * 100) / 100 : 0);
   // «18/11 20:00» from PharmaFly's local time (or an ISO time from the server, shown on the phone's clock)
   function when(at) {
     const s = String(at || '');
@@ -106,7 +111,7 @@
     not_mismatch: 'الأمر ده مبقاش فيه فرق.', no_order: 'الأمر ده مش موجود.',
   };
   const errText = (code) => ERR[code] || 'مقدرتش أكمّل. جرّب تاني.';
-  const api = { money, parseAmount, isLate, statusText, isOpen, needs, openOrders, totals, keepMove, byMove, when, norm, findVendors, errText, LATE_MS, KINDS };
+  const api = { money, parseAmount, isLate, statusText, isOpen, needs, openOrders, totals, keepMove, byMove, fixOf, when, norm, findVendors, errText, LATE_MS, KINDS };
   root.AskerPayLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -168,9 +173,11 @@
       `<select id="pyBox" aria-label="الخزنة"><option value="">كل الخزن</option>${boxes.map((id) => `<option value="${esc(id)}"${String(box) === String(id) ? ' selected' : ''} class="notr">${esc(acctName(id) || id)}</option>`).join('')}</select></div>` +
       (list.length ? list.slice(0, shown).map((m) => {
         const o = done[String(m.id)];
+        const fix = fixOf(o);
         return `<div class="py-card py-move"><div class="py-l1"><span class="py-name">${title(m.kind, m.who, m.memo)}</span><span class="py-amt">${amt(-num(m.amount))}</span></div>` +
           `<div class="py-l2"><bdi dir="ltr">${esc(when(m.at))}</bdi> · <bdi class="notr">${esc(acctName(m.account_id))}</bdi>` + (m.memo && m.kind !== 'owner' ? ` · <bdi class="notr">${esc(m.memo)}</bdi>` : '') +
-          `<span class="py-pill${o ? ' on' : ''}">${o ? '✓ من أمر دفع' : 'اتدخلت في فارمافلاي'}</span></div></div>`;
+          `<span class="py-pill${o ? ' on' : ''}">${o ? '✓ من أمر دفع' : 'اتدخلت في فارمافلاي'}</span></div>` +
+          (fix ? `<div class="py-fix"><span>اتصلّح بدعم</span> ${amt(fix)} · <span>الأمر كان</span> ${amt(o.amount)}</div>` : '') + '</div>';
       }).join('') + (list.length > shown ? '<button id="pyMore" type="button" class="secondary">اعرض أكتر</button>' : '')
         : '<p class="hint">مفيش مدفوعات بالشكل ده.</p>');
   }
