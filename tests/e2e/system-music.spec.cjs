@@ -84,3 +84,16 @@ run('System music in English, and a phone with no Web Audio gets no button and n
  assert.equal(await page.evaluate(()=>AskerMusic.mode()),'none');
  assert.deepEqual(errs,[]);
 });
+
+run('System music: the voice notepad\'s microphone makes it step aside while he dictates, and it comes back when the dictation ends',async({page})=>{
+ await page.addInitScript(FAKE);
+ await page.addInitScript(()=>{window.__rec=null;window.webkitSpeechRecognition=class{constructor(){window.__rec=this}start(){}stop(){if(this.onend)this.onend()}};window.SpeechRecognition=undefined});
+ await page.reload();await page.waitForSelector('#sysMusic');
+ await page.click('[data-group="home"]');await page.waitForSelector('#ntMic');
+ await page.click('body',{position:{x:5,y:300}});
+ await until(page,()=>AskerMusic.sounding());
+ await page.click('#ntMic');
+ await until(page,()=>!AskerMusic.sounding()&&window.__fa.els[0].paused);
+ await page.evaluate(()=>window.__rec.stop());
+ await until(page,()=>AskerMusic.sounding());
+});
