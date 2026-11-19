@@ -9,8 +9,10 @@ const lum=([r,g,b])=>0.2126*r+0.7152*g+0.0722*b;
 const same=(a,b,m)=>assert.ok(a.every((v,i)=>Math.abs(v-b[i])<=2),`${m}: ${a} vs ${b}`);
 const bar=(page)=>page.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.bottomnav button[data-group]')].map(b=>{const cs=getComputedStyle(b),sv=getComputedStyle(b.querySelector('svg'));return [b.dataset.group,{bg:window.__rgb(cs.backgroundColor),bgRaw:cs.backgroundColor,shadow:cs.boxShadow,svg:window.__rgb(sv.backgroundColor),svgRaw:sv.backgroundColor,svgColor:window.__rgb(sv.color)}]})));
 const ORDER=['purchases','accounts','home','sales','care']; // the deepest first
+// no color is read in the middle of a transition (the bar and the tiles fade over 0.2 s: a slow CI machine read «198,85,42» for the system color «192,82,42»)
+const still=async(page)=>{await page.addStyleTag({content:'*,*::before,*::after{transition:none!important;animation:none!important}'});await page.waitForTimeout(150)};
 run('section colors: five shades in the bar, deepest = most important; the system color is the middle one',async({page})=>{
- await page.addInitScript(RGB);await page.reload();await ready(page);
+ await page.addInitScript(RGB);await page.reload();await ready(page);await still(page);
  const b=await bar(page);
  assert.deepEqual(Object.keys(b).sort(),[...ORDER].sort());
  const L=ORDER.map(k=>lum(b[k].bg));
@@ -34,7 +36,7 @@ run('section colors: five shades in the bar, deepest = most important; the syste
 },{home:true});
 
 run('section colors: the small tabs of a section and the section\'s bar segment wear the same shade',async({page})=>{
- await page.addInitScript(RGB);await page.reload();await ready(page);
+ await page.addInitScript(RGB);await page.reload();await ready(page);await still(page);
  const b=await bar(page);
  for(const [g,tab] of [['purchases','short'],['accounts','customers'],['sales','storeorders']]){
   await page.click(`[data-group="${g}"]`);
@@ -53,7 +55,7 @@ run('section colors: the small tabs of a section and the section\'s bar segment 
 run('section colors: home buttons keep the white tile with a THICK border in their section\'s shade; the work apps a light tint of it; a drag copy keeps its color',async({page})=>{
  await page.addInitScript(RGB);
  await page.evaluate(()=>localStorage.setItem('asker-home-buttons',JSON.stringify(['short','customers','storeorders','care','notes','app_ibnsina','app_instapay','app_wab','app_drugeye'])));
- await page.reload();await ready(page);
+ await page.reload();await ready(page);await still(page);
  const b=await bar(page);
  const info=await page.evaluate(()=>[...document.querySelectorAll('#homePanel .qa > button[data-qa]')].map(e=>{const cs=getComputedStyle(e),sv=getComputedStyle(e.querySelector('svg'));return {qa:e.dataset.qa,sec:e.dataset.sec,app:!!e.dataset.app,img:cs.backgroundImage,bg:window.__rgb(cs.backgroundColor),bw:cs.borderTopWidth,bc:window.__rgb(cs.borderTopColor),color:window.__rgb(cs.color),icon:window.__rgb(sv.color)}}));
  const want={short:'purchases',customers:'accounts',storeorders:'sales',care:'care',notes:'home',app_ibnsina:'purchases',app_instapay:'accounts',app_wab:'care',app_drugeye:'home'};
@@ -80,8 +82,7 @@ run('section colors: home buttons keep the white tile with a THICK border in the
 },{home:true});
 
 run('section colors: a different system color changes all five shades (they stay in the same order), and the night look keeps a stripe per section',async({page})=>{
- await page.addInitScript(RGB);await page.reload();await ready(page);
- await page.addStyleTag({content:'*,*::before,*::after{transition:none!important}'}); // (a color read in the middle of a transition is still the old one)
+ await page.addInitScript(RGB);await page.reload();await ready(page);await still(page);
  await page.evaluate(()=>document.documentElement.style.setProperty('--crimson','#2e7d32'));
  const g=await bar(page);
  const L=ORDER.map(k=>lum(g[k].bg));
