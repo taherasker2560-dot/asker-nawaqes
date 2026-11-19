@@ -296,7 +296,16 @@
       ${table ? `<table class="hs-offers-t">${table}</table>` : ''}
       ${bought ? `<div class="hs-buys">${esc(bought)}</div>` : ''}
       ${offers ? `<div class="hs-offers">${esc(offers)}</div>` : ''}
+      ${appsRow(it)}
     </div>`;
+  }
+  // «دراج آي» / «الجرعات» on the phone (owner 2026-11-19, ar/work-apps.js): the item's trade name is copied and the app opens (Android only)
+  function appsRow(it) {
+    const W = root.AskerWorkApps;
+    if (!W || !W.android() || !it.en) return '';
+    const b = esc(W.brandOf(it.en));
+    return `<div class="hs-apps"><button type="button" class="chip" data-app="drugeye" data-copy="${b}" data-copy-what="اسم الصنف">👁️ دراج آي</button>` +
+      `<button type="button" class="chip" data-app="doses" data-copy="${b}" data-copy-what="اسم الصنف">🧮 الجرعات</button></div>`;
   }
   function editor(it) {
     return `<div class="hs-editbox">

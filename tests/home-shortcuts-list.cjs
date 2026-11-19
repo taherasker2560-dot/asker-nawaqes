@@ -17,7 +17,8 @@ for (const x of S.ALL) {
 const tabs = new Set([...html.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]).concat(['home', 'care']));
 let inside = 0;
 for (const x of S.ALL) {
-  const [id, , , , tab, anchor] = x;
+  const [id, , , , tab, anchor, app] = x;
+  if (app) { assert.equal(S.APP_OF[id], app, 'a work app (tests/work-apps.cjs checks it): ' + id); assert.ok(!anchor); continue; }
   assert.equal(S.TAB_OF[id], tab || id, 'what it opens: ' + id);
   assert.ok(tabs.has(S.TAB_OF[id]), id + ' opens a real section: ' + S.TAB_OF[id]);
   if (anchor) {

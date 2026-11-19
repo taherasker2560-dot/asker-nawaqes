@@ -8,7 +8,9 @@
    4) up to 30 buttons (was 12);
    5) press and HOLD a button on the home (about half a second): it lifts, follows the finger, the others make room, let go where you want it; a quick tap still opens the section;
    6) the list of what a button can open also has the new screens that live inside a section (المستخدمين، إعدادات الموقع، أصناف جديدة، مقارنة الطلبيات، فاتورة المندوب، كشف المرتجعات):
-      such a button opens the section and scrolls to that screen. */
+      such a button opens the section and scrolls to that screen.
+   7) the work apps on his phone (owner 2026-11-19, ar/work-apps.js: واتساب بيزنس، الكاميرات، ابن سينا، فارما، دراج آي، الجرعات، إنستا باي) are buttons too:
+      their button carries data-app (the app opens) instead of data-go (a section). */
 (function (root) {
   'use strict';
   const MAX = 30;
@@ -51,12 +53,22 @@
     ['whofrom', 'الصنف جه من مين', 'الحسابات', 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M21 21l-4.3-4.3M11 8v3l2 1', 'vendors', 'veFindBox'],
     ['todo', 'محتاج شغل', 'الرئيسية', 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h9', 'home', 'todoCard'],
     ['notes', 'ملاحظاتي', 'الرئيسية', 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5', 'home', 'notesCard'],
+    // the work apps on his phone (owner 2026-11-19, ar/work-apps.js): [id, label, group, icon, , , the app it opens]
+    ['app_wab', 'واتساب بيزنس', 'تطبيقات الشغل', 'M4 20l1.3-3.9A8 8 0 1 1 8 19zM9 10h.01M12 10h.01M15 10h.01', '', '', 'wab'],
+    ['app_cams', 'الكاميرات', 'تطبيقات الشغل', 'M3 8h4l2-3h6l2 3h4v11H3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8', '', '', 'cams'],
+    ['app_ibnsina', 'ابن سينا', 'تطبيقات الشغل', 'M4 21V7l8-4 8 4v14M10 21v-5h4v5M12 7v4M10 9h4', '', '', 'ibnsina'],
+    ['app_pharma', 'فارما', 'تطبيقات الشغل', 'M10.5 20.5a5 5 0 0 1-7-7l6-6a5 5 0 0 1 7 7zM8.5 8.5l7 7', '', '', 'pharma'],
+    ['app_drugeye', 'دراج آي', 'تطبيقات الشغل', 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6', '', '', 'drugeye'],
+    ['app_doses', 'الجرعات', 'تطبيقات الشغل', 'M6 3h12v18H6zM9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01', '', '', 'doses'],
+    ['app_instapay', 'إنستا باي', 'تطبيقات الشغل', 'M3 6h18v12H3zM3 10h18M7 15h4', '', '', 'instapay'],
   ];
   const LABEL = Object.fromEntries(ALL.map((x) => [x[0], x[1]]));
   const ICON = Object.fromEntries(ALL.map((x) => [x[0], x[3]]));
   // what a button opens: its own section, or (for a screen inside a section) that section and the block to scroll to
   const TAB_OF = Object.fromEntries(ALL.map((x) => [x[0], x[4] || x[0]]));
   const ANCHOR_OF = Object.fromEntries(ALL.filter((x) => x[5]).map((x) => [x[0], x[5]]));
+  // a work app on the phone (ar/work-apps.js opens it): the button carries data-app instead of a section
+  const APP_OF = Object.fromEntries(ALL.filter((x) => x[6]).map((x) => [x[0], x[6]]));
   const GROUPS = [...new Set(ALL.map((x) => x[2]))];
 
   // ---------- pure helpers (tests/home-shortcuts.cjs) ----------
@@ -86,7 +98,7 @@
     [out[i], out[j]] = [out[j], out[i]];
     return out;
   }
-  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, clean, parse, toggle, move };
+  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, clean, parse, toggle, move };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -105,7 +117,7 @@
     const box = document.querySelector('#homePanel .qa');
     if (!box) return;
     // data-go = the section it opens, data-qa = which button it is (the order after a drag is read from these), data-anchor = the block to scroll to
-    box.innerHTML = mine.map((t) => `<button type="button" data-go="${TAB_OF[t]}" data-qa="${t}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
+    box.innerHTML = mine.map((t) => `<button type="button" ${APP_OF[t] ? `data-app="${APP_OF[t]}" class="qa-app"` : `data-go="${TAB_OF[t]}"`} data-qa="${t}"${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`).join('');
     box.classList.toggle('qa-none', !mine.length);
   }
 
@@ -125,7 +137,7 @@
     const r = p.el.getBoundingClientRect();
     const ghost = p.el.cloneNode(true);
     ghost.classList.add('qa-ghost');
-    ['data-go', 'data-qa', 'data-anchor'].forEach((a) => ghost.removeAttribute(a));
+    ['data-go', 'data-qa', 'data-anchor', 'data-app'].forEach((a) => ghost.removeAttribute(a));
     ghost.setAttribute('aria-hidden', 'true');
     ghost.tabIndex = -1;
     ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:60;pointer-events:none`;
