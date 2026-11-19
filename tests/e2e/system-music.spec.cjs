@@ -90,13 +90,15 @@ run('System music in English, and a phone with no Web Audio gets no button and n
 const WAVMOCK=()=>{
  const n=15000,buf=new ArrayBuffer(44+n*2),v=new DataView(buf);for(let i=0;i<n;i++)v.setInt16(44+2*i,Math.round(Math.sin(i/9)*0.1*32767),true);
  window.__wav=buf;window.__fetches=[];window.__promoStatus=200;
+ const rn=Date.now.bind(Date);window.__skew=0;Date.now=()=>rn()+window.__skew;   // the half hour is proven by moving this clock, not by waiting
  const orig=window.fetch.bind(window);
  window.fetch=async(u,o)=>{if(/functions\/v1\/asker-dose/.test(String(u))){window.__fetches.push({u:String(u),body:o&&o.body});return window.__promoStatus===200?new Response(window.__wav.slice(0),{status:200,headers:{'Content-Type':'audio/wav'}}):new Response('x',{status:500})}return orig(u,o)};
 };
 const visit=async(page,base,q)=>{await page.goto(base+'asker-nawaqes-arabic.html'+q);await page.waitForSelector('#sysMusic');await page.evaluate(()=>{AskerApp.client.supabaseUrl='https://test.supabase.co';AskerApp.client.supabaseKey='anon-key'})};
 const promoEl=(page)=>page.evaluate(()=>{const e=window.__fa.els.find(x=>x.attrs['data-music']==='promo');return e?{paused:e.paused,gain:window.__fa.gains[window.__fa.gains.length-1].value}:null});
-run('System music advert: the store\'s advert plays over the music a few seconds after it sounds, from the function once then from the phone\'s copy, at the music\'s own level, never when the music is stopped, quiet when the function does not answer',async({page,base})=>{
+run('System music advert: the store\'s advert plays over the music a few seconds after it sounds and then EVERY HALF HOUR, from the function once then from the phone\'s copy, at the music\'s own level, never when the music is stopped (it waits), tried again after a failed ask',async({page,base})=>{
  await page.addInitScript(FAKE);await page.addInitScript(WAVMOCK);
+ const promos=(p)=>p.evaluate(()=>window.__fa.els.filter(x=>x.attrs['data-music']==='promo').length);
  // 1) a first open (the test link: 3 s): the music, then the advert asked from the function with the voice, played at the store's level over the music
  await visit(page,base,'?promo=1');
  await page.click('body',{position:{x:5,y:300}});
@@ -105,23 +107,43 @@ run('System music advert: the store\'s advert plays over the music a few seconds
  await until(page,()=>window.__fa.els.some(e=>e.attrs['data-music']==='promo'&&!e.paused),9000);
  const f=await page.evaluate(()=>window.__fetches.map(x=>({u:x.u,body:JSON.parse(x.body)})));
  assert.equal(f.length,1);assert.equal(f[0].u,'https://test.supabase.co/functions/v1/asker-dose');assert.deepEqual(f[0].body,{action:'promo',voice:'Orus'});
- const g1=await page.evaluate(()=>({advert:window.__fa.gains[window.__fa.gains.length-1].value,expect:AskerMusic.advertGain(AskerMusic.wavRms(window.__wav),AskerMusic.PROMO&&0.18)}));
+ const g1=await page.evaluate(()=>({advert:window.__fa.gains[window.__fa.gains.length-1].value,expect:AskerMusic.advertGain(AskerMusic.wavRms(window.__wav),0.18)}));
  assert.ok(Math.abs(g1.advert-g1.expect)<1e-9,'at the store\'s level: '+JSON.stringify(g1));
  assert.equal(await page.evaluate(()=>AskerMusic.sounding()),true,'the music goes on under it');
  assert.equal((await page.evaluate(()=>AskerMusic.promoState())).playing,true);
- // it ends: said once in this page's life (the music keeps playing)
+ // it ends: the next one is due in half an hour (30 minutes from now), not before
  await page.evaluate(()=>{const e=window.__fa.els.find(x=>x.attrs['data-music']==='promo');(e.h.ended||[]).forEach(fn=>fn())});
- assert.deepEqual(await page.evaluate(()=>AskerMusic.promoState()),{armed:false,playing:false,done:true});
- await page.waitForTimeout(4500);
- assert.equal(await page.evaluate(()=>window.__fa.els.filter(x=>x.attrs['data-music']==='promo').length),1,'not twice in one open');
- assert.equal(await page.evaluate(()=>AskerMusic.sounding()),true);
- // 2) the next open: again (every open, no cap), now from the phone's own copy (the store's cache): the function is not asked
- await visit(page,base,'?promo=1');
- await page.click('body',{position:{x:5,y:300}});
- await until(page,()=>window.__fa.els.some(e=>e.attrs['data-music']==='promo'&&!e.paused),9000);
- assert.equal(await page.evaluate(()=>window.__fetches.length),0,'the phone\'s copy: the function is not asked again');
+ const st=await page.evaluate(()=>({s:AskerMusic.promoState(),now:Date.now()}));
+ assert.equal(st.s.playing,false);assert.equal(st.s.armed,false);
+ assert.ok(Math.abs(st.s.next-st.now-30*60000)<20000,'due again in 30 minutes: '+(st.s.next-st.now));
+ await page.evaluate(()=>AskerMusic.promoTick());await page.waitForTimeout(4500);
+ assert.equal(await promos(page),1,'not again before the half hour');
+ // 2) the half hour comes (the clock moves 31 minutes; a look is taken): it is said again, over the music, from the phone's copy (the function is not asked again)
+ await page.evaluate(()=>{window.__skew+=31*60000;AskerMusic.promoTick()});
+ await until(page,()=>{const a=window.__fa.els.filter(e=>e.attrs['data-music']==='promo');return a.length===2&&!a[1].paused},9000);
+ assert.equal(await page.evaluate(()=>window.__fetches.length),1,'the second one comes from the phone\'s copy');
  assert.equal(await page.evaluate(async()=>{const c=await caches.open('asker-store-promo-v1');return !!(await c.match('https://asker-store-promo.invalid/v3-orus'))}),true,'kept in the store\'s own cache under its own name');
- // 3) the music turned down takes the advert down with it
+ await page.evaluate(()=>{const e=window.__fa.els.filter(x=>x.attrs['data-music']==='promo')[1];(e.h.ended||[]).forEach(fn=>fn())});
+ const st2=await page.evaluate(()=>({s:AskerMusic.promoState(),now:Date.now()}));
+ assert.ok(Math.abs(st2.s.next-st2.now-30*60000)<20000,'and the next one is half an hour after that');
+ // 3) the half hour falls due while the music is stopped: nothing is said; when his button starts the music again it is said 3 s later
+ await page.evaluate(()=>{window.__skew+=31*60000});
+ await page.click('#sysMusic');await until(page,()=>!AskerMusic.sounding());
+ await page.evaluate(()=>AskerMusic.promoTick());await page.waitForTimeout(4500);
+ assert.equal(await promos(page),2,'no advert over a stopped music');
+ assert.equal((await page.evaluate(()=>AskerMusic.promoState())).armed,false);
+ await page.click('#sysMusic');await until(page,()=>AskerMusic.sounding());
+ await until(page,()=>window.__fa.els.filter(e=>e.attrs['data-music']==='promo').length===3,9000);
+ // 4) the button stops the music inside the waiting seconds of a due advert: it is cancelled with it
+ await page.evaluate(()=>{const e=window.__fa.els.filter(x=>x.attrs['data-music']==='promo')[2];(e.h.ended||[]).forEach(fn=>fn());window.__skew+=31*60000;AskerMusic.promoTick()});
+ assert.equal((await page.evaluate(()=>AskerMusic.promoState())).armed,true,'due: waiting its seconds');
+ await page.click('#sysMusic');await until(page,()=>!AskerMusic.sounding());
+ await page.waitForTimeout(4500);
+ assert.equal(await promos(page),3,'cancelled with the music');
+ assert.equal((await page.evaluate(()=>AskerMusic.promoState())).armed,false);
+ await page.click('#sysMusic');await until(page,()=>AskerMusic.sounding());
+ // 5) a visit with the music turned down: the advert comes down with it
+ await page.evaluate(async()=>{await caches.delete('asker-store-promo-v1')});
  await visit(page,base,'?promo=1');
  await page.evaluate(()=>AskerMusic.setLevel(20));
  await page.click('body',{position:{x:5,y:300}});
@@ -130,26 +152,19 @@ run('System music advert: the store\'s advert plays over the music a few seconds
  assert.ok(Math.abs(low.advert-low.expect)<1e-9,'follows the music level: '+JSON.stringify(low));
  assert.ok(low.advert<g1.advert*0.5,'quieter than at the store\'s level: '+low.advert+' vs '+g1.advert);
  await page.evaluate(()=>localStorage.removeItem('asker_system_music_vol'));
- // 4) the button stops the music inside the waiting seconds: the advert is cancelled with it
- await visit(page,base,'?promo=1');
- await page.click('body',{position:{x:5,y:300}});
- await until(page,()=>AskerMusic.sounding());
- await page.click('#sysMusic');
- await until(page,()=>!AskerMusic.sounding());
- await page.waitForTimeout(4500);
- assert.equal(await page.evaluate(()=>window.__fa.els.filter(x=>x.attrs['data-music']==='promo').length),0,'no advert over a stopped music');
- assert.equal((await page.evaluate(()=>AskerMusic.promoState())).armed,false);
- await page.click('#sysMusic');await until(page,()=>AskerMusic.sounding()); // (his button starts the music again; the phone forgets the stop)
- // 5) the function does not answer (no copy kept in this fresh visit): the music plays, nothing is said, nothing breaks
- await page.evaluate(async()=>{await caches.delete('asker-store-promo-v1');window.__promoStatus=500});
+ // 6) the function does not answer: the music plays, nothing is said, nothing breaks; it is tried again after 10 minutes, and said once the function answers
+ await page.evaluate(async()=>{await caches.delete('asker-store-promo-v1')});
  await visit(page,base,'?promo=1');
  await page.evaluate(()=>{window.__promoStatus=500});
  await page.click('body',{position:{x:5,y:300}});
  await until(page,()=>AskerMusic.sounding());
  await page.waitForTimeout(5500);
- assert.equal(await page.evaluate(()=>window.__fa.els.filter(x=>x.attrs['data-music']==='promo').length),0,'no advert, no error');
+ assert.equal(await promos(page),0,'no advert, no error');
  assert.equal(await page.evaluate(()=>AskerMusic.sounding()),true,'the music plays on');
- assert.equal((await page.evaluate(()=>AskerMusic.promoState())).done,true,'no retry in this visit');
+ const rt=await page.evaluate(()=>({s:AskerMusic.promoState(),now:Date.now()}));
+ assert.ok(Math.abs(rt.s.next-rt.now-10*60000)<20000,'tried again in 10 minutes: '+(rt.s.next-rt.now));
+ await page.evaluate(()=>{window.__promoStatus=200;window.__skew+=11*60000;AskerMusic.promoTick()});
+ await until(page,()=>window.__fa.els.some(e=>e.attrs['data-music']==='promo'&&!e.paused),9000);
 });
 
 run('System music volume option: a second quiet button opens a slider, moving it changes the sound at once, the level is remembered on the phone, and the store\'s music is untouched',async({page})=>{

@@ -11,9 +11,11 @@
    - A SECOND small quiet button (owner 2026-11-19: «اعملي أوبشن أوطّي الصوت») opens a tiny slider for the volume of the system's music. It starts at the store's own level (60 on the slider = gain 0.18),
      goes down to a whisper and up to about three times that; moving it changes the sound at once, and the level is remembered ON THAT PHONE (asker_system_music_vol, its own key). The store's music is untouched.
    - The ADVERT voice (owner 2026-11-19: «عايز صوت الإعلان على السيستم، برضو على المستخدمين بتوع السيستم»): the same spoken advert the customers hear on the store (voice Orus, the function asker-dose action
-     'promo': nothing new on the server), 8 s after the music is sounding, over the music, once per page load (every time the system is opened, as on the store: no cap), at about 5 dB above the music at
-     ITS level (the volume option's slider takes the advert down with the music). The same button stops both; it never plays while the music is quiet (stopped, page hidden, a voice note, the phone speaking,
-     a recording). The phone keeps its copy in the store's own cache (same name, same file), so whichever page asks first pays for both. A test link: asker-nawaqes-arabic.html?promo=1 plays it 3 s after the music sounds.
+     'promo': nothing new on the server), 8 s after the music is sounding, over the music, and then EVERY HALF HOUR while the system stays open (his order the same day, «لا انا عايزها تشتغل كل نص ساعة»;
+     the store's own advert stays once per open: the half hour is the system's), at about 5 dB above the music at ITS level (the volume option's slider takes the advert down with the music). The same
+     button stops both; it never plays while the music is quiet (stopped, page hidden, a voice note, the phone speaking, a recording): when the half hour falls due meanwhile it plays 8 s after the music
+     sounds again. A failed ask (no network) is tried again after 10 minutes. The phone keeps its copy in the store's own cache (same name, same file), so whichever page asks first pays for both.
+     A test link: asker-nawaqes-arabic.html?promo=1 plays the first one 3 s after the music sounds.
    Honest limits: on an iPhone the first tap is needed and the silent switch mutes Web Audio; any phone stops the music when it locks; a piece is about 2.4 MB, loaded as it plays (nothing at all when it
    was stopped, or when nobody is signed in). On mobile data that is about 35 MB an hour: the button is how to stop it. */
 (function (root) {
@@ -38,8 +40,11 @@
   // the volume option: a slider 10..100 (60 = the store's quiet level), squared so the low half has fine steps; its own key on the phone
   const LEVEL_KEY = 'asker_system_music_vol', LEVEL_MIN = 10, LEVEL_MAX = 100, LEVEL_DEFAULT = 60, GAIN_MAX = 0.5;
   const VOL_TEXT = 'صوت الموسيقى';
-  // the advert: the SAME one as store/music.js (tests/system-music.cjs keeps the two in step); every open, no cap
-  const PROMO = { on: true, voice: 'Orus', delay: 8, targetDb: -27, gain: 0.3, cache: 'asker-store-promo-v1', file: 'v3-orus' };
+  // the advert: the SAME one as store/music.js (tests/system-music.cjs keeps the two in step); in the system it comes back every `everyMin` minutes (his order 2026-11-19: every half hour),
+  // and a failed ask is tried again after `retryMin`
+  const PROMO = { on: true, voice: 'Orus', delay: 8, targetDb: -27, gain: 0.3, cache: 'asker-store-promo-v1', file: 'v3-orus', everyMin: 30, retryMin: 10 };
+  // how long until the advert is due again: 0 = due now (next = the moment it is due; 0 = never said in this page's life)
+  function promoWait(next, now) { return next > now ? next - now : 0; }
   const FORCE = (() => { try { return /[?&]promo=1(&|#|$)/.test(String(root.location && root.location.search)); } catch (e) { return false; } })();
   // the loudness (RMS, 0..1) of the speaking parts of a 16-bit mono WAV (the function's own files: a 44-byte header); 0 when it is not one
   function wavRms(buf) {
@@ -85,7 +90,7 @@
   // the slider's level -> the Web Audio gain (60 = 0.18, the store's level)
   function levelGain(p) { const x = cleanLevel(p) / 100; return Math.round(GAIN_MAX * x * x * 1e4) / 1e4; }
 
-  const api = { modeOf, wanted, nextRound, cleanLevel, levelGain, wavRms, promoGain, advertGain, PROMO, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE, LEVEL_KEY, LEVEL_MIN, LEVEL_MAX, LEVEL_DEFAULT, VOL_TEXT };
+  const api = { modeOf, wanted, nextRound, cleanLevel, levelGain, wavRms, promoGain, advertGain, promoWait, PROMO, TRACKS, TEXTS, KEY, VOLUME, FADE_IN, BASE, LEVEL_KEY, LEVEL_MIN, LEVEL_MAX, LEVEL_DEFAULT, VOL_TEXT };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -94,7 +99,7 @@
   const store = (fn) => { try { return fn(root.localStorage); } catch (e) { return null; } }; // a private window or blocked storage: nothing remembered
   let mode = modeOf({ off: store((ls) => ls.getItem(KEY) === '1'), supported: !!AC && typeof root.Audio === 'function' });
   api.mode = () => mode;
-  if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = api.setLevel = () => {}; api.level = () => LEVEL_DEFAULT; api.promoState = () => ({ armed: false, playing: false, done: false }); root.AskerMusic = api; return; }
+  if (mode === 'none') { api.sounding = () => false; api.hold = api.release = api.press = api.setLevel = () => {}; api.level = () => LEVEL_DEFAULT; api.promoState = () => ({ armed: false, playing: false, next: 0 }); api.promoTick = () => {}; root.AskerMusic = api; return; }
 
   let level = cleanLevel(store((ls) => ls.getItem(LEVEL_KEY)));
   const gainNow = () => levelGain(level);
@@ -106,15 +111,15 @@
   api.track = () => last;
 
   // ---------- the advert voice (the store's own advert, owner 2026-11-19) ----------
-  let pTimer = null, pEl = null, pUrl = null, pRun = 0, pArmed = false, pDone = false;   // pDone: heard (or failed) in this page's life: never twice
-  api.promoState = () => ({ armed: pArmed, playing: !!pEl, done: pDone });
+  let pTimer = null, pEl = null, pUrl = null, pRun = 0, pArmed = false, pNext = 0;   // pNext: the moment the advert is due again (0 = not said yet in this page's life)
+  api.promoState = () => ({ armed: pArmed, playing: !!pEl, next: pNext });
   function promoStop() {   // quiet the advert, or cancel a waiting one: the music went quiet (stopped, hidden, a voice note) or the advert ended
     pRun++; pArmed = false; clearTimeout(pTimer); pTimer = null;
     if (pEl) { try { pEl.pause(); } catch (e) { /* gone */ } pEl = null; }
     if (pUrl) { try { URL.revokeObjectURL(pUrl); } catch (e) { /* gone */ } pUrl = null; }
   }
-  function promoArm() {   // the music is sounding: wait a few seconds, then say it (once in this page's life)
-    if (!PROMO.on || pArmed || pDone || !!pEl) return;
+  function promoArm() {   // the music is sounding: wait a few seconds, then say it (when it is due: the first time, then every half hour)
+    if (!PROMO.on || pArmed || !!pEl || promoWait(pNext, Date.now()) > 0) return;
     pArmed = true; pTimer = setTimeout(promoGo, (FORCE ? 3 : PROMO.delay) * 1000);
   }
   // the advert's WAV: kept on the phone after the first time (the store's cache, the same key), else asked from the function (nothing is sent but «which voice»)
@@ -138,7 +143,7 @@
     const run = ++pRun, ok = () => run === pRun && mode === 'auto' && signedIn() && !document.hidden && holds.size === 0 && sounding();
     if (!ok()) { pArmed = false; return; }   // the music went quiet meanwhile: the next time it plays, it is armed again
     const blob = await promoBlob();
-    if (!blob) { pDone = true; pArmed = false; return; }   // no network / no advert: no retry in this visit
+    if (!blob) { pNext = Date.now() + PROMO.retryMin * 60000; pArmed = false; return; }   // no network / no advert: tried again in a few minutes
     let g0 = PROMO.gain;
     try { g0 = advertGain(wavRms(await blob.arrayBuffer()), gainNow()); } catch (e) { /* the fallback */ }
     if (!ok()) { if (run === pRun) pArmed = false; return; }
@@ -147,13 +152,17 @@
       pUrl = URL.createObjectURL(blob); a.src = pUrl;
       const g = ctx.createGain(); g.gain.value = g0;
       ctx.createMediaElementSource(a).connect(g); g.connect(ctx.destination);
-      a.addEventListener('playing', () => { pDone = true; });
+      const failed = () => { pNext = Date.now() + PROMO.retryMin * 60000; promoStop(); };
+      a.addEventListener('playing', () => { pNext = Date.now() + PROMO.everyMin * 60000; });   // said: the next one is due in half an hour
       a.addEventListener('ended', promoStop);
-      a.addEventListener('error', () => { pDone = true; promoStop(); });
+      a.addEventListener('error', failed);
       pEl = a;
-      const p = a.play(); if (p && p.catch) p.catch(() => { pDone = true; promoStop(); });
-    } catch (e) { pDone = true; promoStop(); }
+      const p = a.play(); if (p && p.catch) p.catch(failed);
+    } catch (e) { pNext = Date.now() + PROMO.retryMin * 60000; promoStop(); }
   }
+  // a look every 15 seconds while the music sounds: when the advert is due (the half hour came) it is armed; the music's own «playing» event does the same when the music comes back
+  api.promoTick = () => { if (mode === 'auto' && sounding()) promoArm(); };
+  setInterval(api.promoTick, 15000);
 
   function ramp(to, secs) {
     const p = gain.gain, now = ctx.currentTime;
