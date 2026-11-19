@@ -6,8 +6,10 @@
       الدفع» or «احفظه وأوافق عليه بعدين» (ar_pay_order_save).
    2) the open orders: waiting (approve / edit / cancel), approved (enter it in PharmaFly; late after 2 hours), a difference (the
       order and what came from PharmaFly side by side: «هي دي، اقفله» / «مش هي» / cancel) (ar_pay_order_act).
-   3) what was paid (ar_cash_moves kind vendor / expense, the last 365 days): suppliers / expenses / a box; a move that closed an
-      order says so. Two numbers on top: paid to suppliers and expenses in the last 30 days.
+   3) what was paid (ar_cash_moves kind vendor / expense / owner, the last 365 days): suppliers / expenses / the owner / a box; a move
+      that closed an order says so. Three numbers on top: suppliers, expenses and the owner in the last 30 days.
+   The owner (2026-11-19: «انت ازاى ما حسبتش الدفع لصاحب المنشاه … عمر الخزن ما هتظبط معاك من غيرها»): «👤 صاحب المنشأة» = PharmaFly's
+   op 51 (kind 'owner'): a box, an amount and a note (for whom), no supplier or type (migration 202611190400).
    The server closes an order by itself when the move with the same box, party and amount comes in (migration 202611190300).
    OWNER only (the database refuses everyone else). Nothing here writes to PharmaFly. */
 (function (root) {
@@ -57,20 +59,22 @@
   const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   function totals(moves, days, now) {
     const from = localIso(new Date((now || Date.now()) - days * 864e5));
-    const t = { vendor: 0, vendorN: 0, expense: 0, expenseN: 0 };
+    const t = { vendor: 0, vendorN: 0, expense: 0, expenseN: 0, owner: 0, ownerN: 0 };
     for (const m of moves || []) {
       if (String(m.at) < from) continue;
       if (m.kind === 'vendor') { t.vendor += -num(m.amount); t.vendorN++; }
       else if (m.kind === 'expense') { t.expense += -num(m.amount); t.expenseN++; }
+      else if (m.kind === 'owner') { t.owner += -num(m.amount); t.ownerN++; }
     }
-    t.vendor = Math.round(t.vendor * 100) / 100; t.expense = Math.round(t.expense * 100) / 100;
+    for (const k of ['vendor', 'expense', 'owner']) t[k] = Math.round(t[k] * 100) / 100;
     return t;
   }
+  // the three kinds of payment out of a box: a supplier (op 9), an expense (op 1000+type), the owner (op 51, owner 2026-11-19)
+  const KINDS = ['vendor', 'expense', 'owner'];
   function keepMove(m, filter, box) {
     if (box != null && box !== '' && String(m.account_id) !== String(box)) return false;
-    if (filter === 'vendor') return m.kind === 'vendor';
-    if (filter === 'expense') return m.kind === 'expense';
-    return m.kind === 'vendor' || m.kind === 'expense';
+    if (KINDS.includes(filter)) return m.kind === filter;
+    return KINDS.includes(m.kind);
   }
   // the moves that closed an order: {moveId: order}
   function byMove(orders) {
@@ -102,7 +106,7 @@
     not_mismatch: 'الأمر ده مبقاش فيه فرق.', no_order: 'الأمر ده مش موجود.',
   };
   const errText = (code) => ERR[code] || 'مقدرتش أكمّل. جرّب تاني.';
-  const api = { money, parseAmount, isLate, statusText, isOpen, needs, openOrders, totals, keepMove, byMove, when, norm, findVendors, errText, LATE_MS };
+  const api = { money, parseAmount, isLate, statusText, isOpen, needs, openOrders, totals, keepMove, byMove, when, norm, findVendors, errText, LATE_MS, KINDS };
   root.AskerPayLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -120,20 +124,23 @@
   const acctName = (id) => (accounts.find((a) => String(a.id) === String(id)) || {}).name || '';
   const vendorOf = (id) => vendors.find((v) => String(v.id) === String(id));
   const catOf = (id) => cats.find((c) => String(c.id) === String(id));
-  const kindWord = (k) => (k === 'vendor' ? 'دفعة لمورد' : 'مصروف');
+  const kindWord = (k) => (k === 'vendor' ? 'دفعة لمورد' : k === 'owner' ? 'لصاحب المنشأة' : 'مصروف');
+  // the title of an order or a move: «دفعة لمورد · A M group», «مصروف · البوفيه», «لصاحب المنشأة · طاهر» (the owner's note is his «who»)
+  const title = (kind, who, memo) => `${esc(kindWord(kind))}` + (kind === 'owner' ? (memo ? ` · <bdi class="notr">${esc(memo)}</bdi>` : '') : ` · <bdi class="notr">${esc(who || '')}</bdi>`);
 
   function tiles() {
     const t = totals(moves, 30);
     return `<div class="py-tiles"><div class="py-tile"><span>اتدفع لموردين (30 يوم)</span><b>${amt(t.vendor)}</b><small>${esc(t.vendorN)} دفعة</small></div>` +
-      `<div class="py-tile"><span>مصروفات (30 يوم)</span><b>${amt(t.expense)}</b><small>${esc(t.expenseN)} مصروف</small></div></div>`;
+      `<div class="py-tile"><span>مصروفات (30 يوم)</span><b>${amt(t.expense)}</b><small>${esc(t.expenseN)} مصروف</small></div>` +
+      `<div class="py-tile"><span>لصاحب المنشأة (30 يوم)</span><b>${amt(t.owner)}</b><small>${esc(t.ownerN)} مرة</small></div></div>`;
   }
   function orderCard(o) {
     const late = isLate(o);
     const cls = o.status === 'mismatch' || late ? ' py-look' : o.status === 'waiting' ? ' py-wait' : '';
-    let html = `<div class="py-card${cls}" data-py-order="${esc(o.id)}"><div class="py-l1"><span class="py-name">${esc(kindWord(o.kind))} · <bdi class="notr">${esc(o.who)}</bdi></span>` +
+    let html = `<div class="py-card${cls}" data-py-order="${esc(o.id)}"><div class="py-l1"><span class="py-name">${title(o.kind, o.who, o.memo)}</span>` +
       `<span class="py-amt">${amt(o.amount)}</span></div>` +
       `<div class="py-l2"><span>من خزنة</span> <bdi class="notr">${esc(o.account_name || acctName(o.account_id))}</bdi>` +
-      (o.memo ? ` · <bdi class="notr">${esc(o.memo)}</bdi>` : '') + `<span class="py-pill">${esc(statusText(o))}</span></div>`;
+      (o.memo && o.kind !== 'owner' ? ` · <bdi class="notr">${esc(o.memo)}</bdi>` : '') + `<span class="py-pill">${esc(statusText(o))}</span></div>`;
     if (o.status === 'mismatch' && o.move) {
       const m = o.move;
       html += `<div class="py-diff"><div><span>الأمر:</span> ${amt(o.amount)} · <bdi class="notr">${esc(o.account_name || acctName(o.account_id))}</bdi></div>` +
@@ -157,12 +164,12 @@
       `<h3 class="py-h">أوامر الدفع${open.length ? ` <span class="py-num">${esc(open.length)}</span>` : ''}</h3>` +
       (open.length ? open.map(orderCard).join('') : '<p class="hint">مفيش أوامر دفع مفتوحة.</p>') +
       `<h3 class="py-h">اللي اتدفع</h3>` +
-      `<div class="py-filters"><div class="chips" role="group" aria-label="نوع الدفع">${[['all', 'الكل'], ['vendor', 'موردين'], ['expense', 'مصروفات']].map(([k, t]) => `<button type="button" class="chip${filter === k ? ' on' : ''}" data-py-filter="${k}">${esc(t)}</button>`).join('')}</div>` +
+      `<div class="py-filters"><div class="chips" role="group" aria-label="نوع الدفع">${[['all', 'الكل'], ['vendor', 'موردين'], ['expense', 'مصروفات'], ['owner', 'صاحب المنشأة']].map(([k, t]) => `<button type="button" class="chip${filter === k ? ' on' : ''}" data-py-filter="${k}">${esc(t)}</button>`).join('')}</div>` +
       `<select id="pyBox" aria-label="الخزنة"><option value="">كل الخزن</option>${boxes.map((id) => `<option value="${esc(id)}"${String(box) === String(id) ? ' selected' : ''} class="notr">${esc(acctName(id) || id)}</option>`).join('')}</select></div>` +
       (list.length ? list.slice(0, shown).map((m) => {
         const o = done[String(m.id)];
-        return `<div class="py-card py-move"><div class="py-l1"><span class="py-name">${esc(kindWord(m.kind))} · <bdi class="notr">${esc(m.who || '')}</bdi></span><span class="py-amt">${amt(-num(m.amount))}</span></div>` +
-          `<div class="py-l2"><bdi dir="ltr">${esc(when(m.at))}</bdi> · <bdi class="notr">${esc(acctName(m.account_id))}</bdi>` + (m.memo ? ` · <bdi class="notr">${esc(m.memo)}</bdi>` : '') +
+        return `<div class="py-card py-move"><div class="py-l1"><span class="py-name">${title(m.kind, m.who, m.memo)}</span><span class="py-amt">${amt(-num(m.amount))}</span></div>` +
+          `<div class="py-l2"><bdi dir="ltr">${esc(when(m.at))}</bdi> · <bdi class="notr">${esc(acctName(m.account_id))}</bdi>` + (m.memo && m.kind !== 'owner' ? ` · <bdi class="notr">${esc(m.memo)}</bdi>` : '') +
           `<span class="py-pill${o ? ' on' : ''}">${o ? '✓ من أمر دفع' : 'اتدخلت في فارمافلاي'}</span></div></div>`;
       }).join('') + (list.length > shown ? '<button id="pyMore" type="button" class="secondary">اعرض أكتر</button>' : '')
         : '<p class="hint">مفيش مدفوعات بالشكل ده.</p>');
@@ -182,9 +189,9 @@
     const back = `<div class="cs-head"><button type="button" class="secondary small" data-py-back>رجوع</button><strong>${form.id ? 'تعديل أمر دفع' : 'دفع جديد'}</strong></div>`;
     if (form.step === 'confirm') {
       const who = form.kind === 'vendor' ? (v && (v.name || v.short)) : (catOf(form.party) || {}).name;
-      el.innerHTML = back + `<div class="py-card py-confirm"><div class="py-name">${esc(kindWord(form.kind))} · <bdi class="notr">${esc(who)}</bdi></div>` +
+      el.innerHTML = back + `<div class="py-card py-confirm"><div class="py-name">${title(form.kind, who, form.memo.trim())}</div>` +
         `<div class="py-big">${amt(a)}</div><div class="py-l2"><span>من خزنة</span> <bdi class="notr">${esc(acc && acc.name)}</bdi>` +
-        (form.memo.trim() ? ` · <bdi class="notr">${esc(form.memo.trim())}</bdi>` : '') + '</div>' + summary(a, acc, v) + '</div>' +
+        (form.memo.trim() && form.kind !== 'owner' ? ` · <bdi class="notr">${esc(form.memo.trim())}</bdi>` : '') + '</div>' + summary(a, acc, v) + '</div>' +
         `<button type="button" class="py-new" data-py-save="approve"${busy ? ' disabled' : ''}>أوافق على الدفع</button>` +
         `<button type="button" class="secondary py-wide" data-py-save="later"${busy ? ' disabled' : ''}>احفظه وأوافق عليه بعدين</button>` +
         `<button type="button" class="secondary py-wide" data-py-step="edit">رجوع للتعديل</button>` +
@@ -203,18 +210,18 @@
           (found.length ? `<div class="py-picks">${found.map((x) => `<button type="button" class="py-pick" data-py-party="${esc(x.id)}"><b class="notr">${esc(x.name || x.short)}</b><small>${amt(x.balance)}</small></button>`).join('')}</div>`
             : '<p class="hint">مفيش مورد بالاسم ده.</p>');
       }
-    } else {
+    } else if (form.kind === 'expense') {
       party = cats.length ? `<div class="py-cats">${cats.map((c) => `<button type="button" class="chip${String(form.party) === String(c.id) ? ' on' : ''}" data-py-party="${esc(c.id)}"><span class="notr">${esc(c.name)}</span></button>`).join('')}</div>`
         : '<p class="hint">أنواع المصروفات لسه ما وصلتش من اللاب.</p>';
     }
     const boxes = accounts.length ? `<div class="py-boxes">${accounts.map((x) => `<button type="button" class="py-bx${String(form.account) === String(x.id) ? ' on' : ''}${Number.isFinite(a) && num(x.balance) < a ? ' low' : ''}" data-py-account="${esc(x.id)}"><b class="notr">${esc(x.name)}</b><small>${amt(x.balance)}</small></button>`).join('')}</div>`
       : '<p class="hint">مفيش خزن لسه. اللاب بيبعتها كل شوية.</p>';
     el.innerHTML = back +
-      `<label class="py-lab">الدفع لمين؟</label><div class="py-seg"><button type="button" class="${form.kind === 'vendor' ? 'on' : ''}" data-py-kind="vendor">🏭 مورد</button><button type="button" class="${form.kind === 'expense' ? 'on' : ''}" data-py-kind="expense">🧾 مصروف</button></div>` +
-      `<label class="py-lab">${form.kind === 'vendor' ? 'المورد' : 'نوع المصروف'}</label>${party}` +
+      `<label class="py-lab">الدفع لمين؟</label><div class="py-seg">${[['vendor', '🏭 مورد'], ['expense', '🧾 مصروف'], ['owner', '👤 صاحب المنشأة']].map(([k, t]) => `<button type="button" class="${form.kind === k ? 'on' : ''}" data-py-kind="${k}">${esc(t)}</button>`).join('')}</div>` +
+      (form.kind === 'owner' ? '' : `<label class="py-lab">${form.kind === 'vendor' ? 'المورد' : 'نوع المصروف'}</label>${party}`) +
       `<label class="py-lab">من أنهي خزنة؟</label>${boxes}` +
       `<label class="py-lab" for="pyAmount">المبلغ</label><div class="py-field"><input id="pyAmount" inputmode="decimal" autocomplete="off" value="${esc(form.amount)}" /><small>جنيه</small></div>` +
-      `<label class="py-lab" for="pyMemo">ملاحظة (اختياري)</label><input id="pyMemo" maxlength="200" placeholder="مثلًا: دفعة تحت الحساب" value="${esc(form.memo)}" />` +
+      `<label class="py-lab" for="pyMemo">${form.kind === 'owner' ? 'لمين أو ليه؟ (اختياري)' : 'ملاحظة (اختياري)'}</label><input id="pyMemo" maxlength="200" placeholder="${form.kind === 'owner' ? 'مثلًا: لمين أو ليه' : 'مثلًا: دفعة تحت الحساب'}" value="${esc(form.memo)}" />` +
       `<div id="pySum">${summary(a, acc, v)}</div>` +
       `<button type="button" class="py-new" data-py-step="confirm">راجع وأكّد</button>` +
       (form.msg ? `<p class="status bad">${esc(form.msg)}</p>` : '');
@@ -238,7 +245,7 @@
     });
   }
   function check() {
-    if (!form.party) return form.kind === 'vendor' ? 'اختار المورد.' : 'اختار نوع المصروف.';
+    if (!form.party && form.kind !== 'owner') return form.kind === 'vendor' ? 'اختار المورد.' : 'اختار نوع المصروف.';
     if (!form.account) return 'اختار الخزنة.';
     const a = parseAmount(form.amount);
     if (!Number.isFinite(a) || a <= 0) return 'اكتب المبلغ.';
@@ -252,7 +259,7 @@
     if (form) drawForm(); else drawMain();
   }
   function openForm(o) {
-    form = o ? { id: o.id, kind: o.kind, party: String(o.kind === 'vendor' ? o.vendor_id : o.cat_id), account: String(o.account_id), amount: String(o.amount), memo: o.memo || '', step: 'edit', q: '', msg: '' }
+    form = o ? { id: o.id, kind: o.kind, party: o.kind === 'owner' ? '' : String(o.kind === 'vendor' ? o.vendor_id : o.cat_id), account: String(o.account_id), amount: String(o.amount), memo: o.memo || '', step: 'edit', q: '', msg: '' }
       : { id: null, kind: 'vendor', party: '', account: '', amount: '', memo: '', step: 'edit', q: '', msg: '' };
     draw();
     root.scrollTo && root.scrollTo({ top: 0, behavior: 'smooth' });
@@ -269,7 +276,7 @@
         db().from('ar_cash_cats').select('id,name').order('id'),
         db().from('ar_vendors').select('id,name,short,balance,active').limit(2000),
         db().from('ar_pay_orders').select('id,kind,account_id,account_name,vendor_id,cat_id,who,amount,memo,status,created_at,approved_at,move_id,move,closed_at').order('created_at', { ascending: false }).limit(300),
-        db().from('ar_cash_moves').select('id,account_id,at,op,kind,amount,who,memo').in('kind', ['vendor', 'expense']).gte('at', since).order('at', { ascending: false }).limit(2000),
+        db().from('ar_cash_moves').select('id,account_id,at,op,kind,amount,who,memo').in('kind', KINDS).gte('at', since).order('at', { ascending: false }).limit(2000),
       ]);
       for (const r of [a, c, v, o, m]) if (r.error) throw r.error;
       accounts = (a.data || []).sort((x, y) => num(x.id) - num(y.id));
@@ -293,7 +300,7 @@
     if (msg) { form.msg = msg; form.step = 'edit'; draw(); return; }
     busy = true; draw();
     const r = await rpc('ar_pay_order_save', {
-      p_id: form.id, p_kind: form.kind, p_account: Number(form.account), p_party: Number(form.party),
+      p_id: form.id, p_kind: form.kind, p_account: Number(form.account), p_party: form.kind === 'owner' ? null : Number(form.party),
       p_amount: parseAmount(form.amount), p_memo: form.memo.trim() || null, p_approve: !!approve,
     });
     busy = false;

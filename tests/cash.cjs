@@ -16,6 +16,8 @@ assert.equal(C.signed(0), '0');
 assert.deepEqual(C.label({ kind: 'sales', n: 312 }), { word: 'مبيعات نقدي', who: '', small: '312 بيعة' });
 assert.deepEqual(C.label({ kind: 'customer', who: 'أحمد مسعود' }), { word: 'تحصيل من عميل', who: 'أحمد مسعود', small: '' });
 assert.deepEqual(C.label({ kind: 'vendor', who: 'مخزن الفتح للادوية' }).word, 'دفعة لمورد');
+// PharmaFly's op 51 = the owner (2026-11-19), with his note («طاهر», «ام طاهر») under it
+assert.deepEqual(C.label({ kind: 'owner', op: 51, memo: 'ام طاهر' }), { word: 'لصاحب المنشأة', who: '', small: 'ام طاهر' });
 assert.deepEqual(C.label({ kind: 'transfer_out', who: 'احتياطى 2' }), { word: 'تحويل لخزنة', who: 'احتياطى 2', small: '' });
 assert.equal(C.label({ kind: 'transfer_in' }).word, 'تحويل من خزنة');
 assert.equal(C.label({ kind: 'drawer_out' }).word, 'تسليم الدرج للخزينة');

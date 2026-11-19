@@ -19,6 +19,8 @@
   const WORD = {
     sales: 'مبيعات نقدي', customer: 'تحصيل من عميل', vendor: 'دفعة لمورد', drawer_out: 'تسليم الدرج للخزينة', drawer_in: 'استلام من الدرج',
     transfer_out: 'تحويل لخزنة', transfer_in: 'تحويل من خزنة', expense: 'مصروف', other_in: 'حركة داخلة', other_out: 'حركة خارجة',
+    // PharmaFly's op 51 = money the owner takes out (owner 2026-11-19: «الدفع لصاحب المنشاه»; the notes say «طاهر», «ام طاهر»…)
+    owner: 'لصاحب المنشأة',
   };
   function label(m) {
     const word = WORD[m.kind] || 'حركة';

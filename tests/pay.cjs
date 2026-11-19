@@ -44,12 +44,15 @@ const M = [
   { id: 3, account_id: 3, at: day(5), kind: 'expense', amount: -1963 },
   { id: 4, account_id: 4, at: day(40), kind: 'vendor', amount: -150000 },
   { id: 5, account_id: 1, at: day(1), kind: 'sales', amount: 900 },
+  { id: 6, account_id: 4, at: day(3), kind: 'owner', amount: -20000, memo: 'طاهر' },
 ];
-assert.deepEqual(P.totals(M, 30, now), { vendor: 64850, vendorN: 2, expense: 1963, expenseN: 1 });
-assert.deepEqual(M.filter((m) => P.keepMove(m, 'all', '')).map((m) => m.id), [1, 2, 3, 4], 'sales are not payments');
+assert.deepEqual(P.totals(M, 30, now), { vendor: 64850, vendorN: 2, expense: 1963, expenseN: 1, owner: 20000, ownerN: 1 });
+assert.deepEqual(M.filter((m) => P.keepMove(m, 'all', '')).map((m) => m.id), [1, 2, 3, 4, 6], 'sales are not payments; the owner is');
+assert.deepEqual(M.filter((m) => P.keepMove(m, 'owner', '')).map((m) => m.id), [6]);
 assert.deepEqual(M.filter((m) => P.keepMove(m, 'vendor', '')).map((m) => m.id), [1, 2, 4]);
 assert.deepEqual(M.filter((m) => P.keepMove(m, 'expense', '')).map((m) => m.id), [3]);
-assert.deepEqual(M.filter((m) => P.keepMove(m, 'all', '4')).map((m) => m.id), [1, 4]);
+assert.deepEqual(M.filter((m) => P.keepMove(m, 'all', '4')).map((m) => m.id), [1, 4, 6]);
+assert.deepEqual(P.KINDS, ['vendor', 'expense', 'owner']);
 // the time: PharmaFly's local time as written; a server time on the phone's clock
 assert.equal(P.when('2026-11-18T20:00:46'), '18/11 20:00');
 assert.equal(P.when(''), '');

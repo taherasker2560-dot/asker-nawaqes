@@ -3,6 +3,13 @@
    its English, with the same {n}. Add a line here when a screen shows a new Arabic text (tests/e2e/english.spec.cjs lists them). */
 window.AskerEN = {
  "exact": {
+ "لصاحب المنشأة": "To the owner",
+ "لصاحب المنشأة (30 يوم)": "To the owner (30 days)",
+ "{0} مرة": "{0} times",
+ "صاحب المنشأة": "The owner",
+ "👤 صاحب المنشأة": "👤 The owner",
+ "لمين أو ليه؟ (اختياري)": "For whom or what? (optional)",
+ "مثلًا: لمين أو ليه": "e.g. for whom or what",
  "💸 المدفوعات": "💸 Payments",
  "كل دفعة بتتحط في فارمافلاي بتظهر هنا لوحدها بعد تحديث اللاب، سواء من أمر هنا أو اتدخلت بإيدك. الأمر بيتقفل لوحده لما الدفعة اللي زيه تظهر.": "Every payment put in PharmaFly shows here by itself after the laptop's update, whether it came from an order here or you entered it by hand. An order closes by itself when the payment that matches it shows up.",
  "+ دفع جديد": "+ New payment",

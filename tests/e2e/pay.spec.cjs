@@ -21,7 +21,8 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
    {id:502,account_id:4,at:loc(864e5),op:9,kind:'vendor',amount:-27100,who:'IBN SINA 1',memo:null},
    {id:503,account_id:3,at:loc(5*864e5),op:1005,kind:'expense',amount:-1963,who:'فواتير الموبايل',memo:null},
    {id:504,account_id:4,at:loc(40*864e5),op:9,kind:'vendor',amount:-150000,who:'مخزن الفتح للادوية',memo:null},
-   {id:505,account_id:3,at:loc(36e5),op:9,kind:'vendor',amount:-9500,who:'A M group',memo:null}];
+   {id:505,account_id:3,at:loc(36e5),op:9,kind:'vendor',amount:-9500,who:'A M group',memo:null},
+   {id:506,account_id:4,at:loc(3*864e5),op:51,kind:'owner',amount:-20000,who:null,memo:'طاهر'}];
   T.ar_pay_orders=[
    {id:10,kind:'vendor',account_id:4,account_name:'احتياطى',vendor_id:2374,cat_id:null,who:'A M group',amount:10000,memo:null,status:'mismatch',created_at:iso(2),approved_at:iso(2),move_id:505,move:{id:505,at:loc(36e5),account_id:3,amount:-9500,who:'A M group'}},
    {id:11,kind:'vendor',account_id:4,account_name:'احتياطى',vendor_id:2495,cat_id:null,who:'IBN SINA 1',amount:50000,memo:null,status:'approved',created_at:iso(3),approved_at:iso(3),move_id:null,move:null},
@@ -30,7 +31,7 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
   let seq=100;const calls=window.__payCalls=[];
   window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{
    ar_pay_order_save:(a)=>{calls.push(['save',a]);const acc=T.ar_cash_accounts.find(x=>x.id===a.p_account);if(!acc)return {ok:false,error:'account'};
-    const who=a.p_kind==='vendor'?(T.ar_vendors.find(v=>v.id===a.p_party)||{}).name:(T.ar_cash_cats.find(c=>c.id===a.p_party)||{}).name;if(!who)return {ok:false,error:'party'};
+    const who=a.p_kind==='owner'?'صاحب المنشأة':a.p_kind==='vendor'?(T.ar_vendors.find(v=>v.id===a.p_party)||{}).name:(T.ar_cash_cats.find(c=>c.id===a.p_party)||{}).name;if(!who)return {ok:false,error:'party'};
     const row={kind:a.p_kind,account_id:a.p_account,account_name:acc.name,vendor_id:a.p_kind==='vendor'?a.p_party:null,cat_id:a.p_kind==='expense'?a.p_party:null,who,amount:a.p_amount,memo:a.p_memo,status:a.p_approve?'approved':'waiting',approved_at:a.p_approve?new Date().toISOString():null,move_id:null,move:null};
     if(a.p_id){const o=T.ar_pay_orders.find(x=>x.id===a.p_id);if(!o||o.status!=='waiting')return {ok:false,error:'not_waiting'};Object.assign(o,row);return {ok:true,id:o.id,status:o.status}}
     const id=++seq;T.ar_pay_orders.push({id,created_at:new Date().toISOString(),...row});return {ok:true,id,status:row.status}},
@@ -46,8 +47,8 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
  assert.ok(await page.isVisible('#payPanel'));assert.ok(!(await page.isVisible('#cashPanel')));
  assert.ok(await page.isVisible('.subbar[data-for="accounts"] [data-tab="ops"]'),'the accounts tabs stay on top');assert.ok(await page.isVisible('.subbar[data-for="accounts"] .qa-pin'));
  await page.waitForSelector('#pyMain .py-card');
- // the two numbers: the last 30 days only
- assert.deepEqual(await texts(page,'#pyMain .py-tile'),['اتدفع لموردين (30 يوم) 74,350 ج 3 دفعة','مصروفات (30 يوم) 1,963 ج 1 مصروف']);
+ // the three numbers: the last 30 days only (the owner too, 2026-11-19)
+ assert.deepEqual(await texts(page,'#pyMain .py-tile'),['اتدفع لموردين (30 يوم) 74,350 ج 3 دفعة','مصروفات (30 يوم) 1,963 ج 1 مصروف','لصاحب المنشأة (30 يوم) 20,000 ج 1 مرة']);
  // the open orders: the difference first (the order and PharmaFly's move side by side), then the late one
  const open=await texts(page,'#pyMain [data-py-order]');
  assert.equal(open.length,2);
@@ -55,12 +56,14 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
  assert.match(open[1],/IBN SINA 1 50,000 ج .*اتوافق من أكتر من ساعتين ولسه ما ظهرش في فارمافلاي الغي$/);
  // what was paid: newest first, the one that closed an order says so
  const paid=await texts(page,'#pyMain .py-move');
- assert.equal(paid.length,5);
+ assert.equal(paid.length,6);
+ assert.match(paid.join('|'),/لصاحب المنشأة · طاهر 20,000 ج \d\d\/\d\d \d\d:\d\d · احتياطى اتدخلت في فارمافلاي/,'the owner\'s note is his name; no «undefined»');
  assert.match(paid[0],/A M group 9,500 ج .*اتدخلت في فارمافلاي/);
  assert.match(paid.join('|'),/kemi pharm 37,750 ج .*محفظه فودافون ✓ من أمر دفع/);
  await page.click('[data-py-filter="expense"]');assert.deepEqual((await texts(page,'#pyMain .py-move')).length,1);
  await page.click('[data-py-filter="vendor"]');assert.deepEqual((await texts(page,'#pyMain .py-move')).length,4);
- await page.click('[data-py-filter="all"]');await page.selectOption('#pyBox','4');assert.equal((await texts(page,'#pyMain .py-move')).length,2);
+ await page.click('[data-py-filter="owner"]');assert.deepEqual((await texts(page,'#pyMain .py-move')).length,1);
+ await page.click('[data-py-filter="all"]');await page.selectOption('#pyBox','4');assert.equal((await texts(page,'#pyMain .py-move')).length,3);
  await page.selectOption('#pyBox','');
  // a new supplier payment: nothing chosen → a sentence, not a call
  await page.click('#pyNew');await page.waitForSelector('#pyForm:not(.hidden)');
@@ -103,6 +106,18 @@ run('Payments: open orders, what was paid, a new payment approved, an expense fo
  await page.click(`${waitCard} [data-py-act="approve"]`);
  await page.waitForFunction(()=>/اتوافق عليه/.test(document.querySelector('#pyMain [data-py-order="102"]')?.textContent||''));
  assert.match(await page.textContent(waitCard),/1,400 ج/);
+ // the owner (2026-11-19 «الدفع لصاحب المنشاه»): no supplier, no type; the note says for whom; no supplier balance in the summary
+ await page.click('#pyNew');await page.click('#pyForm [data-py-kind="owner"]');
+ assert.equal(await page.$('#pyVQ'),null);assert.equal(await page.$('#pyForm .py-cats'),null);
+ assert.deepEqual(await texts(page,'#pyForm .py-seg button'),['🏭 مورد','🧾 مصروف','👤 صاحب المنشأة']);
+ assert.match(await page.textContent('#pyForm label[for="pyMemo"]'),/لمين أو ليه؟/);
+ await page.click('#pyForm [data-py-account="4"]');await page.fill('#pyAmount','5000');await page.fill('#pyMemo','ام طاهر');
+ assert.doesNotMatch(await page.textContent('#pySum'),/رصيد المورد/);
+ await page.click('#pyForm [data-py-step="confirm"]');
+ assert.match(await txt(page,'#pyForm .py-confirm'),/^لصاحب المنشأة · ام طاهر 5,000 ج من خزنة احتياطى الخزنة:/);
+ await page.click('#pyForm [data-py-save="approve"]');await page.waitForSelector('#pyForm.hidden',{state:'attached'});
+ assert.deepEqual(await page.evaluate(()=>window.__payCalls.at(-1)),['save',{p_id:null,p_kind:'owner',p_account:4,p_party:null,p_amount:5000,p_memo:'ام طاهر',p_approve:true}]);
+ assert.match(await txt(page,'#pyMain [data-py-order="103"]'),/^لصاحب المنشأة · ام طاهر 5,000 ج من خزنة احتياطى اتوافق عليه: دخّله في فارمافلاي الغي$/);
  // the difference: «هي دي، اقفله» closes it, it leaves the open orders
  await page.click('#pyMain [data-py-order="10"] [data-py-act="accept"]');
  await page.waitForFunction(()=>!document.querySelector('#pyMain [data-py-order="10"]'));
