@@ -56,9 +56,17 @@ let prev = -1; for (let p = M.LEVEL_MIN; p <= M.LEVEL_MAX; p += 5) { const g = M
 // the advert voice (owner 2026-11-19: «عايز صوت الإعلان على السيستم، برضو على المستخدمين بتوع السيستم»): the SAME advert as the store's (voice, file, cache, level), every open (no cap)
 for (const k of ['voice', 'delay', 'targetDb', 'gain', 'file']) assert.equal(M.PROMO[k], S.PROMO[k], 'the advert is the store\'s: ' + k);
 assert.equal(M.PROMO.cache, S.PROMO.cache, 'one phone copy for both pages (the same cache name)');
-assert.equal(S.PROMO.everyDays, 0, 'the store says it every open; the system does too, with no cap of its own');
-assert.ok(!/everyDays|promoDue/.test(src), 'no frequency cap in the system: every open');
+assert.equal(S.PROMO.everyDays, 0, 'the store says it once per open (its own rule)');
 assert.equal(M.PROMO.voice, 'Orus');
+// the system's advert comes back EVERY HALF HOUR (his order 2026-11-19: «لا انا عايزها تشتغل كل نص ساعة»), a failed ask is tried again in a few minutes
+assert.equal(M.PROMO.everyMin, 30, 'every half hour');
+assert.ok(M.PROMO.retryMin >= 5 && M.PROMO.retryMin <= 15, 'a failed ask: a few minutes: ' + M.PROMO.retryMin);
+assert.equal(M.promoWait(0, 1e12), 0, 'never said in this page: due at once');
+const T0 = Date.UTC(2026, 10, 19, 12, 0, 0);
+assert.equal(M.promoWait(T0 + 30 * 60000, T0), 30 * 60000, 'just said: a half hour to wait');
+assert.equal(M.promoWait(T0 + 30 * 60000, T0 + 29 * 60000), 60000, 'a minute left');
+assert.equal(M.promoWait(T0 + 30 * 60000, T0 + 30 * 60000), 0, 'the half hour is up: due');
+assert.equal(M.promoWait(T0 + 30 * 60000, T0 + 95 * 60000), 0, 'long overdue (the page was hidden): due, said once, not many times');
 // its level: measured the same way as the store's; at the music's own level it is the store's gain, and a music turned down takes it down too
 const wav = (amp, n = 15000) => { const b = new ArrayBuffer(44 + n * 2), v = new DataView(b); for (let i = 0; i < n; i++) v.setInt16(44 + 2 * i, Math.round(Math.sin(i / 9) * amp * 32767), true); return b; };
 for (const amp of [0.02, 0.1, 0.4, 0.9]) assert.equal(M.wavRms(wav(amp)), S.wavRms(wav(amp)), 'the same level reading: ' + amp);
