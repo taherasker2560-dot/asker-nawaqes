@@ -33,9 +33,9 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
  // the default period (3 days): FLAGYL (3 months), PANADOL (8 months, 7 left after the return), OLDER ONE (14 months, 2 days ago); not the long one
  const rows=await names(page,'#alExpiry .sd-row');
  assert.equal(rows.length,3);
- assert.match(rows[0],/فلاجيل ١٢٥ شراب.*FLAGYL 125MG SYRUP.*AMG.*11\/26\/1.*باقي 3 شهور.*2 علبة/);
+ assert.match(rows[0],/فلاجيل ١٢٥ شراب.*FLAGYL 125MG SYRUP.*AMG · فاتورة رقم 1 · اتدخلت \d\d\/\d\d\/\d{4}.*باقي 3 شهور.*2 علبة/,'the supplier, the supplier\'s invoice number (no «11/26/»), the day entered with the year');
  assert.match(rows[1],/بانادول اكسترا ٢٤ قرص.*AMG.*باقي 8 شهور.*7 علبة/,'3 of the 10 went back');
- assert.match(rows[2],/OLDER ONE.*REDA.*11\/26\/7.*باقي 14 شهر.*3 علبة/);
+ assert.match(rows[2],/OLDER ONE.*REDA · فاتورة رقم 7 · اتدخلت \d\d\/\d\d\/\d{4}.*باقي 14 شهر.*3 علبة/);
  assert.ok(!rows.join('|').includes('LONG LIFE'),'a 30-month item is not short');
  assert.match(await page.textContent('#alExpiry .al-h'),/3/);
  // colours: under 6 months red, under 12 amber, the rest plain
