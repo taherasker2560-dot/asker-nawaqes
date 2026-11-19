@@ -9,6 +9,8 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  await page.addInitScript(()=>{window.__askerMotion=true});
  await page.reload();
  await ready(page);
+ // (the bar's segments fade in over 0.2 s: a slow runner read the section you are in before its color had arrived, «rgba(0, 0, 0, 0)»)
+ await page.addStyleTag({content:'.bottomnav button,.bottomnav button svg{transition:none!important}'});await page.waitForTimeout(150);
  await page.evaluate(()=>{document.getElementById('todoCard').classList.remove('hidden');document.getElementById('todoList').innerHTML='<button type="button" class="todo-row" data-go="read"><b>23</b><span>جديد في الوارد</span></button>'});
  const look=await page.evaluate(()=>{const cs=(e,p)=>getComputedStyle(e,p),bar=document.querySelector('.appbar'),hero=document.querySelector('.hero'),nav=document.querySelector('.bottomnav'),link=document.querySelector('.hero-link'),h2=document.querySelector('.hero h2'),qa=document.querySelector('.card.home .qa button'),on=nav.querySelector('button:not(.secondary)');
   return {body:cs(document.body).backgroundColor,bless:document.querySelectorAll('.bless').length,blessText:/اللهم صل|ﷺ/.test(document.body.textContent),barBg:cs(bar).backgroundColor,barRadius:cs(bar).borderBottomLeftRadius,wave:cs(bar,'::after').display,
