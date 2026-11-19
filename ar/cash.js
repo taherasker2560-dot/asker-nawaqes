@@ -22,12 +22,18 @@
     // PharmaFly's op 51 = money the owner takes out (owner 2026-11-19: «الدفع لصاحب المنشاه»; the notes say «طاهر», «ام طاهر»…)
     owner: 'لصاحب المنشأة',
   };
+  // an «other» move whose PharmaFly operation he named (it keeps its kind; only its words change)
+  const OP = {
+    // op 50 (owner 2026-11-19): «اسمها دعم من صاحب المنشاه، ساعات بستخدمها للتصحيح عشان لما بيحصل اخطاء دفع مبتتصلحش عالسيستم»
+    50: 'دعم من صاحب المنشأة',
+  };
   function label(m) {
-    const word = WORD[m.kind] || 'حركة';
+    const other = m.kind === 'other_in' || m.kind === 'other_out';
+    const word = (other && OP[m.op]) || WORD[m.kind] || 'حركة';
     const small = [];
     if (m.kind === 'sales' && m.n) small.push(`${m.n} بيعة`);
     if (m.memo) small.push(m.memo);
-    if ((m.kind === 'other_in' || m.kind === 'other_out') && m.op) small.push(`رقم ${m.op}`);
+    if (other && m.op && !OP[m.op]) small.push(`رقم ${m.op}`);
     return { word, who: m.who || '', small: small.join(' · ') };
   }
   const isTransfer = (k) => k === 'transfer_in' || k === 'transfer_out' || k === 'drawer_in' || k === 'drawer_out';

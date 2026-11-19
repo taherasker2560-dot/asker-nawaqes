@@ -17,7 +17,8 @@ run('Cash: the boxes, today\'s in and out, a statement with the balance after ea
    {id:12,account_id:1,at:at(y,23,40),op:5,kind:'drawer_out',amount:-8910.35,who:null,memo:null,n:null},
    {id:13,account_id:2,at:at(y,23,40),op:6,kind:'drawer_in',amount:8920,who:null,memo:null,n:null},
    {id:14,account_id:2,at:at(y,23,41),op:52,kind:'transfer_out',amount:-8800,who:'احتياطى 2',memo:null,n:null},
-   {id:15,account_id:2,at:at(y,20,0),op:51,kind:'other_out',amount:-41.99,who:null,memo:null,n:null}];});
+   {id:15,account_id:2,at:at(y,20,0),op:51,kind:'other_out',amount:-41.99,who:null,memo:null,n:null},
+   {id:16,account_id:2,at:at(y,19,0),op:50,kind:'other_in',amount:25,who:null,memo:'تصحيح',n:null}];});
  await page.click('[data-group="accounts"]');
  assert.deepEqual(await names(page,'.subbar[data-for="accounts"] [data-tab]'),['العملاء','الموردين','الخزن','المدفوعات','العمليات']);
  await page.click('[data-tab="cash"]');
@@ -58,6 +59,8 @@ run('Cash: the boxes, today\'s in and out, a statement with the balance after ea
  const r2=await names(page,'#csStatement .cs-move');
  assert.match(r2[0],/تحويل لخزنة احتياطى 2.*−8,800/);
  assert.match(r2.join('|'),/حركة خارجة.*رقم 51/);
+ // op 50 has his name (2026-11-19): «دعم من صاحب المنشأة», its note under it, no number
+ assert.match(r2.join('|'),/دعم من صاحب المنشأة\s*تصحيح\s*\+25/);assert.doesNotMatch(r2.join('|'),/رقم 50/);
  // fits the phone; the 📌 is there
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth));
  assert.ok(await page.isVisible('.subbar[data-for="accounts"] .qa-pin'));
