@@ -62,7 +62,11 @@ const index = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'store', 'mu
 const slowest = index.slice().sort((a, b) => bpmOf[a.id] - bpmOf[b.id]).slice(0, 4).map((p) => p.file).sort();
 assert.deepEqual(S.MUSIC.tracks.slice().sort(), slowest, 'the four slowest pieces: ' + slowest.join(', '));
 assert.ok(Math.max(...S.MUSIC.tracks.map((f) => bpmOf[index.find((p) => p.file === f).id])) <= 96, 'none faster than 96 bpm');
-assert.ok(S.MUSIC.volume > 0.05 && S.MUSIC.volume < 0.18, 'quieter than the store (0.18) but not silent: ' + S.MUSIC.volume);
+// the level (owner 2026-11-19: «خليها متوسطة … واعمل أوبشن برضو للتعلية والتوطية»): medium = the store's own level, and a volume option like the system's (slider 10..100, squared)
+assert.equal(S.LEVEL_DEFAULT, 60); assert.equal(S.levelGain(60), 0.18, 'medium = the store\'s level'); assert.equal(S.MUSIC.volume, 0.18, 'nothing saved: medium');
+assert.equal(S.levelGain(100), 0.5); assert.equal(S.levelGain(10), 0.005); assert.equal(S.levelGain(30), 0.045); assert.equal(S.levelGain(80), 0.32);
+assert.equal(S.cleanLevel(null), 60); assert.equal(S.cleanLevel(''), 60); assert.equal(S.cleanLevel('abc'), 60); assert.equal(S.cleanLevel(3), 10); assert.equal(S.cleanLevel(500), 100); assert.equal(S.cleanLevel('45.4'), 45);
+assert.equal(S.LEVEL_KEY, 'asker_vendor_music_vol', 'its own key, not the system\'s or the store\'s');
 assert.equal(S.MUSIC.promo, false, 'no spoken advert, no selling');
 assert.equal(S.MUSIC.pharmacyToo, true);
 assert.equal(S.MUSIC.key, 'asker_vendor_music_off', 'not the store\'s «stopped» memory');
