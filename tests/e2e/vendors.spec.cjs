@@ -65,6 +65,16 @@ run('Suppliers: balances, a statement with returns and expiry, an item\'s purcha
  await page.waitForSelector('#veMoves .ve-move');
  assert.equal(await page.$eval('#veFrom',e=>e.value),old,'the chosen dates stay for the next supplier');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ve-range')).from),old,'and are kept on this phone');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ve-range')).open),true,'an «until» left at today is kept as «until today»');
+ // an «until» older than the supplier's last invoice (SKY's is 30 days ago): the statement says so and one tap moves it to today (2026-11-19: the invoice of 15/11 was hidden)
+ assert.ok(!(await page.$('#veStSum .ve-late')),'nothing hidden: no note');
+ await page.fill('#veTo',at(40).slice(0,10));
+ await page.waitForSelector('#veStSum .ve-late');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ve-range')).open),false,'a past day picked on purpose is kept as it is');
+ await page.click('#veStSum [data-ve-today]');
+ await page.waitForFunction(()=>!document.querySelector('#veStSum .ve-late'));
+ assert.equal(await page.$eval('#veTo',e=>e.value),at(0).slice(0,10));
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ve-range')).open),true);
  await page.evaluate(()=>localStorage.removeItem('ve-range'));
  // back to the suppliers
  await page.click('#veSt [data-ve-back]');

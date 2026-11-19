@@ -47,6 +47,21 @@
     const t = dayStart(now || new Date());
     return { from: dateOnly(new Date(t.getFullYear(), t.getMonth() - 1, 1)), to: dateOnly(t) };
   }
+  // The dates he chose are kept on his phone (owner 2026-11-14). An «until» that was TODAY when he chose is kept as «until today»: stored as a fixed
+  // day it froze there and hid every invoice after it (2026-11-19: the 3,500 invoice of 15/11 of صيدليه دكتور احمد رمضان was in the database and in the
+  // balance but not in its statement). A past day he picked on purpose stays; a save from before this has no mark and is read as «until today».
+  function saveRange(r, now) { return { from: r.from, to: r.to, open: String(r.to) >= dateOnly(dayStart(now || new Date())) }; }
+  function restoreRange(raw, now) {
+    if (!raw || !raw.from || !raw.to) return null;
+    return raw.open === false ? { from: raw.from, to: raw.to } : { from: raw.from, to: dateOnly(dayStart(now || new Date())) };
+  }
+  // the day of the supplier's last invoice when it is AFTER the dates shown (the statement cannot show it), else null
+  function lateInvoice(v, r) {
+    const d = parseAt(v && v.last_invoice_at), a = parseAt(r && r.from), b = parseAt(r && r.to);
+    if (!d || !a || !b) return null;
+    const hi = a <= b ? b : a;
+    return dayStart(d) > dayStart(hi) ? dateOnly(dayStart(d)) : null;
+  }
   // dates of the inputs → [from, to) as the server's times
   function rangeArgs(r) {
     const a = parseAt(r && r.from), b = parseAt(r && r.to);
@@ -85,7 +100,7 @@
     return { owed: Math.round(owed * 100) / 100, year: n };
   }
   const KIND = { purchase: 'فاتورة شرا', return: 'مرتجع', payment: 'دفعة' };
-  const api = { money, parseAt, dayText, expText, balanceText, defaultRange, rangeArgs, qtyText, lineValue, pickVendors, totals, KIND };
+  const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, KIND };
   root.AskerVendorsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -101,7 +116,7 @@
   // next supplier too and after the page opens again (kept on this phone only)
   const RANGE_KEY = 've-range';
   let lastRange = null;
-  try { const r = JSON.parse(localStorage.getItem(RANGE_KEY) || 'null'); if (r && rangeArgs(r)) lastRange = { from: r.from, to: r.to }; } catch (e) {}
+  try { const r = restoreRange(JSON.parse(localStorage.getItem(RANGE_KEY) || 'null')); if (r && rangeArgs(r)) lastRange = r; } catch (e) {}
   let it = null;       // the item history: { item, kind, rows, done, busy, sum }
   const names = new Map(), findState = { seq: 0, timer: null, hits: [] };
   const missing = (e) => /schema cache|does not exist|Could not find/i.test(String(e && (e.message || e)));
@@ -226,6 +241,9 @@
         sumHtml += '</div>';
       }
     }
+    // an invoice of his that the dates cannot show: said at once, with the one tap that fixes it
+    const late = lateInvoice(st.v, st.range);
+    if (late) sumHtml += `<p class="status bad ve-late"><span>آخر فاتورة للمورد ده بعد الفترة المختارة:</span> <b dir="ltr">${esc(dayText(late))}</b> <button type="button" data-ve-today>لحد النهارده</button></p>`;
     $('veStSum').innerHTML = sumHtml;
     const status = $('veStStatus');
     if (st.error) { status.textContent = st.error; status.className = 'status bad'; }
@@ -334,6 +352,14 @@
       const o = e.target.closest('[data-ve-open]');
       if (o) { openStatement(o.dataset.veOpen); return; }
       if (e.target.closest('[data-ve-back]')) { if (history.state && history.state.ve) history.back(); else closeStatement(); return; }
+      // «لحد النهارده»: the supplier has an invoice after the dates shown; one tap moves the end to today (and it stays «until today»)
+      if (e.target.closest('[data-ve-today]') && st) {
+        const r = { from: st.range.from, to: dateOnly(dayStart(new Date())) };
+        $('veTo').value = r.to; st.range = r; lastRange = r;
+        try { localStorage.setItem(RANGE_KEY, JSON.stringify(saveRange(r))); } catch (err) {}
+        st.rows = []; st.done = false; st.open.clear(); loadMoves(false);
+        return;
+      }
       if (e.target.closest('#veItemBtn')) { openItem(); return; }
       const k = e.target.closest('[data-ve-kind]');
       if (k && st) { st.kind = k.dataset.veKind || null; st.rows = []; st.done = false; st.open.clear(); loadMoves(false); return; }
@@ -357,7 +383,7 @@
       const r = { from: $('veFrom').value, to: $('veTo').value };
       if (!rangeArgs(r)) return;   // a field emptied while choosing: keep what is shown
       st.range = r; lastRange = r;
-      try { localStorage.setItem(RANGE_KEY, JSON.stringify(r)); } catch (e) {}
+      try { localStorage.setItem(RANGE_KEY, JSON.stringify(saveRange(r))); } catch (e) {}
       st.rows = []; st.done = false; st.open.clear(); loadMoves(false);
     };
     // the phone's date picker may only send «input»: both are listened to
