@@ -327,6 +327,9 @@
     if (!db()) return null;
     if (root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff()) return null; // the database answers the owner only
     try {
+      // nobody is waiting (or it is not the owner: the table shows him nothing): nothing to ask or to mark; only then the overview, which also marks what the stock list shows as arrived
+      const { data: any, error: e0 } = await db().from('ar_waitlist').select('id').in('status', ['waiting', 'arrived']).limit(1);
+      if (e0 || !any || !any.length) return { call: 0, near: 0 };
       const { data: d, error } = await db().rpc('ar_waitlist_overview');
       if (error || !d || d.ok === false) return null;
       return { call: (d.call || []).length, near: (d.leftover || []).filter((r) => r.left_days != null && r.left_days <= 2).length };
