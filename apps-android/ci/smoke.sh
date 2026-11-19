@@ -20,7 +20,8 @@ top_has() { local t; t=$(top); [[ "$t" == *"$1"* ]]; }
 wait_top() { for i in $(seq 1 20); do if top_has "$1"; then return 0; fi; sleep 1; done; return 1; }
 dump() { adb shell uiautomator dump /sdcard/u.xml >/dev/null 2>&1; adb shell cat /sdcard/u.xml | tr -d '\r'; }
 has() { local d; d=$(dump); [[ "$d" == *"$1"* ]]; }
-link() { adb shell am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "$1" >/dev/null; }
+# the link goes through the PHONE's shell too: its «&» must be quoted there (unquoted, «&name=…» ran as a second command and the app never got the name)
+link() { adb shell "am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d '$1'" >/dev/null; }
 tap_text() {
   local b
   b=$(dump | tr '>' '\n' | grep "text=\"$1\"" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' ')
