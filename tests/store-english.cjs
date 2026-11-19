@@ -71,6 +71,8 @@ for(const [state,due] of [['late',-13],['late',-8],['late',-1],['soon',0],['soon
 check(RG.TEXTS.every.replace('{n}','33'));
 // the stock limit in the cart (store/store.js, 2026-11-17): what the page says when he asks for more boxes than the pharmacy has
 for(const n of [1,2,3,10,11,20])check(S.maxText(n));check('خليها 3');check('ده آخر المتاح عندنا');
+// the owner's cap per item (2026-11-19)
+for(const n of [1,2,3,10,11,20])check(S.maxText(n,true));check('ده أقصى كمية في الطلب الواحد');check(S.ERRORS.qtyCap);
 // «⏰ منبه الدوا» (store/alarm.js, 2026-11-17): its fixed texts (the sentence the phone SAYS and the am / pm letters are not shown as text) and the ones it builds
 const AL=require('../store/alarm.js');
 for(const [k,v] of Object.entries(AL.TEXTS)){if(/\{\w+\}/.test(v)||['tryPhrase','sayName','am','pm'].includes(k))continue;check(v)}

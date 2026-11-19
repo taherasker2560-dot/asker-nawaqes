@@ -58,6 +58,8 @@
     bad_pay: 'اختار طريقة الدفع',
     // more than the pharmacy has (2026-11-17, owner: «لو طلب أزيد من الكمية المتاحة يطلع له تنبيه»)
     qty: 'في صنف طلبت منه أكتر من المتاح عندنا. عدّل الكمية وابعت تاني',
+    // more than the owner lets one order hold (2026-11-19, ar_store_items.max_per_order)
+    qtyCap: 'في صنف طلبت منه أكتر من المسموح في الطلب الواحد. عدّل الكمية وابعت تاني',
   };
   const MAX_LINES = 30, MAX_QTY = 20;
 
@@ -167,10 +169,16 @@
     return Math.round(cart.reduce((s, x) => s + x.qty * Number(x.price || 0), 0) * 100) / 100;
   }
   // the boxes the pharmacy has (ar_store_item_qty, for the items in the cart): the lines that ask for more, and how the page says it (2026-11-17, owner: «لو طلب أزيد من الكمية المتاحة يطلع له تنبيه عشان ما يطلبش وبعد كده يلاقي الكمية ما جاتلوش مظبوطة»)
+  // 2026-11-19 (owner: «أقصى كمية من أصناف معينة أنا أحددها»): the server's number is the smaller of the boxes in stock and the cap the owner set on the item, so an item on order has a limit too when he capped it
   function overLimit(cart, limits) {
-    return (cart || []).filter((x) => !x.free_text && !x.on_order && limits && limits[x.id] != null && x.qty > limits[x.id]).map((x) => ({ id: x.id, name: x.name, qty: x.qty, max: Number(limits[x.id]) }));
+    return (cart || []).filter((x) => !x.free_text && limits && limits[x.id] != null && x.qty > limits[x.id]).map((x) => ({ id: x.id, name: x.name, qty: x.qty, max: Number(limits[x.id]) }));
   }
-  const maxText = (n) => (n === 1 ? 'المتاح عندنا علبة واحدة بس' : n === 2 ? 'المتاح عندنا علبتين بس' : n >= 3 && n <= 10 ? `المتاح عندنا ${n} علب بس` : `المتاح عندنا ${n} علبة بس`);
+  // owner = the number is the cap he set (not what the pharmacy has): «أقصى كمية في الطلب …»
+  const maxText = (n, owner) => (owner
+    ? (n === 1 ? 'أقصى كمية في الطلب علبة واحدة' : n === 2 ? 'أقصى كمية في الطلب علبتين' : n >= 3 && n <= 10 ? `أقصى كمية في الطلب ${n} علب` : `أقصى كمية في الطلب ${n} علبة`)
+    : (n === 1 ? 'المتاح عندنا علبة واحدة بس' : n === 2 ? 'المتاح عندنا علبتين بس' : n >= 3 && n <= 10 ? `المتاح عندنا ${n} علب بس` : `المتاح عندنا ${n} علبة بس`));
+  // the form's line: the cap's own words when every line that is too many is above the owner's cap
+  const qtyMsg = (over, capped) => (over && over.length && over.every((x) => capped && capped[x.id]) ? ERRORS.qtyCap : ERRORS.qty);
   function errorText(code) {
     return ERRORS[code] || 'الطلب ماتبعتش. جرب تاني بعد شوية';
   }
@@ -302,7 +310,7 @@
   }
   // صورة كل قسم في الرئيسية: صنف معروف من القسم وعنده صورة (لو الصورة مش موجودة يرجع الرسم)
   const SEC_PICS = { meds: 68432, vit: 4468, care: 27245, baby: 25723, supplies: 3614 };
-  const api = { overLimit, maxText, dataAgeText, arabicPattern, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
+  const api = { overLimit, maxText, qtyMsg, dataAgeText, arabicPattern, shopHours, cairoNow, rememberSearch, MAX_RECENT, SEC_PICS, descHtml, DESC_SECTIONS, cardInfo, NEEDS, rememberSeen, MAX_SEEN, cartAddText, orderItems, cleanText, MAX_TEXT_LINES, itemIdFromHash, itemLink, shareText, STATUS, SECTIONS, ERRORS, MAX_LINES, MAX_QTY, ORDER_STATUS, MAX_SAVED_ORDERS, MAX_RX, MAX_RX_BYTES, shapeOf, searchTerms, termFilter, normPhone, money, onOrder, canAdd, cartAdd, cartLater, cartSet, cartCount, cartTotal, errorText, rememberOrder, reorderPlan, rxExt, rxPath };
   root.AskerStoreLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -899,16 +907,17 @@
     return paths;
   }
   // what the pharmacy has of the items in the cart (asked from the server, not kept long: the stock moves)
-  let limits = {}, limitsKey = '', limitsAt = 0;
+  // capped[id] = the number is the owner's cap on the item (not the pharmacy's stock): the wording differs
+  let limits = {}, capped = {}, limitsKey = '', limitsAt = 0;
   async function loadLimits(force) {
-    const ids = cart.filter((x) => !x.free_text && !x.on_order && x.id != null).map((x) => x.id);
+    const ids = cart.filter((x) => !x.free_text && x.id != null).map((x) => x.id);
     if (!ids.length || !client) return;
     const key = ids.slice().sort((a, b) => a - b).join(',');
     if (!force && key === limitsKey && Date.now() - limitsAt < 30000) return;
     limitsKey = key; limitsAt = Date.now();
     try {
       const { data } = await client.rpc('ar_store_item_qty', { p_ids: ids.slice(0, 50) });
-      if (data && data.ok) { limits = {}; for (const [k, v] of Object.entries(data.max || {})) limits[k] = Number(v); drawCart(); }
+      if (data && data.ok) { limits = {}; capped = {}; for (const [k, v] of Object.entries(data.max || {})) limits[k] = Number(v); for (const k of Object.keys(data.cap || {})) capped[k] = true; drawCart(); }
     } catch (e) { /* no limits shown: the server still refuses an order above the stock */ }
   }
   function drawCart() {
@@ -920,9 +929,9 @@
       return;
     }
     box.innerHTML = cart.map((x) => {
-      const max = !x.free_text && !x.on_order && limits[x.id] != null ? Number(limits[x.id]) : null, over = max != null && x.qty > max, atMax = max != null && x.qty >= max;
-      // the pharmacy has fewer boxes than he asks for: it says so HERE, before he sends (2026-11-17)
-      const warn = over ? `<span class="hint-sm cart-over"><span>${esc(maxText(max))}</span> <button type="button" class="linklike" data-capq="${esc(x.id)}" data-max="${max}">${esc('خليها ' + max)}</button></span>` : atMax && max < MAX_QTY ? `<span class="hint-sm">${esc('ده آخر المتاح عندنا')}</span>` : '';
+      const max = !x.free_text && limits[x.id] != null ? Number(limits[x.id]) : null, over = max != null && x.qty > max, atMax = max != null && x.qty >= max, byOwner = !!capped[x.id];
+      // the pharmacy has fewer boxes than he asks for, or the owner capped the item: it says so HERE, before he sends (2026-11-17, 2026-11-19)
+      const warn = over ? `<span class="hint-sm cart-over"><span>${esc(maxText(max, byOwner))}</span> <button type="button" class="linklike" data-capq="${esc(x.id)}" data-max="${max}">${esc('خليها ' + max)}</button></span>` : atMax && max < MAX_QTY ? `<span class="hint-sm">${esc(byOwner ? 'ده أقصى كمية في الطلب الواحد' : 'ده آخر المتاح عندنا')}</span>` : '';
       return `<article class="item cart-line">
       <div class="item-text"><h3 dir="ltr">${esc(x.name)}</h3>${x.arabic_name ? `<p class="ar">${esc(x.arabic_name)}</p>` : ''}
         <span class="hint-sm">${x.free_text ? 'كتبته بنفسك · هنجيبه ونكلمك بسعره' : x.on_order ? 'بالطلب · السعر يتأكد معاك على واتساب' : money(x.price) + ' ج للواحدة'}</span>${warn}</div>
@@ -934,7 +943,7 @@
     }).join('');
     // more than the pharmacy has: the order is not sent until it is fixed (the server refuses it too)
     const over = overLimit(cart, limits);
-    if (over.length) say(ERRORS.qty, true); else if ($('formMsg').textContent === ERRORS.qty) say('');
+    if (over.length) say(qtyMsg(over, capped), true); else if ([ERRORS.qty, ERRORS.qtyCap].includes($('formMsg').textContent)) say('');
     $('sendBtn').disabled = over.length > 0 || settings.is_open === false;
     loadLimits();
     const later = cartLater(cart);
@@ -963,7 +972,7 @@
     if (!cart.length && !rxFiles.length) return say(ERRORS.bad_items, true);
     if (!link && name.length < 2) return say(ERRORS.bad_name, true);
     if (!phone) return say(ERRORS.bad_phone, true);
-    if (overLimit(cart, limits).length) { drawCart(); return say(ERRORS.qty, true); }
+    { const over = overLimit(cart, limits); if (over.length) { drawCart(); return say(qtyMsg(over, capped), true); } }
     store.set('asker_store_me', { name: typed, phone });
     sending = true; $('sendBtn').disabled = true; say(rxFiles.length ? 'بيرفع صورة الروشتة…' : 'بيبعت الطلب…');
     try {
@@ -983,7 +992,11 @@
         if (link && data && data.error === 'member_cash') acct.memberCashNow();
         if (link && data && data.error === 'link') acct.linkGone();
         // the server says how many boxes there are: the cart shows it at once
-        if (data && data.error === 'qty' && Array.isArray(data.items)) { for (const x of data.items) limits[x.id] = Number(x.max); drawCart(); }
+        if (data && data.error === 'qty' && Array.isArray(data.items)) {
+          for (const x of data.items) { limits[x.id] = Number(x.max); if (x.cap) capped[x.id] = true; else delete capped[x.id]; }
+          drawCart();
+          return say(qtyMsg(overLimit(cart, limits), capped), true);
+        }
         return say(errorText(data && data.error), true);
       }
       const changed = Math.abs(Number(data.total) - cartTotal(cart)) > 0.009;
