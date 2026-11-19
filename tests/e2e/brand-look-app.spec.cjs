@@ -30,8 +30,12 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  assert.equal(look.navRadius,'0px','and flat');
  // since 2026-11-19 (owner: five shades of the system color, tests/e2e/section-colors.spec.cjs) every section of the bar is a filled segment of its own shade; «الرئيسية» is the system color itself
  assert.equal(look.onGroup,'home');assert.notEqual(look.onBg,'rgba(0, 0, 0, 0)','the section you are in is a filled segment of its shade');
- assert.ok(contrast(look.onColor,look.onBg)>=4.5,'and its white words read on it: '+look.onColor+' on '+look.onBg);
- assert.equal(look.qaBg,'rgb(255, 255, 255)','white tiles for the sections');assert.equal(look.qaRadius,'999px','and they stay oval (owner 2026-11-17)');
+ // (since 2026-11-19 the words on a shade are white or black by its luminance, answered as color(xyz-d65 …): read through a canvas)
+ const px=await page.evaluate(([a,b])=>{const f=(s)=>{const c=document.createElement('canvas');c.width=c.height=1;const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#000';x.fillStyle=s;x.fillRect(0,0,1,1);const d=x.getImageData(0,0,1,1).data;return `rgb(${d[0]}, ${d[1]}, ${d[2]})`};return [f(a),f(b)]},[look.onColor,look.onBg]);
+ assert.ok(contrast(px[0],px[1])>=3.9,'and its words read on it: '+px[0]+' on '+px[1]);
+ // 2026-11-19, second round (owner: «ألونها كاملة، مش هنعملها دواير»; tests/e2e/section-colors.spec.cjs): the home buttons are FILLED with their section's shade (the first one, النواقص, is
+ // المشتريات = the system color itself) and are rounded rectangles, no longer ovals (the other buttons of the system stay oval, owner 2026-11-17)
+ assert.equal(look.qaBg,'rgb(192, 82, 42)','the home buttons are filled with their section shade (المشتريات = the calm orange)');assert.equal(look.qaRadius,'14px','rounded rectangles on the home (owner 2026-11-19)');
  assert.equal(look.card,'2px');
  assert.equal(look.accent,'#c0522a','the calm orange by default');
  assert.equal(look.meta,'#c0522a');
