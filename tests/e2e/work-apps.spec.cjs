@@ -34,8 +34,8 @@ run('work apps on Android: home buttons open the apps (WhatsApp Business straigh
  assert.ok(await page.isVisible('#homePanel'),'the system stays where it was');
  await page.click('#homePanel [data-qa="app_drugeye"]');
  await page.waitForFunction(()=>window.__went.length===2);
- assert.equal(await page.evaluate(()=>window.__went[1]),'intent://details?id=com.phycod.drugeye#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.phycod.drugeye;end');
- assert.equal(await toast(page),'دراج آي بيفتح من صفحته في جوجل بلاي: دوس «فتح».');
+ assert.equal(await page.evaluate(()=>window.__went[1]),'intent://open?pkg=com.phycod.drugeye#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.phycod.drugeye;end');
+ assert.equal(await toast(page),'دراج آي بيفتح.');
  await page.click('#homePanel [data-qa="app_cams"]');
  await page.waitForFunction(()=>/لسه ما عرفتش/.test(document.getElementById('appToast').textContent));
  assert.equal(await page.evaluate(()=>window.__went.length),2,'nothing is opened for an app not known yet');
@@ -43,6 +43,9 @@ run('work apps on Android: home buttons open the apps (WhatsApp Business straigh
  await page.click('#qaEdit');
  assert.match(await page.textContent('#qaSheet'),/تطبيقات الشغل/);
  for(const t of['app_ibnsina','app_pharma','app_doses','app_instapay'])assert.ok(await page.isVisible(`#qaSheet [data-qa-flip="${t}"]`),'to add: '+t);
+ // «مفتاح التطبيقات»: its download, on Android
+ assert.equal(await page.getAttribute('#qaKeyApk','href'),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk');
+ assert.match(await page.textContent('.qa-key'),/بدوسة واحدة/);
  await page.click('#qaSheet [data-qa-flip="app_instapay"]');await page.click('#qaDone');
  assert.equal(await page.getAttribute('#homePanel [data-qa="app_instapay"]','data-app'),'instapay');
 },{home:true});
@@ -58,7 +61,7 @@ run('work apps on Android: an item card has «دراج آي» / «الجرعات
  await page.click('#hsItems .hs-apps [data-app="drugeye"]');
  await page.waitForFunction(()=>window.__went.length===1);
  assert.equal(await page.evaluate(()=>window.__clip),'CONCOR');
- assert.equal(await toast(page),'✅ اتنسخ اسم الصنف. دراج آي بيفتح من صفحته في جوجل بلاي: دوس «فتح». الصق جوه التطبيق.');
+ assert.equal(await toast(page),'✅ اتنسخ اسم الصنف. دراج آي بيفتح. الصق جوه التطبيق.');
  await page.fill('#hsQ','');
  // a payment order: the amount, as a plain number
  await page.evaluate(PAY);
@@ -67,7 +70,7 @@ run('work apps on Android: an item card has «دراج آي» / «الجرعات
  assert.equal(await page.getAttribute('.py-apps [data-app="instapay"]','data-copy'),'50000.5');
  await page.click('.py-apps [data-app="instapay"]');
  await page.waitForFunction(()=>window.__went.length===2);
- assert.equal(await page.evaluate(()=>window.__went[1]),'intent://details?id=com.egyptianbanks.instapay#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.egyptianbanks.instapay;end');
+ assert.equal(await page.evaluate(()=>window.__went[1]),'intent://open?pkg=com.egyptianbanks.instapay#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.egyptianbanks.instapay;end');
  assert.equal(await page.evaluate(()=>window.__clip),'50000.5');
  assert.equal(await page.evaluate(()=>window.__tables.ar_pay_orders[0].status),'approved','nothing paid or changed by it');
  // the Ibn Sina order: the order is copied and its app opens; another supplier has no app button
@@ -80,7 +83,7 @@ run('work apps on Android: an item card has «دراج آي» / «الجرعات
  assert.equal(await page.getAttribute('#odApp','data-copy'),msg);
  await page.click('#odApp');
  await page.waitForFunction(()=>window.__went.length===3);
- assert.equal(await page.evaluate(()=>window.__went[2]),'intent://details?id=com.ibnsina_pharma.selfservice#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.ibnsina_pharma.selfservice;end');
+ assert.equal(await page.evaluate(()=>window.__went[2]),'intent://open?pkg=com.ibnsina_pharma.selfservice#Intent;scheme=askerapps;package=com.askerpharmacy.apps;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.ibnsina_pharma.selfservice;end');
  assert.equal(await page.evaluate(()=>window.__clip),msg);
  assert.match(await toast(page),/^✅ اتنسخ الطلبية\. ابن سينا بيفتح/);
  assert.deepEqual(await page.evaluate(()=>window.__tables.ar_orders),[],'nothing marked as ordered by it');
@@ -98,6 +101,7 @@ run('work apps on a computer: no phone-only buttons, WhatsApp Business opens Wha
  await page.click('#homePanel [data-qa="app_drugeye"]');
  await page.waitForFunction(()=>/على الموبايل بس/.test(document.getElementById('appToast').textContent));
  assert.equal(await page.evaluate(()=>window.__went.length),0);
+ await page.click('#qaEdit');assert.equal(await page.$$eval('#qaKeyApk',x=>x.length),0,'no «مفتاح التطبيقات» on a computer');await page.click('#qaDone');
  await page.fill('#hsQ','CONCOR');
  await page.waitForFunction(()=>/CONCOR/.test(document.getElementById('hsItems').textContent));
  assert.equal(await page.$$eval('#hsItems .hs-apps',x=>x.length),0,'no «دراج آي» on a computer');
