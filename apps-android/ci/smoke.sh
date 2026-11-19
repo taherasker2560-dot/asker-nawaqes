@@ -22,13 +22,15 @@ dump() { adb shell uiautomator dump /sdcard/u.xml >/dev/null 2>&1; adb shell cat
 has() { local d; d=$(dump); [[ "$d" == *"$1"* ]]; }
 # the link goes through the PHONE's shell too: its «&» must be quoted there (unquoted, «&name=…» ran as a second command and the app never got the name)
 link() { adb shell "am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d '$1'" >/dev/null; }
-tap_text() {
+# tap the middle of the first node whose line matches the pattern (text="…" or class="…")
+tap_node() {
   local b
-  b=$(dump | tr '>' '\n' | grep "text=\"$1\"" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' ')
+  b=$(dump | tr '>' '\n' | grep "$1" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | grep -o '[0-9]*' | tr '\n' ' ')
   [ -n "$b" ] || return 1
   set -- $b
   adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
 }
+tap_text() { tap_node "text=\"$1\""; }
 
 adb install -r "$APK" || fail "install"
 adb shell input keyevent KEYCODE_HOME
@@ -38,12 +40,15 @@ sleep 2
 link "askerapps://open?app=drugeye&name=DrugEye"
 wait_top "$PKG/.PickActivity" || fail "the list of apps did not open for an app with no choice yet"
 has "DrugEye" || fail "the list does not say which app it asks for"
-has 'text="Settings"' || fail "the list does not show the apps on the phone (no Settings in it)"
-echo "OK 1: the list opened and shows the phone's apps"
+has 'class="android.widget.ListView"' || fail "the list of apps is not there"
+echo "OK 1: the list opened and says which app it asks for"
 
-# 2) he picks Settings (search, then tap the row): Settings opens and the choice is kept
+# 2) he searches «Settings» (the list is alphabetical and scrolls) and taps the row: Settings opens and the choice is kept
+tap_node 'class="android.widget.EditText"' || fail "no search box"
+sleep 1
 adb shell input text "Settings"
 sleep 2
+has 'text="Settings"' || fail "the list does not show the apps on the phone (no Settings row after searching it)"
 tap_text "Settings" || fail "no Settings row to tap"
 wait_top "com.android.settings" || fail "Settings did not open after the choice"
 PREFS=$(adb shell run-as "$PKG" cat shared_prefs/apps.xml | tr -d '\r')
