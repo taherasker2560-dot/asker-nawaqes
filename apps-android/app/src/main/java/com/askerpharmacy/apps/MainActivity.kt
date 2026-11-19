@@ -7,21 +7,27 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 
-/** The app's own icon: says it is ready and opens the system. It is not needed for the work: the system's buttons use OpenActivity. */
+/** The app's own icon: says it works, shows which of his apps each system button opens (and lets him change it), and opens the system. */
 class MainActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val pad = (24 * resources.displayMetrics.density).toInt()
+    override fun onResume() {
+        super.onResume()
+        draw()
+    }
+
+    private fun draw() {
+        val d = resources.displayMetrics.density
+        val pad = (20 * d).toInt()
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
             setPadding(pad, pad, pad, pad)
             setBackgroundColor(Color.WHITE)
-            layoutDirection = android.view.View.LAYOUT_DIRECTION_RTL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
         }
         box.addView(TextView(this).apply {
             text = "🔑 مفتاح التطبيقات"
@@ -31,12 +37,37 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         })
         box.addView(TextView(this).apply {
-            text = "✅ شغّال.\n\nزراير «تطبيقات الشغل» في السيستم بقت بتفتح كل تطبيق بدوسة واحدة.\nمش محتاج تفتح التطبيق ده تاني."
-            textSize = 17f
+            text = "✅ شغّال.\nزراير «تطبيقات الشغل» في السيستم بتفتح تطبيقاتك. أول مرة تدوس على زرار هتختار التطبيق من اللي على موبايلك، وبعد كده بيفتح على طول."
+            textSize = 16f
             setTextColor(Color.parseColor("#1D1B19"))
-            gravity = Gravity.CENTER
             setPadding(0, pad, 0, pad)
         })
+        val chosen = Prefs(this).all()
+        box.addView(TextView(this).apply {
+            text = if (chosen.isEmpty()) "لسه ما اخترتش تطبيقات." else "اللي اخترته:"
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+            contentDescription = "chosen-title"
+        })
+        for ((id, pkg, name) in chosen) {
+            val label = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() } catch (e: Exception) { "مش موجود: $pkg" }
+            val line = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, (6 * d).toInt(), 0, (6 * d).toInt())
+            }
+            line.addView(TextView(this).apply {
+                text = "${name ?: id}  ←  $label"
+                textSize = 15f
+                setTextColor(Color.parseColor("#1D1B19"))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            line.addView(Button(this).apply {
+                text = "غيّر"
+                setOnClickListener { startActivity(Intent(this@MainActivity, PickActivity::class.java).putExtra("app", id).putExtra("name", name)) }
+            })
+            box.addView(line)
+        }
         box.addView(Button(this).apply {
             text = "افتح السيستم"
             setOnClickListener {
@@ -51,7 +82,7 @@ class MainActivity : Activity() {
             setPadding(0, pad, 0, 0)
             contentDescription = "apps-version"
         })
-        setContentView(box)
+        setContentView(ScrollView(this).apply { addView(box) })
     }
 
     companion object {

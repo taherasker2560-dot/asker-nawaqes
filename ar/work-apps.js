@@ -4,34 +4,35 @@
    - Inside the work the app opens with the thing ready ON THE CLIPBOARD: an order «انسخ وافتح ابن سينا / فارما», an item «دراج آي» / «الجرعات»
      (its name), a payment «إنستا باي» (the amount). Any element with data-app="<id>" (and data-copy="<text>") does it.
    - How it opens, on Android (the owner's phone): a page cannot start another app's own screen (Chrome only starts links an app agreed to take), so
-     an app that takes a link (WhatsApp Business: whatsapp://send) opens straight; any other app is handed to «مفتاح التطبيقات» (apps-android/, the
-     owner's small app, «أ، اعمله» 2026-11-19), which starts it: one tap. A phone without that app follows the link's fallback: the app's Google Play
-     page, whose «فتح» starts it. The sheet «✏️ عدّل الزراير» has its download link (Android only).
+     EVERY app is handed to «مفتاح التطبيقات» (apps-android/, the owner's small app): intent://open?app=<id>&name=<label>. That app starts the app HE chose:
+     the first time a button is tapped it shows the list of the apps he really has and asks «اختار تطبيق …» once; after that it opens at once.
+     The packages are NOT guessed from the web any more (11-19: a guessed package opened another «ابن سينا» app, and WhatsApp Business's link without «/?»
+     opened nothing); only WhatsApp Business's package is certain (com.whatsapp.w4b: tried first, also sent as &pkg= so the first version of the helper opens it).
+     A phone without the helper follows the link's fallback: the helper's download (WhatsApp Business: its store page). The sheet «✏️ عدّل الزراير» has the download link.
    - On a computer the apps are not there: WhatsApp Business opens WhatsApp Web; the others say so in one line.
    Nothing here reads inside those apps, pays, orders or sends anything: it opens them and hands them text. */
 (function (root) {
   'use strict';
 
-  // [id, label, the app's Android package, a link the app itself takes (opens it straight), the computer's way (a web page)]
+  // [id, label, a package that is CERTAIN (only WhatsApp Business), the computer's way (a web page)]: the rest is chosen on his phone
   const APPS = [
-    { id: 'wab', label: 'واتساب بيزنس', pkg: 'com.whatsapp.w4b', link: 'whatsapp://send', web: 'https://web.whatsapp.com/' },
-    { id: 'cams', label: 'الكاميرات', pkg: '', link: '', web: '' },
-    { id: 'ibnsina', label: 'ابن سينا', pkg: 'com.ibnsina_pharma.selfservice', link: '', web: '' },
-    { id: 'pharma', label: 'فارما', pkg: '', link: '', web: '' },
-    { id: 'drugeye', label: 'دراج آي', pkg: 'com.phycod.drugeye', link: '', web: '' },
-    { id: 'doses', label: 'الجرعات', pkg: '', link: '', web: '' },
-    { id: 'instapay', label: 'إنستا باي', pkg: 'com.egyptianbanks.instapay', link: '', web: '' },
-  ];
-  const BY_ID = Object.fromEntries(APPS.map((a) => [a.id, a]));
+    { id: 'wab', label: 'واتساب بيزنس', pkg: 'com.whatsapp.w4b', web: 'https://web.whatsapp.com/' },
+    { id: 'cams', label: 'الكاميرات', pkg: '', web: '' },
+    { id: 'ibnsina', label: 'ابن سينا', pkg: '', web: '' },
+    { id: 'pharma', label: 'فارما', pkg: '', web: '' },
+    { id: 'drugeye', label: 'دراج آي', pkg: '', web: '' },
+    { id: 'doses', label: 'الجرعات', pkg: '', web: '' },
+    { id: 'instapay', label: 'إنستا باي', pkg: '', web: '' },
+  ];  const BY_ID = Object.fromEntries(APPS.map((a) => [a.id, a]));
   const TEXTS = {
     phoneOnly: 'التطبيق ده على الموبايل بس.',
     unknown: 'لسه ما عرفتش التطبيق ده على موبايلك.',
     copied: '✅ اتنسخ {what}.',
     paste: 'الصق جوه التطبيق.',
     opened: '{app} اتفتح.',
-    // through «مفتاح التطبيقات» (one tap) or, on a phone without it, its Google Play page (then «فتح»): the page cannot tell which
+    // through «مفتاح التطبيقات»: the app opens, or its list asks «اختار تطبيق …» the first time (the page cannot tell which)
     store: '{app} بيفتح.',
-    keyHint: '🔑 عشان كل تطبيق يفتح بدوسة واحدة، نزّل «مفتاح التطبيقات» مرة واحدة على موبايلك (أندرويد بس). من غيره التطبيق بيفتح من صفحته في جوجل بلاي وتدوس «فتح».',
+    keyHint: '🔑 التطبيقات بتفتح من «مفتاح التطبيقات»: نزّله مرة واحدة على موبايلك (أندرويد بس). أول مرة تدوس على زرار تطبيق بيسألك تختاره من اللي على موبايلك، وبعد كده بيفتح بدوسة.',
     keyLink: 'نزّل «مفتاح التطبيقات»',
     noCopy: 'مقدرتش أنسخ، انسخ بإيدك.',
   };
@@ -39,26 +40,23 @@
 
   // ---------- pure (tests/work-apps.cjs) ----------
   const PKG = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i;
-  // the link that opens an app on Android: straight when it takes a link, otherwise its Google Play page (Android's «فتح» starts it)
   const storeWeb = (pkg) => 'https://play.google.com/store/apps/details?id=' + pkg;
-  // «مفتاح التطبيقات» (apps-android/, owner 2026-11-19 «أ، اعمله»): the owner's small Android app that starts any app it is asked for, so one tap opens it
+  // «مفتاح التطبيقات» (apps-android/, owner 2026-11-19 «أ، اعمله»): the owner's small Android app that starts the app HE chose for a button (asked once, on his phone)
   const KEY_PKG = 'com.askerpharmacy.apps';
   const KEY_APK = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/apps-build/asker-apps.apk';
+  // the link a button follows on Android: the helper with the app's id and its name (for «اختار تطبيق …»); WhatsApp Business's certain package rides along (&pkg=);
+  // a phone without the helper goes to its fallback: the helper's download (WhatsApp Business: its store page)
   function intentFor(app) {
-    if (!app || !PKG.test(app.pkg || '')) return '';
-    const m = /^([a-z][a-z0-9+.-]*):\/\/(.*)$/i.exec(app.link || '');
-    if (m) return `intent://${m[2]}#Intent;scheme=${m[1]};package=${app.pkg};S.browser_fallback_url=${encodeURIComponent(storeWeb(app.pkg))};end`;
-    // «مفتاح التطبيقات» starts the app itself (one tap); a phone without it follows the fallback: the app's Google Play page, whose «فتح» opens it
-    return `intent://open?pkg=${app.pkg}#Intent;scheme=askerapps;package=${KEY_PKG};S.browser_fallback_url=${encodeURIComponent(storeWeb(app.pkg))};end`;
+    if (!app || !/^[a-z][a-z0-9_]{0,30}$/.test(app.id || '')) return '';
+    const pkg = PKG.test(app.pkg || '') ? app.pkg : '';
+    const fallback = pkg ? storeWeb(pkg) : KEY_APK;
+    return `intent://open?app=${app.id}&name=${encodeURIComponent(app.label || '')}${pkg ? '&pkg=' + pkg : ''}#Intent;scheme=askerapps;package=${KEY_PKG};S.browser_fallback_url=${encodeURIComponent(fallback)};end`;
   }
   // what a tap does on this device: { url } to go to, or { say } when there is nothing to open here
   function plan(id, android) {
     const app = BY_ID[id];
     if (!app) return { say: TEXTS.unknown };
-    if (android) {
-      const url = intentFor(app);
-      return url ? { url, straight: !!app.link } : { say: TEXTS.unknown };
-    }
+    if (android) return { url: intentFor(app) };
     return app.web ? { url: app.web, web: true } : { say: TEXTS.phoneOnly };
   }
   // the sentences under the tap: what was copied (true / false = failed / null = nothing to copy), how the app opens, «الصق»
@@ -66,9 +64,8 @@
   function note(p, copied, what, name) {
     const c = copied === true ? fill(TEXTS.copied, { what: what || 'النص' }) : copied === false ? TEXTS.noCopy : '';
     if (p.say) return [c, p.say].filter(Boolean);
-    return [c, p.straight || p.web ? fill(TEXTS.opened, { app: name }) : fill(TEXTS.store, { app: name }), copied === true ? TEXTS.paste : ''].filter(Boolean);
-  }
-  // the trade name of a PharmaFly item for an app's search box: the words before the first one with a digit («CONCOR 5MG 30 TAB» → «CONCOR»,
+    return [c, p.web ? fill(TEXTS.opened, { app: name }) : fill(TEXTS.store, { app: name }), copied === true ? TEXTS.paste : ''].filter(Boolean);
+  }  // the trade name of a PharmaFly item for an app's search box: the words before the first one with a digit («CONCOR 5MG 30 TAB» → «CONCOR»,
   // «MELLITOFIX TRIO 25/5/1000 TAB» → «MELLITOFIX TRIO»); a name that starts with a digit stays whole
   function brandOf(name) {
     const w = String(name || '').replace(/\s+/g, ' ').trim().split(' ');

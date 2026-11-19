@@ -458,7 +458,7 @@ window.AskerEN = {
  "الطلبية": "The order",
  "النص": "The text",
  "{0} بيفتح.": "{0} is opening.",
- "🔑 عشان كل تطبيق يفتح بدوسة واحدة، نزّل «مفتاح التطبيقات» مرة واحدة على موبايلك (أندرويد بس). من غيره التطبيق بيفتح من صفحته في جوجل بلاي وتدوس «فتح».": "🔑 For one tap per app, download «Apps key» once on your phone (Android only). Without it the app opens from its Google Play page and you tap «Open».",
+ "🔑 التطبيقات بتفتح من «مفتاح التطبيقات»: نزّله مرة واحدة على موبايلك (أندرويد بس). أول مرة تدوس على زرار تطبيق بيسألك تختاره من اللي على موبايلك، وبعد كده بيفتح بدوسة.": "🔑 The apps open through «Apps key»: download it once on your phone (Android only). The first time you tap an app button it asks you to pick the app from the ones on your phone, then it opens with one tap.",
  "نزّل «مفتاح التطبيقات»": "Download «Apps key»",
  "رجّع الأصلي": "Back to the default",
   "الحقائب": "Bags",
