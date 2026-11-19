@@ -100,7 +100,19 @@
     return { owed: Math.round(owed * 100) / 100, year: n };
   }
   const KIND = { purchase: 'فاتورة شرا', return: 'مرتجع', payment: 'دفعة' };
-  const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, KIND };
+  // the supplier's personal link (owner 2026-11-19): his own statement page, supplier.html#v=<secret> (migration 202611192000); the owner sends it on WhatsApp
+  function linkUrl(base, token) { return new URL('supplier.html#v=' + token, String(base || '').replace(/#.*$/, '')).href; }
+  function linkMessage(name, url) {
+    return [
+      'أهلًا بحضرتكم 🌿',
+      `ده رابط كشف حساب شركة ${String(name || '').trim()} عند صيدلية عسكر من أول تعامل:`,
+      'فيه الفواتير والأصناف (بصورها وأسعارها وخصوماتها وصلاحياتها) والمرتجعات والمدفوعات.',
+      url,
+      'ثبّتوه على الموبايل وراجعوه، وأي فرق عن دفاترنا قولوا لنا عليه.',
+      'الرابط ده للشركة بس، ما تبعتوهوش لحد.',
+    ].join('\n');
+  }
+  const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, linkUrl, linkMessage, KIND };
   root.AskerVendorsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -210,13 +222,98 @@
   function openStatement(id) {
     const v = vendorOf(id);
     if (!v) return;
-    st = { v, range: lastRange ? { from: lastRange.from, to: lastRange.to } : defaultRange(), kind: null, rows: [], done: false, busy: false, sum: null, open: new Set(), seq: 0 };
+    st = { v, range: lastRange ? { from: lastRange.from, to: lastRange.to } : defaultRange(), kind: null, rows: [], done: false, busy: false, sum: null, open: new Set(), seq: 0, link: undefined };
     it = null;
     show('st');
     $('veFrom').value = st.range.from; $('veTo').value = st.range.to;
     drawSt();
     loadMoves(false);
+    loadLink(st);
     try { history.pushState({ ve: 1 }, ''); } catch (e) {}
+  }
+  // ---------- the supplier's personal link (owner 2026-11-19: «ابعت لهم رابط للصفحة زيهم زي العملاء»; owner only) ----------
+  const ownerHere = () => !(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
+  const tr = (s) => (root.AskerI18n && root.AskerI18n.lang && root.AskerI18n.lang() === 'en' ? root.AskerI18n.translate(s) : s);
+  const errText = (e) => (e && e.message) || String(e);
+  function whenText(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return `${dayText(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  async function loadLink(me) {
+    try {
+      const { data, error } = await db().from('ar_vendor_links').select('token,created_at,last_seen_at,seen_count').eq('vendor_id', me.v.id).maybeSingle();
+      if (error) throw new Error(error.message || String(error));
+      me.link = data || null; me.linkOff = false;
+    } catch (e) {
+      me.link = null; me.linkOff = true; // the table is not on the server (yet)
+    }
+    if (st === me) drawSt();
+  }
+  // the supplier's WhatsApp is chosen on the phone (the warehouses have no number saved here): the chat list opens with the message ready
+  function openLinkChat(me, token) {
+    const t = linkMessage(me.v.name, linkUrl(location.href, token));
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, '');
+    else root.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+  }
+  async function makeLink(me, fresh) {
+    const { data, error } = await db().rpc('ar_vendor_link', { p_vendor: me.v.id, p_new: !!fresh });
+    if (error) throw new Error(error.message || String(error));
+    if (!data || !data.ok || !data.token) throw new Error((data && data.error) || 'مفيش رابط');
+    me.link = fresh || !me.link ? { token: data.token, created_at: new Date().toISOString(), last_seen_at: null, seen_count: 0 } : Object.assign(me.link, { token: data.token });
+    return data.token;
+  }
+  async function sendLink(fresh) {
+    const me = st;
+    if (!me || me.linkBusy) return;
+    if (fresh && me.link && !root.confirm(tr('الرابط القديم هيبطل على طول، وهيتبعتله رابط جديد. أكمّل؟'))) return;
+    // the same link again: WhatsApp opens at once
+    if (!fresh && me.link && me.link.token) {
+      openLinkChat(me, me.link.token);
+      Object.assign(me, { linkMsg: 'اتفتحت محادثته في الواتس ومعاها رابطه: دوس إرسال هناك.', linkBad: false });
+      drawSt();
+      return;
+    }
+    me.linkBusy = true; me.linkMsg = ''; drawSt();
+    try {
+      const token = await makeLink(me, fresh);
+      openLinkChat(me, token);
+      Object.assign(me, { linkMsg: 'اتفتحت محادثته في الواتس ومعاها رابطه: دوس إرسال هناك.', linkBad: false });
+    } catch (e) {
+      Object.assign(me, { linkMsg: 'الرابط ما اتعملش: ' + errText(e), linkBad: true });
+    } finally {
+      me.linkBusy = false;
+      if (st === me) drawSt();
+    }
+  }
+  // «👁 شوف صفحته»: his page as he sees it, in a new tab; nothing is sent to him, and the server is told it is a look (the pharmacy's phone is signed in)
+  async function viewPage() {
+    const me = st;
+    if (!me || me.linkBusy) return;
+    const go = (w, token) => { const url = linkUrl(location.href, token); if (w && !w.closed) w.location.href = url; else root.open(url, '_blank'); };
+    const w = root.open('', '_blank');
+    if (me.link && me.link.token) { go(w, me.link.token); return; }
+    me.linkBusy = true; me.linkMsg = ''; drawSt();
+    try {
+      go(w, await makeLink(me, false));
+    } catch (e) {
+      if (w && !w.closed) w.close();
+      Object.assign(me, { linkMsg: 'الصفحة ما اتفتحتش: ' + errText(e), linkBad: true });
+    } finally {
+      me.linkBusy = false;
+      if (st === me) drawSt();
+    }
+  }
+  function linkHtml() {
+    if (!st || !ownerHere() || st.linkOff || st.link === undefined) return '';
+    const l = st.link;
+    const seen = !l ? 'لسه ما اتبعتلوش رابط' : l.last_seen_at ? `فتح رابطه: ${whenText(l.last_seen_at)}` : 'لسه ما فتحش رابطه';
+    return '<div class="cu-link">' +
+      `<button type="button" class="cu-send" data-ve-link-send${st.linkBusy ? ' disabled' : ''}>🔗 ابعتله رابط حسابه على الواتس</button>` +
+      `<button type="button" class="secondary cu-view" data-ve-link-view${st.linkBusy ? ' disabled' : ''}>👁 شوف صفحته</button>` +
+      `<div class="cu-link-seen"><span>${esc(seen)}</span>${l ? '<button type="button" class="linklike" data-ve-link-new>🔄 رابط جديد</button>' : ''}</div>` +
+      (st.linkMsg ? `<p class="status cu-note ${st.linkBad ? 'bad' : 'good'}">${esc(st.linkMsg)}</p>` : '') +
+      '</div>';
   }
   function linesHtml(m) {
     const ls = Array.isArray(m.lines) ? m.lines : [];
@@ -229,7 +326,7 @@
   function drawSt() {
     if (!st || !$('veSt')) return;
     const b = balanceText(st.v.balance);
-    $('veStHead').innerHTML = `<h2 class="notr">${esc(st.v.name)}</h2><p><span>الرصيد</span> <b class="ve-bal ${b.cls}" dir="auto">${esc(b.text)}</b></p>`;
+    $('veStHead').innerHTML = `<h2 class="notr">${esc(st.v.name)}</h2><p><span>الرصيد</span> <b class="ve-bal ${b.cls}" dir="auto">${esc(b.text)}</b></p>` + linkHtml();
     document.querySelectorAll('[data-ve-kind]').forEach((x) => x.classList.toggle('on', (x.dataset.veKind || '') === (st.kind || '')));
     let sumHtml = '';
     const s = st.sum;
@@ -360,6 +457,9 @@
         st.rows = []; st.done = false; st.open.clear(); loadMoves(false);
         return;
       }
+      if (e.target.closest('[data-ve-link-send]')) { sendLink(false); return; }
+      if (e.target.closest('[data-ve-link-view]')) { viewPage(); return; }
+      if (e.target.closest('[data-ve-link-new]')) { sendLink(true); return; }
       if (e.target.closest('#veItemBtn')) { openItem(); return; }
       const k = e.target.closest('[data-ve-kind]');
       if (k && st) { st.kind = k.dataset.veKind || null; st.rows = []; st.done = false; st.open.clear(); loadMoves(false); return; }
