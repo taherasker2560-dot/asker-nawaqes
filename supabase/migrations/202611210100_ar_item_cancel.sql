@@ -6,7 +6,7 @@
 --   word = a name with «ملغى» / «لاغى» in it · dup = the same name on several cards with different prices (the dearest card stays, the others are cancelled) ·
 --   idle = no sale and no purchase for two years (and the card is not new).
 -- Each list is ONE row of text, «id:detail,id:detail,…»: word «id:YYYYMMDD» (the day the system first saw it), dup «id:YYYYMMDD:price of the card that stays», idle «id:YYYYMM» (the last month
--- anything moved). The page decides what is really hidden (an item with stock, on the shortage list, or (idle only) in a warehouse's list stays; a purchase after the day it was first seen,
+-- anything moved). The page decides what is really hidden (an item with stock or on the shortage list stays with a mark; an idle item a warehouse lists today is not cancelled at all, owner 2026-11-21; a purchase after the day it was first seen,
 -- or after its last month, brings it back by itself), so the list never has to be cleaned by hand.
 -- ar_item_cancel_seen remembers the first day an item was seen as word/dup (the laptop's upload keeps it, nobody reads it); ar_item_cancel_restored = the owner's «ارجعه» (permanent).
 -- Read: the owner and staff with «search». Write: the owner (restored) / the laptop through ar_item_cancel_sync with its sync key.
