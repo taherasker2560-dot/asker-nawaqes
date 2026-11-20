@@ -297,7 +297,14 @@
       ${bought ? `<div class="hs-buys">${esc(bought)}</div>` : ''}
       ${offers ? `<div class="hs-offers">${esc(offers)}</div>` : ''}
       ${appsRow(it)}
+      ${actionsRow(it)}
     </div>`;
+  }
+  // «⚙️ عمليات وتقارير» (owner 2026-11-20, ar/item-actions.js): the item's reports and operations, for any item that has a PharmaFly code (in stock or not); not for staff (phase 1)
+  function actionsRow(it) {
+    if (root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff()) return '';
+    if (it.id == null) return '<div class="hs-ia"><button type="button" class="chip" disabled>⚙️ عمليات وتقارير</button> <small class="hint">الصنف ده لسه مش متسجل في فارما فلاي</small></div>';
+    return `<div class="hs-ia"><button type="button" class="chip on" data-ia>⚙️ عمليات وتقارير</button></div>`;
   }
   // «دراج آي» / «الجرعات» on the phone (owner 2026-11-19, ar/work-apps.js): the item's trade name is copied and the app opens (Android only)
   function appsRow(it) {
@@ -409,6 +416,7 @@
       if (!cardEl) return;
       const key = cardEl.dataset.k, it = shown.get(key);
       if (!it) return;
+      if (e.target.closest('[data-ia]')) { if (root.AskerItemActions) root.AskerItemActions.open(it); return; }
       if (e.target.closest('[data-edit]')) return openEditor(key);
       if (e.target.closest('[data-cancel]')) { editing = null; cardEl.querySelector('.hs-editbox')?.remove(); return; }
       const save = e.target.closest('[data-save]');

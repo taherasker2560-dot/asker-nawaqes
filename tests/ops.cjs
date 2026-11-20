@@ -23,4 +23,8 @@ assert.deepEqual(merge(null, undefined), []);
 // a purchase order chosen item by item
 const b = merge([{ id: 10, kind: 'purchase_order', party_id: 2540, party_name: 'مخزن الفتح للادوية', items: [{ i: 1, q: 3 }, { i: 2, q: 1 }], status: 'pending', created_at: '2026-11-15T14:00:00Z' }], []);
 assert.equal(b[0].text, 'أمر شرا لـ مخزن الفتح للادوية: 2 صنف');
+// an operation chosen on an item from the search card (owner 2026-11-20): a barcode print waits in the same list, and only a waiting one is cancelled (as the other kinds)
+const io = merge([], [], [{ id: 1, kind: 'barcode', item_id: 101, item_name: 'بروفين ٤٠٠ مجم', qty: 25, status: 'pending', created_at: '2026-11-20T10:00:00Z' }, { id: 2, kind: 'barcode', item_id: 7, item_name: null, qty: 1, status: 'done', created_at: '2026-11-20T11:00:00Z' }]);
+assert.deepEqual(io.map((r) => [r.key, r.table, r.status, r.text]), [['item2', 'ar_item_ops', 'done', 'طباعة 1 ملصق باركود: #7'], ['item1', 'ar_item_ops', 'pending', 'طباعة 25 ملصق باركود: بروفين ٤٠٠ مجم']]);
+assert.equal(merge(ops, [], null).length, 2, 'no item operations: as before');
 console.log('PASS: ops list: both tables in one list, newest first, statuses in words');

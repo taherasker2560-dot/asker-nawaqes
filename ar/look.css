@@ -2414,3 +2414,40 @@ html.night .vn-pk.guess { color: var(--ink); }
 .hs-apps, .py-apps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .hs-apps .chip { margin: 0; }
 /* «ألوان الأقسام» (owner 2026-11-19) and the airy look that replaced it the same night: see ar/airy.css (the last stylesheet). */
+/* «⚙️ عمليات وتقارير» on an item's card in the search (owner 2026-11-20, ar/item-actions.js): a sheet over the page */
+.hs-ia { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.hs-ia .chip { margin: 0; }
+body.ia-lock { overflow: hidden; }
+.ia-sheet { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgba(28, 38, 48, 0.45); }
+.ia-sheet.hidden { display: none; }
+.ia-box { width: min(560px, 100%); max-height: 92vh; overflow-y: auto; padding: 12px 14px 22px; border-radius: 20px 20px 0 0; background: var(--card, #fff); color: var(--ink); box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18); }
+.ia-head { position: sticky; top: -12px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -12px -14px 6px; padding: 12px 14px 8px; background: var(--card, #fff); }
+.ia-head b { font-size: 17px; overflow-wrap: anywhere; }
+.ia-h { margin: 14px 2px 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.ia-tile { display: flex; align-items: center; gap: 10px; width: 100%; margin: 8px 0 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); text-align: start; box-shadow: none; }
+.ia-tile i { flex: none; width: 30px; font-size: 20px; font-style: normal; text-align: center; }
+.ia-tile span { flex: 1; min-width: 0; }
+.ia-tile b { display: block; font-size: 14.5px; }
+.ia-tile small { color: var(--muted); font-size: 12px; }
+.ia-tile.op { border-color: transparent; background: var(--rose); }
+.ia-bar input { flex: none; width: 64px; margin: 0; padding: 6px 8px; text-align: center; font-weight: 800; }
+.ia-bar button { flex: none; margin: 0; }
+.ia-seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.ia-seg button { margin: 0; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); font-size: 13px; font-weight: 700; box-shadow: none; }
+.ia-seg button.on { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); }
+.ia-mv { margin-top: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); cursor: pointer; }
+.ia-mv.open { border-color: transparent; background: var(--rose); }
+.ia-l1 { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.ia-l1 b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ia-d { color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.ia-l2 { margin-top: 3px; color: var(--muted); font-size: 12.5px; }
+.ia-pill { flex: none; padding: 1px 9px; border-radius: 999px; background: var(--rose); color: var(--crimson-ink); font-size: 11.5px; font-weight: 700; }
+.ia-pill.sale { background: var(--card); border: 1px solid var(--crimson); color: var(--crimson-ink); }
+.ia-pill.ret { background: var(--card); border: 1px dashed var(--muted); color: var(--muted); }
+.ia-lines { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 12.5px; background: var(--card); border-radius: 10px; overflow: hidden; }
+.ia-lines th, .ia-lines td { padding: 6px 8px; text-align: start; border-bottom: 1px solid var(--line); }
+.ia-lines th { color: var(--muted); font-weight: 700; }
+.ia-lines td small { display: block; color: var(--muted); }
+.ia-lines tr.me td { background: var(--rose); font-weight: 700; }
+html.night .ia-sheet { background: rgba(0, 0, 0, 0.6); }
+html.night .ia-mv.open, html.night .ia-tile.op, html.night .ia-lines tr.me td { background: var(--tint-2, var(--rose)); }
