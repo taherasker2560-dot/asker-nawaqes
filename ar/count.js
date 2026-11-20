@@ -514,5 +514,18 @@
     try { Promise.resolve(root.AskerAlerts && root.AskerAlerts.load && root.AskerAlerts.load(false)).then(() => { if (view === 'priority') draw(); }, () => {}); } catch (e) {}
   }
   function close() { stopCam(); }
-  root.AskerCount = { open, close, flush, scanned };
+  // the item card's «📋 جرد» (owner 2026-11-20, ar/item-actions.js): this item opens on top of the screen to be counted, the same as after its sticker is read.
+  // True when it is opened; false when the count data does not hold it (an item with no stock in PharmaFly now): the screen says so
+  async function openItem(id) {
+    await open();
+    const it = byId.get(Number(id));
+    if (!it) { say('الصنف ده ملوش رصيد في فارما فلاي دلوقتي، والجرد بيشتغل على اللي عليه رصيد.', 'bad'); return false; }
+    if (editId != null && editId !== it.i) { say('خلّص الصنف اللي قدامك الأول: احفظ أو إلغاء', 'bad'); return true; }
+    randomId = it.i;
+    $('ctQ').value = '';
+    say(`اتفتح للجرد: ${nameOf(it)}`, 'ok');
+    drawRandom();
+    return true;
+  }
+  root.AskerCount = { open, close, flush, scanned, openItem };
 })(typeof window === 'undefined' ? globalThis : window);

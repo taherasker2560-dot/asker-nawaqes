@@ -18,7 +18,7 @@
   const STATUS = { pending: 'مستنية', running: 'بتتنفذ', done: 'اتنفذت', failed: 'فشلت', cancelled: 'اتلغت', entered: 'اتنفذت' };
   const statusText = (s) => STATUS[s] || String(s || '');
   // one list from the two tables: [{key, table, id, at, status, text}] newest first
-  function merge(ops, sales) {
+  function merge(ops, sales, itemOps) {
     const out = [];
     for (const o of ops || []) {
       const who = o.party_name || '#' + o.party_id, n = Array.isArray(o.items) ? o.items.length : 0;
@@ -33,6 +33,10 @@
         key: 'sale' + s.no, table: 'ar_temp_sales', id: s.no, at: s.created_at, status: s.status,
         text: `${s.kind === 'return' ? 'مرتجع' : 'بيعة'} رقم ${s.no}: ${s.customer_name || 'نقدي'} · ${n} صنف · ${money(s.total)} ج`,
       });
+    }
+    // an operation chosen on an item from the search card (owner 2026-11-20, migration 202611202100): a barcode print waits until the laptop carries it out
+    for (const o of itemOps || []) {
+      out.push({ key: 'item' + o.id, table: 'ar_item_ops', id: o.id, at: o.created_at, status: o.status, text: `طباعة ${num(o.qty)} ملصق باركود: ${o.item_name || '#' + o.item_id}` });
     }
     return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   }
@@ -67,13 +71,14 @@
     if (loading || !db()) return;
     loading = true;
     try {
-      const [o, s] = await Promise.all([
+      const [o, s, io] = await Promise.all([
         db().from('ar_ops').select('id,kind,party_id,party_name,amount,items,status,created_at').order('created_at', { ascending: false }).limit(40),
         db().from('ar_temp_sales').select('no,kind,customer_name,items,total,status,created_at').not('adam_request', 'is', null).order('created_at', { ascending: false }).limit(40),
+        db().from('ar_item_ops').select('id,kind,item_id,item_name,qty,status,created_at').order('created_at', { ascending: false }).limit(40),   // before the migration this one is simply empty
       ]);
       if (o.error) throw o.error;
       if (s.error) throw s.error;
-      rows = merge(o.data, s.data).slice(0, 60);
+      rows = merge(o.data, s.data, io.error ? [] : io.data).slice(0, 60);
       draw('');
     } catch (e) {
       rows = [];
@@ -84,7 +89,7 @@
     const r = rows.find((x) => x.key === key);
     if (!r || r.status !== 'pending') return;
     const patch = { status: 'cancelled', updated_at: new Date().toISOString() };
-    const q = r.table === 'ar_ops' ? db().from('ar_ops').update(patch).eq('id', r.id).eq('status', 'pending') : db().from('ar_temp_sales').update(patch).eq('no', r.id).eq('status', 'pending');
+    const q = r.table === 'ar_ops' ? db().from('ar_ops').update(patch).eq('id', r.id).eq('status', 'pending') : r.table === 'ar_item_ops' ? db().from('ar_item_ops').update(patch).eq('id', r.id).eq('status', 'pending') : db().from('ar_temp_sales').update(patch).eq('no', r.id).eq('status', 'pending');
     const { error } = await q;
     if (error) { draw('مقدرتش ألغي: ' + error.message); return; }
     await load();
