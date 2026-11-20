@@ -9,7 +9,7 @@ node fake.cjs & FAKE=$!
 trap 'kill $FAKE 2>/dev/null || true' EXIT
 sleep 1
 adb install -r -g "$APK"
-OUT=$(adb shell am broadcast -n "$PKG/.DebugReceiver" --es url http://10.0.2.2:8787 --es key "$KEY" --es add "Existing Person|01111111111")
+OUT=$(adb shell am broadcast -n "$PKG/.DebugReceiver" --es url http://10.0.2.2:8787 --es key "$KEY" --es add "'Existing Person@@01111111111'")
 echo "$OUT"; echo "$OUT" | grep -q 'data="add=true"'
 OUT=$(adb shell am broadcast -n "$PKG/.DebugReceiver" --es sync 1)
 echo "$OUT"
