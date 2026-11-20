@@ -1942,6 +1942,17 @@ html.night .ve-lines td.exp { color: var(--crimson-ink); }
 .im-in.ro { background: var(--tint); color: var(--muted); }
 .im-two { display: grid; grid-template-columns: 1fr; gap: 2px; } /* one under the other: a drug's full name does not fit in half a phone */
 .im-btn.main { background: var(--tint); color: var(--crimson-ink); border: 1px solid var(--crimson); }
+/* «📷 صوّر المادة الفعالة» (owner 2026-11-21): the reading's state under the button: waiting (a small spinner), read (soft green: the fields below are filled, he checks them), could not read (soft red) */
+.im-read { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); font-size: 13.5px; }
+.im-read b { display: block; font-size: 14px; }
+.im-read small { display: block; margin-top: 2px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.im-read.ok { background: var(--good-bg); border-color: var(--good); }
+.im-read.bad { background: var(--bad-bg); border-color: var(--bad); }
+.im-tag { display: inline-block; margin-inline-start: 4px; padding: 1px 8px; border-radius: 999px; background: #fff; color: var(--crimson-ink); font-size: 11.5px; font-weight: 700; }
+.im-spin { flex: 0 0 20px; width: 20px; height: 20px; border: 3px solid var(--line); border-top-color: var(--crimson); border-radius: 50%; animation: im-turn 0.9s linear infinite; }
+@keyframes im-turn { to { transform: rotate(360deg); } }
+.im-in.im-fresh { border-color: var(--good); box-shadow: 0 0 0 3px var(--good-bg); }
+@media (prefers-reduced-motion: reduce) { .im-spin { animation: none; } }
 
 /* «العمليات» (owner 2026-11-15, ar/ops.js): what Adam recorded by voice */
 .op-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; padding: 10px 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-1); }
