@@ -116,6 +116,23 @@ assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
   assert.equal(W.bookCounts(bk).private, 3); assert.equal(ph('private', '').length, 3);
 }
 
+// ---- the waiting items of one supplier as ONE message (owner 2026-11-20: «انت معملتش اوبشن ارسال رساله واتس اب لاصناف الانتظار») ----
+{
+  const rows = [
+    { id: 1, item_id: 7, item: 'CATAFLAM 50MG 20 TAB', qty: 1, phone: '01055556666', who: 'عميل مثال' },
+    { id: 2, item_id: 7, item: 'CATAFLAM 50MG 20 TAB', qty: 2, phone: '01077778888', who: null },    // the same item for another customer: once, quantities added
+    { id: 3, item_id: null, item: 'PHARMABILAST ORAL', qty: 2, phone: '01099998888', who: null },
+    { id: 4, item_id: null, item: 'pharmabilast oral', qty: 1, phone: '01011112222', who: null },    // a typed item is the same by its name
+    { id: 5, item_id: 9, item: 'XYZ CREAM 30G', qty: 0, phone: '01022223333', who: null }];           // no quantity = one box
+  const list = W.waitingList(rows);
+  assert.deepEqual(list, [{ item: 'CATAFLAM 50MG 20 TAB', qty: 3 }, { item: 'PHARMABILAST ORAL', qty: 3 }, { item: 'XYZ CREAM 30G', qty: 1 }]);
+  const msg = W.vendorListMsg(list);
+  assert.equal(msg, 'السلام عليكم\nمحتاج:\n1) 3 علب CATAFLAM 50MG 20 TAB\n2) 3 علب PHARMABILAST ORAL\n3) علبة XYZ CREAM 30G\nابعتلي السعر والخصم.\nشكرًا.');
+  assert.doesNotMatch(msg, /\d{8,}/, 'no customer number goes to the supplier'); assert.doesNotMatch(msg, /عميل مثال/, 'no customer name either');
+  assert.deepEqual(W.waitingList([]), []); assert.deepEqual(W.waitingList(null), []);
+  assert.equal(W.vendorListMsg([{ item: 'A', qty: 2 }]).includes('1) علبتين A'), true);
+}
+
 // ---- English: every text the screen draws, fixed and built, comes out with no Arabic left ----
 global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
@@ -133,6 +150,7 @@ for (const s of ['الانتظار', '📝 الانتظار', '📝 طلب مش 
   '🔒 خاص: يظهر ليك انت بس، والموظفين ما يشوفوش اسمه ولا رقمه. اللي ما فتحتوش من «غيرهم» لسه خاص.', 'الانتظار (طلب مش موجود، وكلّم دول)', 'طلبات الانتظار', 'دفتر الأرقام',
   '📱 تطبيق الموبايل', 'بيحفظ الأرقام الجديدة في جهات اتصال موبايلك وجوجل لوحده، وكل 10 أيام بيبعت جهات اتصالك هنا (وبتيجي مقفولة على الموظفين).', 'لسه مفيش موبايل مربوط.', 'موبايل مربوط، آخر اتصال:',
   'آخر إرسال لجهات الاتصال:', 'جهة اتصال', '(لسه ما اتدمجتش على اللاب)', 'أرقام مستنية تنزل على الموبايل:', 'اربط التطبيق', 'نزّل التطبيق',
+  '📲 ابعت للتليسيلز', '📲 ابعت كل المستنيين لـ', 'اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.', 'الرسالة طويلة: اتنسخت، الزقها في المحادثة اللي اتفتحت.',
   'مقدرتش أحمّل الانتظار: boom', 'ماتغيّرش: boom', 'دوا وصل لعملاء مستنيينه: كلّمهم', 'دوا ميعاد رجوعه للمورد قرب (يومين أو أقل)']) check(s);
 for (const e of ['item', 'name', 'phone', 'qty', 'vendor', 'kind', 'state', 'missing', 'action']) check(W.errText(e));
 for (const n of [0, 1, 2, 5, 11]) { check(W.ago('وصل', n)); check(W.ago('اتطلب', n)); }

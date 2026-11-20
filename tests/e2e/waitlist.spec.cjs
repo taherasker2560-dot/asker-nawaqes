@@ -365,6 +365,56 @@ run('Waiting list: «📱 تطبيق الموبايل» inside the number book: 
  await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;return window.AskerWait.open()});
  assert.equal(await page.$('[data-wl-bk]'),null);
 });
+run('Waiting list: «📲 ابعت للتليسيلز» on a waiting item, and ONE message with a supplier\'s whole waiting list (owner: «انت معملتش اوبشن ارسال رساله واتس اب لاصناف الانتظار»)',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  window.__tables.ar_vendor_contacts=[{vendor_id:10,role:'telesales',phone:'01012345678',name:'تليسيلز مثال'},{vendor_id:11,role:'telesales',phone:'447710173736',name:'تليسيلز برة'},{vendor_id:12,role:'distributor',phone:'01122223333',name:'موزع'}];
+  window.__wl.waiting=[
+   {id:1,item_id:7,item:'CATAFLAM 50MG 20 TAB',qty:1,phone:'01055556666',who:'عميل مثال',vendor_id:10,vendor:'المتحدة للأدوية',vkind:'warehouse',days:2},
+   {id:2,item_id:7,item:'CATAFLAM 50MG 20 TAB',qty:2,phone:'01077778888',who:null,vendor_id:10,vendor:'المتحدة للأدوية',vkind:'warehouse',days:1},
+   {id:3,item_id:null,item:'PHARMABILAST ORAL',qty:2,phone:'01099998888',who:null,vendor_id:10,vendor:'المتحدة للأدوية',vkind:'warehouse',days:0},
+   {id:4,item_id:5,item:'AUGMENTIN 1GM 14 TAB',qty:1,phone:'01012345679',who:null,vendor_id:11,vendor:'مورد برة',vkind:'center',days:0},
+   {id:5,item_id:9,item:'XYZ CREAM 30G',qty:1,phone:'01022223333',who:null,vendor_id:12,vendor:'مركز النور',vkind:'center',days:0},
+   {id:6,item_id:null,item:'NO SUPPLIER ITEM',qty:1,phone:'01033334444',who:null,vendor_id:null,vendor:null,vkind:null,days:0}];
+  window.__wa=[];window.AskerApp.openWhatsApp=(t,p)=>{window.__wa.push({t,p})};
+  window.__copied='';Object.defineProperty(navigator,'clipboard',{value:{writeText:async(t)=>{window.__copied=t}},configurable:true});
+ });
+ await open(page);
+ await page.waitForSelector('[data-wl-tele]');
+ // a button on every waiting item of a supplier that has a telesales number: suppliers 10 and 11; not 12 (a distributor only) and not the one with no supplier
+ assert.deepEqual(await page.$$eval('[data-wl-tele]',b=>b.map(x=>x.dataset.wlTele)),['1','2','3','4']);
+ assert.equal((await page.textContent('[data-wl-tele="1"]')).trim(),'📲 ابعت للتليسيلز');
+ // one list-button for a supplier with two or more different waiting items (10), none for one item (11)
+ assert.deepEqual(await page.$$eval('[data-wl-telegroup]',b=>b.map(x=>x.dataset.wlTelegroup)),['10']);
+ assert.match(await txt(page,'[data-wl-telegroup="10"]'),/📲 ابعت كل المستنيين لـ المتحدة للأدوية 2/);
+ // one request → the one-item message, on HIS telesales number (an international number as it is)
+ await page.click('[data-wl-tele="4"]');
+ await page.waitForFunction(()=>window.__wa.length===1);
+ assert.deepEqual(await page.evaluate(()=>window.__wa[0]),{p:'447710173736',t:'السلام عليكم\nمحتاج علبة AUGMENTIN 1GM 14 TAB لو متوفر.\nابعتلي السعر والخصم.\nشكرًا.'});
+ assert.equal(await txt(page,'#wlStatus'),'اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.');
+ // the supplier's whole list → ONE message: the same item once with the quantities added, in the order they came
+ await page.click('[data-wl-telegroup="10"]');
+ await page.waitForFunction(()=>window.__wa.length===2);
+ const b=await page.evaluate(()=>window.__wa[1]);
+ assert.equal(b.p,'01012345678');
+ assert.equal(b.t,'السلام عليكم\nمحتاج:\n1) 3 علب CATAFLAM 50MG 20 TAB\n2) علبتين PHARMABILAST ORAL\nابعتلي السعر والخصم.\nشكرًا.');
+ assert.doesNotMatch(b.t,/\d{8,}|عميل مثال/,'no customer number or name goes to the supplier');
+ // nothing was written or changed by sending
+ assert.equal((await page.evaluate(()=>window.__wl.calls)).length,0);
+ // a list too long for a link: copied, the chat opens bare
+ await page.evaluate(()=>{window.__wl.waiting=Array.from({length:120},(_,i)=>({id:100+i,item_id:1000+i,item:'DRUG NUMBER '+i+' 10MG 20 TAB LONG NAME',qty:1,phone:'01055556666',who:null,vendor_id:10,vendor:'المتحدة للأدوية',vkind:'warehouse',days:0}));return window.AskerWait.open()});
+ await page.waitForSelector('[data-wl-telegroup="10"]');
+ await page.click('[data-wl-telegroup="10"]');
+ await page.waitForFunction(()=>window.__wa.length===3);
+ assert.deepEqual(await page.evaluate(()=>[window.__wa[2].t,window.__wa[2].p]),['','01012345678']);
+ assert.match(await page.evaluate(()=>window.__copied),/^السلام عليكم\nمحتاج:\n1\) علبة DRUG NUMBER 0 /);
+ assert.equal(await txt(page,'#wlStatus'),'الرسالة طويلة: اتنسخت، الزقها في المحادثة اللي اتفتحت.');
+ // staff: no buttons (the numbers are the owner's)
+ await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;return window.AskerWait.open()});
+ await page.waitForFunction(()=>!document.querySelector('[data-wl-tele],[data-wl-telegroup]'),null,{timeout:5000});
+ assert.ok(await page.$('[data-wl-act="cancelled"]'),'the page itself is still there');
+});
+
 run('Waiting list: the phone app block is not drawn when the server part is not there yet',async({page})=>{
  await seed(page);
  await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false}]});
