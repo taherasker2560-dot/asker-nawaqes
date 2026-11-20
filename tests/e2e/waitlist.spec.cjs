@@ -333,6 +333,49 @@ run('Waiting list: the book shows 30 numbers at a time and «عرض أكتر» s
  assert.equal(await txt(page,'[data-wl-bkbulk]'),'افتح كل اللي ظاهر (1)','the word changed: the question starts again');
 });
 
+run('Waiting list: «📱 تطبيق الموبايل» inside the number book: the status, the download, «اربط التطبيق» makes a key and opens the phone app with it',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false}];
+  window.__opened=[];window.open=(u)=>{window.__opened.push(u);return null};   // the phone app's own link must not leave the page in the test
+  window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{
+   ar_phone_status:()=>({pending:3,last_sync:{n:2602,finished_at:'2026-11-20T10:00:00Z',merged_at:null},phones:[{label:'phone 2026-11-20',created_at:'2026-11-20T09:00:00Z',last_used_at:'2026-11-20T10:05:00Z'}]}),
+   ar_phone_link:()=>{window.__linkCalls=(window.__linkCalls||0)+1;return 'ab'.repeat(32)}});
+ });
+ await open(page);
+ await page.click('[data-wl-bk]');
+ await page.waitForSelector('#wlPhoneApp .py-acts');
+ const t=await txt(page,'#wlPhoneApp');
+ assert.match(t,/📱 تطبيق الموبايل/);assert.match(t,/موبايل مربوط، آخر اتصال: 2026-11-20 \d\d:05/);
+ assert.match(t,/آخر إرسال لجهات الاتصال: 2602 جهة اتصال \(لسه ما اتدمجتش على اللاب\)/);assert.match(t,/أرقام مستنية تنزل على الموبايل: 3/);
+ assert.equal(await page.getAttribute('#wlPhoneApp a','href'),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/contacts-build/asker-contacts.apk');
+ assert.equal((await page.textContent('#wlPhoneApp a')).trim(),'نزّل التطبيق');
+ // «اربط التطبيق»: a new key (64 hex) from the server, the page goes to the phone app's link with it; the server's address is not in the link
+ await page.click('[data-wl-applink]');
+ await page.waitForFunction(()=>window.__opened.length===1,null,{timeout:5000});
+ const u=await page.evaluate(()=>window.__opened[0]);
+ assert.equal(u,'askercontacts://link?k='+'ab'.repeat(32));assert.doesNotMatch(u,/supabase/);
+ // on Android: an intent: link (the app's download page when it is not installed)
+ await page.evaluate(()=>Object.defineProperty(navigator,'userAgent',{value:'Mozilla/5.0 (Linux; Android 14; Pixel) Chrome/120',configurable:true}));
+ await page.click('[data-wl-applink]');
+ await page.waitForFunction(()=>window.__opened.length===2,null,{timeout:5000});
+ assert.equal(await page.evaluate(()=>window.__opened[1]),'intent://link?k='+'ab'.repeat(32)+'#Intent;scheme=askercontacts;package=com.askerpharmacy.contacts;S.browser_fallback_url='+encodeURIComponent('https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/contacts-build/asker-contacts.apk')+';end');
+ assert.equal(await page.evaluate(()=>window.__linkCalls),2,'a new key each time');
+ // a staff member never sees it (the book screen is the owner's)
+ await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;return window.AskerWait.open()});
+ assert.equal(await page.$('[data-wl-bk]'),null);
+});
+run('Waiting list: the phone app block is not drawn when the server part is not there yet',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false}]});
+ await open(page);
+ await page.click('[data-wl-bk]');
+ await page.waitForSelector('#wlBkChips');
+ await page.waitForFunction(()=>document.getElementById('wlPhoneApp')&&!/بحمّل/.test(document.getElementById('wlPhoneApp').textContent),null,{timeout:5000});
+ assert.equal((await txt(page,'#wlPhoneApp')),'','no ar_phone_status on the server: nothing');
+ assert.ok(await page.$('#wlBkChips'),'the book itself works as before');
+});
+
 run('Waiting list in English: no Arabic left on the screen except names, and the words read right',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
  await page.reload();

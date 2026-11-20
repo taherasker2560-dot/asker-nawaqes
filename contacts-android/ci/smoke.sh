@@ -3,7 +3,7 @@
 #  - a contact the phone already has, then both jobs: the number the "system" wants written is written (and told back), and every contact of the phone goes up, in a complete sync;
 #  - a second run writes nothing twice; the system's link (askercontacts://link) opens the app's own LinkActivity.
 set -euo pipefail
-APK="$1"; PKG=com.askerpharmacy.contacts; KEY=$(printf 'ab%.0s' $(seq 1 32))
+APK="$(realpath "$1")"; PKG=com.askerpharmacy.contacts; KEY=$(printf 'ab%.0s' $(seq 1 32))
 cd "$(dirname "$0")"
 node fake.cjs & FAKE=$!
 trap 'kill $FAKE 2>/dev/null || true' EXIT

@@ -2362,6 +2362,8 @@ html.night .py-known { background: var(--tint-2, var(--rose)); }
 .py-bkf button.on { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); }
 .py-bkf button .notr { margin-inline-start: 3px; color: var(--muted); font-weight: 600; }
 html.night .py-bkf button.on { color: var(--ink); }
+.py-phone { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); }
+.py-phone .hint { margin: 2px 0 4px; }
 .py-bk small { display: block; color: var(--muted); }
 .py-bk button { margin: 0; flex: none; }
 /* «📇 أرقام الشركة» (owner 2026-11-20): a supplier company's three numbers: telesales, distributor, accountant, picked from his number book */
