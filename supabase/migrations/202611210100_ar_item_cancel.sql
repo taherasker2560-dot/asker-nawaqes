@@ -81,14 +81,14 @@ begin
   insert into public.ar_item_cancel_sets as s (kind, ids, n, updated_at)
   select 'word', coalesce(string_agg(x.item_id || ':' || to_char(x.first_at, 'YYYYMMDD'), ',' order by x.item_id), ''), count(*), now()
   from public.ar_item_cancel_seen x
-  where x.item_id in (select (t)::int from unnest(string_to_array(p_word, ',')) t where t <> '')
+  where x.kind = 'word' and x.item_id in (select (t)::int from unnest(string_to_array(p_word, ',')) t where t <> '')
   on conflict (kind) do update set ids = excluded.ids, n = excluded.n, updated_at = now();
   get diagnostics v_w = row_count;
 
   insert into public.ar_item_cancel_sets as s (kind, ids, n, updated_at)
   select 'dup', coalesce(string_agg(d.id || ':' || to_char(x.first_at, 'YYYYMMDD') || ':' || d.price, ',' order by d.id), ''), count(*), now()
   from (select (split_part(t, ':', 1))::int as id, split_part(t, ':', 2) as price from unnest(string_to_array(p_dup, ',')) t where t <> '') d
-  join public.ar_item_cancel_seen x on x.item_id = d.id
+  join public.ar_item_cancel_seen x on x.item_id = d.id and x.kind = 'dup'
   on conflict (kind) do update set ids = excluded.ids, n = excluded.n, updated_at = now();
   get diagnostics v_d = row_count;
 
