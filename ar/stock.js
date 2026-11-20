@@ -81,9 +81,12 @@
     const others = otherText(it.other, it.parts).map((t) => `<div class="st-other">${esc(t)}</div>`).join('');
     // the item's photo on the side (ar/item-media.js, owner 2026-11-14); tapping it shows the photo big and the description
     const pic = root.AskerItemMedia && it.item_id != null ? root.AskerItemMedia.thumb(it.item_id, it.name, ar || it.name) : '';
+    // the active ingredient he wrote in the item sheet (owner 2026-11-21), under the name
+    const act = root.AskerItemMedia && it.item_id != null ? root.AskerItemMedia.active(it.item_id) : '';
     return `<div class="st-item${pic ? ' im-row' : ''}">${pic}<div class="im-main">
       <strong>${esc(ar || it.name)}</strong>
       ${ar ? `<div class="st-en" dir="ltr">${esc(it.name)}</div>` : ''}
+      ${act ? `<div class="hs-act" translate="no">💊 ${esc(act)}</div>` : ''}
       <div class="st-qty">${esc(qtyText(it.packs, it.units, it.parts))}</div>
       ${others}
       <div class="hint">${esc(expText(it.exp_near))}${num(it.price) ? ' · ' + esc(num(it.price)) + ' ج' : ''}</div>
@@ -167,6 +170,13 @@
     drawTop();
   });
   $('gsClear')?.addEventListener('click', () => { closeSearch(); $('gsQ').focus(); });
+  // the item sheet fixed a name or wrote an active ingredient (ar/item-media.js): the rows on screen follow
+  root.addEventListener && root.addEventListener('asker-item-name', (e) => {
+    const d = e.detail || {}, r = rows.find((x) => String(x.item_id) === String(d.id));
+    if (r) r.arabic_name = d.ar || '';
+    draw(); drawTop();
+  });
+  if (root.AskerItemMedia && root.AskerItemMedia.onChange) root.AskerItemMedia.onChange(() => { draw(); drawTop(); });
   // «الرئيسية» (ar/home.js): the stock rows, loaded once (and again after 10 minutes)
   async function ensure() {
     if (!rows.length || Date.now() - loadedAt >= FRESH_MS) await open();

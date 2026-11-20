@@ -27,9 +27,16 @@
     if (e && e.descr) return e.descr;
     return shard && shard.i && shard.i[id] != null ? shard.t[shard.i[id]] || null : null;
   }
+  // the active ingredient (owner 2026-11-21): written in Arabic and/or English; the page's language first, the other one when only that is written
+  function activeOf(id, edits, lang) {
+    const e = edits && edits[id];
+    if (!e) return '';
+    const ar = String(e.active_ar || '').trim(), en = String(e.active_en || '').trim();
+    return lang === 'en' ? en || ar : ar || en;
+  }
   const SECTIONS = [['u', 'بيستخدم في', ''], ['f', 'مميزاته', ''], ['w', 'تنبيهات وأضرار', ' warn']];
   function descHtml(d) {
-    if (!d || typeof d !== 'object') return '<p class="hint">مفيش بيان للصنف ده لسه. تقدر تكتبه من «✏️ عدّل».</p>';
+    if (!d || typeof d !== 'object') return '<p class="hint">مفيش بيان للصنف ده لسه. تقدر تكتبه من «✏️ تعديل الصنف».</p>';
     const list = (a) => (Array.isArray(a) ? a.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 5) : []);
     const parts = SECTIONS.map(([k, t, c]) => { const l = list(d[k]); return l.length ? `<div class="im-sec${c}"><h4>${t}</h4><ul>${l.map((x) => `<li translate="no">${esc(x)}</li>`).join('')}</ul></div>` : ''; }).join('');
     const h = String(d.h || '').trim();
@@ -43,7 +50,7 @@
     return `<button type="button" class="im-th${src ? '' : ' im-none'}" data-im="${esc(id)}" aria-label="صورة الصنف وبيانه">`
       + (src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<span dir="ltr" translate="no">${esc(short(en))}</span>`) + '</button>';
   }
-  const api = { photoOf, descFrom, descHtml, thumbHtml, short, SECTIONS, IMG_URL };
+  const api = { photoOf, descFrom, descHtml, thumbHtml, short, activeOf, SECTIONS, IMG_URL };
   root.AskerItemMediaLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -74,9 +81,12 @@
   }
   async function loadEdits() {
     const c = app(); if (!c) return;
-    const { data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off');
+    // active_ar / active_en came with migration 202611210200: before it, the older columns only
+    let { data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off,active_ar,active_en');
+    if (error) ({ data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off'));
     if (!error && Array.isArray(data)) { edits = {}; for (const r of data) edits[r.item_id] = r; }
   }
+  const lang = () => { try { return localStorage.getItem('asker-lang') === 'en' ? 'en' : 'ar'; } catch (e) { return 'ar'; } };
   function shard(id) {
     const n = Number(id) % DESC_SHARDS;
     if (!shards[n]) shards[n] = fetch(`store/desc/${n}.json?v=${DESC_VER}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -117,13 +127,14 @@
   async function draw(editing) {
     if (!cur) return;
     await load();
-    const id = cur.id, src = photoOf(id, pics, edits), d = descFrom(id, await shard(id), edits);
+    const id = cur.id, src = photoOf(id, pics, edits), d = descFrom(id, await shard(id), edits), act = activeOf(id, edits, lang());
     const ok = await allowed();
     const body = document.getElementById('imBody');
     body.innerHTML = `<div class="im-big">${src ? `<img src="${esc(src)}" alt="">` : `<span dir="ltr" translate="no">${esc(short(cur.en))}</span>`}</div>
       <h3 class="im-title">${esc(cur.title)}</h3>${cur.en && cur.en !== cur.title ? `<div class="hint" dir="ltr" translate="no">${esc(cur.en)}</div>` : ''}
+      ${act ? `<div class="im-act"><b>💊 المادة الفعالة:</b> <span translate="no">${esc(act)}</span></div>` : ''}
       <div class="im-desc">${descHtml(d)}</div>
-      ${ok ? `<button type="button" class="im-edit-btn" id="imEditBtn">${editing ? '✖ اقفل التعديل' : '✏️ عدّل الصورة أو البيان'}</button><div id="imEdit"${editing ? '' : ' hidden'}></div>` : ''}`;
+      ${ok ? `<button type="button" class="im-edit-btn" id="imEditBtn">${editing ? '✖ اقفل التعديل' : '✏️ تعديل الصنف'}</button><div id="imEdit"${editing ? '' : ' hidden'}></div>` : ''}`;
     if (!ok) return;
     document.getElementById('imEditBtn').addEventListener('click', () => draw(!editing));
     if (editing) await drawPanel(d, src);
@@ -139,27 +150,77 @@
       <label class="im-btn">📷 صوّر أو ارفع صورة من الموبايل<input type="file" id="imFile" accept="image/*" hidden></label>
       ${src ? '<button type="button" class="im-btn red" id="imNoImg">🗑️ شيل الصورة</button>' : ''}
       ${e.img || e.img_off ? '<button type="button" class="im-btn" id="imImgBack">↩️ رجّع الصورة الأصلية</button>' : ''}
+      <h4>الاسم</h4>
+      <label class="im-l">الاسم العربي<input id="imName" class="im-in" type="text" maxlength="250" dir="rtl" value="${esc(arName0())}" placeholder="اكتب الاسم الصح بالعربي"></label>
+      <label class="im-l">الاسم في فارما فلاي (للقراية بس)<input class="im-in ro" type="text" dir="ltr" translate="no" value="${esc(cur.en)}" readonly></label>
+      <h4>💊 المادة الفعالة</h4>
+      <div class="im-two">
+        <label class="im-l">المادة الفعالة بالعربي<input id="imActAr" class="im-in" type="text" maxlength="200" dir="rtl" value="${esc(e.active_ar || '')}"></label>
+        <label class="im-l">المادة الفعالة بالإنجليزي<input id="imActEn" class="im-in" type="text" maxlength="200" dir="ltr" value="${esc(e.active_en || '')}"></label>
+      </div>
+      <p class="hint">اللي تكتبه بلغة واحدة بس بيتعرض زي ما هو في اللغتين.</p>
       <h4>البيان</h4>
       <label class="im-l">الجملة التسويقية<textarea id="imH" rows="2">${esc(d ? d.h : '')}</textarea></label>
       <label class="im-l">بيستخدم في (كل نقطة في سطر)<textarea id="imU" rows="2">${esc(d ? (d.u || []).join('\n') : '')}</textarea></label>
       <label class="im-l">مميزاته<textarea id="imF" rows="2">${esc(d ? (d.f || []).join('\n') : '')}</textarea></label>
       <label class="im-l">تنبيهات وأضرار<textarea id="imW" rows="2">${esc(d ? (d.w || []).join('\n') : '')}</textarea></label>
-      <button type="button" class="im-btn" id="imSaveDesc">✍️ احفظ البيان</button>
       <button type="button" class="im-btn ${e.desc_off ? '' : 'red'}" id="imDescOff">${e.desc_off ? '👁️ ورّي البيان تاني' : '🙈 خبّي البيان من الصنف ده'}</button>
+      <button type="button" class="im-btn main" id="imSaveAll">✍️ احفظ</button>
       <p id="imNote" class="im-note" role="status"></p>`;
+    // what the fields held when they were drawn: only what changed is written (an untouched description is never copied into his own text)
+    descInit = JSON.stringify(descForm());
     note(last[0], last[1]);
     box.querySelectorAll('[data-alt]').forEach((b) => b.addEventListener('click', () => sendPhoto({ url: list[Number(b.dataset.alt)] })));
     document.getElementById('imFile').addEventListener('change', (ev) => phoneFile(ev.target.files && ev.target.files[0]));
     const on = (bid, f) => { const b = document.getElementById(bid); if (b) b.addEventListener('click', f); };
     on('imNoImg', async () => { if (await save({ img_off: true })) note('الصورة اتشالت ✔'); });
     on('imImgBack', async () => { if (await save({ img: null, img_off: false })) note('رجعت الصورة الأصلية ✔'); });
-    on('imSaveDesc', async () => {
-      const descr = editLib().descFromForm({ h: val('imH'), u: val('imU'), f: val('imF'), w: val('imW') });
-      if (await save({ descr, desc_off: false })) note('البيان اتحفظ ✔');
-    });
+    on('imSaveAll', saveAll);
     on('imDescOff', async () => { const off = !(edits[id] || {}).desc_off; if (await save({ desc_off: off })) note(off ? 'البيان اتخبّى ✔' : 'البيان رجع ✔'); });
   }
   const val = (id) => (document.getElementById(id) || {}).value || '';
+  let descInit = '';
+  const descForm = () => ({ h: val('imH'), u: val('imU'), f: val('imF'), w: val('imW') });
+  // the Arabic name the sheet was opened with (the title is the English name when no Arabic name is written yet)
+  const arName0 = () => (cur && cur.title && cur.title !== cur.en ? cur.title : '');
+  // the Arabic name: the same two writes the search card's pen makes (ar_store_owner_set_arabic: the owner's name wins in the store and the stock, and the nightly sync
+  // never takes it back; ar_names «approved»: the shortages and the reading of the warehouses' messages); an empty name = back to the automatic one
+  async function saveName(id, en, value) {
+    const c = app();
+    const { data, error } = await c.rpc('ar_store_owner_set_arabic', { p_id: Number(id), p_arabic: value });
+    if (error) throw error;
+    if (!data || !data.ok) throw new Error(data && data.error === 'too_short' ? 'الاسم قصير قوي' : 'الصنف مش موجود في السيستم');
+    const L = root.AskerApp && root.AskerApp.lookup ? root.AskerApp.lookup() : null;
+    if (value && en && L) {
+      const row = { name_key: L.nk(en), english_name: en, arabic_name: value, status: 'approved', updated_at: new Date().toISOString() };
+      const r = await c.from('ar_names').upsert(row, { onConflict: 'name_key' });
+      if (r.error) throw r.error;
+      if (root.AskerApp.setName) root.AskerApp.setName(row);
+    }
+    const shown = data.arabic_name || '';
+    cur.title = shown || cur.en;
+    root.dispatchEvent(new CustomEvent('asker-item-name', { detail: { id: Number(id), ar: shown } })); // the card on screen follows
+    return shown;
+  }
+  // one «احفظ» for the name, the active ingredient and the description; only what changed is written (the photo buttons save at once)
+  async function saveAll() {
+    if (busy || !cur) return;
+    const id = cur.id, e = edits[id] || {};
+    const name = val('imName').replace(/\s+/g, ' ').trim(), aAr = val('imActAr').trim(), aEn = val('imActEn').trim(), form = descForm();
+    const nameChanged = name !== arName0(), activeChanged = aAr !== (e.active_ar || '') || aEn !== (e.active_en || ''), descChanged = JSON.stringify(form) !== descInit;
+    if (name && name.length < 2) return note('الاسم قصير قوي', true);
+    if (!nameChanged && !activeChanged && !descChanged) return note('مفيش تغيير');
+    busy = true; note('بيحفظ…');
+    try {
+      if (nameChanged) await saveName(id, cur.en, name);
+      const patch = {};
+      if (activeChanged) { patch.active_ar = aAr || null; patch.active_en = aEn || null; }
+      if (descChanged) { patch.descr = editLib().descFromForm(form); patch.desc_off = false; }
+      busy = false;
+      if (Object.keys(patch).length) { if (!(await save(patch))) return; } else await draw(true);
+      note('اتحفظ ✔');
+    } catch (err) { note('ماتحفظش: ' + ((err && err.message) || err), true); } finally { busy = false; }
+  }
   async function save(patch) {
     const id = cur.id;
     const row = Object.assign({ item_id: Number(id), img: null, img_off: false, descr: null, desc_off: false }, edits[id] || {}, patch, { updated_at: new Date().toISOString() });
@@ -211,6 +272,8 @@
       load();
       return thumbHtml(id, en, pics, edits).replace('<button ', `<button data-im-title="${esc(title || en || '')}" data-im-en="${esc(en || '')}" `);
     },
+    // the active ingredient to show under an item's name in a list (his text, in the page's language); '' until the edits are read (onChange then redraws the list)
+    active(id) { load(); return id == null ? '' : activeOf(id, edits, lang()); },
     onChange(f) { listeners.push(f); },
   };
 })(typeof window !== 'undefined' ? window : globalThis);
