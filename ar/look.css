@@ -1935,6 +1935,13 @@ html.night .ve-lines td.exp { color: var(--crimson-ink); }
 .im-l textarea { display: block; width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 13.5px; background: var(--card); color: inherit; resize: vertical; }
 .im-note { margin: 4px 0 0; font-size: 13px; font-weight: 700; color: var(--crimson-ink); text-align: center; }
 .im-note.bad { color: #b91c1c; }
+/* «💊 المادة الفعالة» (owner 2026-11-21): a quiet line under an item's name in the lists and in the sheet, and the sheet's name / active-ingredient fields (airy: a soft save button, not a solid block) */
+.hs-act { margin-top: 3px; padding: 2px 8px; max-width: 100%; display: inline-block; border-radius: 8px; background: var(--tint); font-size: 13px; overflow-wrap: anywhere; }
+.im-act { margin: 6px 0 0; font-size: 13.5px; }
+.im-in { display: block; width: 100%; margin-top: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; font: inherit; font-size: 14px; background: var(--card); color: inherit; box-sizing: border-box; }
+.im-in.ro { background: var(--tint); color: var(--muted); }
+.im-two { display: grid; grid-template-columns: 1fr; gap: 2px; } /* one under the other: a drug's full name does not fit in half a phone */
+.im-btn.main { background: var(--tint); color: var(--crimson-ink); border: 1px solid var(--crimson); }
 
 /* «العمليات» (owner 2026-11-15, ar/ops.js): what Adam recorded by voice */
 .op-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; padding: 10px 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh-1); }

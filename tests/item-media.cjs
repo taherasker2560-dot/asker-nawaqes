@@ -19,4 +19,19 @@ assert.match(M.thumbHtml(5, 'PANADOL 500', pics, edits), /data-im="5".*<img src=
 assert.match(M.thumbHtml(99, 'ANGIOFOX TAB 25MG', pics, edits), /im-none.*>ANGIOFOX TAB</);
 assert.equal(M.thumbHtml(null, 'X', pics, edits), '');
 assert.equal(M.short('<b>x</b> 10MG'), '<B>X</B>'); assert.doesNotMatch(M.thumbHtml(1, '<b>x</b>', {}, {}), /<b>/, 'escaped');
+// the active ingredient (owner 2026-11-21): the page's language first, the other one when only that is written, nothing when nothing
+const act = { 1: { active_ar: 'ديكلوفيناك بوتاسيوم ٥٠ مجم', active_en: 'Diclofenac potassium 50 mg' }, 2: { active_ar: 'باراسيتامول' }, 3: { active_en: 'Paracetamol' }, 4: { active_ar: '  ', active_en: null } };
+assert.equal(M.activeOf(1, act, 'ar'), 'ديكلوفيناك بوتاسيوم ٥٠ مجم'); assert.equal(M.activeOf(1, act, 'en'), 'Diclofenac potassium 50 mg');
+assert.equal(M.activeOf(2, act, 'en'), 'باراسيتامول', 'only Arabic written: shown as it is in English too');
+assert.equal(M.activeOf(3, act, 'ar'), 'Paracetamol', 'only English written: shown as it is in Arabic too');
+assert.equal(M.activeOf(4, act, 'ar'), '', 'blank = nothing'); assert.equal(M.activeOf(99, act, 'ar'), ''); assert.equal(M.activeOf(1, null, 'ar'), '');
+// English: every text the sheet draws for the owner comes out with no Arabic left
+global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
+const I = global.AskerI18n; I._use(global.AskerEN);
+const AR = /[؀-ۿ]/, bad = [];
+for (const t of ['✏️ تعديل الصنف', '✖ اقفل التعديل', 'صورة الصنف', 'الاسم', 'الاسم العربي', 'الاسم في فارما فلاي (للقراية بس)', '💊 المادة الفعالة', '💊 المادة الفعالة:', 'المادة الفعالة بالعربي', 'المادة الفعالة بالإنجليزي',
+  'اللي تكتبه بلغة واحدة بس بيتعرض زي ما هو في اللغتين.', 'البيان', '✍️ احفظ', 'مفيش تغيير', 'اتحفظ ✔', 'بيحفظ…', 'الاسم قصير قوي', 'ماتحفظش: network error', 'اكتب الاسم الصح بالعربي',
+  'مفيش بيان للصنف ده لسه. تقدر تكتبه من «✏️ تعديل الصنف».']) { const e = I.translate(t); if (AR.test(e)) bad.push(t + ' -> ' + e); }
+assert.deepEqual(bad, [], 'untranslated: ' + bad.join(' | '));
+assert.equal(I.translate('✍️ احفظ'), '✍️ Save'); assert.equal(I.translate('💊 المادة الفعالة'), '💊 Active ingredient');
 console.log('item-media ok');

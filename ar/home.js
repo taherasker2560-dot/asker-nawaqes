@@ -313,6 +313,19 @@
       .catch((e) => { linesFail = 'قوايم المخازن ماتحمّلتش: ' + ((e && e.message) || e); })
       .finally(() => { linesLoading = null; draw(); });
   }
+  // the item sheet (ar/item-media.js) fixed an Arabic name: the card, the kept rows and the search words follow at once
+  root.addEventListener && root.addEventListener('asker-item-name', (e) => {
+    const d = e.detail || {};
+    if (d.id == null) return;
+    const it = index && index.items.find((x) => String(x.id) === String(d.id));
+    if (it) { it.ar = d.ar || ''; it._h = [fz().fold(it.ar), fz().fold(it.en)]; }
+    const c = catalog && catalog.find((r) => String(r.id) === String(d.id));
+    if (c) { c.arabic_name = d.ar || ''; keepCatalog(); }
+    if (it && it.stock) it.stock.arabic_name = d.ar || '';
+    draw();
+  });
+  // a fixed photo or a written active ingredient (item sheet): the cards on screen are drawn again
+  if (root.AskerItemMedia && root.AskerItemMedia.onChange) root.AskerItemMedia.onChange(() => draw());
   // the lists newer than the kept copy arrived in the background (ar/suppliers.js)
   root.addEventListener && root.addEventListener('asker-lines', (e) => { if (Array.isArray(e.detail)) { lines = e.detail; draw(); } });
   // ready before the first search: start reading (the kept copies, then the server) a moment after the bot opens
@@ -348,6 +361,11 @@
     const o = [...(it.offers || [])].filter((x) => Number(x.price) > 0).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
     return o ? Number(o.price) : null;
   }
+  // «💊 ديكلوفيناك بوتاسيوم ٥٠ مجم» under the name: the active ingredient he wrote in the item sheet (owner 2026-11-21)
+  function activeLine(it) {
+    const a = root.AskerItemMedia && it.id != null && root.AskerItemMedia.active ? root.AskerItemMedia.active(it.id) : '';
+    return a ? `<div class="hs-act" translate="no">💊 ${esc(a)}</div>` : '';
+  }
   // the card follows the button under the box (owner 2026-11-13): «المخزون» = the pharmacy only (no warehouse, no «آخر شرا»);
   // «القوايم» = the warehouses only (one row each with the discount difference, «آخر شرا» against today; no stock)
   function card(it) {
@@ -369,7 +387,7 @@
     return `<div class="hs-item" data-k="${esc(it.key)}">
       <div class="hs-top">
         ${root.AskerItemMedia && it.id != null ? root.AskerItemMedia.thumb(it.id, it.en, it.ar || it.en) : ''}
-        <div class="hs-names"><strong>${esc(it.ar || it.en)}</strong>${it.ar && it.en ? `<div class="hs-en" dir="ltr">${esc(it.en)}</div>` : ''}</div>
+        <div class="hs-names"><strong>${esc(it.ar || it.en)}</strong>${it.ar && it.en ? `<div class="hs-en" dir="ltr">${esc(it.en)}</div>` : ''}${activeLine(it)}</div>
         <button type="button" class="hs-pen" data-edit aria-label="عدّل الاسم العربي" title="عدّل الاسم العربي">${PEN}</button>
       </div>
       ${tags ? `<div class="hs-tags">${tags}</div>` : ''}
