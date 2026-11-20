@@ -83,7 +83,35 @@
     vendor: 'المورد ده مش موجود.', kind: 'اختار مخزن ولا مركز توزيع.', state: 'الطلب ده اتغيّر قبل كده. حدّث الصفحة.', missing: 'الطلب ده مش موجود.', action: 'مقدرتش أكمّل. جرّب تاني.',
   };
   const errText = (code) => ERR[code] || 'مقدرتش أكمّل. جرّب تاني.';
-  const api = { normPhone, cleanName, parseQty, qtyWord, vendorMsg, customerMsg, waLink, telLink, kindText, KIND_DAYS, ago, leftText, daysLeft, needs, groupCall, errText };
+  // ---- the book of numbers (owner 2026-11-20, migration 202611201300): his phone's contacts, owner only ----
+  // a name as a key to search: Arabic letters unified, Arabic digits read, no marks («عميل ١٢١» is found by «عميل 121»)
+  const nameKey = (s) => digits(s).normalize('NFKC').replace(/[یى]/g, 'ي').replace(/ک/g, 'ك').replace(/[ھة]/g, 'ه').replace(/[أإآٱ]/g, 'ا')
+    .replace(/[ً-ٰٟـ]/g, '').toLowerCase().replace(/[^a-z0-9ء-ي]+/g, ' ').replace(/\s+/g, ' ').trim();
+  function makeBook(rows) {
+    const list = (rows || []).map((r) => ({ phone: String(r.phone), name: String(r.name || ''), kind: r.kind || 'other', last_item: r.last_item || null,
+      key: nameKey(`${r.name || ''} ${r.last_item || ''}`), mobile: /^01\d{9}$/.test(String(r.phone)) }));
+    return { list, byPhone: new Map(list.map((c) => [c.phone, c])) };
+  }
+  // the book's entry for a number as he types it (01012345678, +20 101 …, Arabic digits)
+  const bookFind = (book, phone) => { const p = normPhone(phone); return p && book ? book.byPhone.get(p) || null : null; };
+  // up to `limit` mobile entries whose name (or drug) holds every word typed; the ones that start with it first
+  function bookSearch(book, q, limit) {
+    const k = nameKey(q), words = k.split(' ').filter(Boolean);
+    if (!book || k.length < 2) return [];
+    const hit = book.list.filter((c) => c.mobile && words.every((w) => c.key.includes(w)));
+    hit.sort((a, b) => (b.key.startsWith(k) ? 1 : 0) - (a.key.startsWith(k) ? 1 : 0) || a.name.length - b.name.length);
+    return hit.slice(0, limit || 6);
+  }
+  const bookKind = (k) => (k === 'cash' ? 'نقدي' : k === 'account' ? 'له حساب' : '');
+  const STATUS_TEXT = { waiting: 'مستني', arrived: 'وصل', delivered: 'اتسلّم', returned: 'رجع للمورد', kept: 'اتحفظ', cancelled: 'اتلغى' };
+  // his history with one number: the requests the system kept (newest first) and, when the book has one, the drug written beside his name in the phone («قديم»)
+  function historyRows(hist, known) {
+    const out = (hist || []).map((r) => ({ item: r.item_name, day: String(r.created_at || '').slice(5, 10), status: STATUS_TEXT[r.status] || '' }));
+    if (known && known.last_item) out.push({ item: known.last_item, day: '', status: 'قديم' });
+    return out;
+  }
+  const api = { normPhone, cleanName, parseQty, qtyWord, vendorMsg, customerMsg, waLink, telLink, kindText, KIND_DAYS, ago, leftText, daysLeft, needs, groupCall, errText,
+    nameKey, makeBook, bookFind, bookSearch, bookKind, STATUS_TEXT, historyRows };
   root.AskerWaitLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -94,7 +122,9 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   let data = { waiting: [], call: [], leftover: [], vendors: [] }, loaded = false, loading = false, busy = false, sure = null, note = '', lastMsg = '';
   // the form: null = closed; {item: {id, name} | null, q, results, phone, name, qty, vendor, kind, msg}
-  let form = null, searchTimer = null, searchSeq = 0;
+  // + known (the book's entry for the typed number), hist (his requests with that number), picks (names that fit what is typed), nameAuto (the name box was filled by the book)
+  let form = null, searchTimer = null, searchSeq = 0, histSeq = 0;
+  let book = makeBook([]), bookState = 'none';   // none | loading | ready
 
   const vendorOf = (id) => data.vendors.find((v) => String(v.id) === String(id));
   const who = (r) => (r.who ? cleanName(r.who) : '');
@@ -142,6 +172,21 @@
   }
   const head = (title, n) => `<h3 class="py-h">${esc(title)} <span class="py-num">${esc(n)}</span></h3>`;
 
+  // the number typed is in the book: his name, his kind, and (under it) his requests so far
+  function knownHtml() {
+    const f = form;
+    if (!f) return '';
+    const k = f.known, rows = historyRows(f.hist, k);
+    if (!k && !rows.length) return '';
+    return (k ? `<div class="py-known"><span class="py-ok">✓</span><b><bdi class="notr">${esc(k.name)}</bdi></b>${bookKind(k.kind) ? `<span class="py-pill">${esc(bookKind(k.kind))}</span>` : ''}<span class="py-pill">من دفتر أرقامك</span></div>` : '') +
+      (rows.length ? `<div class="py-hist"><span class="py-lab">سجل طلباته</span>${rows.map((r) => `<div class="py-hrow"><span dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${r.day ? `<small>${esc(r.day)}</small>` : ''}${r.status ? `<span class="py-pill">${esc(r.status)}</span>` : ''}</div>`).join('')}</div>` : '');
+  }
+  // the names in the book that fit what he typed in the name box: a tap fills the number too
+  const picksHtml = () => (form && form.picks && form.picks.length
+    ? `<div class="py-picks">${form.picks.map((c) => `<button type="button" class="py-pick" data-wl-contact="${esc(c.phone)}"><b><bdi class="notr">${esc(c.name)}</bdi></b><small dir="ltr"><bdi class="notr">${esc(c.phone)}${c.last_item ? ' · ' + esc(c.last_item) : ''}</bdi></small></button>`).join('')}</div>` : '');
+  const paintKnown = () => { const el = $('wlKnown'); if (el) el.innerHTML = knownHtml(); };
+  const paintPicks = () => { const el = $('wlPicks'); if (el) el.innerHTML = picksHtml(); };
+
   function formHtml() {
     if (!form) return '<button type="button" class="py-new" data-wl-new>📝 طلب مش موجود</button>';
     const f = form, v = vendorOf(f.vendor);
@@ -152,7 +197,9 @@
     return `<div class="py-card py-confirm"><span class="py-lab">الدوا</span>${picked}` +
       `<span class="py-lab">العميل</span><div class="py-seg" style="grid-template-columns:2fr 1fr"><input id="wlPhone" type="tel" dir="ltr" placeholder="01xxxxxxxxx" aria-label="رقم العميل" value="${esc(f.phone)}" />` +
       `<input id="wlQty" type="text" inputmode="numeric" placeholder="الكمية 1" aria-label="الكمية" value="${esc(f.qty)}" /></div>` +
-      `<input id="wlName" type="text" placeholder="اسم العميل (اختياري)" aria-label="اسم العميل" maxlength="80" value="${esc(f.name)}" />` +
+      `<div id="wlKnown">${knownHtml()}</div>` +
+      `<input id="wlName" type="text" placeholder="اسم العميل (اختياري)" aria-label="اسم العميل" maxlength="80" autocomplete="off" value="${esc(f.name)}" />` +
+      `<div id="wlPicks">${picksHtml()}</div>` +
       `<span class="py-lab">المورد اللي هتبعتله</span>${vendorSelect('id="wlVendor"', f.vendor)}` +
       (v && !v.kind ? `<span class="py-lab">المورد ده مخزن ولا مركز توزيع؟ (مرة واحدة بس)</span><div class="py-seg" style="grid-template-columns:1fr 1fr"><button type="button" class="${f.kind === 'warehouse' ? 'on' : ''}" data-wl-kind="warehouse">مخزن · رجوع 30 يوم</button><button type="button" class="${f.kind === 'center' ? 'on' : ''}" data-wl-kind="center">مركز توزيع · رجوع 7 أيام</button></div>` : '') +
       (f.msg ? `<p class="status bad" id="wlMsg">${esc(f.msg)}</p>` : '') +
@@ -238,6 +285,59 @@
     if ($('wlName')) form.name = $('wlName').value;
     if ($('wlVendor')) form.vendor = $('wlVendor').value;
   }
+  // ---- the book: loaded once when the form opens (a few thousand rows, owner only); a number typed → his name, a name typed → the numbers that fit ----
+  async function loadBook() {
+    if (bookState !== 'none' || !db()) return;
+    bookState = 'loading';
+    try {
+      let all = [];
+      for (let from = 0; from < 20000; from += 1000) {
+        const { data: rows, error } = await db().from('ar_contacts').select('phone,name,kind,last_item').order('phone').range(from, from + 999);
+        if (error) throw error;
+        all = all.concat(rows || []);
+        if (!rows || rows.length < 1000) break;
+      }
+      book = makeBook(all); bookState = 'ready';
+    } catch (e) { bookState = 'none'; return; }   // the table is not there yet (or not the owner): the form works as before
+    if (form) { readForm(); onPhone(); onName(); }
+  }
+  // his requests so far with this number (the system keeps them in ar_waitlist); shown under the name
+  async function loadHist(phone) {
+    if (!form || !db()) return;
+    const mine = ++histSeq;
+    try {
+      const { data: rows, error } = await db().from('ar_waitlist').select('item_name,status,created_at').eq('phone', phone).order('created_at', { ascending: false }).limit(6);
+      if (error || mine !== histSeq || !form || normPhone(form.phone) !== phone) return;
+      form.hist = rows || []; paintKnown();
+    } catch (e) { /* the history is a help, not a need */ }
+  }
+  // a number was typed: the name appears when the book knows it (a name he typed himself stays)
+  function onPhone() {
+    const f = form;
+    if (!f) return;
+    const p = normPhone(f.phone), k = p ? bookFind(book, p) : null, nm = $('wlName');
+    f.known = k; f.hist = []; f.picks = [];
+    if (k && (!f.name.trim() || f.nameAuto)) { f.name = k.name; f.nameAuto = true; if (nm) nm.value = k.name; }
+    else if (!k && f.nameAuto) { f.name = ''; f.nameAuto = false; if (nm) nm.value = ''; }
+    paintKnown(); paintPicks();
+    if (p) loadHist(p);
+  }
+  // a name was typed: the numbers in the book that fit it are offered (a tap fills the number)
+  function onName() {
+    const f = form;
+    if (!f) return;
+    f.picks = f.nameAuto || normPhone(f.phone) ? [] : bookSearch(book, f.name, 6);
+    paintPicks();
+  }
+  // a request was saved with a number the book does not know: keep it with the name he wrote (never over a number it already has)
+  async function remember(phone, name) {
+    const nm = String(name || '').trim().replace(/\s+/g, ' ').slice(0, 120);
+    if (!nm || bookFind(book, phone) || !db()) return;
+    try {
+      const { error } = await db().from('ar_contacts').upsert({ phone, name: nm, kind: /^عميل/.test(nm) ? 'cash' : 'other', source: 'typed', updated_at: new Date().toISOString() }, { onConflict: 'phone', ignoreDuplicates: true });
+      if (!error) book = makeBook(book.list.concat([{ phone, name: nm, kind: /^عميل/.test(nm) ? 'cash' : 'other', last_item: null }]));
+    } catch (e) { /* the request itself is saved */ }
+  }
   async function search() {
     if (!form || form.item) return;
     const mine = ++searchSeq;
@@ -269,8 +369,9 @@
         const k = await rpc('ar_waitlist_vendor_kind', { p_vendor_id: Number(v.id), p_kind: f.kind });
         if (!k || !k.ok) throw new Error(errText(k && k.error));
       }
-      const d = await rpc('ar_waitlist_add', { p_item_id: f.item && f.item.id != null ? Number(f.item.id) : null, p_item_name: item, p_phone: phone, p_name: f.name.trim() || null, p_qty: qty, p_vendor_id: v ? Number(v.id) : null });
+      const d = await rpc('ar_waitlist_add', { p_item_id: f.item && f.item.id != null ? Number(f.item.id) : null, p_item_name: item, p_phone: phone, p_name: f.name.trim().slice(0, 80) || null, p_qty: qty, p_vendor_id: v ? Number(v.id) : null });
       if (!d || !d.ok) throw new Error(errText(d && d.error));
+      await remember(phone, f.name);
       let copied = false;
       const text = vendorMsg(item, qty);
       if (copyMsg) copied = await copy(text);
@@ -292,6 +393,8 @@
     $('wlRefresh')?.addEventListener('click', () => { note = ''; load(); });
     panel.addEventListener('input', (e) => {
       if (e.target.id === 'wlItem' && form) { form.q = e.target.value; clearTimeout(searchTimer); searchTimer = setTimeout(search, 250); }
+      else if (e.target.id === 'wlPhone' && form) { form.phone = e.target.value; onPhone(); }
+      else if (e.target.id === 'wlName' && form) { form.name = e.target.value; form.nameAuto = false; onName(); }
     });
     panel.addEventListener('change', (e) => {
       const t = e.target;
@@ -299,10 +402,10 @@
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact]');
       if (!t) return;
       const d = t.dataset;
-      if ('wlNew' in d) { note = ''; lastMsg = ''; form = { item: null, q: '', results: [], phone: '', name: '', qty: '', vendor: '', kind: '', msg: '' }; draw(); $('wlItem')?.focus(); return; }
+      if ('wlNew' in d) { note = ''; lastMsg = ''; form = { item: null, q: '', results: [], phone: '', name: '', qty: '', vendor: '', kind: '', msg: '', known: null, hist: [], picks: [], nameAuto: false }; draw(); $('wlItem')?.focus(); loadBook(); return; }
       if ('wlClose' in d) { form = null; draw(); return; }
       if ('wlCalled' in d) { rpc('ar_waitlist_set', { p_id: Number(d.wlCalled), p_action: 'called' }).then(() => setTimeout(load, 800), () => {}); return; }
       if ('wlAct' in d) {
@@ -316,6 +419,7 @@
       if ('wlPick' in d) { const r = form.results.find((x) => String(x.id) === d.wlPick); if (r) { form.item = { id: r.id, name: r.name }; form.results = []; form.msg = ''; draw(); $('wlPhone')?.focus(); } return; }
       if ('wlTyped' in d) { form.item = { id: null, name: form.q.trim().replace(/\s+/g, ' ') }; form.results = []; draw(); $('wlPhone')?.focus(); return; }
       if ('wlUnpick' in d) { form.item = null; form.q = ''; form.results = []; draw(); $('wlItem')?.focus(); return; }
+      if ('wlContact' in d) { const c = book.byPhone.get(d.wlContact); if (c) { form.phone = c.phone; form.name = c.name; form.nameAuto = true; form.known = c; form.hist = []; form.picks = []; form.msg = ''; draw(); loadHist(c.phone); $('wlQty')?.focus(); } return; }
       if ('wlKind' in d) { form.kind = d.wlKind; form.msg = ''; draw(); return; }
       if ('wlSave' in d) save(d.wlSave === 'copy');
     });

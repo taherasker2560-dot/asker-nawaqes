@@ -154,6 +154,62 @@ run('Waiting list: a new request: search, the supplier\'s kind asked once, the n
  assert.ok(await page.isVisible('[data-wl-new]'));
 },{permissions:['clipboard-read','clipboard-write']});
 
+run('Waiting list: the number book (owner 2026-11-20): a number shows the name and his requests, a name fills the number, a new number is kept, a known one is never changed',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  window.__tables.ar_contacts=[
+   {phone:'01001234567',name:'عميل ١٢١',kind:'cash',last_item:'Entresto'},
+   {phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null},
+   {phone:'01112223334',name:'أحمد الطنطاوي الصغير',kind:'other',last_item:null},
+   {phone:'0471234567',name:'مكتب احمد الطنطاوى',kind:'other',last_item:null}];   // a landline: in the book, never offered for this form
+  window.__tables.ar_waitlist=[{id:1,status:'waiting'},
+   {id:11,phone:'01001234567',item_name:'Eltroxin 100',status:'delivered',created_at:'2026-11-05T09:00:00Z'},
+   {id:12,phone:'01001234567',item_name:'Whiton Cream',status:'returned',created_at:'2026-10-21T09:00:00Z'},
+   {id:13,phone:'01061287937',item_name:'AUGMENTIN 1GM 14 TAB',status:'waiting',created_at:'2026-11-18T09:00:00Z'}];
+ });
+ await open(page);
+ await page.click('[data-wl-new]');
+ // a number (with spaces and +20): his name fills the name box, his kind, his requests newest first, then the old one from his phone
+ await page.fill('#wlPhone','+20 100 123 4567');
+ await page.waitForFunction(()=>document.getElementById('wlName').value==='عميل ١٢١',null,{timeout:5000});
+ assert.match(await txt(page,'#wlKnown'),/^✓ عميل ١٢١ نقدي من دفتر أرقامك/);
+ await page.waitForFunction(()=>document.querySelectorAll('#wlKnown .py-hrow').length===3,null,{timeout:5000});
+ assert.deepEqual(await texts(page,'#wlKnown .py-hrow'),['Eltroxin 100 11-05 اتسلّم','Whiton Cream 10-21 رجع للمورد','Entresto قديم']);
+ // the number is wiped: the name that came from the book goes with it
+ await page.fill('#wlPhone','');
+ await page.waitForFunction(()=>document.getElementById('wlName').value==='',null,{timeout:5000});
+ assert.equal(await txt(page,'#wlKnown'),'');
+ // a name (Ya / Alef spelled the other way): the numbers that fit, the shorter name first, no landline; a tap fills the number and the name
+ await page.fill('#wlName','الطنطاوي');
+ await page.waitForSelector('[data-wl-contact]');
+ assert.deepEqual(await page.$$eval('[data-wl-contact]',(b)=>b.map((x)=>x.dataset.wlContact)),['01061287937','01112223334']);
+ await page.click('[data-wl-contact="01061287937"]');
+ assert.equal(await page.inputValue('#wlPhone'),'01061287937');assert.equal(await page.inputValue('#wlName'),'احمد الطنطاوى');
+ await page.waitForFunction(()=>document.querySelectorAll('#wlKnown .py-hrow').length===1,null,{timeout:5000});
+ assert.deepEqual(await texts(page,'#wlKnown .py-hrow'),['AUGMENTIN 1GM 14 TAB 11-18 مستني']);
+ assert.match(await txt(page,'#wlKnown'),/له حساب/);
+ // the drug by its name (a «عميل» number is also found by the drug beside it)
+ await page.fill('#wlItem','augm');await page.waitForSelector('[data-wl-pick="5"]');await page.click('[data-wl-pick="5"]');
+ await page.click('[data-wl-save="only"]');
+ await page.waitForFunction(()=>window.__wl.calls.some(c=>c[0]==='add'),null,{timeout:5000});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='add')[0][1],{p_item_id:5,p_item_name:'AUGMENTIN 1GM 14 TAB',p_phone:'01061287937',p_name:'احمد الطنطاوى',p_qty:1,p_vendor_id:null});
+ await page.waitForFunction(()=>document.getElementById('wlStatus').textContent.trim()==='اتسجّل.',null,{timeout:5000});
+ assert.equal((await page.evaluate(()=>window.__fakeWrites)).filter((w)=>w.table==='ar_contacts').length,0,'a number the book already has is not written again');
+ // a number the book does not know, with the name he wrote: kept (as a cash customer when it starts with «عميل»), and known the next time
+ await page.click('[data-wl-new]');await page.fill('#wlItem','NEWDRUG 10MG');await page.waitForSelector('[data-wl-typed]');await page.click('[data-wl-typed]');
+ await page.fill('#wlPhone','01055550000');await page.fill('#wlName','عميل ١٢٦');
+ assert.equal(await txt(page,'#wlKnown'),'','not in the book: nothing shown');
+ await page.click('[data-wl-save="only"]');
+ await page.waitForFunction(()=>window.__fakeWrites.some((w)=>w.table==='ar_contacts'),null,{timeout:5000});
+ const wr=(await page.evaluate(()=>window.__fakeWrites)).filter((w)=>w.table==='ar_contacts');
+ assert.equal(wr.length,1);assert.equal(wr[0].k,'upsert');
+ assert.deepEqual({...wr[0].v[0],updated_at:'x'},{phone:'01055550000',name:'عميل ١٢٦',kind:'cash',source:'typed',updated_at:'x'});
+ await page.waitForFunction(()=>document.getElementById('wlStatus').textContent.trim()==='اتسجّل.',null,{timeout:5000});
+ await page.click('[data-wl-new]');await page.fill('#wlPhone','01055550000');
+ await page.waitForFunction(()=>document.getElementById('wlName').value==='عميل ١٢٦',null,{timeout:5000});
+ assert.match(await txt(page,'#wlKnown'),/^✓ عميل ١٢٦ نقدي/);
+});
+
 run('Waiting list in English: no Arabic left on the screen except names, and the words read right',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
  await page.reload();

@@ -2342,6 +2342,18 @@ html.night .py-fix { color: var(--ink); }
 .py-pick, .py-bx { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); text-align: start; box-shadow: none; }
 .py-pick b, .py-bx b { font-size: 13.5px; overflow-wrap: anywhere; }
 .py-pick small, .py-bx small { color: var(--muted); font-size: 12px; }
+/* the number book in the new-request form (owner 2026-11-20): the name that appeared for the typed number, and his requests so far */
+.py-known { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 10px; border-radius: 12px; background: var(--rose); color: var(--ink); }
+.py-known b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.py-known .py-pill { margin-inline-start: 0; }
+.py-ok { color: var(--crimson); font-weight: 800; }
+.py-hist { margin-top: 6px; padding: 4px 10px 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.py-hist .py-lab { margin: 6px 0 4px; }
+.py-hrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.py-hrow span:first-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.py-hrow small { color: var(--muted); font-size: 12px; }
+.py-hrow .py-pill { margin-inline-start: 0; }
+html.night .py-known { background: var(--tint-2, var(--rose)); }
 .py-bx.on { border-color: var(--crimson); background: var(--rose); color: var(--ink); }
 .py-bx.low { opacity: 0.5; }
 .py-cats { display: flex; flex-wrap: wrap; gap: 6px; }
