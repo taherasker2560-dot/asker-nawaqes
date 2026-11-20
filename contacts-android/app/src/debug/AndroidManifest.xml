@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CI only (the debug build is never published): a receiver the emulator test drives, and plain http to the test's fake server on the build machine -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:usesCleartextTraffic="true">
+        <receiver android:name="com.askerpharmacy.contacts.DebugReceiver" android:exported="true" />
+    </application>
+</manifest>

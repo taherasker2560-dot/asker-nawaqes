@@ -1,0 +1,120 @@
+# Builds «دفتر الأرقام», the owner's phone app (contacts-android/) that keeps his phone's contacts (and so Google's) in step with the system's number book.
+# Tested here: the plain rules (JUnit) and a real Android emulator against a fake of the system's server (the number the system wants written is written,
+# every contact of the phone goes up in a complete sync, nothing is written twice). The finished APK is attached to a pre-release called «contacts-build»
+# as asker-contacts.apk (only from main): the system's «نزّل التطبيق» button points to it. The APK holds no secret: this phone's key is put on it by the system's «اربط التطبيق» button.
+name: contacts-apk
+on:
+  push:
+    branches: [main, 'contacts-**']
+    paths:
+      - 'contacts-android/**'
+      - '.github/workflows/contacts-apk.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '43 4 * * 1'   # weekly: touch the signing key's cache so GitHub never evicts it (a new key would stop the app from updating in place)
+permissions:
+  contents: write
+concurrency:
+  group: contacts-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v4
+        id: ks
+        with:
+          path: ~/contacts.keystore
+          key: contacts-keystore-v1
+      - run: echo "signing key cache hit = ${{ steps.ks.outputs.cache-hit }}"
+  build:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Signing key (cached)
+        id: ks
+        uses: actions/cache@v4
+        with:
+          path: ~/contacts.keystore
+          key: contacts-keystore-v1
+      - name: Make the signing key
+        if: steps.ks.outputs.cache-hit != 'true'
+        run: |
+          keytool -genkeypair -keystore ~/contacts.keystore -storepass contacts-sideload -keypass contacts-sideload -alias contacts -keyalg RSA -keysize 2048 -validity 9125 -dname "CN=Asker Contacts, O=Asker Pharmacy"
+      - name: Test and build
+        working-directory: contacts-android
+        env:
+          CONTACTS_KEYSTORE: /home/runner/contacts.keystore
+          CONTACTS_KS_PASS: contacts-sideload
+        run: gradle testDebugUnitTest assembleDebug assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+      - name: Show the errors (on failure)
+        if: failure()
+        run: |
+          grep -E '^e: |error:|FAILED|What went wrong|Could not|Unresolved|AAPT' /tmp/build.log | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+      - name: What is inside the APK
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=contacts-android/app/build/outputs/apk/release/app-release.apk
+          ls -l "$APK"; sha256sum "$APK"
+          "$BT/apksigner" verify --print-certs "$APK" | head -5
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package|sdkVersion|uses-permission|launchable-activity|application-label:" | head -20
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contacts-apk-release
+          path: contacts-android/app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contacts-apk-debug
+          path: contacts-android/app/build/outputs/apk/debug/app-debug.apk
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: contacts-apk-debug
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash contacts-android/ci/smoke.sh apk/app-debug.apk
+  publish:
+    needs: [build, smoke]
+    if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: contacts-apk-release
+          path: apk
+      - name: Attach to the pre-release «contacts-build»
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp apk/app-release.apk asker-contacts.apk
+          sha256sum asker-contacts.apk
+          gh release view contacts-build --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create contacts-build --repo "$GITHUB_REPOSITORY" --prerelease --title "Number book app (owner)" --notes "«دفتر الأرقام»: the owner's Android app that keeps his phone's contacts in step with the system's number book. Built and tested by the contacts-apk workflow; the asset is replaced by each build."
+          gh release upload contacts-build asker-contacts.apk --clobber --repo "$GITHUB_REPOSITORY"
