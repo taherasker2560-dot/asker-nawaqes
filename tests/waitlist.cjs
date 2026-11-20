@@ -59,6 +59,30 @@ assert.deepEqual(G.map((g) => [g.item, g.rows.map((r) => r.id)]), [['A', [1, 3]]
 assert.equal(W.errText('phone'), 'رقم الموبايل لازم يكون 11 رقم ويبدأ بـ 01.');
 assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
 
+// ---- the book of numbers (owner 2026-11-20): a number → his name, a name → the numbers that fit; Arabic digits and letters are read alike ----
+{
+  const bk = W.makeBook([
+    { phone: '01001234567', name: 'عميل ١٢١', kind: 'cash', last_item: 'Entresto' },
+    { phone: '01061287937', name: 'احمد الطنطاوى', kind: 'account', last_item: null },
+    { phone: '01112223334', name: 'أحمد الطنطاوي الصغير', kind: 'other', last_item: null },
+    { phone: '0471234567', name: 'احمد الطنطاوى مكتب', kind: 'other', last_item: null },   // a landline: in the book, but not offered for the form
+    { phone: '447710173736', name: 'خارجي', kind: 'other', last_item: null },
+  ]);
+  assert.equal(W.bookFind(bk, '+20 100 123 4567').name, 'عميل ١٢١', 'a number as he types it (+20, spaces) finds the name');
+  assert.equal(W.bookFind(bk, '٠١٠٠١٢٣٤٥٦٧').name, 'عميل ١٢١', 'Arabic digits');
+  assert.equal(W.bookFind(bk, '01099999999'), null);
+  assert.equal(W.bookFind(bk, '010'), null, 'half a number finds nothing');
+  assert.deepEqual(W.bookSearch(bk, 'عميل 121').map((c) => c.phone), ['01001234567'], '«121» finds «١٢١»');
+  assert.deepEqual(W.bookSearch(bk, 'entresto').map((c) => c.phone), ['01001234567'], 'the drug beside the name is searched too');
+  assert.deepEqual(W.bookSearch(bk, 'احمد الطنطاوي').map((c) => c.phone), ['01061287937', '01112223334'], 'ى/ي and أ/ا are the same; the shorter name first; a landline is not offered');
+  assert.deepEqual(W.bookSearch(bk, 'ا'), [], 'one letter offers nothing');
+  assert.equal(W.bookSearch(bk, 'احمد').length, 2);
+  assert.equal(W.bookKind('cash'), 'نقدي'); assert.equal(W.bookKind('account'), 'له حساب'); assert.equal(W.bookKind('other'), '');
+  const h = W.historyRows([{ item_name: 'Entresto 50 mg', status: 'waiting', created_at: '2026-11-20T10:00:00Z' }, { item_name: 'Eltroxin 100', status: 'delivered', created_at: '2026-11-05T09:00:00Z' }], bk.list[0]);
+  assert.deepEqual(h, [{ item: 'Entresto 50 mg', day: '11-20', status: 'مستني' }, { item: 'Eltroxin 100', day: '11-05', status: 'اتسلّم' }, { item: 'Entresto', day: '', status: 'قديم' }], 'the kept requests, then the old one from his phone');
+  assert.deepEqual(W.historyRows([], null), []);
+}
+
 // ---- English: every text the screen draws, fixed and built, comes out with no Arabic left ----
 global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
@@ -71,6 +95,7 @@ for (const s of ['الانتظار', '📝 الانتظار', '📝 طلب مش 
   'اللي بيوصل بيتعرف من قايمة المخزون لوحده (على قد تحديث اللاب)، أو دوس «وصل» بإيدك. السيستم ما بيبعتش رسالة لوحده.',
   'اتسجّل.', 'الطلب ده كان مسجّل قبل كده.', 'اتسجّل. رسالة المورد اتنسخت، ابعتها من واتساب.', 'الطلب ده كان مسجّل قبل كده. رسالة المورد اتنسخت، ابعتها من واتساب.',
   'اتسجّل. ماقدرتش أنسخ الرسالة، انسخها بإيدك من تحت.', 'الطلب ده كان مسجّل قبل كده. ماقدرتش أنسخ الرسالة، انسخها بإيدك من تحت.',
+  'من دفتر أرقامك', 'سجل طلباته', 'نقدي', 'له حساب', 'قديم', 'مستني', 'اتلغى', 'اتحفظ', 'رجع للمورد',
   'مقدرتش أحمّل الانتظار: boom', 'ماتغيّرش: boom', 'دوا وصل لعملاء مستنيينه: كلّمهم', 'دوا ميعاد رجوعه للمورد قرب (يومين أو أقل)']) check(s);
 for (const e of ['item', 'name', 'phone', 'qty', 'vendor', 'kind', 'state', 'missing', 'action']) check(W.errText(e));
 for (const n of [0, 1, 2, 5, 11]) { check(W.ago('وصل', n)); check(W.ago('اتطلب', n)); }
