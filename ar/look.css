@@ -2343,7 +2343,7 @@ html.night .py-fix { color: var(--ink); }
 .py-pick b, .py-bx b { font-size: 13.5px; overflow-wrap: anywhere; }
 .py-pick small, .py-bx small { color: var(--muted); font-size: 12px; }
 /* the number book in the new-request form (owner 2026-11-20): the name that appeared for the typed number, and his requests so far */
-.py-known { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 10px; border-radius: 12px; background: var(--rose); color: var(--ink); }
+.py-known { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 10px; border-radius: 12px; background: var(--rose); color: var(--ink); }
 .py-known b { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .py-known .py-pill { margin-inline-start: 0; }
 .py-ok { color: var(--crimson); font-weight: 800; }
@@ -2354,6 +2354,16 @@ html.night .py-fix { color: var(--ink); }
 .py-hrow small { color: var(--muted); font-size: 12px; }
 .py-hrow .py-pill { margin-inline-start: 0; }
 html.night .py-known { background: var(--tint-2, var(--rose)); }
+/* «📒 دفتر الأرقام» (owner 2026-11-20): who stays private (🔒 = the staff never see it); one tap per number, or all that are shown */
+.py-known .py-lock { margin: 0; margin-inline-start: auto; }
+.py-bk-open { display: block; width: 100%; margin: 0 0 10px; }
+.py-bkf { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.py-bkf button { margin: 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink); font-size: 13px; font-weight: 700; box-shadow: none; }
+.py-bkf button.on { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); }
+.py-bkf button .notr { margin-inline-start: 3px; color: var(--muted); font-weight: 600; }
+html.night .py-bkf button.on { color: var(--ink); }
+.py-bk small { display: block; color: var(--muted); }
+.py-bk button { margin: 0; flex: none; }
 .py-bx.on { border-color: var(--crimson); background: var(--rose); color: var(--ink); }
 .py-bx.low { opacity: 0.5; }
 .py-cats { display: flex; flex-wrap: wrap; gap: 6px; }

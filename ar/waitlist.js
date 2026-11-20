@@ -8,8 +8,11 @@
    3) «مستنيين الدوا»: asked from the supplier, not here yet («وصل» by hand when the stock list does not show it).
    4) «↩️ قرار الرجوع»: what is here and not delivered: how long it has been, the days left to return, sold in the last year, the price, the nearest
       expiry in stock (flagged under 18 months, his own rule of the short-dated report). No «slow» or «expensive» label: the numbers are his to read.
-   The server (migration 202611190500) finds the arrival by itself (the stock list shows more than at the request). OWNER only. Nothing here writes
-   to PharmaFly or sends a message. */
+   The server (migration 202611190500) finds the arrival by itself (the stock list shows more than at the request). Nothing here writes
+   to PharmaFly or sends a message.
+   Who: the owner, and (owner 2026-11-20, migration 202611201500) a staff member with the «الانتظار» switch (key `wait`): he adds a request, calls, marks «اتسلّم» / «إلغاء»; the
+   returns decisions, the suppliers and the private numbers never reach him (the server sends none of it; this page only hides the buttons).
+   «📒 دفتر الأرقام» (owner only): his numbers, each markable «🔒 خاص» = the staff never see it, one by one or all that are shown. */
 (function (root) {
   'use strict';
 
@@ -88,9 +91,26 @@
   const nameKey = (s) => digits(s).normalize('NFKC').replace(/[یى]/g, 'ي').replace(/ک/g, 'ك').replace(/[ھة]/g, 'ه').replace(/[أإآٱ]/g, 'ا')
     .replace(/[ً-ٰٟـ]/g, '').toLowerCase().replace(/[^a-z0-9ء-ي]+/g, ' ').replace(/\s+/g, ' ').trim();
   function makeBook(rows) {
-    const list = (rows || []).map((r) => ({ phone: String(r.phone), name: String(r.name || ''), kind: r.kind || 'other', last_item: r.last_item || null,
+    const list = (rows || []).map((r) => ({ phone: String(r.phone), name: String(r.name || ''), kind: r.kind || 'other', last_item: r.last_item || null, private: !!r.private,
       key: nameKey(`${r.name || ''} ${r.last_item || ''}`), mobile: /^01\d{9}$/.test(String(r.phone)) }));
     return { list, byPhone: new Map(list.map((c) => [c.phone, c])) };
+  }
+  // ---- «📒 دفتر الأرقام» (owner 2026-11-20): who may see a number; private = the owner alone ----
+  const BOOK_FILTERS = [['all', 'الكل'], ['cash', 'نقدي'], ['account', 'له حساب'], ['other', 'غيرهم'], ['private', '🔒 خاص']];
+  // how many numbers under each filter
+  function bookCounts(book) {
+    const c = { all: 0, cash: 0, account: 0, other: 0, private: 0 };
+    for (const x of (book && book.list) || []) { c.all++; c[x.kind] = (c[x.kind] || 0) + 1; if (x.private) c.private++; }
+    return c;
+  }
+  // the numbers the screen lists: one filter (a kind, or private) and what is typed (digits only = part of a number; else every word in the name), by name
+  function bookView(book, filter, q) {
+    let list = (book && book.list) || [];
+    if (filter === 'private') list = list.filter((c) => c.private); else if (filter && filter !== 'all') list = list.filter((c) => c.kind === filter);
+    const t = digits(q), d = t.replace(/\D/g, ''), words = nameKey(q).split(' ').filter(Boolean);
+    if (d.length >= 2 && /^[\d\s+()-]*$/.test(t)) list = list.filter((c) => c.phone.includes(d));
+    else if (words.length) list = list.filter((c) => words.every((w) => c.key.includes(w)));
+    return list.slice().sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }
   // the book's entry for a number as he types it (01012345678, +20 101 …, Arabic digits)
   const bookFind = (book, phone) => { const p = normPhone(phone); return p && book ? book.byPhone.get(p) || null : null; };
@@ -111,7 +131,7 @@
     return out;
   }
   const api = { normPhone, cleanName, parseQty, qtyWord, vendorMsg, customerMsg, waLink, telLink, kindText, KIND_DAYS, ago, leftText, daysLeft, needs, groupCall, errText,
-    nameKey, makeBook, bookFind, bookSearch, bookKind, STATUS_TEXT, historyRows };
+    nameKey, makeBook, bookFind, bookSearch, bookKind, STATUS_TEXT, historyRows, BOOK_FILTERS, bookCounts, bookView };
   root.AskerWaitLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -125,11 +145,15 @@
   // + known (the book's entry for the typed number), hist (his requests with that number), picks (names that fit what is typed), nameAuto (the name box was filled by the book)
   let form = null, searchTimer = null, searchSeq = 0, histSeq = 0;
   let book = makeBook([]), bookState = 'none';   // none | loading | ready
+  // «📒 دفتر الأرقام» (owner only): null = closed; {filter, q, shown, sure}
+  let mgr = null;
+  // a staff member (or the owner looking as one): no suppliers, no returns, no book screen; the server holds the line, this hides the buttons
+  const isStaff = () => !!(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
 
   const vendorOf = (id) => data.vendors.find((v) => String(v.id) === String(id));
   const who = (r) => (r.who ? cleanName(r.who) : '');
   const person = (r) => `<bdi class="notr">${esc(who(r) || r.phone)}</bdi>` + (who(r) ? ` · <bdi dir="ltr" class="notr">${esc(r.phone)}</bdi>` : '');
-  const vchip = (r) => (r.vendor ? `<span class="py-pill"><bdi class="notr">${esc(r.vendor)}</bdi>${r.vkind ? ` · <span>${esc(kindText(r.vkind))}</span>` : ''}</span>` : '');
+  const vchip = (r) => (r.vendor && !isStaff() ?`<span class="py-pill"><bdi class="notr">${esc(r.vendor)}</bdi>${r.vkind ? ` · <span>${esc(kindText(r.vkind))}</span>` : ''}</span>` : '');
   const qtySpan = (r) => `<span>${esc(qtyWord(num(r.qty) || 1))}</span>`;
   const tag = (s) => `<span class="py-pill">${esc(s)}</span>`;
 
@@ -150,15 +174,15 @@
       html += `<div class="py-l2">${person(r)} · ${qtySpan(r)}</div><div class="py-acts">` +
         `<a class="py-a on" href="${esc(telLink(r.phone))}" data-wl-called="${esc(r.id)}">اتصل</a>` +
         `<a class="py-a" href="${esc(wa)}" target="_blank" rel="noopener" data-wl-called="${esc(r.id)}">واتساب</a>` +
-        act(r.id, 'delivered', 'اتسلّم', 'py-p') + act(r.id, 'reopen', 'مش وصل لسه') + '</div>';
+        act(r.id, 'delivered', 'اتسلّم', 'py-p') + (isStaff() ? '' : act(r.id, 'reopen', 'مش وصل لسه')) + '</div>';
     }
     return html + '</div>';
   }
   function waitCard(r) {
     return `<div class="py-card"><div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>` +
       `<div class="py-l2">${person(r)} · ${qtySpan(r)} · <span>${esc(ago('اتطلب', r.days))}</span>` + (r.item_id == null ? ` · <span>${esc('صنف مش معروف للسيستم: دوس «وصل» بإيدك')}</span>` : '') + '</div>' +
-      (r.vendor_id == null ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
-      `<div class="py-acts">${act(r.id, 'arrived', 'وصل', 'py-p')}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
+      (r.vendor_id == null && !isStaff() ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
+      `<div class="py-acts">${isStaff() ? '' : act(r.id, 'arrived', 'وصل', 'py-p')}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
   }
   function leftCard(r) {
     const left = r.left_days, hot = left != null && left <= 2;
@@ -178,18 +202,46 @@
     if (!f) return '';
     const k = f.known, rows = historyRows(f.hist, k);
     if (!k && !rows.length) return '';
-    return (k ? `<div class="py-known"><span class="py-ok">✓</span><b><bdi class="notr">${esc(k.name)}</bdi></b>${bookKind(k.kind) ? `<span class="py-pill">${esc(bookKind(k.kind))}</span>` : ''}<span class="py-pill">من دفتر أرقامك</span></div>` : '') +
+    return (k ? `<div class="py-known"><span class="py-ok">✓</span><b><bdi class="notr">${esc(k.name)}</bdi></b>${bookKind(k.kind) ? `<span class="py-pill">${esc(bookKind(k.kind))}</span>` : ''}${k.private ? '<span class="py-pill on">🔒 خاص</span>' : ''}` +
+        (isStaff() ? '' : `<span class="py-pill">من دفتر أرقامك</span><button type="button" class="secondary small py-lock" data-wl-lock="${esc(k.phone)}" data-flag="${k.private ? 0 : 1}">${k.private ? 'افتحه للموظفين' : '🔒 خاص'}</button>`) + '</div>' : '') +
       (rows.length ? `<div class="py-hist"><span class="py-lab">سجل طلباته</span>${rows.map((r) => `<div class="py-hrow"><span dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${r.day ? `<small>${esc(r.day)}</small>` : ''}${r.status ? `<span class="py-pill">${esc(r.status)}</span>` : ''}</div>`).join('')}</div>` : '');
   }
   // the names in the book that fit what he typed in the name box: a tap fills the number too
   const picksHtml = () => (form && form.picks && form.picks.length
-    ? `<div class="py-picks">${form.picks.map((c) => `<button type="button" class="py-pick" data-wl-contact="${esc(c.phone)}"><b><bdi class="notr">${esc(c.name)}</bdi></b><small dir="ltr"><bdi class="notr">${esc(c.phone)}${c.last_item ? ' · ' + esc(c.last_item) : ''}</bdi></small></button>`).join('')}</div>` : '');
+    ? `<div class="py-picks">${form.picks.map((c) => `<button type="button" class="py-pick" data-wl-contact="${esc(c.phone)}"><b><bdi class="notr">${esc(c.name)}</bdi></b><small dir="ltr"><bdi class="notr">${esc(c.phone)}${c.last_item ? ' · ' + esc(c.last_item) : ''}${c.private ? ' · 🔒' : ''}</bdi></small></button>`).join('')}</div>` : '');
   const paintKnown = () => { const el = $('wlKnown'); if (el) el.innerHTML = knownHtml(); };
   const paintPicks = () => { const el = $('wlPicks'); if (el) el.innerHTML = picksHtml(); };
 
+  // ---- «📒 دفتر الأرقام» (owner only): choose who stays private; one tap per number, or all that are shown ----
+  const MGR_STEP = 30;
+  const bkRow = (c) => `<div class="py-hrow py-bk"><span><b><bdi class="notr">${esc(c.name)}</bdi></b><small dir="ltr"><bdi class="notr">${esc(c.phone)}${c.last_item ? ' · ' + esc(c.last_item) : ''}</bdi></small></span>` +
+    (bookKind(c.kind) ? `<span class="py-pill">${esc(bookKind(c.kind))}</span>` : '') + (c.private ? '<span class="py-pill on">🔒 خاص</span>' : '') +
+    `<button type="button" class="${c.private ? 'py-p' : 'secondary'} small" data-wl-lock="${esc(c.phone)}" data-flag="${c.private ? 0 : 1}">${c.private ? 'افتحه' : '🔒 خاص'}</button></div>`;
+  function bkChips() {
+    const c = bookCounts(book);
+    return BOOK_FILTERS.map(([k, label]) => `<button type="button" class="${mgr.filter === k ? 'on' : ''}" data-wl-bkf="${k}">${esc(label)} <span class="notr">${c[k] || 0}</span></button>`).join('');
+  }
+  function bkList() {
+    const m = mgr;
+    if (bookState !== 'ready') return `<p class="hint">${esc(bookState === 'loading' ? 'بحمّل…' : 'الدفتر مش متاح دلوقتي.')}</p>`;
+    const rows = bookView(book, m.filter, m.q), shown = rows.slice(0, m.shown);
+    const flip = rows.filter((c) => c.private !== (m.filter !== 'private')).length;   // what one tap on the bottom button would change (private filter: open them; any other: close the open ones)
+    const label = m.sure ? 'متأكد؟ دوس تاني' : m.filter === 'private' ? 'افتح كل اللي ظاهر' : '🔒 اقفل كل اللي ظاهر';
+    return `<p class="hint"><span>الأرقام الظاهرة</span> <span class="py-num">${rows.length}</span></p>` +
+      (shown.length ? shown.map(bkRow).join('') : `<p class="empty">${esc('مفيش أرقام بالشكل ده.')}</p>`) +
+      (rows.length > shown.length ? '<button type="button" class="secondary small" data-wl-bkmore>عرض أكتر</button>' : '') +
+      (flip ? `<div class="py-acts"><button type="button" class="${m.sure ? 'py-p' : 'secondary'}" data-wl-bkbulk>${esc(label)} <span class="notr">(${flip})</span></button></div>` : '');
+  }
+  const bkHtml = () => '<div class="py-card py-confirm"><div class="py-l1"><b>📒 دفتر الأرقام</b><button type="button" class="secondary small" data-wl-bkclose>إغلاق</button></div>' +
+    '<p class="hint">🔒 خاص: يظهر ليك انت بس، والموظفين ما يشوفوش اسمه ولا رقمه. اللي ما فتحتوش من «غيرهم» لسه خاص.</p>' +
+    `<div class="py-bkf" id="wlBkChips">${bkChips()}</div>` +
+    `<input id="wlBkQ" type="search" placeholder="دوّر بالاسم أو الرقم" aria-label="دوّر بالاسم أو الرقم" value="${esc(mgr.q)}" autocomplete="off" />` +
+    `<div id="wlBkList">${bkList()}</div></div>`;
+  const paintBook = () => { const a = $('wlBkChips'), b = $('wlBkList'); if (a && mgr) a.innerHTML = bkChips(); if (b && mgr) b.innerHTML = bkList(); };
+
   function formHtml() {
-    if (!form) return '<button type="button" class="py-new" data-wl-new>📝 طلب مش موجود</button>';
-    const f = form, v = vendorOf(f.vendor);
+    if (!form) return '<button type="button" class="py-new" data-wl-new>📝 طلب مش موجود</button>' + (isStaff() ? '' : '<button type="button" class="secondary py-bk-open" data-wl-bk>📒 دفتر الأرقام</button>');
+    const f = form, v = isStaff() ? null : vendorOf(f.vendor), staff = isStaff();
     const picked = f.item ? `<div class="py-field"><span dir="ltr"><bdi class="notr">${esc(f.item.name)}</bdi></span><button type="button" class="secondary small" data-wl-unpick>✕</button></div>`
       : `<input id="wlItem" type="search" dir="ltr" placeholder="اسم الدوا (إنجليزي أو عربي)" aria-label="اسم الدوا" value="${esc(f.q)}" autocomplete="off" />` +
         (f.q.trim().length >= 2 ? `<div class="py-picks">${f.results.map((r) => `<button type="button" class="py-pick" data-wl-pick="${esc(r.id)}"><b dir="ltr"><bdi class="notr">${esc(r.name)}</bdi></b>${r.arabic_name ? `<small>${esc(r.arabic_name)}</small>` : ''}</button>`).join('')}` +
@@ -200,16 +252,17 @@
       `<div id="wlKnown">${knownHtml()}</div>` +
       `<input id="wlName" type="text" placeholder="اسم العميل (اختياري)" aria-label="اسم العميل" maxlength="80" autocomplete="off" value="${esc(f.name)}" />` +
       `<div id="wlPicks">${picksHtml()}</div>` +
-      `<span class="py-lab">المورد اللي هتبعتله</span>${vendorSelect('id="wlVendor"', f.vendor)}` +
+      (staff ? '' : `<span class="py-lab">المورد اللي هتبعتله</span>${vendorSelect('id="wlVendor"', f.vendor)}`) +
       (v && !v.kind ? `<span class="py-lab">المورد ده مخزن ولا مركز توزيع؟ (مرة واحدة بس)</span><div class="py-seg" style="grid-template-columns:1fr 1fr"><button type="button" class="${f.kind === 'warehouse' ? 'on' : ''}" data-wl-kind="warehouse">مخزن · رجوع 30 يوم</button><button type="button" class="${f.kind === 'center' ? 'on' : ''}" data-wl-kind="center">مركز توزيع · رجوع 7 أيام</button></div>` : '') +
       (f.msg ? `<p class="status bad" id="wlMsg">${esc(f.msg)}</p>` : '') +
-      `<div class="py-acts"><button type="button" class="py-p" data-wl-save="copy"${busy ? ' disabled' : ''}>سجّل وانسخ رسالة المورد</button><button type="button" class="secondary" data-wl-save="only"${busy ? ' disabled' : ''}>سجّل بس</button><button type="button" class="secondary" data-wl-close>إلغاء</button></div></div>`;
+      `<div class="py-acts">${staff ? '' : `<button type="button" class="py-p" data-wl-save="copy"${busy ? ' disabled' : ''}>سجّل وانسخ رسالة المورد</button>`}<button type="button" class="${staff ? 'py-p' : 'secondary'}" data-wl-save="only"${busy ? ' disabled' : ''}>سجّل بس</button><button type="button" class="secondary" data-wl-close>إلغاء</button></div></div>`;
   }
 
   function draw() {
     const main = $('wlMain'), fm = $('wlForm');
     if (!main || !fm) return;
-    fm.innerHTML = formHtml();
+    fm.innerHTML = mgr ? bkHtml() : formHtml();
+    main.hidden = !!mgr;
     let html = lastMsg ? `<div class="py-card"><textarea readonly rows="4" dir="rtl" aria-label="رسالة المورد">${esc(lastMsg)}</textarea></div>` : '';
     const groups = groupCall(data.call);
     if (groups.length) html += head('📞 كلّم دول', data.call.length) + groups.map(callCard).join('');
@@ -290,16 +343,32 @@
     if (bookState !== 'none' || !db()) return;
     bookState = 'loading';
     try {
-      let all = [];
+      let all = [], cols = 'phone,name,kind,last_item,private';
       for (let from = 0; from < 20000; from += 1000) {
-        const { data: rows, error } = await db().from('ar_contacts').select('phone,name,kind,last_item').order('phone').range(from, from + 999);
+        let { data: rows, error } = await db().from('ar_contacts').select(cols).order('phone').range(from, from + 999);
+        // the «private» column comes with migration 202611201500: until it is applied the book loads without it
+        if (error && cols.includes('private') && /private/i.test(String(error.message))) { cols = 'phone,name,kind,last_item'; ({ data: rows, error } = await db().from('ar_contacts').select(cols).order('phone').range(from, from + 999)); }
         if (error) throw error;
         all = all.concat(rows || []);
         if (!rows || rows.length < 1000) break;
       }
       book = makeBook(all); bookState = 'ready';
-    } catch (e) { bookState = 'none'; return; }   // the table is not there yet (or not the owner): the form works as before
+    } catch (e) { bookState = 'none'; if (mgr) draw(); return; }   // the table is not there yet (or no right to it): the form works as before
     if (form) { readForm(); onPhone(); onName(); }
+    if (mgr) paintBook();
+  }
+  // mark numbers private (true) or open (false): one or many at once, the server (owner only) does it; the local book follows
+  async function setPrivate(phones, flag) {
+    if (!phones.length || busy || isStaff()) return;
+    busy = true;
+    try {
+      await rpc('ar_contacts_private', { p_phones: phones, p_private: flag });
+      for (const p of phones) { const c = book.byPhone.get(p); if (c) c.private = flag; }
+      note = '';
+    } catch (e) { note = 'ماتغيّرش: ' + (e && e.message ? e.message : ''); }
+    busy = false;
+    if (mgr) { mgr.sure = false; paintBook(); } else { paintKnown(); paintPicks(); }
+    const st = $('wlStatus'); if (st) st.textContent = note;
   }
   // his requests so far with this number (the system keeps them in ar_waitlist); shown under the name
   async function loadHist(phone) {
@@ -395,6 +464,7 @@
       if (e.target.id === 'wlItem' && form) { form.q = e.target.value; clearTimeout(searchTimer); searchTimer = setTimeout(search, 250); }
       else if (e.target.id === 'wlPhone' && form) { form.phone = e.target.value; onPhone(); }
       else if (e.target.id === 'wlName' && form) { form.name = e.target.value; form.nameAuto = false; onName(); }
+      else if (e.target.id === 'wlBkQ' && mgr) { mgr.q = e.target.value; mgr.shown = MGR_STEP; mgr.sure = false; paintBook(); }
     });
     panel.addEventListener('change', (e) => {
       const t = e.target;
@@ -402,9 +472,21 @@
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-bk],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
       if (!t) return;
       const d = t.dataset;
+      // the number book screen and the «🔒 خاص» marks (owner only)
+      if ('wlBk' in d) { if (!isStaff()) { form = null; note = ''; mgr = { filter: 'other', q: '', shown: MGR_STEP, sure: false }; loadBook(); draw(); } return; }
+      if ('wlBkclose' in d) { mgr = null; draw(); return; }
+      if ('wlBkf' in d) { if (mgr) { mgr.filter = d.wlBkf; mgr.shown = MGR_STEP; mgr.sure = false; paintBook(); } return; }
+      if ('wlBkmore' in d) { if (mgr) { mgr.shown += MGR_STEP; paintBook(); } return; }
+      if ('wlLock' in d) { setPrivate([d.wlLock], d.flag === '1'); return; }
+      if ('wlBkbulk' in d) {
+        if (!mgr) return;
+        const flag = mgr.filter !== 'private', todo = bookView(book, mgr.filter, mgr.q).filter((c) => c.private !== flag).map((c) => c.phone);
+        if (!mgr.sure) { mgr.sure = true; paintBook(); return; }   // marking many is a second tap
+        setPrivate(todo, flag); return;
+      }
       if ('wlNew' in d) { note = ''; lastMsg = ''; form = { item: null, q: '', results: [], phone: '', name: '', qty: '', vendor: '', kind: '', msg: '', known: null, hist: [], picks: [], nameAuto: false }; draw(); $('wlItem')?.focus(); loadBook(); return; }
       if ('wlClose' in d) { form = null; draw(); return; }
       if ('wlCalled' in d) { rpc('ar_waitlist_set', { p_id: Number(d.wlCalled), p_action: 'called' }).then(() => setTimeout(load, 800), () => {}); return; }

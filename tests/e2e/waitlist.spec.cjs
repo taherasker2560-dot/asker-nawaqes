@@ -210,23 +210,154 @@ run('Waiting list: the number book (owner 2026-11-20): a number shows the name a
  assert.match(await txt(page,'#wlKnown'),/^✓ عميل ١٢٦ نقدي/);
 });
 
+run('Waiting list: «📒 دفتر الأرقام» (owner 2026-11-20): the filters, the search, one tap marks a number private, all that are shown with a second tap, the mark in the request form; and the staff view',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  window.__tables.ar_contacts=[
+   {phone:'01001234567',name:'عميل ١٢١',kind:'cash',last_item:'Entresto',private:false},
+   {phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false},
+   {phone:'01112223334',name:'اخويا',kind:'other',last_item:null,private:true},
+   {phone:'01223334445',name:'ماما',kind:'other',last_item:null,private:true},
+   {phone:'01334445556',name:'سيد النجار',kind:'other',last_item:null,private:false},
+   {phone:'01445556667',name:'سيد المصرى',kind:'other',last_item:null,private:false}];
+  window.__fakeRpcs.ar_contacts_private=(a)=>{window.__wl.calls.push(['private',a.p_phones,a.p_private]);for(const r of window.__tables.ar_contacts)if(a.p_phones.includes(r.phone))r.private=a.p_private;return a.p_phones.length};
+ });
+ await open(page);
+ assert.ok(await page.isVisible('[data-wl-bk]'),'the owner has the book button');
+ await page.click('[data-wl-bk]');
+ await page.waitForSelector('#wlBkList .py-bk');
+ assert.ok(!(await page.isVisible('#wlMain')),'the lists give way to the book');
+ const chips=()=>texts(page,'#wlBkChips button');
+ assert.deepEqual(await chips(),['الكل 6','نقدي 1','له حساب 1','غيرهم 4','🔒 خاص 2']);
+ assert.equal(await page.getAttribute('#wlBkChips button.on','data-wl-bkf'),'other','it opens on «غيرهم»');
+ const rows=()=>page.$$eval('#wlBkList .py-bk [data-wl-lock]',(b)=>b.map((x)=>x.dataset.wlLock).sort());
+ assert.deepEqual(await rows(),['01112223334','01223334445','01334445556','01445556667']);
+ // one tap on a number that is open: private; the counts and the row follow, the server is told
+ await page.click('[data-wl-lock="01334445556"]');
+ await page.waitForFunction(()=>window.__wl.calls.some(c=>c[0]==='private'),null,{timeout:5000});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='private'),[['private',['01334445556'],true]]);
+ await page.waitForFunction(()=>/خاص 3/.test(document.getElementById('wlBkChips').textContent),null,{timeout:5000});
+ assert.deepEqual(await chips(),['الكل 6','نقدي 1','له حساب 1','غيرهم 4','🔒 خاص 3']);
+ assert.match((await texts(page,'#wlBkList .py-bk:has([data-wl-lock="01334445556"])'))[0],/سيد النجار 01334445556 🔒 خاص افتحه$/);
+ // the private filter and a word
+ await page.click('[data-wl-bkf="private"]');
+ assert.deepEqual(await rows(),['01112223334','01223334445','01334445556']);
+ await page.fill('#wlBkQ','ماما');
+ assert.deepEqual(await rows(),['01223334445']);
+ // another tap opens it again
+ await page.click('[data-wl-lock="01223334445"]');
+ await page.waitForFunction(()=>window.__wl.calls.filter(c=>c[0]==='private').length===2,null,{timeout:5000});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='private')[1],['private',['01223334445'],false]);
+ assert.deepEqual(await rows(),[],'opened: it left the «خاص» filter');
+ await page.click('[data-wl-bkf="all"]');
+ await page.click('[data-wl-lock="01223334445"]');   // and private again
+ await page.waitForFunction(()=>window.__wl.calls.filter(c=>c[0]==='private').length===3,null,{timeout:5000});
+ // all that are shown: a word under «غيرهم»; the button counts what it would change; the first tap asks, the second does it
+ await page.fill('#wlBkQ','');await page.click('[data-wl-bkf="other"]');await page.fill('#wlBkQ','سيد');
+ assert.deepEqual(await rows(),['01334445556','01445556667']);
+ assert.equal((await txt(page,'[data-wl-bkbulk]')),'🔒 اقفل كل اللي ظاهر (1)','only the open one would change');
+ await page.click('[data-wl-bkbulk]');
+ assert.equal((await txt(page,'[data-wl-bkbulk]')),'متأكد؟ دوس تاني (1)');
+ assert.equal((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='private').length,3,'the first tap asks, nothing is sent');
+ await page.click('[data-wl-bkbulk]');
+ await page.waitForFunction(()=>window.__wl.calls.filter(c=>c[0]==='private').length===4,null,{timeout:5000});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='private')[3],['private',['01445556667'],true]);
+ await page.waitForFunction(()=>!document.querySelector('[data-wl-bkbulk]'),null,{timeout:5000});
+ await page.fill('#wlBkQ','');await page.click('[data-wl-bkf="all"]');
+ assert.equal((await rows()).length,6,'the six in the book');
+ await page.click('[data-wl-bkclose]');
+ assert.ok(await page.isVisible('#wlMain')&&await page.isVisible('[data-wl-new]'),'closed: the lists are back');
+ // the mark in the request form: his brother's number shows the name, 🔒 خاص, and a button to open it to the staff
+ await page.click('[data-wl-new]');
+ await page.fill('#wlPhone','01112223334');
+ await page.waitForFunction(()=>document.getElementById('wlName').value==='اخويا',null,{timeout:5000});
+ assert.match(await txt(page,'#wlKnown'),/^✓ اخويا 🔒 خاص من دفتر أرقامك افتحه للموظفين/);
+ await page.click('#wlKnown [data-wl-lock]');
+ await page.waitForFunction(()=>/🔒 خاص$/.test(document.querySelector('#wlKnown [data-wl-lock]').textContent.trim()),null,{timeout:5000});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='private').slice(-1),[['private',['01112223334'],false]]);
+ assert.doesNotMatch(await txt(page,'#wlKnown'),/^✓ اخويا 🔒/,'open now: no private pill');
+ assert.equal(await page.inputValue('#wlPhone'),'01112223334','what he typed stays');
+ await page.click('[data-wl-close]');
+
+ // the staff view: no book button, no supplier, no copy button, no «arrived» / «reopen» / return decisions; the server sends none of the suppliers or leftovers to him
+ await page.evaluate(()=>{window.__wl.left=[];window.__wl.vendors=[];window.AskerStaff.isStaff=()=>true;return window.AskerWait.open()});
+ await page.waitForFunction(()=>!document.querySelector('#wlMain [data-wl-act="returned"]'),null,{timeout:5000});
+ assert.ok(!(await page.$('[data-wl-bk]')),'no book button for staff');
+ assert.ok(await page.isVisible('[data-wl-new]'));
+ assert.ok(await page.$('[data-wl-act="delivered"]'),'he hands it over');
+ assert.ok(!(await page.$('[data-wl-act="reopen"]')),'no «مش وصل لسه» for staff');
+ assert.ok(await page.$('[data-wl-act="cancelled"]'),'he can cancel a request');
+ assert.ok(!(await page.$('[data-wl-act="arrived"]')),'no «وصل» by hand for staff');
+ assert.ok(!(await page.$('select[data-wl-vendor]')),'no supplier choice');
+ assert.doesNotMatch(await txt(page,'#waitPanel'),/المتحدة للأدوية|مركز توزيع النور|قرار الرجوع/,'no supplier names, no returns decisions');
+ await page.click('[data-wl-new]');
+ assert.ok(!(await page.$('#wlVendor')),'no supplier in the form');
+ assert.ok(!(await page.$('[data-wl-save="copy"]')),'no supplier message to copy');
+ await page.fill('#wlItem','augm');await page.waitForSelector('[data-wl-pick="5"]');await page.click('[data-wl-pick="5"]');
+ await page.fill('#wlPhone','01061287937');
+ await page.waitForFunction(()=>document.getElementById('wlName').value==='احمد الطنطاوى',null,{timeout:5000});
+ assert.ok(!(await page.$('#wlKnown [data-wl-lock]')),'no private mark for staff');
+ assert.doesNotMatch(await txt(page,'#wlKnown'),/من دفتر أرقامك/);
+ await page.click('[data-wl-save="only"]');
+ await page.waitForFunction(()=>window.__wl.calls.some(c=>c[0]==='add'),null,{timeout:5000});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='add')[0][1],{p_item_id:5,p_item_name:'AUGMENTIN 1GM 14 TAB',p_phone:'01061287937',p_name:'احمد الطنطاوى',p_qty:1,p_vendor_id:null});
+});
+
+run('Waiting list: the book shows 30 numbers at a time and «عرض أكتر» shows more; marking all that are shown sends them all',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  window.__tables.ar_contacts=Array.from({length:70},(_,i)=>({phone:'0155'+String(1000000+i),name:'شخص '+String(100+i),kind:'other',last_item:null,private:false}));
+  window.__fakeRpcs.ar_contacts_private=(a)=>{window.__wl.calls.push(['private',a.p_phones,a.p_private]);for(const r of window.__tables.ar_contacts)if(a.p_phones.includes(r.phone))r.private=a.p_private;return a.p_phones.length};
+ });
+ await open(page);
+ await page.click('[data-wl-bk]');
+ await page.waitForSelector('#wlBkList .py-bk');
+ const n=()=>page.$$eval('#wlBkList .py-bk',(x)=>x.length);
+ assert.equal(await n(),30);
+ assert.equal(await txt(page,'#wlBkList .hint'),'الأرقام الظاهرة 70');
+ await page.click('[data-wl-bkmore]');assert.equal(await n(),60);
+ await page.click('[data-wl-bkmore]');assert.equal(await n(),70);
+ assert.ok(!(await page.$('[data-wl-bkmore]')),'nothing more to show');
+ // all 70 are open: «اقفل كل اللي ظاهر (70)», a second tap sends all 70 once
+ assert.equal(await txt(page,'[data-wl-bkbulk]'),'🔒 اقفل كل اللي ظاهر (70)');
+ await page.click('[data-wl-bkbulk]');await page.click('[data-wl-bkbulk]');
+ await page.waitForFunction(()=>window.__wl.calls.some(c=>c[0]==='private'),null,{timeout:5000});
+ const c=(await page.evaluate(()=>window.__wl.calls)).filter(x=>x[0]==='private');
+ assert.equal(c.length,1);assert.equal(c[0][1].length,70);assert.equal(c[0][2],true);
+ await page.waitForFunction(()=>/🔒 خاص 70/.test(document.getElementById('wlBkChips').textContent),null,{timeout:5000});
+ // changing the filter or the word clears a half-done «متأكد؟»
+ await page.click('[data-wl-bkf="private"]');
+ assert.equal(await txt(page,'[data-wl-bkbulk]'),'افتح كل اللي ظاهر (70)');
+ await page.click('[data-wl-bkbulk]');assert.equal(await txt(page,'[data-wl-bkbulk]'),'متأكد؟ دوس تاني (70)');
+ await page.fill('#wlBkQ','شخص 105');
+ assert.equal(await txt(page,'[data-wl-bkbulk]'),'افتح كل اللي ظاهر (1)','the word changed: the question starts again');
+});
+
 run('Waiting list in English: no Arabic left on the screen except names, and the words read right',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
  await page.reload();
  await page.waitForSelector('[data-group="purchases"]');
  await seed(page);
+ await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false},{phone:'01112223334',name:'اخويا',kind:'other',last_item:null,private:true}]});
  await open(page);
  await page.click('[data-wl-new]');
  await page.selectOption('#wlVendor','11');
- const left=await page.evaluate(()=>{
+ const scan=()=>page.evaluate(()=>{
   const p=document.getElementById('waitPanel'),AR=/[؀-ۿ]/,out=[];
   const w=document.createTreeWalker(p,NodeFilter.SHOW_TEXT);let n;
   while((n=w.nextNode())){const e=n.parentElement;if(AR.test(n.nodeValue)&&!e.closest('.notr,textarea,option'))out.push(n.nodeValue.trim())}
   for(const el of p.querySelectorAll('[placeholder],[aria-label]'))for(const a of ['placeholder','aria-label'])if(AR.test(el.getAttribute(a)||''))out.push(a+': '+el.getAttribute(a));
   return out});
+ const left=await scan();
  assert.deepEqual(left,[],'Arabic left: '+left.join(' | '));
  const all=await txt(page,'#waitPanel');
  for(const s of ['Waiting list','Call these','Waiting for the medicine','Return or keep','1 day left to return','Sold in the last year: 3.5 packs','Set the supplier kind to see the return deadline','Arrived 22 days ago','Asked 2 days ago','Put it on the waiting shelf','Is this supplier a warehouse or a distribution center? (once only)'])assert.ok(all.includes(s),'missing in English: '+s);
+ // the number book screen in English too
+ await page.click('[data-wl-close]');await page.click('[data-wl-bk]');await page.waitForSelector('#wlBkList .py-bk');
+ const left2=await scan();
+ assert.deepEqual(left2,[],'Arabic left in the book: '+left2.join(' | '));
+ assert.deepEqual(await texts(page,'#wlBkChips button'),['All 2','Cash 0','Has an account 1','Others 1','🔒 Private 1']);
+ assert.match(await txt(page,'#waitPanel'),/Numbers shown 1/);
 });
 
 run('Waiting list: when nobody is waiting the home asks the server nothing (no call, nothing written)',async({page})=>{

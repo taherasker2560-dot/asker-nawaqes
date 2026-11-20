@@ -296,7 +296,7 @@
     // «💸 المدفوعات» (ar/pay.js, owner 2026-11-19): payment orders from the boxes; owner only
     $('payPanel')?.classList.toggle('hidden', tab !== 'pay');
     if (tab === 'pay') window.AskerPay?.open();
-    // «📝 الانتظار» (ar/waitlist.js, owner 2026-11-19): medicines customers asked for that the pharmacy did not have; owner only
+    // «📝 الانتظار» (ar/waitlist.js, owner 2026-11-19): medicines customers asked for that the pharmacy did not have; the owner, and a staff member with the `wait` switch (2026-11-20)
     $('waitPanel')?.classList.toggle('hidden', tab !== 'wait');
     if (tab === 'wait') window.AskerWait?.open();
     // «العمليات» (ar/ops.js, owner 2026-11-15): what Adam recorded by voice
