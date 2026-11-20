@@ -83,6 +83,39 @@ assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
   assert.deepEqual(W.historyRows([], null), []);
 }
 
+// ---- «📒 دفتر الأرقام» (owner 2026-11-20): who stays private; the filters, the counts, the search ----
+{
+  const bk = W.makeBook([
+    { phone: '01001234567', name: 'عميل ١٢١', kind: 'cash', last_item: 'Entresto', private: false },
+    { phone: '01061287937', name: 'احمد الطنطاوى', kind: 'account', last_item: null, private: false },
+    { phone: '01112223334', name: 'أحمد اخويا', kind: 'other', last_item: null, private: true },
+    { phone: '01223334445', name: 'ماما', kind: 'other', last_item: null, private: true },
+    { phone: '01334445556', name: 'سيد النجار', kind: 'other', last_item: null, private: false },
+    { phone: '447710173736', name: 'خارجي', kind: 'other', last_item: null },   // no «private» column yet (before the migration): open
+  ]);
+  assert.deepEqual(W.makeBook([{ phone: '01001234567', name: 'x' }]).list[0].private, false, 'no column = not private');
+  assert.deepEqual(W.bookCounts(bk), { all: 6, cash: 1, account: 1, other: 4, private: 2 });
+  assert.deepEqual(W.bookCounts(null), { all: 0, cash: 0, account: 0, other: 0, private: 0 });
+  assert.deepEqual(W.BOOK_FILTERS.map((f) => f[0]), ['all', 'cash', 'account', 'other', 'private']);
+  const ph = (f, q) => W.bookView(bk, f, q).map((c) => c.phone);
+  assert.equal(ph('all', '').length, 6, 'all of them');
+  assert.deepEqual(ph('cash', ''), ['01001234567']); assert.deepEqual(ph('account', ''), ['01061287937']);
+  assert.deepEqual(ph('other', '').sort(), ['01112223334', '01223334445', '01334445556', '447710173736']);
+  assert.deepEqual(ph('private', '').sort(), ['01112223334', '01223334445'], 'private: only the marked ones');
+  assert.deepEqual(ph('all', 'احمد').sort(), ['01061287937', '01112223334'], 'a word: أ/ا are the same');
+  assert.deepEqual(ph('private', 'احمد'), ['01112223334'], 'the filter and the word together');
+  assert.deepEqual(ph('all', '0133'), ['01334445556'], 'digits only: part of a number');
+  assert.deepEqual(ph('all', '+20 133'), [], 'a plus sign is not part of the stored number (01…): nothing, not everything');
+  assert.deepEqual(ph('all', 'عميل 121'), ['01001234567'], '«121» finds «١٢١»');
+  assert.deepEqual(ph('other', 'zzz'), []);
+  // sorted by name, so he can run down the list
+  const names = W.bookView(bk, 'all', '').map((c) => c.name);
+  assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, 'ar')));
+  // marking one in the local book: the filters follow
+  bk.byPhone.get('01334445556').private = true;
+  assert.equal(W.bookCounts(bk).private, 3); assert.equal(ph('private', '').length, 3);
+}
+
 // ---- English: every text the screen draws, fixed and built, comes out with no Arabic left ----
 global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
@@ -96,6 +129,8 @@ for (const s of ['الانتظار', '📝 الانتظار', '📝 طلب مش 
   'اتسجّل.', 'الطلب ده كان مسجّل قبل كده.', 'اتسجّل. رسالة المورد اتنسخت، ابعتها من واتساب.', 'الطلب ده كان مسجّل قبل كده. رسالة المورد اتنسخت، ابعتها من واتساب.',
   'اتسجّل. ماقدرتش أنسخ الرسالة، انسخها بإيدك من تحت.', 'الطلب ده كان مسجّل قبل كده. ماقدرتش أنسخ الرسالة، انسخها بإيدك من تحت.',
   'من دفتر أرقامك', 'سجل طلباته', 'نقدي', 'له حساب', 'قديم', 'مستني', 'اتلغى', 'اتحفظ', 'رجع للمورد',
+  '📒 دفتر الأرقام', '🔒 خاص', 'افتحه للموظفين', 'افتحه', 'غيرهم', 'الكل', 'إغلاق', 'عرض أكتر', 'الأرقام الظاهرة', 'دوّر بالاسم أو الرقم', 'الدفتر مش متاح دلوقتي.', 'مفيش أرقام بالشكل ده.', 'افتح كل اللي ظاهر', '🔒 اقفل كل اللي ظاهر',
+  '🔒 خاص: يظهر ليك انت بس، والموظفين ما يشوفوش اسمه ولا رقمه. اللي ما فتحتوش من «غيرهم» لسه خاص.', 'الانتظار (طلب مش موجود، وكلّم دول)', 'طلبات الانتظار', 'دفتر الأرقام',
   'مقدرتش أحمّل الانتظار: boom', 'ماتغيّرش: boom', 'دوا وصل لعملاء مستنيينه: كلّمهم', 'دوا ميعاد رجوعه للمورد قرب (يومين أو أقل)']) check(s);
 for (const e of ['item', 'name', 'phone', 'qty', 'vendor', 'kind', 'state', 'missing', 'action']) check(W.errText(e));
 for (const n of [0, 1, 2, 5, 11]) { check(W.ago('وصل', n)); check(W.ago('اتطلب', n)); }
