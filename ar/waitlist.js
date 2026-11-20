@@ -40,6 +40,18 @@
   const qtyWord = (q) => (q === 1 ? 'علبة' : q === 2 ? 'علبتين' : `${q} علب`);
   // the message he sends to the supplier (copied, never sent by itself): no customer's name or number in it
   const vendorMsg = (item, qty) => `السلام عليكم\nمحتاج ${qtyWord(num(qty) || 1)} ${item} لو متوفر.\nابعتلي السعر والخصم.\nشكرًا.`;
+  // the waiting requests of ONE supplier as one list (owner 2026-11-20: a WhatsApp for the waiting items to the supplier's telesales): the same item once with the quantities added; the customer's name and number are never in it
+  function waitingList(rows) {
+    const at = new Map(), out = [];
+    for (const r of rows || []) {
+      const key = r.item_id != null ? 'i' + r.item_id : 't' + String(r.item || '').toLowerCase();
+      let e = at.get(key);
+      if (!e) { e = { item: r.item, qty: 0 }; at.set(key, e); out.push(e); }
+      e.qty += num(r.qty) || 1;
+    }
+    return out;
+  }
+  const vendorListMsg = (items) => `السلام عليكم\nمحتاج:\n${items.map((x, i) => `${i + 1}) ${qtyWord(num(x.qty) || 1)} ${x.item}`).join('\n')}\nابعتلي السعر والخصم.\nشكرًا.`;
   // the message to the customer when it is here (a WhatsApp link: he presses send)
   const customerMsg = (item) => `أهلًا بحضرتك، الدوا اللي سألت عليه (${item}) وصل في الصيدلية. تقدر تعدّي تاخده. شكرًا.`;
   const waLink = (phone, text) => `https://wa.me/2${phone}?text=${encodeURIComponent(text)}`;
@@ -130,7 +142,7 @@
     if (known && known.last_item) out.push({ item: known.last_item, day: '', status: 'قديم' });
     return out;
   }
-  const api = { normPhone, cleanName, parseQty, qtyWord, vendorMsg, customerMsg, waLink, telLink, kindText, KIND_DAYS, ago, leftText, daysLeft, needs, groupCall, errText,
+  const api = { normPhone, cleanName, parseQty, qtyWord, vendorMsg, waitingList, vendorListMsg, customerMsg, waLink, telLink, kindText, KIND_DAYS, ago, leftText, daysLeft, needs, groupCall, errText,
     nameKey, makeBook, bookFind, bookSearch, bookKind, STATUS_TEXT, historyRows, BOOK_FILTERS, bookCounts, bookView };
   root.AskerWaitLib = api;
   if (typeof module !== 'undefined') module.exports = api;
@@ -184,7 +196,17 @@
     return `<div class="py-card"><div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>` +
       `<div class="py-l2">${person(r)} · ${qtySpan(r)} · <span>${esc(ago('اتطلب', r.days))}</span>` + (r.item_id == null ? ` · <span>${esc('صنف مش معروف للسيستم: دوس «وصل» بإيدك')}</span>` : '') + '</div>' +
       (r.vendor_id == null && !isStaff() ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
-      `<div class="py-acts">${isStaff() ? '' : act(r.id, 'arrived', 'وصل', 'py-p')}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
+      `<div class="py-acts">${isStaff() ? '' : act(r.id, 'arrived', 'وصل', 'py-p')}${teleBtn(r)}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
+  }
+  // «📲 ابعت للتليسيلز»: the supplier of this request has a telesales number saved (ar/vendors.js): WhatsApp opens on it with the request ready (owner only)
+  const teleOf1 = (r) => (isStaff() || r.vendor_id == null ? null : vnums.get(String(r.vendor_id)) || null);
+  const teleBtn = (r) => (teleOf1(r) ? `<button type="button" class="secondary small" data-wl-tele="${esc(r.id)}">📲 ابعت للتليسيلز</button>` : '');
+  // one button per supplier that has two or more different waiting items: ONE message with the whole list
+  function teleGroupsHtml() {
+    const by = new Map();
+    for (const r of data.waiting) if (teleOf1(r)) { if (!by.has(String(r.vendor_id))) by.set(String(r.vendor_id), []); by.get(String(r.vendor_id)).push(r); }
+    const btns = [...by.entries()].filter(([, rows]) => waitingList(rows).length >= 2).map(([vid, rows]) => `<button type="button" class="secondary small" data-wl-telegroup="${esc(vid)}"><span>📲 ابعت كل المستنيين لـ</span> <bdi class="notr">${esc(rows[0].vendor || vid)}</bdi> <span class="py-num">${waitingList(rows).length}</span></button>`);
+    return btns.length ? `<div class="py-acts">${btns.join('')}</div>` : '';
   }
   function leftCard(r) {
     const left = r.left_days, hot = left != null && left <= 2;
@@ -319,23 +341,40 @@
       if (error) throw error;
       vnums = new Map((rows || []).map((r) => [String(r.vendor_id), { phone: String(r.phone), name: r.name || '' }]));
     } catch (e) { vnums = new Map(); /* the table is not there yet: the form works as before */ }
-    vnumsState = 'ready'; paintActs();
+    vnumsState = 'ready'; paintActs(); drawLists();   // the buttons of the waiting cards need the numbers too
+  }
+  // «📲 ابعت للتليسيلز»: one request, or one supplier's whole waiting list as ONE message; WhatsApp opens on his telesales number with it ready, he presses send (a list too long for a link is copied and the chat opens bare)
+  function sendTele(vendorId, rows) {
+    const tele = vnums.get(String(vendorId));
+    if (!tele || !rows.length) return;
+    const items = waitingList(rows), msg = items.length === 1 ? vendorMsg(items[0].item, items[0].qty) : vendorListMsg(items), long = msg.length > 3000;
+    if (long) copy(msg);
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(long ? '' : msg, tele.phone);
+    else root.open('https://wa.me/' + (/^01\d{9}$/.test(tele.phone) ? '2' : '') + tele.phone + (long ? '' : '?text=' + encodeURIComponent(msg)), '_blank');
+    note = long ? 'الرسالة طويلة: اتنسخت، الزقها في المحادثة اللي اتفتحت.' : 'اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.';
+    const st = $('wlStatus'); if (st) st.textContent = note;
   }
 
   function draw() {
-    const main = $('wlMain'), fm = $('wlForm');
-    if (!main || !fm) return;
+    const fm = $('wlForm');
+    if (!$('wlMain') || !fm) return;
     fm.innerHTML = mgr ? bkHtml() : formHtml();
+    drawLists();
+    const st = $('wlStatus');
+    if (st) { st.textContent = note || (loading ? 'بحمّل…' : ''); st.className = 'status'; }
+  }
+  // the lists under the form (called alone when only they change, so what is typed in the form stays)
+  function drawLists() {
+    const main = $('wlMain');
+    if (!main) return;
     main.hidden = !!mgr;
     let html = lastMsg ? `<div class="py-card"><textarea readonly rows="4" dir="rtl" aria-label="رسالة المورد">${esc(lastMsg)}</textarea></div>` : '';
     const groups = groupCall(data.call);
     if (groups.length) html += head('📞 كلّم دول', data.call.length) + groups.map(callCard).join('');
-    if (data.waiting.length) html += head('مستنيين الدوا', data.waiting.length) + data.waiting.map(waitCard).join('');
+    if (data.waiting.length) html += head('مستنيين الدوا', data.waiting.length) + teleGroupsHtml() + data.waiting.map(waitCard).join('');
     if (data.leftover.length) html += head('↩️ قرار الرجوع', data.leftover.length) + '<p class="hint">اللي وصل وما اتسلّمش. الأقرب ميعادًا فوق. القرار ليك: السيستم بيعرض الأرقام بس.</p>' + data.leftover.map(leftCard).join('');
     if (!html) html = loaded ? '<p class="empty">مفيش طلبات انتظار دلوقتي. لما عميل يسأل على دوا مش موجود، دوس «طلب مش موجود».</p>' : '';
     main.innerHTML = html;
-    const st = $('wlStatus');
-    if (st) { st.textContent = note || (loading ? 'بحمّل…' : ''); st.className = 'status'; }
   }
 
   // keep = the sentence from the action that just ran stays on the screen (a refresh by hand clears it)
@@ -542,12 +581,14 @@
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-bk],[data-wl-applink],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
       if (!t) return;
       const d = t.dataset;
       // the number book screen and the «🔒 خاص» marks (owner only)
       if ('wlBk' in d) { if (!isStaff()) { form = null; note = ''; mgr = { filter: 'other', q: '', shown: MGR_STEP, sure: false }; loadBook(); draw(); loadPhoneApp(); } return; }
       if ('wlApplink' in d) { linkApp(); return; }
+      if ('wlTele' in d) { const r = data.waiting.find((x) => String(x.id) === d.wlTele); if (r) sendTele(r.vendor_id, [r]); return; }
+      if ('wlTelegroup' in d) { sendTele(d.wlTelegroup, data.waiting.filter((x) => String(x.vendor_id) === d.wlTelegroup)); return; }
       if ('wlBkclose' in d) { mgr = null; draw(); return; }
       if ('wlBkf' in d) { if (mgr) { mgr.filter = d.wlBkf; mgr.shown = MGR_STEP; mgr.sure = false; paintBook(); } return; }
       if ('wlBkmore' in d) { if (mgr) { mgr.shown += MGR_STEP; paintBook(); } return; }
@@ -578,7 +619,7 @@
     });
   }
 
-  function open() { bind(); load(); }
+  function open() { bind(); load(); vnumsState = 'none'; loadVNums(); }
   // the numbers for the home (ar/notify.js): this also marks what the stock list shows as arrived
   async function counts() {
     if (!db()) return null;
