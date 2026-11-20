@@ -147,6 +147,8 @@
   let book = makeBook([]), bookState = 'none';   // none | loading | ready
   // «📒 دفتر الأرقام» (owner only): null = closed; {filter, q, shown, sure}
   let mgr = null;
+  // the telesales number of each supplier company (owner 2026-11-20, ar/vendors.js keeps them): «سجّل وابعت للتليسيلز» opens WhatsApp on it; vendor_id → {phone, name}
+  let vnums = new Map(), vnumsState = 'none';
   // a staff member (or the owner looking as one): no suppliers, no returns, no book screen; the server holds the line, this hides the buttons
   const isStaff = () => !!(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
 
@@ -255,7 +257,27 @@
       (staff ? '' : `<span class="py-lab">المورد اللي هتبعتله</span>${vendorSelect('id="wlVendor"', f.vendor)}`) +
       (v && !v.kind ? `<span class="py-lab">المورد ده مخزن ولا مركز توزيع؟ (مرة واحدة بس)</span><div class="py-seg" style="grid-template-columns:1fr 1fr"><button type="button" class="${f.kind === 'warehouse' ? 'on' : ''}" data-wl-kind="warehouse">مخزن · رجوع 30 يوم</button><button type="button" class="${f.kind === 'center' ? 'on' : ''}" data-wl-kind="center">مركز توزيع · رجوع 7 أيام</button></div>` : '') +
       (f.msg ? `<p class="status bad" id="wlMsg">${esc(f.msg)}</p>` : '') +
-      `<div class="py-acts">${staff ? '' : `<button type="button" class="py-p" data-wl-save="copy"${busy ? ' disabled' : ''}>سجّل وانسخ رسالة المورد</button>`}<button type="button" class="${staff ? 'py-p' : 'secondary'}" data-wl-save="only"${busy ? ' disabled' : ''}>سجّل بس</button><button type="button" class="secondary" data-wl-close>إلغاء</button></div></div>`;
+      `<div class="py-acts" id="wlActs">${actsHtml()}</div></div>`;
+  }
+  // the save buttons: with a telesales number for the chosen supplier the first one opens WhatsApp on him (he presses send); staff just save
+  function teleOf(f) { return f && !isStaff() && f.vendor ? vnums.get(String(f.vendor)) || null : null; }
+  function actsHtml() {
+    const f = form, staff = isStaff(), tele = teleOf(f), off = busy ? ' disabled' : '';
+    return (tele ? `<button type="button" class="py-p" data-wl-save="wa"${off}>سجّل وابعت للتليسيلز على واتساب</button>` : '') +
+      (staff ? '' : `<button type="button" class="${tele ? 'secondary' : 'py-p'}" data-wl-save="copy"${off}>سجّل وانسخ رسالة المورد</button>`) +
+      `<button type="button" class="${staff ? 'py-p' : 'secondary'}" data-wl-save="only"${off}>سجّل بس</button><button type="button" class="secondary" data-wl-close>إلغاء</button>` +
+      (tele ? `<p class="hint">التليسيلز: <b class="notr">${esc(tele.name || tele.phone)}</b></p>` : '');
+  }
+  const paintActs = () => { const el = $('wlActs'); if (el && form) el.innerHTML = actsHtml(); };
+  async function loadVNums() {
+    if (vnumsState !== 'none' || !db() || isStaff()) return;
+    vnumsState = 'loading';
+    try {
+      const { data: rows, error } = await db().from('ar_vendor_contacts').select('vendor_id,phone,name').eq('role', 'telesales');
+      if (error) throw error;
+      vnums = new Map((rows || []).map((r) => [String(r.vendor_id), { phone: String(r.phone), name: r.name || '' }]));
+    } catch (e) { vnums = new Map(); /* the table is not there yet: the form works as before */ }
+    vnumsState = 'ready'; paintActs();
   }
 
   function draw() {
@@ -422,10 +444,11 @@
     const again = $('wlItem');
     if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) { /* not supported */ } }
   }
-  async function save(copyMsg) {
+  async function save(mode) {
     if (!form || busy) return;
     readForm();
-    const f = form;
+    const f = form, tele = mode === 'wa' ? teleOf(f) : null;
+    const copyMsg = mode === 'copy' || (mode === 'wa' && !tele);   // no number saved for him: it falls back to «انسخ»
     const item = f.item ? f.item.name : f.q.trim().replace(/\s+/g, ' ');
     const phone = normPhone(f.phone), qty = parseQty(f.qty), v = vendorOf(f.vendor);
     if (item.length < 2) { f.msg = errText('name'); return draw(); }
@@ -445,7 +468,12 @@
       const text = vendorMsg(item, qty);
       if (copyMsg) copied = await copy(text);
       const base = d.dup ? 'الطلب ده كان مسجّل قبل كده.' : 'اتسجّل.';
-      note = !copyMsg ? base : copied ? base + ' رسالة المورد اتنسخت، ابعتها من واتساب.' : base + ' ماقدرتش أنسخ الرسالة، انسخها بإيدك من تحت.';
+      if (tele) {
+        // WhatsApp opens on the telesales number with the message ready (the number of the customer is not in it); he presses send there
+        if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(text, tele.phone);
+        else root.open('https://wa.me/' + (/^01\d{9}$/.test(tele.phone) ? '2' : '') + tele.phone + '?text=' + encodeURIComponent(text), '_blank');
+      }
+      note = tele ? base + ' اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.' : !copyMsg ? base : copied ? base + ' رسالة المورد اتنسخت، ابعتها من واتساب.' : base + ' ماقدرتش أنسخ الرسالة، انسخها بإيدك من تحت.';
       // when the phone refuses the copy, the message is shown in a box to copy by hand
       lastMsg = copyMsg && !copied ? text : '';
       form = null; busy = false;
@@ -487,7 +515,7 @@
         if (!mgr.sure) { mgr.sure = true; paintBook(); return; }   // marking many is a second tap
         setPrivate(todo, flag); return;
       }
-      if ('wlNew' in d) { note = ''; lastMsg = ''; form = { item: null, q: '', results: [], phone: '', name: '', qty: '', vendor: '', kind: '', msg: '', known: null, hist: [], picks: [], nameAuto: false }; draw(); $('wlItem')?.focus(); loadBook(); return; }
+      if ('wlNew' in d) { note = ''; lastMsg = ''; form = { item: null, q: '', results: [], phone: '', name: '', qty: '', vendor: '', kind: '', msg: '', known: null, hist: [], picks: [], nameAuto: false }; draw(); $('wlItem')?.focus(); loadBook(); vnumsState = 'none'; loadVNums(); return; }
       if ('wlClose' in d) { form = null; draw(); return; }
       if ('wlCalled' in d) { rpc('ar_waitlist_set', { p_id: Number(d.wlCalled), p_action: 'called' }).then(() => setTimeout(load, 800), () => {}); return; }
       if ('wlAct' in d) {
@@ -503,7 +531,7 @@
       if ('wlUnpick' in d) { form.item = null; form.q = ''; form.results = []; draw(); $('wlItem')?.focus(); return; }
       if ('wlContact' in d) { const c = book.byPhone.get(d.wlContact); if (c) { form.phone = c.phone; form.name = c.name; form.nameAuto = true; form.known = c; form.hist = []; form.picks = []; form.msg = ''; draw(); loadHist(c.phone); $('wlQty')?.focus(); } return; }
       if ('wlKind' in d) { form.kind = d.wlKind; form.msg = ''; draw(); return; }
-      if ('wlSave' in d) save(d.wlSave === 'copy');
+      if ('wlSave' in d) save(d.wlSave);
     });
   }
 
@@ -521,5 +549,11 @@
       return { call: (d.call || []).length, near: (d.leftover || []).filter((r) => r.left_days != null && r.left_days <= 2).length };
     } catch (e) { return null; }
   }
-  root.AskerWait = { open, counts };
+  // the number book for the supplier's page (ar/vendors.js picks a company's numbers from it): loaded once, null when it is not there
+  async function ensureBook() {
+    await loadBook();
+    for (let i = 0; i < 150 && bookState === 'loading'; i++) await new Promise((r) => setTimeout(r, 100));
+    return bookState === 'ready' ? book : null;
+  }
+  root.AskerWait = { open, counts, book: ensureBook };
 })(typeof window === 'undefined' ? globalThis : window);

@@ -8,7 +8,8 @@
      year and its best buy.
    Data: ar_vendors / ar_vendor_moves (migration 202611142000), sent by the laptop (Store\SYNC_VENDORS.ps1, read only on
    PharmaFly). Balance = Σ AmountAdjustment + Σ payments (checked against PharmaFly's screen: AMG 96,422.75). Nothing is
-   written from here. */
+   written to PharmaFly from here. The owner keeps up to three numbers per company (telesales: orders and «طلب مش موجود»; distributor: the returns statement; accountant: the
+   account statement) in ar_vendor_contacts, picked from his number book (2026-11-20, migration 202611201700); WhatsApp opens on the number, he presses send. */
 (function (root) {
   'use strict';
 
@@ -112,7 +113,45 @@
       'الرابط ده للشركة بس، ما تبعتوهوش لحد.',
     ].join('\n');
   }
-  const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, linkUrl, linkMessage, KIND };
+  // ---- the company's three numbers (owner 2026-11-20: «تليسيلز هنطلب منه، موزع هنبعتله بيان مرتجعات، محاسب نبعتله كشف حساب ونحدث منه قايمة المخزن»; migration 202611201700) ----
+  // [role, label, what it is for]; the numbers are picked from his number book (ar_contacts), owner only
+  const VN_ROLES = [['telesales', 'التليسيلز', 'الطلبات و«طلب مش موجود»'], ['distributor', 'الموزع', 'بيان المرتجعات'], ['accountant', 'المحاسب', 'كشف الحساب وقايمة المخزن']];
+  const WL = () => root.AskerWaitLib || null;   // the number book's helpers (ar/waitlist.js)
+  const keyOf = (s) => (WL() ? WL().nameKey(s) : String(s || '').toLowerCase());
+  // words that do not tell one company from another (written the way keyOf writes them)
+  const VN_STOP = ['pharma', 'pharm', 'pharmacy', 'co', 'company', 'for', 'drug', 'drugs', 'medical', 'شركة', 'شركه', 'مخزن', 'صيدلية', 'صيدليه', 'الدكتور', 'دكتور', 'مستحضرات', 'للمستحضرات', 'للادوية', 'الادوية', 'ادوية', 'فارما', 'مكتب', 'موزع', 'للتجارة', 'التجارة', 'للتوزيع', 'والتوزيع', 'مصر'];
+  let stopSet = null;
+  const stops = () => stopSet || (stopSet = new Set(VN_STOP.map(keyOf)));
+  // the words of a company's name that point to it («رضا عطية» → رضا، عطيه; «IBN SINA 1» → ibn، sina): no short words, no numbers, no «شركة / صيدلية …»
+  function vendorTokens(v) {
+    return [...new Set(keyOf(v && v.name).split(' ').filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !stops().has(w)))];
+  }
+  // the contacts in the book that fit a company by name: every word of a one- or two-word name, two words of a longer one (or its short code as a whole word); the best fit first
+  function suggestFor(book, v, limit) {
+    const toks = vendorTokens(v), short = keyOf(v && v.short), need = Math.min(2, toks.length);
+    if (!book || (!toks.length && short.length < 4)) return [];
+    const scored = [];
+    for (const c of book.list) {
+      const n = toks.filter((t) => c.key.includes(t)).length;
+      if ((toks.length && n >= need) || (short.length >= 4 && (' ' + c.key + ' ').includes(' ' + short + ' '))) scored.push({ c, n });
+    }
+    scored.sort((a, b) => b.n - a.n || a.c.name.length - b.c.name.length);
+    return scored.slice(0, limit || 10).map((x) => x.c);
+  }
+  // the job a contact's name points to (accountant, telesales, distributor); null when the name does not say
+  function guessRole(name) {
+    const k = keyOf(name);
+    if (/محاسب|حسابات|mhasb|mhasp|accountant|accounts?\b/.test(k)) return 'accountant';
+    if (/تليسيلز|تلي سيلز|تيلي سيلز|telesales|tele sales|telesale/.test(k)) return 'telesales';
+    if (/موزع|مندوب|مخزن|mwz3|mwaz3|\brep\b|delivery/.test(k)) return 'distributor';
+    return null;
+  }
+  // the contacts that fit what he typed (every word in the name, or digits in the number), by name
+  const findInBook = (book, q, limit) => (WL() && book ? WL().bookView(book, 'all', q).slice(0, limit || 10) : []);
+  // a number as WhatsApp wants it (a mobile 01… gets 20 in front)
+  const waDigits = (p) => { const d = String(p || '').replace(/\D/g, ''); return /^01\d{9}$/.test(d) ? '2' + d : /^\d{8,15}$/.test(d) ? d : ''; };
+  const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, linkUrl, linkMessage, KIND,
+    VN_ROLES, vendorTokens, suggestFor, guessRole, findInBook, waDigits };
   root.AskerVendorsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -222,13 +261,15 @@
   function openStatement(id) {
     const v = vendorOf(id);
     if (!v) return;
-    st = { v, range: lastRange ? { from: lastRange.from, to: lastRange.to } : defaultRange(), kind: null, rows: [], done: false, busy: false, sum: null, open: new Set(), seq: 0, link: undefined };
+    st = { v, range: lastRange ? { from: lastRange.from, to: lastRange.to } : defaultRange(), kind: null, rows: [], done: false, busy: false, sum: null, open: new Set(), seq: 0, link: undefined,
+      nums: null, numsOff: false, pick: false, pq: '', book: null, numsBusy: false, numsMsg: '' };
     it = null;
     show('st');
     $('veFrom').value = st.range.from; $('veTo').value = st.range.to;
     drawSt();
     loadMoves(false);
     loadLink(st);
+    loadNums(st);
     try { history.pushState({ ve: 1 }, ''); } catch (e) {}
   }
   // ---------- the supplier's personal link (owner 2026-11-19: «ابعت لهم رابط للصفحة زيهم زي العملاء»; owner only) ----------
@@ -250,11 +291,83 @@
     }
     if (st === me) drawSt();
   }
-  // the supplier's WhatsApp is chosen on the phone (the warehouses have no number saved here): the chat list opens with the message ready
+  // the company's accountant gets his statement (owner 2026-11-20): WhatsApp opens on his number with the message ready; with no number saved the chat list opens and he picks the chat
   function openLinkChat(me, token) {
     const t = linkMessage(me.v.name, linkUrl(location.href, token));
-    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, '');
-    else root.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+    const to = me.nums && me.nums.accountant ? me.nums.accountant.phone : '';
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(t, to);
+    else root.open('https://wa.me/' + waDigits(to) + '?text=' + encodeURIComponent(t), '_blank');
+  }
+  // ---------- the company's three numbers (owner only; migration 202611201700) ----------
+  async function loadNums(me) {
+    if (!ownerHere() || !db()) return;
+    try {
+      const { data, error } = await db().from('ar_vendor_contacts').select('role,phone,name').eq('vendor_id', me.v.id);
+      if (error) throw error;
+      me.nums = {};
+      for (const r of data || []) me.nums[r.role] = { phone: String(r.phone), name: r.name || '' };
+      me.numsOff = false;
+    } catch (e) {
+      me.nums = null; me.numsOff = true; // the table is not on the server (yet)
+    }
+    if (st === me) drawSt();
+  }
+  function pickRows() {
+    const me = st;
+    if (!me.book) return `<p class="hint">${esc(me.bookFail ? 'دفتر الأرقام مش متاح دلوقتي.' : 'بحمّل دفترك…')}</p>`;
+    const q = me.pq.trim(), rows = q.length >= 2 ? findInBook(me.book, q, 10) : suggestFor(me.book, me.v, 10);
+    if (!rows.length) return `<p class="hint">${esc(q.length >= 2 ? 'مفيش حد بالاسم ده في دفترك.' : 'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.')}</p>`;
+    return rows.map((c) => {
+      const g = guessRole(c.name);
+      return `<div class="vn-sg"><div class="vn-who"><b class="notr">${esc(c.name)}</b><small dir="ltr"><bdi class="notr">${esc(c.phone)}</bdi></small></div>` +
+        VN_ROLES.map(([k, label]) => `<button type="button" class="vn-pk${g === k ? ' guess' : ''}${me.nums[k] && me.nums[k].phone === c.phone ? ' on' : ''}" data-vn-set="${k}" data-phone="${esc(c.phone)}">${esc(label)}</button>`).join('') + '</div>';
+    }).join('');
+  }
+  const pickHtml = () => '<div class="vn-pick"><p class="hint">دوس على وظيفة الرقم. المقترح من الاسم بلون مميز، والقرار ليك.</p>' +
+    `<input id="vnQ" type="search" placeholder="دوّر في دفترك بالاسم أو الرقم" aria-label="دوّر في دفترك بالاسم أو الرقم" value="${esc(st.pq)}" autocomplete="off" /><div id="vnRows">${pickRows()}</div>` +
+    '<button type="button" class="linklike" data-vn-pick-close>قفل</button></div>';
+  function numsHtml() {
+    if (!st || !ownerHere() || st.numsOff || !st.nums) return '';
+    const slots = VN_ROLES.map(([k, label, use]) => {
+      const n = st.nums[k];
+      return `<div class="vn-slot${n ? ' set' : ''}"><div class="vn-lab"><b>${esc(label)}</b> <small>${esc(use)}</small></div>` +
+        (n ? `<div class="vn-val"><span class="notr">${esc(n.name || '')}</span><span class="vn-num" dir="ltr"><bdi class="notr">${esc(n.phone)}</bdi></span><button type="button" class="linklike" data-vn-clear="${k}">شيله</button></div>` : '<div class="vn-val vn-none">لسه ما اتحددش</div>') + '</div>';
+    }).join('');
+    return `<div class="vn-card"><h3>📇 أرقام الشركة</h3>${slots}` + (st.pick ? pickHtml() : '<button type="button" class="secondary small" data-vn-pick>اختار من دفترك</button>') +
+      (st.numsMsg ? `<p class="status bad">${esc(st.numsMsg)}</p>` : '') + '</div>';
+  }
+  async function openPick() {
+    const me = st;
+    if (!me || !me.nums) return;
+    me.pick = true; me.pq = ''; drawSt();
+    if (me.book) return;
+    try { me.book = (root.AskerWait && root.AskerWait.book ? await root.AskerWait.book() : null); me.bookFail = !me.book; }
+    catch (e) { me.book = null; me.bookFail = true; }
+    if (st === me) drawSt();
+  }
+  async function setNum(role, phone) {
+    const me = st, c = me && me.book ? me.book.byPhone.get(phone) : null;
+    if (!me || !c || me.numsBusy || !VN_ROLES.some((r) => r[0] === role)) return;
+    me.numsBusy = true; me.numsMsg = '';
+    try {
+      const { error } = await db().from('ar_vendor_contacts').upsert({ vendor_id: me.v.id, role, phone: c.phone, name: c.name.slice(0, 120), updated_at: new Date().toISOString() }, { onConflict: 'vendor_id,role' });
+      if (error) throw error;
+      me.nums[role] = { phone: c.phone, name: c.name };
+    } catch (e) { me.numsMsg = 'ماتحفظش: ' + errText(e); }
+    me.numsBusy = false;
+    if (st === me) drawSt();
+  }
+  async function clearNum(role) {
+    const me = st;
+    if (!me || !me.nums || me.numsBusy || !me.nums[role]) return;
+    me.numsBusy = true; me.numsMsg = '';
+    try {
+      const { error } = await db().from('ar_vendor_contacts').delete().eq('vendor_id', me.v.id).eq('role', role);
+      if (error) throw error;
+      delete me.nums[role];
+    } catch (e) { me.numsMsg = 'ماتشالش: ' + errText(e); }
+    me.numsBusy = false;
+    if (st === me) drawSt();
   }
   async function makeLink(me, fresh) {
     const { data, error } = await db().rpc('ar_vendor_link', { p_vendor: me.v.id, p_new: !!fresh });
@@ -311,6 +424,7 @@
     return '<div class="cu-link">' +
       `<button type="button" class="cu-send" data-ve-link-send${st.linkBusy ? ' disabled' : ''}>🔗 ابعتله رابط حسابه على الواتس</button>` +
       `<button type="button" class="secondary cu-view" data-ve-link-view${st.linkBusy ? ' disabled' : ''}>👁 شوف صفحته</button>` +
+      (st.nums && st.nums.accountant ? `<div class="cu-link-seen"><span>هيروح للمحاسب:</span> <b class="notr">${esc(st.nums.accountant.name || st.nums.accountant.phone)}</b></div>` : '') +
       `<div class="cu-link-seen"><span>${esc(seen)}</span>${l ? '<button type="button" class="linklike" data-ve-link-new>🔄 رابط جديد</button>' : ''}</div>` +
       (st.linkMsg ? `<p class="status cu-note ${st.linkBad ? 'bad' : 'good'}">${esc(st.linkMsg)}</p>` : '') +
       '</div>';
@@ -326,7 +440,7 @@
   function drawSt() {
     if (!st || !$('veSt')) return;
     const b = balanceText(st.v.balance);
-    $('veStHead').innerHTML = `<h2 class="notr">${esc(st.v.name)}</h2><p><span>الرصيد</span> <b class="ve-bal ${b.cls}" dir="auto">${esc(b.text)}</b></p>` + linkHtml();
+    $('veStHead').innerHTML = `<h2 class="notr">${esc(st.v.name)}</h2><p><span>الرصيد</span> <b class="ve-bal ${b.cls}" dir="auto">${esc(b.text)}</b></p>` + linkHtml() + numsHtml();
     document.querySelectorAll('[data-ve-kind]').forEach((x) => x.classList.toggle('on', (x.dataset.veKind || '') === (st.kind || '')));
     let sumHtml = '';
     const s = st.sum;
@@ -457,6 +571,12 @@
         st.rows = []; st.done = false; st.open.clear(); loadMoves(false);
         return;
       }
+      if (e.target.closest('[data-vn-pick]')) { openPick(); return; }
+      if (e.target.closest('[data-vn-pick-close]') && st) { st.pick = false; drawSt(); return; }
+      const vs = e.target.closest('[data-vn-set]');
+      if (vs) { setNum(vs.dataset.vnSet, vs.dataset.phone); return; }
+      const vc = e.target.closest('[data-vn-clear]');
+      if (vc) { clearNum(vc.dataset.vnClear); return; }
       if (e.target.closest('[data-ve-link-send]')) { sendLink(false); return; }
       if (e.target.closest('[data-ve-link-view]')) { viewPage(); return; }
       if (e.target.closest('[data-ve-link-new]')) { sendLink(true); return; }
@@ -476,6 +596,10 @@
       const ik = e.target.closest('[data-ve-ikind]');
       if (ik && it && it.item) { it.kind = ik.dataset.veIkind; it.rows = []; it.done = false; loadItem(false); return; }
       if (e.target.closest('#veItemMore')) { loadItem(true); return; }
+    });
+    // what he types in the number picker: only the list under it is redrawn (the box keeps its focus)
+    panel.addEventListener('input', (e) => {
+      if (e.target.id === 'vnQ' && st) { st.pq = e.target.value; const r = $('vnRows'); if (r) r.innerHTML = pickRows(); }
     });
     panel.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-ve-move]')) { e.preventDefault(); e.target.click(); } });
     const range = () => {

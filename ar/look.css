@@ -2364,6 +2364,28 @@ html.night .py-known { background: var(--tint-2, var(--rose)); }
 html.night .py-bkf button.on { color: var(--ink); }
 .py-bk small { display: block; color: var(--muted); }
 .py-bk button { margin: 0; flex: none; }
+/* «📇 أرقام الشركة» (owner 2026-11-20): a supplier company's three numbers: telesales, distributor, accountant, picked from his number book */
+.vn-card { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); }
+.vn-card h3 { margin: 0 0 6px; font-size: 15px; }
+.vn-slot { margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.vn-slot.set { border-color: transparent; background: var(--rose); }
+.vn-lab small { color: var(--muted); font-size: 12px; }
+.vn-val { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.vn-val > span:first-child { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.vn-num { color: var(--muted); font-size: 12.5px; }
+.vn-none { color: var(--muted); }
+.py-acts .hint { flex: 1 0 100%; margin: 2px 0 0; }
+.vn-pick { margin-top: 10px; }
+.vn-pick input { width: 100%; margin: 6px 0; }
+.vn-sg { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-top: 1px solid var(--line); }
+.vn-who { flex: 1; min-width: 0; }
+.vn-who b { display: block; font-size: 14px; overflow-wrap: anywhere; }
+.vn-who small { display: block; color: var(--muted); font-size: 12px; }
+.vn-pk { margin: 0; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); font-size: 12.5px; font-weight: 600; box-shadow: none; }
+.vn-pk.guess { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 800; }
+.vn-pk.on { border-color: var(--crimson); background: var(--crimson); color: #fff; }
+html.night .vn-slot.set { background: var(--tint-2, var(--rose)); }
+html.night .vn-pk.guess { color: var(--ink); }
 .py-bx.on { border-color: var(--crimson); background: var(--rose); color: var(--ink); }
 .py-bx.low { opacity: 0.5; }
 .py-cats { display: flex; flex-wrap: wrap; gap: 6px; }

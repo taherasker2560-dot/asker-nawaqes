@@ -3,7 +3,8 @@
    (the photo that arrives in the documents group) has come for each one. «لسه ما راحتش» = booked, no notice yet; «راحت» = the notice names the same invoice number and amount.
    Returns older than the company's first notice photo (minus 3 days) are only counted: nobody can say about them.
    Data: asker-private/returns/returns.json from the laptop (Hub\returns\BUILD_RETURNS.ps1, read only; owner only), drawn at the top of «الحسابات ← الموردين» (#rtBox) and as a
-   home row. «انسخ الكشف» copies a statement of the pending ones to send to the company by hand. Nothing is written or sent from here. */
+   home row. «انسخ الكشف» copies a statement of the pending ones to send to the company by hand; with the company's distributor number saved (owner 2026-11-20, ar/vendors.js) «📲 ابعت للموزع»
+   opens WhatsApp on it with the statement ready. Nothing is written or sent from here (he presses send). */
 (function (root) {
   'use strict';
   const PATH = 'returns/returns.json';
@@ -66,7 +67,17 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
   let data = null, loading = null, loadedAt = 0;
-  const note = (t) => { const el = $('rtNote'); if (!el) return; el.textContent = t || ''; el.classList.toggle('hidden', !t); };
+  // the distributor's number of each company (owner 2026-11-20: «موزع هنبعتله بيان مرتجعات»; ar/vendors.js keeps them, owner only): vendor id → {phone, name}
+  let dist = new Map();
+  const isStaff = () => !!(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
+  async function loadDist() {
+    if (!db() || isStaff()) { dist = new Map(); return; }
+    try {
+      const { data: rows, error } = await db().from('ar_vendor_contacts').select('vendor_id,phone,name').eq('role', 'distributor');
+      dist = error ? new Map() : new Map((rows || []).map((r) => [String(r.vendor_id), { phone: String(r.phone), name: r.name || '' }]));
+    } catch (e) { dist = new Map(); }   // the table is not there yet: only «انسخ» is shown
+  }
+  const note =(t) => { const el = $('rtNote'); if (!el) return; el.textContent = t || ''; el.classList.toggle('hidden', !t); };
   function retHtml(r) {
     const items = r.items.map((i) => { const q = qtyOf(i); return `<span class="notr" dir="auto">${esc(i.ar || i.n)}</span> <small>${esc(q.k === 'p' ? `${pct(q.n)} علبة` : `${pct(q.n)} وحدة`)}</small>`; }).join('<br>');
     const st = r.status === 'handed'
@@ -82,6 +93,7 @@
       (v.pending.n ? `<span class="pill bad">${esc(`${v.pending.n} لسه ما راحتش`)}</span> <b>${esc(`${money(v.pending.amount)} ج`)}</b>` : '<span class="pill good">✓</span>') +
       (v.handed.n ? ` <span class="pill good">${esc(`${v.handed.n} راحت`)}</span>` : '') + '</span></summary>' +
       `<div class="rt-body">${rows.map(retHtml).join('')}${old}` +
+      (v.pending.n && dist.get(String(v.id)) ? `<button type="button" class="small" data-rt-wa="${esc(v.id)}">📲 ابعت للموزع على واتساب</button> <small class="hint"><span>الموزع:</span> <b class="notr">${esc(dist.get(String(v.id)).name || dist.get(String(v.id)).phone)}</b></small> ` : '') +
       (v.pending.n ? `<button type="button" class="small" data-rt-copy="${esc(v.id)}">📋 انسخ كشف المرتجعات</button>` : '') + '</div></details>';
   }
   function draw() {
@@ -102,6 +114,7 @@
       try {
         const { data: blob, error } = await db().storage.from('asker-private').download(PATH);
         data = error || !blob ? null : parse(JSON.parse(await blob.text()));
+        await loadDist();
         loadedAt = Date.now();
       } catch (e) {
         data = null;
@@ -121,6 +134,20 @@
     const fail = () => note('مقدرتش أنسخ لوحدي: ' + msg.replace(/\n/g, ' | '));
     try { navigator.clipboard.writeText(msg).then(() => note('اتنسخ كشف المرتجعات: الزقه في محادثة الشركة.'), fail); } catch (e) { fail(); }
   }
-  $('rtBox')?.addEventListener('click', (e) => { const c = e.target.closest('[data-rt-copy]'); if (c) copy(c.dataset.rtCopy); });
+  // «📲 ابعت للموزع»: WhatsApp opens on the distributor's number with the statement ready (he presses send); a statement too long for a link is copied and the chat opens bare
+  function send(id) {
+    const v = data && data.vendors.find((x) => String(x.id) === String(id)), to = dist.get(String(id));
+    const msg = v ? statementText(v) : '';
+    if (!msg || !to) return;
+    const long = msg.length > 3000;
+    if (long) { try { navigator.clipboard.writeText(msg); } catch (e) { /* the note says so */ } }
+    if (root.AskerApp && root.AskerApp.openWhatsApp) root.AskerApp.openWhatsApp(long ? '' : msg, to.phone);
+    else root.open('https://wa.me/' + (/^01\d{9}$/.test(to.phone) ? '2' : '') + to.phone + (long ? '' : '?text=' + encodeURIComponent(msg)), '_blank');
+    note(long ? 'الكشف طويل: اتنسخ، الزقه في المحادثة اللي اتفتحت.' : 'اتفتحت محادثة الموزع ومعاها الكشف: دوس إرسال هناك.');
+  }
+  $('rtBox')?.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-rt-copy]'), w = e.target.closest('[data-rt-wa]');
+    if (c) copy(c.dataset.rtCopy); else if (w) send(w.dataset.rtWa);
+  });
   root.AskerReturns = { open: () => load(true), load, count: () => totals(data), data: () => data };
 })(typeof window === 'undefined' ? globalThis : window);
