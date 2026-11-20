@@ -234,7 +234,49 @@
       (rows.length > shown.length ? '<button type="button" class="secondary small" data-wl-bkmore>عرض أكتر</button>' : '') +
       (flip ? `<div class="py-acts"><button type="button" class="${m.sure ? 'py-p' : 'secondary'}" data-wl-bkbulk>${esc(label)} <span class="notr">(${flip})</span></button></div>` : '');
   }
+  // ---- «📱 تطبيق الموبايل» (owner 2026-11-20, option «أ»; migration 202611201900, contacts-android/): the phone app that writes the numbers saved here into his phone's contacts (and so Google's)
+  // and sends the phone's contacts here every 10 days (the laptop merges them: new ones come CLOSED to the staff) ----
+  const APP_URL = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/contacts-build/asker-contacts.apk';
+  let phoneApp = null;   // null = not asked yet; {data} = the status; {error} = the server part is not there yet (nothing is shown)
+  const go = (u) => { root.open(u, '_self'); };   // a custom-scheme link (the phone app's own): the same tab; e2e replaces window.open
+  const dayTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  function phoneAppHtml() {
+    if (phoneApp && phoneApp.error) return '';
+    const p = phoneApp && phoneApp.data, lines = [];
+    if (!p) lines.push('<span>بحمّل…</span>');
+    else {
+      const last = (p.phones || []).map((x) => x.last_used_at).filter(Boolean).sort().pop();
+      lines.push((p.phones || []).length ? `<span>موبايل مربوط، آخر اتصال:</span> <b dir="ltr">${esc(last ? dayTime(last) : '—')}</b>` : '<span>لسه مفيش موبايل مربوط.</span>');
+      if (p.last_sync) lines.push(`<span>آخر إرسال لجهات الاتصال:</span> <b>${esc(p.last_sync.n)}</b> <span>جهة اتصال</span>${p.last_sync.merged_at ? ' ✓' : ' <span>(لسه ما اتدمجتش على اللاب)</span>'}`);
+      if (Number(p.pending) > 0) lines.push(`<span>أرقام مستنية تنزل على الموبايل:</span> <b>${esc(p.pending)}</b>`);
+    }
+    return '<div class="py-l1"><b>📱 تطبيق الموبايل</b></div>' +
+      '<p class="hint">بيحفظ الأرقام الجديدة في جهات اتصال موبايلك وجوجل لوحده، وكل 10 أيام بيبعت جهات اتصالك هنا (وبتيجي مقفولة على الموظفين).</p>' +
+      lines.map((l) => `<div class="py-l2">${l}</div>`).join('') +
+      `<div class="py-acts"><a class="py-a" href="${esc(APP_URL)}" target="_blank" rel="noopener">نزّل التطبيق</a><button type="button" class="py-p small" data-wl-applink>اربط التطبيق</button></div>`;
+  }
+  const paintPhoneApp = () => { const el = $('wlPhoneApp'); if (el && mgr) el.innerHTML = phoneAppHtml(); };
+  async function loadPhoneApp() {
+    if (!db() || isStaff()) return;
+    try { const { data: d, error } = await db().rpc('ar_phone_status'); phoneApp = error || !d ? { error: true } : { data: d }; } catch (e) { phoneApp = { error: true }; }
+    paintPhoneApp();
+  }
+  // «اربط التطبيق»: a new key for this phone (the server keeps only its hash), then the phone app opens with it (it asks him once). On Android an intent: link (the app's page if it is not installed).
+  async function linkApp() {
+    if (busy || isStaff()) return;
+    busy = true;
+    try {
+      const { data: k, error } = await db().rpc('ar_phone_link');
+      if (error || !/^[0-9a-f]{64}$/.test(String(k || ''))) throw new Error(error ? error.message : 'key');
+      go(/Android/i.test(root.navigator.userAgent) ? `intent://link?k=${k}#Intent;scheme=askercontacts;package=com.askerpharmacy.contacts;S.browser_fallback_url=${encodeURIComponent(APP_URL)};end` : `askercontacts://link?k=${k}`);
+      note = '';
+      setTimeout(loadPhoneApp, 4000);
+    } catch (e) { note = 'ماتغيّرش: ' + (e && e.message ? e.message : ''); }
+    busy = false;
+    const st = $('wlStatus'); if (st) st.textContent = note;
+  }
   const bkHtml = () => '<div class="py-card py-confirm"><div class="py-l1"><b>📒 دفتر الأرقام</b><button type="button" class="secondary small" data-wl-bkclose>إغلاق</button></div>' +
+    `<div class="py-phone" id="wlPhoneApp">${phoneAppHtml()}</div>` +
     '<p class="hint">🔒 خاص: يظهر ليك انت بس، والموظفين ما يشوفوش اسمه ولا رقمه. اللي ما فتحتوش من «غيرهم» لسه خاص.</p>' +
     `<div class="py-bkf" id="wlBkChips">${bkChips()}</div>` +
     `<input id="wlBkQ" type="search" placeholder="دوّر بالاسم أو الرقم" aria-label="دوّر بالاسم أو الرقم" value="${esc(mgr.q)}" autocomplete="off" />` +
@@ -500,11 +542,12 @@
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-bk],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-bk],[data-wl-applink],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
       if (!t) return;
       const d = t.dataset;
       // the number book screen and the «🔒 خاص» marks (owner only)
-      if ('wlBk' in d) { if (!isStaff()) { form = null; note = ''; mgr = { filter: 'other', q: '', shown: MGR_STEP, sure: false }; loadBook(); draw(); } return; }
+      if ('wlBk' in d) { if (!isStaff()) { form = null; note = ''; mgr = { filter: 'other', q: '', shown: MGR_STEP, sure: false }; loadBook(); draw(); loadPhoneApp(); } return; }
+      if ('wlApplink' in d) { linkApp(); return; }
       if ('wlBkclose' in d) { mgr = null; draw(); return; }
       if ('wlBkf' in d) { if (mgr) { mgr.filter = d.wlBkf; mgr.shown = MGR_STEP; mgr.sure = false; paintBook(); } return; }
       if ('wlBkmore' in d) { if (mgr) { mgr.shown += MGR_STEP; paintBook(); } return; }

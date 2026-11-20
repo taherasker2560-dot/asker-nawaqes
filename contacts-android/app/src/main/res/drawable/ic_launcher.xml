@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- a small book on the system's calm blue -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <path
+        android:fillColor="#217BAB"
+        android:pathData="M48,48m-48,0a48,48 0,1 1,96 0a48,48 0,1 1,-96 0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,24h32a4,4 0,0 1,4 4v40a4,4 0,0 1,-4 4H30z" />
+    <path
+        android:fillColor="#217BAB"
+        android:pathData="M48,36m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0M38,56c0,-6 20,-6 20,0v2H38z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M26,30h4v6h-4zM26,44h4v6h-4zM26,58h4v6h-4z" />
+</vector>
