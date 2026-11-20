@@ -79,7 +79,10 @@ run('Supplier link: he opens it and sees only his own account: invoices with ite
  assert.equal(await page.$eval('#spCredit .sp-agza',e=>e.textContent),'Agza');
  assert.equal(await page.$eval('#spCredit .sp-tm',e=>e.textContent),'TM');
  assert.equal(await page.$eval('#spCredit .sp-ai',e=>e.textContent),'AI');
- assert.equal(await page.$eval('#spCredit',e=>e.textContent.replace(/\s+/g,' ').trim()),'تصميم شركة AgzaTM AI · لبرمجة سوق الدواء بالذكاء الاصطناعي');
+ // 2026-11-20: «شيل الكلام اللي بالعربي … وخلي اجزاء AI بس لوحدها»: the name alone, no Arabic words
+ assert.equal(await page.$eval('#spCredit',e=>e.textContent.replace(/\s+/g,' ').trim()),'AgzaTM AI');
+ assert.doesNotMatch(await page.$eval('#spCredit',e=>e.textContent),/[\u0600-\u06FF]/,'no Arabic in the line');
+ assert.equal(await page.$eval('#spCredit',e=>getComputedStyle(e,'::after').content!=='none'),true,'the shimmering line under it stays');
  assert.equal(await page.evaluate(()=>{const fs=s=>parseFloat(getComputedStyle(document.querySelector(s)).fontSize),tm=getComputedStyle(document.querySelector('#spCredit .sp-tm'));return fs('#spCredit .sp-ai')>fs('#spCredit .sp-agza')&&fs('#spCredit .sp-agza')>fs('#spCredit')&&tm.borderTopLeftRadius==='50%'&&parseFloat(tm.borderTopWidth)<=1&&parseFloat(tm.borderTopWidth)>0}),true,'AI bigger than the name, the name bigger than the line; the sign in a thin round outline');
  assert.equal(await page.evaluate(()=>{const b=document.querySelector('#spCredit .sp-brand').getBoundingClientRect(),c=document.getElementById('spCredit').getBoundingClientRect();return b.left>=c.left&&b.right<=c.right}),true,'the whole line fits at phone width');
  assert.equal(await page.evaluate(()=>{const c=document.getElementById('spCredit').getBoundingClientRect(),h=document.querySelector('.sp-head').getBoundingClientRect();return c.top<=1&&c.bottom<=h.top+1&&c.height<40}),true,'the very top, thin, above the header');
