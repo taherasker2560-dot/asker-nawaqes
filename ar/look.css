@@ -2449,5 +2449,19 @@ body.ia-lock { overflow: hidden; }
 .ia-lines th { color: var(--muted); font-weight: 700; }
 .ia-lines td small { display: block; color: var(--muted); }
 .ia-lines tr.me td { background: var(--rose); font-weight: 700; }
+.ia-tot { margin: 10px 2px 6px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.ia-yr { margin-top: 8px; }
+.ia-yh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; width: 100%; margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); text-align: start; box-shadow: none; }
+.ia-yr.open .ia-yh { border-color: transparent; background: var(--rose); }
+.ia-yh b { font-size: 16px; }
+.ia-ys { flex: 1; min-width: 0; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+.ia-ch { flex: none; color: var(--muted); font-style: normal; }
+.ia-mo { margin: 0 6px; padding: 7px 4px 6px; border-bottom: 1px solid var(--line); }
+.ia-mo.none { color: var(--muted); opacity: 0.7; }
+.ia-mr { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.ia-mn { flex: none; width: 64px; font-weight: 700; }
+.ia-mb { flex: 1; min-width: 0; height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.ia-mb i { display: block; height: 100%; border-radius: 999px; background: var(--crimson); }
+.ia-mq { flex: none; min-width: 56px; text-align: end; font-size: 14.5px; }
 html.night .ia-sheet { background: rgba(0, 0, 0, 0.6); }
 html.night .ia-mv.open, html.night .ia-tile.op, html.night .ia-lines tr.me td { background: var(--tint-2, var(--rose)); }
