@@ -4,6 +4,8 @@
    - «📈 حركة الصنف» (all), «🛒 المشتريات», «🧾 المبيعات»: one list, newest first: purchases and purchase returns (ar_vendor_moves since 2018, ar_vendor_item_moves) and sales and
      sale returns (ar_sales: the last 12 months, ar_sales_list); filters all / purchases / sales / returns and last month / last year / all; a tap on a row opens the whole invoice
      (a sale ticket with its lines and names; a purchase invoice with its lines, discounts, expiries and the balance after it).
+   - «📅 المبيعات الشهرية» (owner 2026-11-20, «أ»): a line a month per item since 2018 (ar_item_sales_monthly, migration 202611202300, filled once a day by the laptop's Store\SYNC_ITEM_SALES.ps1):
+     packs sold, returned, value, invoices; a block per year (the latest two open), a bar against the item's busiest month; a month with no sale is a row of zeros.
    - «📋 جرد»: opens the existing count screen (ar/count.js) on this item (items with stock in PharmaFly only: the count works on what the system holds).
    - «🏷️ طباعة باركود»: records the operation (ar_item_ops, migration 202611202100) with the number of labels: it waits as «مستنية» in «الحسابات ← العمليات» (cancel there) until the laptop carries it
      out on PharmaFly's own screens (a later phase). Nothing here writes to PharmaFly or prints. */
@@ -106,7 +108,36 @@
     const n = Number(t);
     return n >= 1 && n <= 500 ? n : NaN;
   }
-  const api = { money, dmy, expText, buyQty, saleQty, buyValue, saleValue, KINDS, PILL, TABS, PERIODS, keepKind, periodFrom, buyRow, saleRow, newer, makeStream, takeMerged, hasMore, parseCopies, PAGE };
+  // ---- the monthly sales (ar_item_sales_monthly, one row per item: {"2018-03": [packs sold, packs returned, value, invoices], ...}) ----
+  const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  // the years newest first, each with its months newest first and its totals. From the item's first month to the current month (or its last month if later) every month has a row:
+  // a month with no sale is a row of zeros, so «nothing sold» is not mistaken for «not loaded».
+  function byYear(months, now) {
+    const keys = Object.keys(months && typeof months === 'object' && !Array.isArray(months) ? months : {}).filter((k) => /^\d{4}-(0[1-9]|1[0-2])$/.test(k) && Array.isArray(months[k])).sort();
+    if (!keys.length) return [];
+    const d = now || new Date(), cur = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    const last = keys[keys.length - 1] > cur ? keys[keys.length - 1] : cur;
+    const [fy, fm] = keys[0].split('-').map(Number), [ly, lm] = last.split('-').map(Number);
+    const years = [];
+    for (let y = ly; y >= fy; y--) {
+      const g = { year: y, rows: [], tot: { s: 0, r: 0, v: 0, n: 0 } };
+      for (let m = (y === ly ? lm : 12); m >= (y === fy ? fm : 1); m--) {
+        const a = months[`${y}-${pad(m)}`] || [], row = { ym: `${y}-${pad(m)}`, month: m, s: num(a[0]), r: num(a[1]), v: num(a[2]), n: num(a[3]) };
+        g.rows.push(row);
+        for (const k of ['s', 'r', 'v', 'n']) g.tot[k] += row[k];
+      }
+      for (const k of ['s', 'r', 'v']) g.tot[k] = r2(g.tot[k]);
+      years.push(g);
+    }
+    return years;
+  }
+  const grandTotal = (years) => { const t = { s: 0, r: 0, v: 0, n: 0 }; for (const g of years) for (const k of ['s', 'r', 'v', 'n']) t[k] += g.tot[k]; for (const k of ['s', 'r', 'v']) t[k] = r2(t[k]); return t; };
+  const maxSold = (years) => years.reduce((m, g) => g.rows.reduce((x, r) => Math.max(x, r.s), m), 0);
+  // a bar's width in percent: the month's packs against the busiest month of the item; a small stub when something sold, nothing when not
+  const barPct = (s, max) => (max > 0 && s > 0 ? Math.max(3, Math.min(100, Math.round((s / max) * 100))) : 0);
+  // «2026-11-20T18:30:00+00:00» → «20/11/2026» in the viewer's own time
+  function localDmy(iso) { const t = new Date(iso); return Number.isNaN(t.getTime()) ? '' : `${pad(t.getDate())}/${pad(t.getMonth() + 1)}/${t.getFullYear()}`; }
+  const api = { money, dmy, expText, buyQty, saleQty, buyValue, saleValue, KINDS, PILL, TABS, PERIODS, keepKind, periodFrom, buyRow, saleRow, newer, makeStream, takeMerged, hasMore, parseCopies, PAGE, MONTHS, byYear, grandTotal, maxSold, barPct, localDmy };
   root.AskerItemActionsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -151,6 +182,7 @@
       '<button type="button" class="ia-tile" data-ia-go="all"><i>📈</i><span><b>حركة الصنف</b><small>مشتريات ومبيعات ومرتجعات بالتاريخ، وتدوس على الفاتورة تتفتح</small></span></button>' +
       '<button type="button" class="ia-tile" data-ia-go="buy"><i>🛒</i><span><b>حركة المشتريات</b><small>كل شراء: الشركة، الفاتورة، الكمية والبونص، الخصم، الصلاحية</small></span></button>' +
       '<button type="button" class="ia-tile" data-ia-go="sale"><i>🧾</i><span><b>حركة المبيعات</b><small>كل بيعة: التذكرة، الكمية، السعر، نقدي ولا آجل</small></span></button>' +
+      '<button type="button" class="ia-tile" data-ia-monthly><i>📅</i><span><b>المبيعات الشهرية</b><small>كام اتباع من الصنف كل شهر من 2018، سنة بسنة</small></span></button>' +
       '<h2 class="ia-h">⚙️ عمليات على الصنف</h2>' +
       '<button type="button" class="ia-tile op" data-ia-count><i>📋</i><span><b>جرد</b><small>تسجّل اللي لقيته لكل صلاحية (للصنف اللي عليه رصيد)</small></span></button>' +
       `<div class="ia-tile op ia-bar"><i>🏷️</i><span><b>طباعة باركود</b><small>عدد الملصقات:</small></span><input id="iaCopies" type="text" inputmode="numeric" maxlength="3" value="${esc(st.copies)}" aria-label="عدد الملصقات" /><button type="button" class="py-p small" data-ia-barcode${st.busy ? ' disabled' : ''}>سجّل</button></div>` +
@@ -198,13 +230,35 @@
     else body = st.rows.map(rowHtml).join('');
     return '<button type="button" class="secondary small" data-ia-back>‹ رجوع للقايمة</button>' + seg(TABS, st.tab, 'data-ia-tab') + seg(PERIODS, st.period, 'data-ia-period') + `<div id="iaRows">${body}</div>` +
       (hasMore(st.streams) && st.rows.length ? `<button type="button" class="secondary small" data-ia-more${st.busy ? ' disabled' : ''}>عرض أكتر</button>` : '') +
-      '<p class="hint">المشتريات من 2018. المبيعات التفصيلية آخر سنة بس (ده اللي السيستم بيحتفظ بيه).</p>';
+      '<p class="hint">المشتريات من 2018. المبيعات التفصيلية آخر سنة بس، وقبلها في «المبيعات الشهرية».</p>';
+  }
+  // «📅 المبيعات الشهرية»: a block per year (the latest two open), a line per month with a bar against the item's busiest month
+  const cnt = (n) => `<bdi class="notr" dir="ltr">${esc(money(n))}</bdi>`;
+  const sep = '<bdi class="notr"> · </bdi>';
+  function monthlyHtml() {
+    const mo = st.mon || {}, back = '<button type="button" class="secondary small" data-ia-back>‹ رجوع للقايمة</button>';
+    if (mo.error) return back + `<p class="status bad">${esc(mo.error)}</p>`;
+    if (mo.busy) return back + '<p class="hint">بيجيب الملخص الشهري…</p>';
+    if (mo.notLoaded) return back + '<p class="hint">الملخص الشهري لسه ما اتحمّلش من اللابتوب.</p>';
+    const years = mo.years || [];
+    if (!years.length) return back + '<p class="hint">الصنف ده ما اتباعش في أي شهر من 2018.</p>';
+    const tot = grandTotal(years), max = maxSold(years), first = years[years.length - 1].rows[years[years.length - 1].rows.length - 1].ym.split('-');
+    const figs = (t) => !t.s && !t.r && !t.v && !t.n ? '<span>مفيش مبيعات</span>' : [`${cnt(t.s)} <span>علبة</span>`, `${cnt(t.v)} <span>ج</span>`, `<span>فواتير</span> ${cnt(t.n)}`].join(sep) + (t.r ? sep + `<span>مرتجع</span> ${cnt(t.r)}` : '');
+    const rows = (g) => g.rows.map((r) => {
+      const empty = !r.s && !r.r && !r.v && !r.n;
+      return `<div class="ia-mo${empty ? ' none' : ''}"><div class="ia-mr"><span class="ia-mn"><span>${esc(MONTHS[r.month - 1])}</span></span><span class="ia-mb"><i style="width:${barPct(r.s, max)}%"></i></span><b class="ia-mq">${empty ? '—' : cnt(r.s)}</b></div>` +
+        (empty ? '' : `<div class="ia-l2">${[`${cnt(r.v)} <span>ج</span>`, `<span>فواتير</span> ${cnt(r.n)}`].join(sep)}${r.r ? sep + `<span>مرتجع</span> ${cnt(r.r)}` : ''}</div>`) + '</div>';
+    }).join('');
+    const blocks = years.map((g) => { const on = mo.open.has(g.year);
+      return `<section class="ia-yr${on ? ' open' : ''}"><button type="button" class="ia-yh" data-ia-year="${g.year}" aria-expanded="${on}"><b class="notr">${g.year}</b><span class="ia-ys">${figs(g.tot)}</span><i class="ia-ch" aria-hidden="true">${on ? '▾' : '‹'}</i></button>${on ? rows(g) : ''}</section>`; }).join('');
+    return back + `<p class="ia-tot"><span>الإجمالي من</span> <bdi class="notr" dir="ltr">${esc(first[1] + '/' + first[0])}</bdi><br>${figs(tot)}</p>` + `<div id="iaMonthly">${blocks}</div>` +
+      `<p class="hint"><span>الأرقام بالعلب (العلب + الوحدات ÷ عدد الوحدات في العلبة). الشهر الحالي بيكتمل مع التحديث اليومي.</span>${mo.at ? ` <span>آخر تحديث من اللابتوب:</span> <bdi class="notr" dir="ltr">${esc(mo.at)}</bdi>` : ''}</p>`;
   }
   function draw() {
     const body = $('iaBody');
     if (!st || !body) return;
-    $('iaTitle').textContent = (st.view === 'move' ? '📈 ' : '') + title(st.item);
-    body.innerHTML = st.view === 'menu' ? menuHtml() : moveHtml();
+    $('iaTitle').textContent = (st.view === 'move' ? '📈 ' : st.view === 'monthly' ? '📅 ' : '') + title(st.item);
+    body.innerHTML = st.view === 'menu' ? menuHtml() : st.view === 'monthly' ? monthlyHtml() : moveHtml();
   }
 
   // ---------- the report ----------
@@ -254,6 +308,27 @@
     } finally {
       if (st === me && token === seq) { me.busy = false; draw(); }
     }
+  }
+  // the monthly summary: the item's own row and the heartbeat row (-1: when the laptop last sent); no heartbeat = the table was never filled
+  async function loadMonthly() {
+    const me = st;
+    if (!me) return;
+    const token = ++seq;
+    me.view = 'monthly'; me.mon = { busy: true, open: new Set() };
+    draw();
+    const mo = { open: new Set() };
+    try {
+      const { data, error } = await db().from('ar_item_sales_monthly').select('item_id,months,updated_at').in('item_id', [Number(me.item.id), -1]);
+      if (error) throw error;
+      const mine = (data || []).find((x) => Number(x.item_id) === Number(me.item.id)), beat = (data || []).find((x) => Number(x.item_id) === -1);
+      if (!beat) mo.notLoaded = true;
+      mo.years = byYear(mine && mine.months);
+      mo.at = beat ? localDmy(beat.updated_at) : '';
+      for (const g of mo.years.slice(0, 2)) mo.open.add(g.year);
+    } catch (e) {
+      mo.error = missing(e) ? 'التقارير دي لسه مش متاحة: محتاجة تفعيل على السيرفر الأول.' : 'مقدرتش أجيب الملخص الشهري: ' + (e && e.message);
+    }
+    if (st === me && token === seq) { me.mon = mo; draw(); }
   }
   async function openInvoice(key) {
     const me = st, r = me && me.rows.find((x) => x.key === key);
@@ -311,6 +386,9 @@
     if (!st) return;
     const go = e.target.closest('[data-ia-go]');
     if (go) { st.view = 'move'; st.tab = go.dataset.iaGo; return load(false); }
+    if (e.target.closest('[data-ia-monthly]')) return loadMonthly();
+    const yr = e.target.closest('[data-ia-year]');
+    if (yr && st.mon && st.mon.open) { const y = Number(yr.dataset.iaYear); if (st.mon.open.has(y)) st.mon.open.delete(y); else st.mon.open.add(y); return draw(); }
     if (e.target.closest('[data-ia-back]')) { st.view = 'menu'; seq++; st.busy = false; return draw(); }
     const tab = e.target.closest('[data-ia-tab]');
     if (tab) { st.tab = tab.dataset.iaTab; return load(false); }

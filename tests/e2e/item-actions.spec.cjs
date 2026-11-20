@@ -24,6 +24,10 @@ const seed=(page)=>page.evaluate(()=>{
   {id:59790,at:at(5),customer_id:null,kind:'return',total:-85,items:[101],lines:[{i:101,p:1,u:0,k:1,s:85,d:0}]},
   {id:59000,at:at(100),customer_id:9,kind:'sale',total:255,items:[101],lines:[{i:101,p:3,u:0,k:1,s:85,d:0}]}];
  T.ar_item_ops=[];
+ // the monthly summary (one row per item, and the heartbeat row -1): this month, two months of last year, March 2018
+ const now=new Date(),Y=now.getFullYear(),M=String(now.getMonth()+1).padStart(2,'0');
+ T.ar_item_sales_monthly=[{item_id:-1,months:{},updated_at:new Date().toISOString()},
+  {item_id:101,months:{[`${Y}-${M}`]:[5,1,300,3],[`${Y-1}-06`]:[20,2,1000,12],[`${Y-1}-12`]:[8,0,400,6],'2018-03':[10,0,850.5,4]},updated_at:new Date().toISOString()}];
  localStorage.setItem('__fakeTables',JSON.stringify(T));
 });
 const ready=(page)=>page.waitForFunction(()=>/\d/.test(document.getElementById('shStats')?.textContent||''));
@@ -122,6 +126,69 @@ run('Item card: «طباعة باركود» records the operation, it waits in �
  assert.equal(await page.$('[data-op-cancel^="item"]'),null,'a cancelled one has no cancel button');
 });
 
+const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const monthRows=async(page,yearSel)=>{const sel=`${yearSel} .ia-mo`,t=await texts(page,sel);
+ const m=await page.$$eval(sel,(r)=>r.map((x)=>({name:x.querySelector('.ia-mn').textContent.trim(),none:x.classList.contains('none'),bar:x.querySelector('.ia-mb i').style.width})));
+ return m.map((x,i)=>({...x,text:t[i]}))};
+const goMonthly=async(page)=>{await page.click('[data-ia-monthly]');await page.waitForFunction(()=>!/بيجيب الملخص الشهري/.test(document.getElementById('iaBody').textContent))};
+
+run('Item card: «المبيعات الشهرية»: a block per year, the latest two open, totals, a line a month with a bar, empty months as zeros, a tap opens and closes a year',async({page})=>{
+ await seed(page);await page.reload();await ready(page);
+ const now=new Date(),Y=now.getFullYear(),M=now.getMonth()+1;
+ await search(page,'بروفين','بروفين');await page.click('#hsItems [data-ia]');
+ assert.match(await txt(page,'#iaBody'),/حركة المبيعات.*المبيعات الشهرية كام اتباع من الصنف كل شهر من 2018، سنة بسنة.*⚙️ عمليات على الصنف/);
+ await goMonthly(page);
+ assert.equal((await page.textContent('#iaTitle')).trim(),'📅 بروفين ٤٠٠ مجم');
+ // a block per year from 2018 to this year, newest first; the latest two are open
+ assert.equal((await page.$$('#iaMonthly .ia-yr')).length,Y-2018+1);
+ const yrs=await page.$$eval('#iaMonthly .ia-yh',(b)=>b.map((x)=>[x.querySelector('b').textContent,x.closest('.ia-yr').classList.contains('open')]));
+ assert.deepEqual(yrs.slice(0,3),[[String(Y),true],[String(Y-1),true],[String(Y-2),false]]);assert.deepEqual(yrs[yrs.length-1],['2018',false]);
+ // the totals: all the years, and each year's
+ assert.match(await txt(page,'.ia-tot'),/الإجمالي من 03\/2018 43 علبة · 2,550\.50 ج · فواتير 25 · مرتجع 3/);
+ assert.match(await txt(page,`[data-ia-year="${Y}"]`),/5 علبة · 300 ج · فواتير 3 · مرتجع 1/);
+ assert.match(await txt(page,`[data-ia-year="${Y-1}"]`),/28 علبة · 1,400 ج · فواتير 18 · مرتجع 2/);
+ assert.match(await txt(page,`[data-ia-year="${Y-2}"]`),/مفيش مبيعات/,'a year nothing sold says so');
+ // this year: January to this month, the current month with its figures; last year: twelve months, the bars against the busiest month (20)
+ const cur=await monthRows(page,'#iaMonthly .ia-yr:nth-child(1)');
+ assert.equal(cur.length,M);assert.equal(cur[0].name,MONTHS[M-1]);assert.match(cur[0].text,/5 300 ج · فواتير 3 · مرتجع 1/);assert.equal(cur[0].bar,'25%');assert.ok(!cur[0].none);
+ const last=await monthRows(page,'#iaMonthly .ia-yr:nth-child(2)');
+ assert.equal(last.length,12);
+ const jun=last.find((x)=>x.name==='يونيو'),dec=last.find((x)=>x.name==='ديسمبر'),jan=last.find((x)=>x.name==='يناير');
+ assert.equal(jun.bar,'100%');assert.match(jun.text,/20 1,000 ج · فواتير 12 · مرتجع 2/);assert.equal(dec.bar,'40%');
+ assert.ok(jan.none&&/—/.test(jan.text)&&jan.bar==='0%','a month nothing sold is a row of zeros, not a hole');
+ // a closed year opens on a tap and closes on the next; 2018 starts in March (the item's first month)
+ await page.click('[data-ia-year="2018"]');
+ const y18=await monthRows(page,'#iaMonthly .ia-yr:last-child');
+ assert.equal(y18.length,10);assert.equal(y18[y18.length-1].name,'مارس');assert.match(y18[y18.length-1].text,/10 850\.50 ج · فواتير 4/);
+ await page.click('[data-ia-year="2018"]');assert.equal((await monthRows(page,'#iaMonthly .ia-yr:last-child')).length,0);
+ assert.match(await txt(page,'#iaBody'),/آخر تحديث من اللابتوب: \d\d\/\d\d\/\d{4}/);
+ // back to the menu
+ await page.click('[data-ia-back]');assert.ok(await page.isVisible('[data-ia-monthly]'));
+ // the list's own note points here
+ await page.click('[data-ia-go="all"]');await page.waitForFunction(()=>document.querySelectorAll('#iaRows .ia-mv').length>0);
+ assert.match(await txt(page,'#iaBody'),/وقبلها في «المبيعات الشهرية»/);
+});
+
+run('Item card: «المبيعات الشهرية» for an item never sold, before the laptop has loaded it, and when the read fails',async({page})=>{
+ await seed(page);await page.reload();await ready(page);
+ // an item with no row: sold in no month
+ await search(page,'OTHER','OTHER');await page.click('#hsItems [data-ia]');await goMonthly(page);
+ assert.match(await txt(page,'#iaBody'),/الصنف ده ما اتباعش في أي شهر من 2018\./);assert.equal(await page.$('#iaMonthly'),null);
+ await page.click('[data-ia-close]');
+ // the table is empty (no heartbeat row): not loaded yet
+ await page.evaluate(()=>{const T=JSON.parse(localStorage.getItem('__fakeTables'));T.ar_item_sales_monthly=[];localStorage.setItem('__fakeTables',JSON.stringify(T))});
+ await page.reload();await ready(page);
+ await search(page,'بروفين','بروفين');await page.click('#hsItems [data-ia]');await goMonthly(page);
+ assert.match(await txt(page,'#iaBody'),/الملخص الشهري لسه ما اتحمّلش من اللابتوب\./);
+ await page.click('[data-ia-close]');
+ // the read fails: the reason is shown
+ await page.evaluate(()=>localStorage.setItem('__fakeFail','ar_item_sales_monthly'));
+ await page.reload();await ready(page);
+ await search(page,'بروفين','بروفين');await page.click('#hsItems [data-ia]');await goMonthly(page);
+ assert.match(await txt(page,'#iaBody'),/مقدرتش أجيب الملخص الشهري: down/);
+ await page.click('[data-ia-back]');assert.ok(await page.isVisible('[data-ia-monthly]'),'back works after an error');
+});
+
 run('Item card in English: no Arabic left on the sheet except names',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
  await seed(page);await page.reload();await ready(page);
@@ -139,4 +206,13 @@ run('Item card in English: no Arabic left on the sheet except names',async({page
  l=await left();assert.deepEqual(l,[],'Arabic left in the movement: '+l.join(' | '));
  const all=await txt(page,'#iaSheet');
  assert.match(all,/Cash sale/);assert.match(all,/Invoice no\. 11\/26\/300/);assert.match(all,/Ticket no\. 59812/);
+ // the monthly summary in English: months, totals, the note
+ await page.click('[data-ia-back]');
+ assert.match(await txt(page,'#iaSheet'),/Monthly sales How much of the item sold each month since 2018, year by year/);
+ await page.click('[data-ia-monthly]');await page.waitForFunction(()=>!!document.querySelector('#iaMonthly .ia-yr'));
+ l=await left();assert.deepEqual(l,[],'Arabic left in the monthly summary: '+l.join(' | '));
+ await page.click('[data-ia-year="2018"]');
+ l=await left();assert.deepEqual(l,[],'Arabic left in the monthly summary (2018 open): '+l.join(' | '));
+ const en=await txt(page,'#iaSheet');
+ assert.match(en,/Total since 03\/2018 43 box · 2,550\.50 EGP · Invoices 25 · return 3/);assert.match(en,/2024 No sales/);assert.match(en,/March/);assert.match(en,/Last update from the laptop: \d\d\/\d\d\/\d{4}/);
 });

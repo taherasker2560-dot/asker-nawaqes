@@ -60,6 +60,22 @@ assert.deepEqual([{ at: '2026-11-01T10:00:00', id: 1 }, { at: '2026-11-02T10:00:
   assert.equal(A.parseCopies('10'), 10); assert.equal(A.parseCopies('٢٥'), 25); assert.equal(A.parseCopies(' 500 '), 500);
   for (const bad of ['0', '501', '', 'abc', '1.5', '-3', '1000']) assert.ok(Number.isNaN(A.parseCopies(bad)), bad);
 
+  // ---- the monthly summary: years newest first, months newest first, a row of zeros for a month nothing sold, totals, bars ----
+  const now = new Date(2026, 10, 20, 15, 0);
+  const yrs = A.byYear({ '2026-11': [5, 1, 300, 3], '2025-06': [20, 2, 1000, 12], '2025-12': [8, 0, 400, 6], '2018-03': [10, 0, 850.5, 4], 'bad': [1], '2019-13': [1, 1, 1, 1], '2019-05': 'x' }, now);
+  assert.deepEqual(yrs.map((g) => g.year), [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018], 'every year from the first month to this one; bad keys and shapes are left out');
+  assert.deepEqual(yrs[0].rows.map((r) => r.month), [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1], 'this year: January to this month, newest first');
+  assert.deepEqual(yrs[1].rows.length, 12); assert.deepEqual(yrs[yrs.length - 1].rows.map((r) => r.month), [12, 11, 10, 9, 8, 7, 6, 5, 4, 3], '2018 starts at the first month');
+  assert.deepEqual(yrs[0].tot, { s: 5, r: 1, v: 300, n: 3 }); assert.deepEqual(yrs[1].tot, { s: 28, r: 2, v: 1400, n: 18 });
+  assert.deepEqual(yrs[1].rows.find((r) => r.month === 1), { ym: '2025-01', month: 1, s: 0, r: 0, v: 0, n: 0 }, 'a month nothing sold is zeros');
+  assert.deepEqual(A.grandTotal(yrs), { s: 43, r: 3, v: 2550.5, n: 25 });
+  assert.equal(A.maxSold(yrs), 20);
+  assert.deepEqual([[20, 20], [5, 20], [0, 20], [0.1, 20], [3, 0], [25, 20]].map(([s, m]) => A.barPct(s, m)), [100, 25, 0, 3, 0, 100], 'a stub when something sold, nothing when not, never over 100');
+  assert.deepEqual(A.byYear({}, now), []); assert.deepEqual(A.byYear(null, now), []); assert.deepEqual(A.byYear([1, 2], now), []);
+  assert.deepEqual(A.byYear({ '2026-12': [1, 0, 1, 1] }, now).map((g) => [g.year, g.rows.map((r) => r.month)]), [[2026, [12]]], 'a month later than today (a wrong clock) ends the range there');
+  assert.equal(A.MONTHS.length, 12);
+  assert.equal(A.localDmy('2026-11-20T10:30:00+02:00'), '20/11/2026'); assert.equal(A.localDmy('nope'), '');
+
   // ---- English: every text the sheet draws comes out with no Arabic left ----
   global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
   const I = global.AskerI18n; I._use(global.AskerEN);
@@ -69,7 +85,10 @@ assert.deepEqual([{ at: '2026-11-01T10:00:00', id: 1 }, { at: '2026-11-02T10:00:
     'كل شراء: الشركة، الفاتورة، الكمية والبونص، الخصم، الصلاحية', 'حركة المبيعات', 'كل بيعة: التذكرة، الكمية، السعر، نقدي ولا آجل', '⚙️ عمليات على الصنف', 'جرد', 'تسجّل اللي لقيته لكل صلاحية (للصنف اللي عليه رصيد)',
     'طباعة باركود', 'عدد الملصقات:', 'عدد الملصقات', 'سجّل', 'العملية بتتسجّل في «الحسابات ← العمليات» بحالة «مستنية» وتقدر تلغيها هناك. بتتنفذ على فارما فلاي بالريموت لما نخلّص ربط الشاشة دي.',
     'عدد الملصقات من 1 لـ 500.', 'اتسجّلت في «العمليات»: طباعة باركود (مستنية).', 'ما اتسجّلتش: boom', '‹ رجوع للقايمة', 'الكل', 'مشتريات', 'مبيعات', 'مرتجعات', 'آخر شهر', 'آخر سنة', 'من 2018',
-    'بيجيب الحركة…', 'ما اتعاملناش على الصنف ده في الفترة دي.', 'عرض أكتر', 'المشتريات من 2018. المبيعات التفصيلية آخر سنة بس (ده اللي السيستم بيحتفظ بيه).', 'التقارير دي لسه مش متاحة: محتاجة تفعيل على السيرفر الأول.',
+    'بيجيب الحركة…', 'ما اتعاملناش على الصنف ده في الفترة دي.', 'عرض أكتر', 'المشتريات من 2018. المبيعات التفصيلية آخر سنة بس، وقبلها في «المبيعات الشهرية».', 'التقارير دي لسه مش متاحة: محتاجة تفعيل على السيرفر الأول.',
+    'المبيعات الشهرية', 'كام اتباع من الصنف كل شهر من 2018، سنة بسنة', 'بيجيب الملخص الشهري…', 'الملخص الشهري لسه ما اتحمّلش من اللابتوب.', 'الصنف ده ما اتباعش في أي شهر من 2018.',
+    'مقدرتش أجيب الملخص الشهري: boom', 'الإجمالي من', 'مفيش مبيعات', 'فواتير', 'مرتجع', 'الأرقام بالعلب (العلب + الوحدات ÷ عدد الوحدات في العلبة). الشهر الحالي بيكتمل مع التحديث اليومي.', 'آخر تحديث من اللابتوب:',
+    ...A.MONTHS,
     'مقدرتش أجيب الحركة: boom', 'الفاتورة مش موجودة.', 'مقدرتش أفتح الفاتورة: boom', 'بيفتح الفاتورة…', 'شراء', 'مرتجع شراء', 'بيع نقدي', 'بيع آجل', 'مرتجع بيع', 'نقدي', 'رقم الفاتورة', 'رقم التذكرة',
     'التكلفة', 'السعر', 'الخصم', 'الصلاحية', 'الصنف', 'الكمية', 'القيمة', 'الإجمالي:', 'ج', 'الرصيد بعدها', 'علبة', 'وحدة', 'بونص', 'إغلاق',
     'طباعة 10 ملصق باركود: CATAFLAM', 'الصنف ده ملوش رصيد في فارما فلاي دلوقتي، والجرد بيشتغل على اللي عليه رصيد.', 'اتفتح للجرد: CATAFLAM']) check(s);
