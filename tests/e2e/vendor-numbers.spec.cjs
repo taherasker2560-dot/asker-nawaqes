@@ -79,6 +79,41 @@ run('Company numbers: three empty places, the suggestions from the name, one tap
  assert.equal(await page.evaluate(()=>window.__wa[2].p),'');
 });
 
+run('Company numbers: the people saved in «الوارد» are offered first (the sales people who send the lists and carry out the orders), the company\'s own first; one already saved shows as taken',async({page})=>{
+ await page.evaluate(()=>{});
+ await seed(page,{ar_suppliers:[{name:'مخزن ايه ام جروب (محمد على)',phone:'201033645645'},{name:'مخزن رضا عطيه (بكر)',phone:'201069051541'},{name:'مخزن رضا عطيه (احمد)',phone:'201096957316'},{name:'شركه ابن سينا (محمد سعيد)',phone:'201069048503'}],
+  ar_vendors:[...VENDORS,{id:2374,name:'A M group',short:'AMG',active:true,balance:3120,invoices:3,last_invoice_at:at(1),last_payment_at:null,last_payment:null}],
+  ar_vendor_moves:[...MOVES,{id:14,vendor_id:2374,at:at(1),kind:'purchase',code:'11/26/300',inv_date:null,amount:1100,total:1100,balance:3120,lines:[]}],
+  ar_vendor_contacts:[{vendor_id:2374,role:'telesales',phone:'01033645645',name:'مخزن ايه ام جروب (محمد على)'}]});
+ await openVendor(page,2278);
+ await page.click('[data-vn-pick]');
+ await page.waitForSelector('#vnRows .vn-h');
+ assert.match(await text(page,'#vnRows .vn-h'),/مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات/);
+ // «رضا عطية»'s own people first, then the others saved there; the name of the person as saved in «الوارد», the number as the book writes it
+ const rows=await page.$$eval('#vnRows .vn-sg',(r)=>r.map((x)=>[x.querySelector('.vn-who b').textContent,x.querySelector('.vn-who small').textContent.trim()]));
+ assert.deepEqual(rows.slice(0,4),[['مخزن رضا عطيه (احمد)','01096957316'],['مخزن رضا عطيه (بكر)','01069051541'],['شركه ابن سينا (محمد سعيد)','01069048503'],['مخزن ايه ام جروب (محمد على)','01033645645']]);
+ // an inbox person is a sales person: telesales is the highlighted job
+ assert.equal(await page.$$eval('#vnRows .vn-sg:first-of-type .vn-pk.guess',(b)=>b.map((x)=>x.dataset.vnSet).join()),'telesales');
+ // the book's own suggestions come after, under their own heading
+ assert.match(await text(page,'#vnRows'),/من دفترك/);
+ // one tap on an inbox person: saved with the name as saved in «الوارد»
+ await page.click('#vnRows [data-vn-set="telesales"][data-phone="01096957316"]');
+ await page.waitForFunction(()=>window.__fakeWrites.some((w)=>w.table==='ar_vendor_contacts'));
+ const w=(await page.evaluate(()=>window.__fakeWrites)).filter((x)=>x.table==='ar_vendor_contacts');
+ assert.deepEqual({...w[0].v[0],updated_at:'x'},{vendor_id:2278,role:'telesales',phone:'01096957316',name:'مخزن رضا عطيه (احمد)',updated_at:'x'});
+ assert.match((await slots(page))[0],/مخزن رضا عطيه \(احمد\) 01096957316/);
+ // the search covers them
+ await page.fill('#vnQ','بكر');
+ assert.deepEqual(await page.$$eval('#vnRows .vn-who b',(b)=>b.map((x)=>x.textContent)),['مخزن رضا عطيه (بكر)']);
+ // a company the names do not fit (Latin name here, Arabic there): all of them are offered, and the one already saved as its telesales is marked taken
+ await page.click('[data-ve-back]');await page.waitForSelector('#veListView:not(.hidden)');
+ await page.click('[data-ve-open="2374"]');await page.waitForSelector('#veStHead .vn-card');
+ assert.match((await slots(page))[0],/مخزن ايه ام جروب \(محمد على\) 01033645645/);
+ await page.click('[data-vn-pick]');await page.waitForSelector('#vnRows .vn-sg');
+ assert.equal(await page.$$eval('#vnRows .vn-sg',(r)=>r.length>=4),true,'all four inbox people are there');
+ assert.equal(await page.$$eval('#vnRows .vn-pk.on',(b)=>b.map((x)=>x.dataset.phone+':'+x.dataset.vnSet).join()),'01033645645:telesales');
+});
+
 run('Company numbers: the missing-item request opens WhatsApp on the telesales number; no number = «انسخ» as before; staff see none of it',async({page})=>{
  await seed(page,{ar_vendor_contacts:[{vendor_id:10,role:'telesales',phone:'01012345678',name:'تليسيلز مثال'},{vendor_id:10,role:'accountant',phone:'01099990000',name:'محاسب مثال'}],ar_waitlist:[{id:1,status:'waiting'}]});
  await page.evaluate(()=>{window.__calls=[];window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{

@@ -47,6 +47,15 @@ assert.deepEqual(V.findInBook(book, '0100000000').length, 9, 'digits: part of a 
 assert.deepEqual(V.findInBook(book, 'zzzz'), []);
 assert.deepEqual(V.findInBook(null, 'sina'), []);
 
+// the people saved in «الوارد» (owner: «الطبيعي ان السيلز هو اللي هيبعت الوارد وينفذ الطلبيات»): the number as the book writes it, the ones that fit the company's name first
+assert.equal(V.normBook('201033645645'), '01033645645'); assert.equal(V.normBook('01033645645'), '01033645645'); assert.equal(V.normBook('447710173736'), '447710173736'); assert.equal(V.normBook('12'), ''); assert.equal(V.normBook(null), '');
+const inbox = V.inboxPeople([
+  { name: 'مخزن ايه ام جروب (محمد على)', phone: '201033645645' }, { name: 'مخزن رضا عطيه (بكر)', phone: '201069051541' }, { name: 'مخزن رضا عطيه (احمد)', phone: '201096957316' },
+  { name: 'شركه ابن سينا (محمد سعيد)', phone: '201069048503' }, { name: 'من غير رقم', phone: null }, { name: '', phone: '201000000000' }], { name: 'رضا عطية' });
+assert.deepEqual(inbox.map((p) => [p.name, p.phone, p.fit]), [['مخزن رضا عطيه (احمد)', '01096957316', 2], ['مخزن رضا عطيه (بكر)', '01069051541', 2], ['شركه ابن سينا (محمد سعيد)', '01069048503', 0], ['مخزن ايه ام جروب (محمد على)', '01033645645', 0]],
+  'the company\'s own people first (by name), the rest by name; no number or no name: left out');
+assert.deepEqual(V.inboxPeople(null, { name: 'x' }), []);
+assert.equal(V.findInBook({ list: inbox }, 'بكر', 5).length, 1, 'the search works on them like on the book');
 // the number WhatsApp opens: a mobile gets 20, an international number stays
 assert.equal(V.waDigits('01012345678'), '201012345678');
 assert.equal(V.waDigits('447710173736'), '447710173736');
@@ -62,6 +71,7 @@ for (const s of ['📇 أرقام الشركة', 'التليسيلز', 'المو
   'دوس على وظيفة الرقم. المقترح من الاسم بلون مميز، والقرار ليك.', 'دوّر في دفترك بالاسم أو الرقم', 'بحمّل دفترك…', 'دفتر الأرقام مش متاح دلوقتي.', 'مفيش حد بالاسم ده في دفترك.',
   'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.', 'هيروح للمحاسب:', 'ماتحفظش: boom', 'ماتشالش: boom', 'سجّل وابعت للتليسيلز على واتساب', 'التليسيلز:',
   'اتسجّل. اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.', 'الطلب ده كان مسجّل قبل كده. اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.',
+  'مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات', 'من دفترك',
   '📲 ابعت للموزع على واتساب', 'الموزع:', 'الكشف طويل: اتنسخ، الزقه في المحادثة اللي اتفتحت.', 'اتفتحت محادثة الموزع ومعاها الكشف: دوس إرسال هناك.']) check(s);
 for (const [, label, use] of V.VN_ROLES) { check(label); check(use); }
 assert.deepEqual(bad, [], 'texts left in Arabic:\n' + bad.join('\n'));

@@ -148,10 +148,23 @@
   }
   // the contacts that fit what he typed (every word in the name, or digits in the number), by name
   const findInBook = (book, q, limit) => (WL() && book ? WL().bookView(book, 'all', q).slice(0, limit || 10) : []);
+  // the people saved in «الوارد ← الشركات» (ar_suppliers; owner 2026-11-20: «الطبيعي ان السيلز هو اللي هيبعت الوارد وينفذ الطلبيات مش الشركة نفسها»): each is a sales person with his number.
+  // A number as the book writes it (201xxxxxxxxx → 01xxxxxxxxx); the ones that fit the company's name first, the rest by name
+  const normBook = (p) => { const d = String(p || '').replace(/\D/g, ''); return /^201\d{9}$/.test(d) ? d.slice(1) : /^\d{8,15}$/.test(d) ? d : ''; };
+  function inboxPeople(rows, v) {
+    const toks = vendorTokens(v), short = keyOf(v && v.short), out = [];
+    for (const r of rows || []) {
+      const phone = normBook(r && r.phone), key = keyOf(r && r.name);
+      if (!phone || !key) continue;
+      const fit = toks.filter((t) => key.includes(t)).length + (short.length >= 4 && (' ' + key + ' ').includes(' ' + short + ' ') ? 1 : 0);
+      out.push({ phone, name: String(r.name), key, kind: 'other', private: false, fit });
+    }
+    return out.sort((a, b) => b.fit - a.fit || a.name.localeCompare(b.name, 'ar'));
+  }
   // a number as WhatsApp wants it (a mobile 01… gets 20 in front)
   const waDigits = (p) => { const d = String(p || '').replace(/\D/g, ''); return /^01\d{9}$/.test(d) ? '2' + d : /^\d{8,15}$/.test(d) ? d : ''; };
   const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, linkUrl, linkMessage, KIND,
-    VN_ROLES, vendorTokens, suggestFor, guessRole, findInBook, waDigits };
+    VN_ROLES, vendorTokens, suggestFor, guessRole, findInBook, waDigits, normBook, inboxPeople };
   root.AskerVendorsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -312,16 +325,24 @@
     }
     if (st === me) drawSt();
   }
+  // one person with the three jobs to tap; the job his name says (an inbox person: telesales unless his name says otherwise) is highlighted
+  const sgRow = (me, c, inboxPerson) => {
+    // an inbox person is a sales person even when his name starts with «مخزن» («مخزن رضا عطيه (احمد)»): only «محاسب» in his name says otherwise
+    const g = inboxPerson ? (guessRole(c.name) === 'accountant' ? 'accountant' : 'telesales') : guessRole(c.name);
+    return `<div class="vn-sg"><div class="vn-who"><b class="notr">${esc(c.name)}</b><small dir="ltr"><bdi class="notr">${esc(c.phone)}</bdi></small></div>` +
+      VN_ROLES.map(([k, label]) => `<button type="button" class="vn-pk${g === k ? ' guess' : ''}${me.nums[k] && me.nums[k].phone === c.phone ? ' on' : ''}" data-vn-set="${k}" data-phone="${esc(c.phone)}">${esc(label)}</button>`).join('') + '</div>';
+  };
+  // the picker: first the people saved in «الوارد» (the sales people, the company's name first), then the number book
   function pickRows() {
-    const me = st;
-    if (!me.book) return `<p class="hint">${esc(me.bookFail ? 'دفتر الأرقام مش متاح دلوقتي.' : 'بحمّل دفترك…')}</p>`;
-    const q = me.pq.trim(), rows = q.length >= 2 ? findInBook(me.book, q, 10) : suggestFor(me.book, me.v, 10);
-    if (!rows.length) return `<p class="hint">${esc(q.length >= 2 ? 'مفيش حد بالاسم ده في دفترك.' : 'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.')}</p>`;
-    return rows.map((c) => {
-      const g = guessRole(c.name);
-      return `<div class="vn-sg"><div class="vn-who"><b class="notr">${esc(c.name)}</b><small dir="ltr"><bdi class="notr">${esc(c.phone)}</bdi></small></div>` +
-        VN_ROLES.map(([k, label]) => `<button type="button" class="vn-pk${g === k ? ' guess' : ''}${me.nums[k] && me.nums[k].phone === c.phone ? ' on' : ''}" data-vn-set="${k}" data-phone="${esc(c.phone)}">${esc(label)}</button>`).join('') + '</div>';
-    }).join('');
+    const me = st, q = me.pq.trim(), search = q.length >= 2, inbox = me.inbox || [];
+    const inRows = search && WL() ? WL().bookView({ list: inbox }, 'all', q).slice(0, 10) : inbox.slice(0, 13);
+    const inPhones = new Set(inbox.map((c) => c.phone));
+    let html = '';
+    if (inRows.length) html += `<p class="vn-h">مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات</p>` + inRows.map((c) => sgRow(me, c, true)).join('');
+    if (!me.book) return html + `<p class="hint">${esc(me.bookFail ? 'دفتر الأرقام مش متاح دلوقتي.' : 'بحمّل دفترك…')}</p>`;
+    const rows = (search ? findInBook(me.book, q, 10) : suggestFor(me.book, me.v, 10)).filter((c) => !inPhones.has(c.phone));
+    if (rows.length) return html + (inRows.length ? '<p class="vn-h">من دفترك</p>' : '') + rows.map((c) => sgRow(me, c)).join('');
+    return html + (inRows.length ? '' : `<p class="hint">${esc(search ? 'مفيش حد بالاسم ده في دفترك.' : 'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.')}</p>`);
   }
   const pickHtml = () => '<div class="vn-pick"><p class="hint">دوس على وظيفة الرقم. المقترح من الاسم بلون مميز، والقرار ليك.</p>' +
     `<input id="vnQ" type="search" placeholder="دوّر في دفترك بالاسم أو الرقم" aria-label="دوّر في دفترك بالاسم أو الرقم" value="${esc(st.pq)}" autocomplete="off" /><div id="vnRows">${pickRows()}</div>` +
@@ -340,13 +361,26 @@
     const me = st;
     if (!me || !me.nums) return;
     me.pick = true; me.pq = ''; drawSt();
-    if (me.book) return;
-    try { me.book = (root.AskerWait && root.AskerWait.book ? await root.AskerWait.book() : null); me.bookFail = !me.book; }
-    catch (e) { me.book = null; me.bookFail = true; }
+    // the people saved in «الوارد» (a few rows) and the number book (a few thousand), both read when the picker opens
+    const loadInbox = async () => {
+      try {
+        const { data, error } = await db().from('ar_suppliers').select('name,phone').order('name');
+        me.inbox = error ? [] : inboxPeople(data, me.v);
+      } catch (e) { me.inbox = []; }
+    };
+    const loadBook = async () => {
+      if (me.book) return;
+      try { me.book = (root.AskerWait && root.AskerWait.book ? await root.AskerWait.book() : null); me.bookFail = !me.book; }
+      catch (e) { me.book = null; me.bookFail = true; }
+    };
+    if (!me.inbox) await loadInbox();
+    if (st === me) drawSt();
+    await loadBook();
     if (st === me) drawSt();
   }
   async function setNum(role, phone) {
-    const me = st, c = me && me.book ? me.book.byPhone.get(phone) : null;
+    // the person: an inbox person (his name as saved there) or a contact of the book
+    const me = st, c = me ? (me.inbox || []).find((x) => x.phone === phone) || (me.book ? me.book.byPhone.get(phone) : null) : null;
     if (!me || !c || me.numsBusy || !VN_ROLES.some((r) => r[0] === role)) return;
     me.numsBusy = true; me.numsMsg = '';
     try {

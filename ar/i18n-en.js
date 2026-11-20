@@ -1571,6 +1571,8 @@ window.AskerEN = {
   "مفيش حد بالاسم ده في دفترك.": "No one with this name in your book.",
   "مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.": "I found no one by this company's name in your book: search by name or number.",
   "هيروح للمحاسب:": "It goes to the accountant:",
+  "مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات": "Saved in “Incoming”: they send the lists and carry out the orders",
+  "من دفترك": "From your book",
   "ماتحفظش:": "Not saved:",
   "ماتحفظش: {0}": "Not saved: {0}",
   "ماتشالش:": "Not removed:",
