@@ -59,7 +59,7 @@ run('search on top: الكل / المخزون / القوايم / النواقص'
  await seed(page);await page.reload();await ready(page);
  const names=()=>page.$$eval('#hsItems .hs-item strong',x=>x.map(e=>e.textContent.trim()));
  const find=async(q,re)=>{await page.fill('#hsQ',q);await page.waitForFunction(src=>new RegExp(src).test(document.getElementById('hsStatus').textContent+document.getElementById('hsItems').textContent),re.source);};
- assert.deepEqual(await page.$$eval('#hsScope [data-scope]',b=>b.map(x=>x.textContent.trim())),['الكل','المخزون','القوايم','النواقص']);
+ assert.deepEqual(await page.$$eval('#hsScope [data-scope]',b=>b.map(x=>x.textContent.trim())),['الكل','المخزون','الملغى','القوايم','النواقص']);
  assert.equal(await page.$eval('#hsScope .on',b=>b.dataset.scope),'all','starts on «الكل»');
  // المخزون: only what has stock now (Brufen 3 packs), Flagyl (no stock) is not there
  await page.click('[data-scope="stock"]');
@@ -136,6 +136,66 @@ run('search on top: ✏️ fixes the Arabic name everywhere',async({page})=>{
  // a name too short is refused with a clear note
  await page.click('#hsItems [data-edit]');await page.fill('#hsAr','ك');await page.click('#hsItems [data-save]');
  await page.waitForFunction(()=>/ماتحفظش/.test(document.getElementById('hsItems').textContent));
+},{home:true});
+// owner 2026-11-20/21 «الملغى»: the laptop's lists (ملغى/لاغى in the name, the same name on cards with different prices, no movement for two years) leave «الكل» and the
+// other buttons, live under «الملغى» (owner) with the reason and «ارجعه»; stock / the shortage list / a purchase after the cancel day keep or bring an item back
+run('search on top: «الملغى» holds the cancelled items, «ارجعه» puts one back for good',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{const T=JSON.parse(localStorage.getItem('__fakeTables'));
+  T.ar_store_items.push({id:401,name:'ZETA 10MG 10TAB',arabic_name:'زيتا ١٠ مجم',price:20,status:'on_order',is_listed:true,hidden:false},
+   {id:402,name:'OMEGA 20MG 10TAB',arabic_name:'اوميجا ٢٠ مجم',price:20,status:'on_order',is_listed:true,hidden:false},
+   {id:403,name:'SIGMA 5MG 10TAB',arabic_name:'سيجما ٥ مجم',price:20,status:'on_order',is_listed:true,hidden:false});
+  T.ar_item_buys.push({item_id:403,supplier:'AMG',last_date:'2026-11-01',discount_pct:10,bonus:0});
+  // 301 CONCOR = «ملغى» in its name · 401 = the same name at a higher price (30) · 402 = no movement since 03/2021 · 403 = the same but bought in 11/2026 (back) ·
+  // 101 BRUFEN has stock and 201 FLAGYL is on the shortage list: both are listed as cancelled but stay on screen with a mark
+  T.ar_item_cancel_sets=[{kind:'word',ids:'301:20261120'},{kind:'dup',ids:'401:20261120:30,201:20261120:30'},{kind:'idle',ids:'402:202103,403:202103,101:202103'}];
+  T.ar_item_cancel_restored=[];
+  localStorage.setItem('__fakeTables',JSON.stringify(T));});
+ await page.reload();await ready(page);
+ const names=()=>page.$$eval('#hsItems .hs-item strong',x=>x.map(e=>e.textContent.trim()));
+ const find=async(q,re)=>{await page.fill('#hsQ',q);await page.waitForFunction(src=>new RegExp(src).test(document.getElementById('hsStatus').textContent+document.getElementById('hsItems').textContent),re.source);};
+ await page.waitForFunction(()=>window.__reads.some(r=>r.table==='ar_item_cancel_sets'),null,{timeout:15000});
+ assert.ok(await page.isVisible('#hsScope [data-scope="cancelled"]'),'the owner has «الملغى»');
+ // «الكل»: 301 is not there, with the owner told that «الملغى» has it
+ await page.fill('#hsQ','CONCOR');
+ await page.waitForFunction(()=>/وفيه 1 في «الملغى»/.test(document.getElementById('hsCx').textContent),null,{timeout:15000});
+ assert.deepEqual(await names(),[],'a cancelled item is not in «الكل»');
+ assert.match(await page.textContent('#hsCx'),/وفيه 1 في «الملغى» بالاسم ده/);
+ // the same name with a higher price (401) is gone, 403 (bought after its last month) is back, 402 (idle) is gone
+ await page.fill('#hsQ','زيتا');await page.waitForFunction(()=>/مفيش صنف/.test(document.getElementById('hsStatus').textContent));
+ await find('سيجما',/سيجما ٥ مجم/);assert.deepEqual(await names(),['سيجما ٥ مجم'],'bought after its last movement: back for good');
+ await page.fill('#hsQ','اوميجا');await page.waitForFunction(()=>/مفيش صنف/.test(document.getElementById('hsStatus').textContent));
+ // stock and the shortage list keep an item on screen, with the mark
+ await find('بروفين',/بروفين ٤٠٠/);let c=await cards(page);assert.deepEqual(c[0].tags,['3 علب','ناقص','🚫 ملغي']);
+ await find('FLAGYL',/فلاجيل ١٢٥ شراب/);c=await cards(page);assert.ok(c[0].tags.includes('🚫 ملغي'),'on the shortage list: stays, marked');
+ // the other buttons leave it out too
+ await page.click('[data-scope="lists"]');await page.fill('#hsQ','CONCOR');await page.waitForFunction(()=>/مفيش صنف بالاسم ده في القوايم/.test(document.getElementById('hsStatus').textContent));
+ // «الملغى»: the cancelled ones, each with its reason, and «ارجعه»
+ await page.click('[data-scope="cancelled"]');
+ await find('كونكور',/كونكور ٥ غلط/);
+ assert.match(await page.textContent('#hsStatus'),/في الملغى/);
+ c=await cards(page);assert.deepEqual(c[0].tags,['ملوش رصيد','مكتوب جنب اسمه «ملغى»']);
+ await find('زيتا',/زيتا ١٠ مجم/);c=await cards(page);assert.ok(c[0].tags.includes('نفس الاسم بسعر أعلى: 30 ج'));
+ await find('اوميجا',/اوميجا ٢٠ مجم/);c=await cards(page);assert.ok(c[0].tags.includes('مفيش حركة من سنتين · آخر حركة 03/2021'));
+ await find('بروفين',/مفيش صنف بالاسم ده في الملغى/);assert.deepEqual(await names(),[],'an item with stock is not under «الملغى»');
+ // «ارجعه»: one write, the item is back in «الكل» at once and stays back
+ await find('كونكور',/كونكور ٥ غلط/);
+ await page.click('#hsItems [data-restore]');
+ await page.waitForFunction(()=>/رجع للبحث/.test(document.getElementById('hsStatus').textContent));
+ assert.deepEqual(await names(),[],'it left «الملغى»');
+ const w=await page.evaluate(()=>window.__fakeWrites.filter(x=>/ar_item_cancel/.test(JSON.stringify(x))));
+ assert.equal(w.length,1);assert.equal(w[0].table,'ar_item_cancel_restored');assert.deepEqual(w[0].v.map(r=>r.item_id),[301]);
+ await page.click('[data-scope="all"]');await find('CONCOR',/كونكور ٥ غلط/);
+ assert.deepEqual((await cards(page))[0].tags,['ملوش رصيد']);
+ // the server keeps the row (the fake keeps its tables in memory only: carry it over the reload): 301 is still back
+ await page.evaluate(()=>{const T=JSON.parse(localStorage.getItem('__fakeTables'));T.ar_item_cancel_restored=window.__tables.ar_item_cancel_restored;localStorage.setItem('__fakeTables',JSON.stringify(T));});
+ await page.reload();await ready(page);await page.fill('#hsQ','CONCOR');
+ await page.waitForFunction(()=>/كونكور ٥ غلط/.test(document.getElementById('hsItems').textContent),null,{timeout:15000});
+ // staff never see «الملغى»; a scope left on it goes back to «الكل»
+ await page.evaluate(()=>{window.AskerStaff=Object.assign(window.AskerStaff||{},{isStaff:()=>true});});
+ await page.fill('#hsQ','CONCOR');await page.fill('#hsQ','CONCOR ');
+ await page.waitForFunction(()=>document.querySelector('#hsScope [data-scope="cancelled"]').classList.contains('hidden'));
+ assert.equal(await page.evaluate(()=>window.__fakeWrites.filter(x=>/ar_item_cancel/.test(JSON.stringify(x))).length),0,'a reload wrote nothing');
 },{home:true});
 run('settings: 27 colors (the calm sky blue first and the default), any color, the night look, kept after a reload',async({page})=>{
  // a new phone opens on the calm sky blue (2026-11-19 night; the calm orange 11-17, the vivid orange 11-15, the blue of the round logo before)

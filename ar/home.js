@@ -89,7 +89,56 @@
       it._h = [fold(it.ar), fold(it.en)];
     }
     for (const l of extra) l._h = [fold(l.supplier_name), fold(l.pharmafly_name || '')];
-    return { items, extra };
+    // «الملغى» (owner 2026-11-21): the cancelled items (src.cancel, parseCancel) leave «الكل» and the other buttons: visible / gone
+    const visible = [], gone = [];
+    for (const it of items) {
+      const st = src.cancel && it.id != null ? cancelState(it, src.cancel.get(String(it.id))) : null;
+      if (st && st.hidden) { it.cancel = st; gone.push(it); } else { if (st) it.cancelNote = st; visible.push(it); }
+    }
+    return { items, extra, visible, gone };
+  }
+  // ---------- «الملغى» (owner 2026-11-20/21: «الاخفاء هيبقا عالملغى أو اللي جنب اسمه ملغى أو اللي ليه اسم تاني بسعر اعلى … والأصناف اللي ما عليهاش حركة من سنتين …
+  // ويرجع بشكل أوتوماتيك لو دخل مشتريات بعدين») ----------
+  // the laptop's lists (ar_item_cancel_sets, Store\SYNC_ITEM_CANCEL.ps1) + the owner's «ارجعه» (ar_item_cancel_restored) as rows {kind, ids}:
+  //   word «id:YYYYMMDD» (the day it was first seen), dup «id:YYYYMMDD:price of the card that stays», idle «id:YYYYMM» (the last month anything moved; 000000 = never),
+  //   restored «id,id,…». -> Map(id -> {kind, first | last, keep}); an id the owner put back is not in it
+  function parseCancel(rows) {
+    const rank = { word: 0, dup: 1, idle: 2 };
+    const map = new Map(), back = new Set();
+    const day = (d) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+    for (const r of [...(rows || [])].sort((a, b) => (rank[a && a.kind] ?? 9) - (rank[b && b.kind] ?? 9))) {
+      if (!r || !r.kind) continue;
+      for (const tok of String(r.ids || '').split(',')) {
+        if (!tok) continue;
+        const p = tok.split(':'), id = p[0];
+        if (r.kind === 'restored') { back.add(id); continue; }
+        if (map.has(id)) continue; // word beats dup beats idle
+        if (r.kind === 'word' && /^\d{8}$/.test(p[1] || '')) map.set(id, { kind: 'word', first: day(p[1]) });
+        else if (r.kind === 'dup' && /^\d{8}$/.test(p[1] || '')) map.set(id, { kind: 'dup', first: day(p[1]), keep: num(p[2]) });
+        else if (r.kind === 'idle' && /^\d{6}$/.test(p[1] || '')) map.set(id, { kind: 'idle', last: p[1] === '000000' ? null : p[1].slice(0, 4) + '-' + p[1].slice(4, 6) });
+      }
+    }
+    for (const id of back) map.delete(id);
+    return map;
+  }
+  // one item against its entry: null = not cancelled (a purchase after the day it was first seen, or after its last month, brought it back for good; an idle item a warehouse lists
+  // today is a market item that is alive: owner 2026-11-21 «الموجود في قوايم المخازن متلغيهوش لان دي اصناف سوق وشغالة»); else {hidden}: an item with stock or on the shortage list
+  // stays on screen with a «🚫 ملغي» mark instead of going to «الملغى»
+  function cancelState(it, e) {
+    if (!e) return null;
+    const buys = (it.buys || []).map((b) => String((b && b.date) || ''));
+    if (e.kind === 'idle') { if (buys.some((d) => d.slice(0, 7) > (e.last || '0000-00')) || (it.offers || []).length > 0) return null; }
+    else if (buys.some((d) => d.slice(0, 10) > e.first)) return null;
+    const s = it.stock, has = !!s && (num(s.packs) || 0) + (num(s.units) || 0) > 0;
+    return Object.assign({ hidden: !(has || !!it.short) }, e);
+  }
+  // why it is cancelled, in the owner's words (the card under «الملغى»)
+  function cancelWhy(it) {
+    const c = it.cancel || it.cancelNote;
+    if (!c) return '';
+    if (c.kind === 'word') return /لاغ[ىي]/.test(String(it.en || it.ar || '')) ? 'مكتوب جنب اسمه «لاغى»' : 'مكتوب جنب اسمه «ملغى»';
+    if (c.kind === 'dup') return c.keep != null ? `نفس الاسم بسعر أعلى: ${r2(c.keep)} ج` : 'نفس الاسم بسعر أعلى';
+    return c.last ? `مفيش حركة من سنتين · آخر حركة ${c.last.slice(5)}/${c.last.slice(0, 4)}` : 'مفيش حركة من سنتين · عمره ما اتباع ولا اتشترى';
   }
   // the marks under the name, in this order: stock, ناقص, اتطلب النهارده
   function marks(it, qtyText) {
@@ -100,6 +149,7 @@
     else out.push({ text: 'ملوش رصيد', kind: 'none' });
     if (it.short) out.push({ text: 'ناقص', kind: 'bad' });
     if (it.ordered) out.push({ text: 'اتطلب النهارده', kind: 'warn' });
+    if (it.cancelNote) out.push({ text: '🚫 ملغي', kind: 'warn' }); // cancelled but kept on screen (stock, shortage list, a warehouse's list)
     return out;
   }
   // «في القوايم: AMG 22% · رضا عطية 20% · …» every warehouse (there are four lists; 2026-11-12: the fourth was cut before)
@@ -132,12 +182,14 @@
   // the four buttons under the box (owner 2026-11-12): الكل / المخزون (has stock now) / القوايم (in a warehouse's list) /
   // النواقص (on the shortage list)
   function inScope(it, scope) {
+    if (scope === 'cancelled') return !!it.cancel;
+    if (it.cancel) return false; // a cancelled item is only under «الملغى»
     if (scope === 'stock') { const s = it.stock; return !!s && (num(s.packs) || 0) + (num(s.units) || 0) > 0; }
     if (scope === 'lists') return (it.offers || []).length > 0;
     if (scope === 'short') return !!it.short;
     return true;
   }
-  const SCOPE_WORDS = { stock: 'في المخزون', lists: 'في القوايم', short: 'في النواقص' };
+  const SCOPE_WORDS = { stock: 'في المخزون', lists: 'في القوايم', short: 'في النواقص', cancelled: 'في الملغى' };
   // a warehouse list priced differently from ours (owner 2026-11-15: «لو … سعره عندي جنيه، وفي حد في القوائم سعره جنيه وربع، تكتب
   // لي جنبه وفي القوائم مخزن كذا جنيه وربع»): the newest line of each warehouse whose price is not ours
   function listPriceText(it, ours) {
@@ -152,7 +204,7 @@
     }
     return diff.length ? 'وفي القوايم ' + diff.join(' · ') : '';
   }
-  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists, listPriceText };
+  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists, listPriceText, parseCancel, cancelState, cancelWhy };
   root.AskerHomeLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -168,6 +220,9 @@
   let lines = null, linesLoading = null, linesFail = '';
   let catalog = null, catLoading = null, catFail = '';
   let buys = null, buysLoading = null; // «آخر شرا» (ar_item_buys): quiet when the table is not there yet
+  let cancelRows = null, cancelMap = null, cancelLoading = null; // «الملغى» (ar_item_cancel_sets + ar_item_cancel_restored): quiet when the tables are not there yet
+  // the owner and the staff who may search read the cancelled lists; only the owner has «الملغى» and «ارجعه»
+  const isOwner = () => !(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
   let scope = 'all'; // the button under the box; every page open starts on «الكل», so nothing is hidden by a forgotten choice
 
   function say(text, kind) {
@@ -225,6 +280,32 @@
       .catch(() => { buys = []; }) // not there yet (before its migration) or not readable: the cards just have no «آخر شرا»
       .finally(() => { buysLoading = null; draw(); });
   }
+  // the laptop's cancelled lists (3 short rows of text) + the ids the owner put back: one small read, kept on the phone like the other lists
+  async function readCancel() {
+    const one = (table, cols) => (root.AskerCache && root.AskerCache.limited ? root.AskerCache.limited(() => db().from(table).select(cols), 30000) : db().from(table).select(cols));
+    const s = await one('ar_item_cancel_sets', 'kind,ids');
+    if (s.error) throw s.error;
+    const rows = [...(s.data || [])];
+    const r = await one('ar_item_cancel_restored', 'item_id');
+    if (!r.error) rows.push({ kind: 'restored', ids: (r.data || []).map((x) => x.item_id).join(',') });
+    return rows;
+  }
+  function keepCancel() { if (cancelRows && cache()) cache().set('hs-cancel-v1', { at: Date.now(), rows: cancelRows }); }
+  // the kept copy shows at once, but the server is ALWAYS read too (it is a few short rows): an item the owner put back must never come back cancelled from an old copy
+  function loadCancel() {
+    if (cancelRows || cancelLoading || !db()) return;
+    cancelLoading = (async () => {
+      const copy = cache() ? await cache().get('hs-cancel-v1') : null;
+      if (copy && Array.isArray(copy.rows) && copy.rows.length) { cancelRows = copy.rows; cancelMap = parseCancel(cancelRows); draw(); }
+      const rows = await readCancel();
+      cancelRows = rows; cancelMap = parseCancel(rows);
+      keepCancel();
+    })()
+      .catch(() => { if (!cancelRows) { cancelRows = []; cancelMap = new Map(); } }) // not there yet (before its migration) or no line: the kept copy stays, else nothing is cancelled
+      .finally(() => { cancelLoading = null; draw(); });
+  }
+  // «الملغى» is the owner's button (staff never see it)
+  function showScopeChip() { const b = document.querySelector('#hsScope [data-scope="cancelled"]'); if (b) b.classList.toggle('hidden', !isOwner()); }
   function loadLines() {
     if (lines || linesLoading || !root.AskerSuppliers || !root.AskerSuppliers.lines) return;
     linesLoading = root.AskerSuppliers.lines()
@@ -240,7 +321,8 @@
     if (preloaded || !db() || !$('app') || $('app').classList.contains('hidden')) return;
     if (root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff() && !(root.AskerStaff.can && root.AskerStaff.can('search'))) return;
     preloaded = true;
-    loadCatalog(); loadLines(); loadBuys(); askStock();
+    showScopeChip();
+    loadCatalog(); loadLines(); loadBuys(); loadCancel(); askStock();
   }
   let stockAsked = false;
   function askStock() {
@@ -252,10 +334,10 @@
   function currentIndex() {
     const L = root.AskerApp && root.AskerApp.lookup ? root.AskerApp.lookup() : { shortages: [], knownNames: new Map(), orders: [], nk: (s) => String(s || '').toUpperCase().trim() };
     const stock = root.AskerStock ? root.AskerStock.rows() : [];
-    const src = [catalog, stock, lines, buys, L.shortages, L.knownNames, L.orders];
+    const src = [catalog, stock, lines, buys, cancelMap, L.shortages, L.knownNames, L.orders];
     if (index && built && src.every((x, i) => x === built[i])) return index;
     built = src;
-    index = buildIndex({ items: catalog || [], stock, lines: lines || [], buys: buys || [], shortages: L.shortages, names: L.knownNames, orders: L.orders, nk: L.nk, sure: root.AskerSuppliers && root.AskerSuppliers.sure, fold: fz().fold });
+    index = buildIndex({ items: catalog || [], stock, lines: lines || [], buys: buys || [], cancel: cancelMap, shortages: L.shortages, names: L.knownNames, orders: L.orders, nk: L.nk, sure: root.AskerSuppliers && root.AskerSuppliers.sure, fold: fz().fold });
     return index;
   }
   const PEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -271,7 +353,8 @@
   function card(it) {
     const lib = stockLib();
     const lists = scope === 'lists', pharmacy = scope === 'stock';
-    const tags = marks(it, lib.qtyText).filter((m) => !lists || m.kind === 'bad' || m.kind === 'warn').map((m) => `<span class="tag ${m.kind}">${esc(m.text)}</span>`).join('');
+    const tags = marks(it, lib.qtyText).filter((m) => !lists || m.kind === 'bad' || m.kind === 'warn').map((m) => `<span class="tag ${m.kind}">${esc(m.text)}</span>`).join('')
+      + (it.cancel ? `<span class="tag warn">${esc(cancelWhy(it))}</span>` : ''); // under «الملغى»: why it is there
     const s = lists ? null : it.stock;
     // the public price in every view, «القوايم» too (owner 2026-11-15: «السعر الجمهور ما بيظهرش في كارت الصنف … انا ببحث اعرف
     // سعره»): the pharmacy's price, else the store's, else the newest warehouse list's
@@ -304,7 +387,21 @@
   function actionsRow(it) {
     if (root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff()) return '';
     if (it.id == null) return '<div class="hs-ia"><button type="button" class="chip" disabled>⚙️ عمليات وتقارير</button> <small class="hint">الصنف ده لسه مش متسجل في فارما فلاي</small></div>';
-    return `<div class="hs-ia"><button type="button" class="chip on" data-ia>⚙️ عمليات وتقارير</button></div>`;
+    return `<div class="hs-ia"><button type="button" class="chip on" data-ia>⚙️ عمليات وتقارير</button>${it.cancel ? '<button type="button" class="chip on" data-restore>↩️ ارجعه</button>' : ''}</div>`;
+  }
+  // «ارجعه» (owner): the item goes back to the search for good (ar_item_cancel_restored); the laptop's lists never take it again
+  async function restoreItem(it, btn) {
+    btn.disabled = true;
+    const { error } = await db().from('ar_item_cancel_restored').upsert({ item_id: Number(it.id) }, { onConflict: 'item_id', ignoreDuplicates: true });
+    if (error) { btn.disabled = false; return say('ماترجعش: ' + (error.message || error), 'bad'); }
+    const prev = (cancelRows || []).find((r) => r.kind === 'restored');
+    const ids = new Set(String((prev && prev.ids) || '').split(',').filter(Boolean));
+    ids.add(String(it.id));
+    cancelRows = [...(cancelRows || []).filter((r) => r.kind !== 'restored'), { kind: 'restored', ids: [...ids].join(',') }];
+    cancelMap = parseCancel(cancelRows);
+    keepCancel();
+    draw();
+    say('«' + (it.ar || it.en) + '» رجع للبحث', 'good');
   }
   // «دراج آي» / «الجرعات» on the phone (owner 2026-11-19, ar/work-apps.js): the item's trade name is copied and the app opens (Android only)
   function appsRow(it) {
@@ -336,11 +433,14 @@
     $('hsClear')?.classList.toggle('hidden', !box.value);
     $('hsOut')?.classList.toggle('hidden', !on);
     $('app')?.classList.toggle('searching', on);
-    if (!on) { $('hsItems').innerHTML = ''; $('hsLinesBox').classList.add('hidden'); editing = null; return say(''); }
+    if (!on) { $('hsItems').innerHTML = ''; $('hsLinesBox').classList.add('hidden'); $('hsCx')?.classList.add('hidden'); editing = null; return say(''); }
     if (editing && document.activeElement && document.activeElement.id === 'hsAr') return; // never wipe what is being typed
-    loadCatalog(); loadLines(); loadBuys(); askStock();
+    showScopeChip();
+    loadCatalog(); loadLines(); loadBuys(); loadCancel(); askStock();
+    if (scope === 'cancelled' && !isOwner()) scope = 'all';
     const ix = currentIndex();
-    const pool = scope === 'all' ? ix.items : ix.items.filter((it) => inScope(it, scope));
+    // «الكل» and the other buttons leave the cancelled items out; «الملغى» (owner) holds only them
+    const pool = scope === 'cancelled' ? ix.gone : scope === 'all' ? ix.visible : ix.visible.filter((it) => inScope(it, scope));
     // only the names close to the best one (owner 2026-11-13: «Abimol» filled 25 cards with ALFABRIMO, CARBIMAZOLE…)
     const hits = fz().rank(q, pool, (it) => it._h, 25, { rel: 0.75 });
     // the warehouses' lines that are not surely one of our items belong to «الكل» and «القوايم»
@@ -349,6 +449,13 @@
     const extra = lines && (scope === 'all' || scope === 'lists') ? fz().rank(q, ix.extra, (l) => l._h, 10, { strict: true, min: 0.6 }) : [];
     shown = new Map(hits.map((it) => [it.key, it]));
     $('hsItems').innerHTML = hits.map(card).join('');
+    // the owner is told when the same name has cancelled items too (so a missing item is never taken for «not in the system»)
+    const cx = $('hsCx');
+    if (cx) {
+      const n = isOwner() && scope !== 'cancelled' && ix.gone.length ? fz().rank(q, ix.gone, (it) => it._h, 25, { rel: 0.75 }).length : 0;
+      cx.classList.toggle('hidden', !n);
+      cx.textContent = n ? `وفيه ${n} في «الملغى» بالاسم ده · شوفهم` : '';
+    }
     if (editing && shown.has(editing)) openEditor(editing);
     $('hsLines').innerHTML = extra.map(line).join('');
     $('hsLinesBox').classList.toggle('hidden', !extra.length);
@@ -402,21 +509,28 @@
     const warm = setInterval(() => { tries++; setTimeout(preload, 0); if (preloaded || tries > 60) clearInterval(warm); }, 2000);
     box.addEventListener('input', () => { editing = null; clearTimeout(timer); timer = setTimeout(draw, 220); });
     $('hsClear')?.addEventListener('click', () => { box.value = ''; editing = null; draw(); box.focus(); });
-    $('hsScope')?.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-scope]');
+    const pickScope = (name) => {
+      const b = $('hsScope').querySelector(`[data-scope="${name}"]`);
       if (!b) return;
-      scope = b.dataset.scope;
+      scope = name;
       $('hsScope').querySelectorAll('[data-scope]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
       editing = null;
       draw();
       if (!box.value) box.focus();
+    };
+    $('hsScope')?.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-scope]');
+      if (b) pickScope(b.dataset.scope);
     });
+    $('hsCx')?.addEventListener('click', () => pickScope('cancelled')); // «وفيه 5 في «الملغى» بالاسم ده · شوفهم»
     $('hsItems')?.addEventListener('click', async (e) => {
       const cardEl = e.target.closest('[data-k]');
       if (!cardEl) return;
       const key = cardEl.dataset.k, it = shown.get(key);
       if (!it) return;
       if (e.target.closest('[data-ia]')) { if (root.AskerItemActions) root.AskerItemActions.open(it); return; }
+      const back = e.target.closest('[data-restore]');
+      if (back) return restoreItem(it, back);
       if (e.target.closest('[data-edit]')) return openEditor(key);
       if (e.target.closest('[data-cancel]')) { editing = null; cardEl.querySelector('.hs-editbox')?.remove(); return; }
       const save = e.target.closest('[data-save]');

@@ -18,7 +18,7 @@ run('English: the switch, every section in English, names and messages untouched
  assert.equal(await page.evaluate(()=>[document.documentElement.lang,document.documentElement.dir].join(' ')),'en ltr');
  assert.equal(await page.textContent('.brand h1'),'Asker Pharmacy');
  assert.deepEqual(await page.$$eval('.bottomnav button span',s=>s.map(x=>x.textContent.trim())),['Home','Purchases','Accounts','Sales','Customer care']);
- assert.deepEqual(await page.$$eval('#hsScope [data-scope]',b=>b.map(x=>x.textContent.trim())),['All','Stock','Lists','Shortages']);
+ assert.deepEqual(await page.$$eval('#hsScope [data-scope]',b=>b.map(x=>x.textContent.trim())),['All','Stock','Cancelled','Lists','Shortages']);
  // the alerts (2026-11-12) with real-looking rows, so their lines are checked too
  await page.evaluate(()=>{window.__storage['alerts/alerts.json']=JSON.stringify({generated_at:new Date().toISOString(),data_at:'2026-11-11T23:59:08',day_start:'2026-11-11T06:00:00',soon_until:'2027-03-01',
   tasks:{expiry_mix:[{id:1,name:'LAMIFEN CREAM 15GM',parts:1,today:2,n7:5,last:'2026-11-11T22:34:52',batches:[{store:1,exp:'2028-07-28',packs:2,units:0},{store:5,store_name:'مخزن انتظار ابن سينا',exp:'2028-09-28',packs:3,units:1}]},{id:2,name:'OLDER',parts:1,today:0,n7:1,last:'2026-11-08T10:00:00',batches:[]}],
