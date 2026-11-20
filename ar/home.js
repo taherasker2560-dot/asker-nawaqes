@@ -121,16 +121,16 @@
     for (const id of back) map.delete(id);
     return map;
   }
-  // one item against its entry: null = not cancelled (a purchase after the day it was first seen, or after its last month, brought it back for good);
-  // else {hidden}: an item with stock, on the shortage list, or (idle only) in a warehouse's list stays on screen with a «🚫 ملغي» mark instead of going to «الملغى»
+  // one item against its entry: null = not cancelled (a purchase after the day it was first seen, or after its last month, brought it back for good; an idle item a warehouse lists
+  // today is a market item that is alive: owner 2026-11-21 «الموجود في قوايم المخازن متلغيهوش لان دي اصناف سوق وشغالة»); else {hidden}: an item with stock or on the shortage list
+  // stays on screen with a «🚫 ملغي» mark instead of going to «الملغى»
   function cancelState(it, e) {
     if (!e) return null;
     const buys = (it.buys || []).map((b) => String((b && b.date) || ''));
-    if (e.kind === 'idle') { if (buys.some((d) => d.slice(0, 7) > (e.last || '0000-00'))) return null; }
+    if (e.kind === 'idle') { if (buys.some((d) => d.slice(0, 7) > (e.last || '0000-00')) || (it.offers || []).length > 0) return null; }
     else if (buys.some((d) => d.slice(0, 10) > e.first)) return null;
     const s = it.stock, has = !!s && (num(s.packs) || 0) + (num(s.units) || 0) > 0;
-    const stays = has || !!it.short || (e.kind === 'idle' && (it.offers || []).length > 0);
-    return Object.assign({ hidden: !stays }, e);
+    return Object.assign({ hidden: !(has || !!it.short) }, e);
   }
   // why it is cancelled, in the owner's words (the card under «الملغى»)
   function cancelWhy(it) {

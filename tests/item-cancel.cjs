@@ -28,11 +28,12 @@ const idle = { kind: 'idle', last: '2021-03' }, word = { kind: 'word', first: '2
 assert.equal(H.cancelState(it({}), undefined), null, 'no entry = not cancelled');
 assert.equal(H.cancelState(it({}), idle).hidden, true, 'idle, nothing else: hidden');
 assert.equal(H.cancelState(it({}), word).hidden, true); assert.equal(H.cancelState(it({}), dup).hidden, true);
-// stock, the shortage list: stays on screen (with the mark); an idle item in a warehouse's list stays too, a word/dup one does not
+// stock, the shortage list: stays on screen (with the mark); an idle item a warehouse lists is not cancelled at all (no mark: owner 2026-11-21, market items that are alive), a word/dup one still is
 assert.equal(H.cancelState(it({ stock: { packs: 2, units: 0 } }), word).hidden, false, 'with stock: stays');
 assert.equal(H.cancelState(it({ stock: { packs: 0, units: 0 } }), word).hidden, true, 'a stock row of zero is no stock');
 assert.equal(H.cancelState(it({ short: true }), dup).hidden, false, 'on the shortage list: stays');
-assert.equal(H.cancelState(it({ offers: [{ supplier: 'AMG' }] }), idle).hidden, false, 'idle but in a warehouse list: stays');
+assert.equal(H.cancelState(it({ offers: [{ supplier: 'AMG' }] }), idle), null, 'idle but a warehouse lists it today: not cancelled, no mark');
+assert.equal(H.cancelState(it({ offers: [{ supplier: 'AMG' }] }), { kind: 'idle', last: null }), null, 'never sold nor bought but in a warehouse list: not cancelled');
 assert.equal(H.cancelState(it({ offers: [{ supplier: 'AMG' }] }), word).hidden, true, 'a «ملغى» item in a list is still cancelled');
 // a purchase brings it back for good: after the day it was first seen (word, dup) or after its last month (idle)
 assert.equal(H.cancelState(it({ buys: [{ date: '2026-11-22' }] }), word), null, 'bought after the day it was first seen: back');
