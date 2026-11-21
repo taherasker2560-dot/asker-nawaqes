@@ -205,7 +205,6 @@
           <div class="chips" data-pfor="orders" role="group" aria-label="طلبيات" hidden>
             <button type="button" class="chip" data-tab="drafts">الطلبيات</button
             ><button type="button" class="chip" data-tab="docs">الفواتير</button
-            ><button type="button" class="chip" data-tab="review">المراجعة</button
             ><button type="button" class="chip" data-tab="suppliers">قوايم المخازن</button
             ><button type="button" class="chip" data-tab="wait">الانتظار</button>
           </div>
@@ -537,6 +536,15 @@
           </details>
         </section>
 
+        <!-- «🧾 مراجعة الفواتير» (owner 2026-11-21, ar/invoice-review.js): the invoices Claude has read and prepared, before they are entered in PharmaFly; he answers the notes and approves; owner only -->
+        <section id="reviewPanel" class="card hidden">
+          <h2>مراجعة الفواتير قبل الإدخال</h2>
+          <p class="hint">الفواتير اللي قريتها وجهّزتها. راجعها، ورد على الملاحظات، وبعدين «وافق ودخّلها» أو Enter. مش هدخّل حاجة في فارمافلاي قبل موافقتك.</p>
+          <button id="rvRefresh" type="button" class="rv-link">تحديث</button>
+          <p id="rvStatus" class="status"></p>
+          <div id="rvMain"></div>
+        </section>
+
         <section id="docsPanel" class="card hidden">
           <h2>فواتير الشرا والإيصالات</h2>
           <p class="hint">
@@ -553,15 +561,6 @@
           <h3 id="dcWaitTitle">مستنية</h3>
           <div id="dcWait"></div>
           <div id="dcDoneBox" class="hidden"><h3>اتعملت</h3><div id="dcDone"></div></div>
-        </section>
-
-        <!-- «🧾 مراجعة الفواتير» (owner 2026-11-21, ar/invoice-review.js): the invoices Claude has read and prepared, before they are entered in PharmaFly; he answers the notes and approves; owner only -->
-        <section id="reviewPanel" class="card hidden">
-          <h2>مراجعة الفواتير قبل الإدخال</h2>
-          <p class="hint">الفواتير اللي قريتها وجهّزتها. راجعها، ورد على الملاحظات، وبعدين «وافق ودخّلها» أو Enter. مش هدخّل حاجة في فارمافلاي قبل موافقتك.</p>
-          <button id="rvRefresh" type="button" class="rv-link">تحديث</button>
-          <p id="rvStatus" class="status"></p>
-          <div id="rvMain"></div>
         </section>
 
         <section id="draftsPanel" class="card hidden">

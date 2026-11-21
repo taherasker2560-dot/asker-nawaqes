@@ -22,14 +22,16 @@ const seed=(page)=>page.evaluate(()=>{
   mk(17,6,'مورد ز','900006',90,lines(90),{status:'failed',result:{msg:'وقفت عند رسالة جديدة في فارمافلاي'}})];
  // the paper's photo comes from the private bucket as a signed address (the fake gives a one-pixel picture)
 });
-const open=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="review"]');await page.waitForSelector('#rvMain .rv-card');};
+const open=async(page)=>{await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');await page.waitForSelector('#rvMain .rv-card');};
 const rows=(page)=>page.evaluate(()=>JSON.parse(JSON.stringify(window.__tables.ar_invoice_reviews)));
 const row=async(page,id)=>(await rows(page)).find(r=>r.id===id);
 
 run('Invoice review: the cards in box order, chips, summary, «وافق على الجاهز»',async({page})=>{
  await seed(page);await open(page);
  assert.ok(await page.isVisible('#reviewPanel'));
- assert.deepEqual(await texts(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','المراجعة','قوايم المخازن','الانتظار'],'the tab sits with the orders, after «الفواتير»');
+ assert.deepEqual(await texts(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن','الانتظار'],'no new small tab (the row would not fit a phone): the review is the top of «الفواتير»');
+ assert.ok(await page.isVisible('#docsPanel'),'the photos card is still there');
+ assert.ok(await page.evaluate(()=>!!(document.getElementById('reviewPanel').compareDocumentPosition(document.getElementById('docsPanel'))&Node.DOCUMENT_POSITION_FOLLOWING)),'the review card comes first');
  assert.deepEqual(await texts(page,'#rvMain .py-h'),['مستنية موافقتك 4','وافقت عليها (بتتدخل) 1','وقفت 1','اتدخلت 1']);
  // the waiting ones in the box order 1, 2, 3, 9 (the number is in the circle)
  const ords=await page.$$eval('#rvMain .rv-card .rv-ord',(b)=>b.map(x=>x.textContent));
@@ -96,10 +98,12 @@ run('Invoice review: the notes, each answer saved, the button works only when al
 run('Invoice review: hold, the laptop\'s results, the paper\'s photo and its viewer, the badge and the home row, the empty screen',async({page})=>{
  await seed(page);
  // the badge and the home row count the READY ones (a held one waits on purpose, an approved one is the laptop's)
+ await page.evaluate(()=>{const now=new Date().toISOString();window.__tables.ar_documents=[{id:'d1',source:'whatsapp',file_path:'docs/2026-11-21/1.jpg',kind:'image',status:'new',received_at:now},{id:'d2',source:'whatsapp',file_path:'docs/2026-11-21/2.jpg',kind:'image',status:'new',received_at:now}]});
  await page.evaluate(()=>window.AskerNotify.tick());
- await page.waitForFunction(()=>document.querySelector('.subbar [data-tab="review"]')?.dataset.badge,null,{timeout:5000});
- assert.equal(await page.getAttribute('.subbar [data-tab="review"]','data-badge'),'4');
- assert.match((await texts(page,'#todoList .todo-row')).join('|'),/4\s*فاتورة متجهزة مستنية موافقتك/);
+ await page.waitForFunction(()=>document.querySelector('.subbar [data-tab="docs"]')?.dataset.badge,null,{timeout:5000});
+ assert.equal(await page.getAttribute('.subbar [data-tab="docs"]','data-badge'),'6','two photos waiting + four prepared invoices on the one small tab');
+ const todo=(await texts(page,'#todoList .todo-row')).join('|');
+ assert.match(todo,/4\s*فاتورة متجهزة مستنية موافقتك/);assert.match(todo,/2\s*صورة مستنية في الفواتير/);
  await open(page);
  // hold: the invoice stays but is not counted and not entered until he approves it
  await page.click('[data-rv="12"] [data-rv-toggle]');await page.click('[data-rv-hold="12"]');
@@ -123,4 +127,7 @@ run('Invoice review: hold, the laptop\'s results, the paper\'s photo and its vie
  await page.evaluate(()=>{window.__tables.ar_invoice_reviews=[];return window.AskerInvReview.open()});
  await page.waitForFunction(()=>/مفيش فواتير متجهزة دلوقتي/.test(document.getElementById('rvMain').textContent),null,{timeout:5000});
  assert.equal(await page.$('[data-rv-allok]'),null);
+ // a staff member with the invoices switch sees the photos, never this card (the table is the owner's)
+ await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;window.AskerApp.showTab('home');window.AskerApp.showTab('docs')});
+ assert.ok(!(await page.isVisible('#reviewPanel')),'hidden for staff');assert.ok(await page.isVisible('#docsPanel'));
 });

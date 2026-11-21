@@ -224,10 +224,10 @@
   // a [data-tab], and a section (and a group of «المشتريات») remembers the small tab you were on.
   const GROUP_OF = {
     home: 'home',
-    short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', review: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
+    short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
     customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', sales: 'sales', tempsale: 'sales', care: 'care',
   };
-  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', review: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
+  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
   const lastPTab = { short: 'short', orders: 'drafts', stock: 'stock' };
   function showTab(tab) {
@@ -277,9 +277,10 @@
     if (tab === 'suppliers') window.AskerSuppliers?.open();
     $('docsPanel')?.classList.toggle('hidden', tab !== 'docs');
     if (tab === 'docs') window.AskerDocs?.open();
-    // «🧾 مراجعة الفواتير» (ar/invoice-review.js, owner 2026-11-21): the invoices Claude prepared, before they are entered; owner only
-    $('reviewPanel')?.classList.toggle('hidden', tab !== 'review');
-    if (tab === 'review') window.AskerInvReview?.open(); else window.AskerInvReview?.close();
+    // «🧾 مراجعة الفواتير» (ar/invoice-review.js, owner 2026-11-21): the invoices Claude prepared, before they are entered, at the top of «الفواتير»; the owner only (a staff member sees only the photos)
+    const reviewOn = tab === 'docs' && !(window.AskerStaff && window.AskerStaff.isStaff && window.AskerStaff.isStaff());
+    $('reviewPanel')?.classList.toggle('hidden', !reviewOn);
+    if (reviewOn) window.AskerInvReview?.open(); else window.AskerInvReview?.close();
     $('draftsPanel')?.classList.toggle('hidden', tab !== 'drafts');
     if (tab === 'drafts') { window.AskerRepInvoices?.open(); window.AskerPoStatement?.open(); window.AskerOrderCompare?.open(); window.AskerOrderDrafts?.open(); }
     $('stockPanel')?.classList.toggle('hidden', tab !== 'stock');

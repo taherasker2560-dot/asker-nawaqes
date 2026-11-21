@@ -24,7 +24,7 @@
     { key: 'incoming', group: 'purchases', tab: 'read', sound: 'pop', title: 'وارد جديد من المخازن', body: (n) => `${n} جديد في الوارد` },
     { key: 'docs', group: 'purchases', tab: 'docs', sound: 'ding', title: 'فاتورة جديدة مستنية', body: (n) => `${n} صورة مستنية في الفواتير` },
     // «🧾 مراجعة الفواتير» (ar/invoice-review.js, owner 2026-11-21): invoices Claude prepared and is waiting for his yes before entering them
-    { key: 'review', group: 'purchases', tab: 'review', sound: 'ding', title: 'فاتورة جاهزة مستنية موافقتك', body: (n) => `${n} فاتورة متجهزة مستنية موافقتك قبل ما تتدخل` },
+    { key: 'review', group: 'purchases', tab: 'docs', sound: 'ding', title: 'فاتورة جاهزة مستنية موافقتك', body: (n) => `${n} فاتورة متجهزة مستنية موافقتك قبل ما تتدخل` },
     { key: 'expiry', group: 'purchases', tab: 'expiry', sound: 'double', title: 'صلاحيات محتاجة شغل', body: (n) => `${n} صنف النهارده: صلاحيات اتلخبطت من البيع أو بيع بالسالب` },
     { key: 'customers', group: 'accounts', tab: 'customers', sound: 'alert', title: 'عميل عدّى الحد', body: (n) => `${n} عميل عدّوا حدهم` },
     { key: 'store', group: 'sales', tab: 'storeorders', sound: 'bell', title: 'طلب جديد من الموقع', body: (n) => `${n} طلب جديد من الموقع` },
@@ -169,10 +169,13 @@
       const n = g[b.dataset.group] || 0;
       if (n) b.dataset.badge = n > 99 ? '99+' : String(n); else delete b.dataset.badge;
     });
-    for (const k of KINDS) {
-      const chip = document.querySelector(`.subbar [data-tab="${k.tab}"]`);
+    // two kinds can sit on one small tab (the invoice photos and the prepared invoices, both on «الفواتير»): their numbers add up
+    const byTab = {};
+    for (const k of KINDS) byTab[k.tab] = (byTab[k.tab] || 0) + (counts[k.key] || 0);
+    for (const tab of Object.keys(byTab)) {
+      const chip = document.querySelector(`.subbar [data-tab="${tab}"]`);
       if (!chip) continue;
-      const n = counts[k.key] || 0;
+      const n = byTab[tab];
       if (n) chip.dataset.badge = n > 99 ? '99+' : String(n); else delete chip.dataset.badge;
     }
   }
