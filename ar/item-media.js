@@ -120,6 +120,7 @@
   async function open(id, title, en) {
     cur = { id: String(id), title: title || en || '', en: en || '' };
     last = ['', false];
+    readState = null; pollGen++; // a photo reading belongs to the item it was asked for; the latest one is looked up when the edit panel opens
     sheetEl().hidden = false;
     await draw(false);
   }
@@ -159,6 +160,8 @@
         <label class="im-l">المادة الفعالة بالإنجليزي<input id="imActEn" class="im-in" type="text" maxlength="200" dir="ltr" value="${esc(e.active_en || '')}"></label>
       </div>
       <p class="hint">اللي تكتبه بلغة واحدة بس بيتعرض زي ما هو في اللغتين.</p>
+      <label class="im-btn">📷 صوّر المادة الفعالة من العلبة<input type="file" id="imActFile" accept="image/*" capture="environment" hidden></label>
+      <div id="imRead"></div>
       <h4>البيان</h4>
       <label class="im-l">الجملة التسويقية<textarea id="imH" rows="2">${esc(d ? d.h : '')}</textarea></label>
       <label class="im-l">بيستخدم في (كل نقطة في سطر)<textarea id="imU" rows="2">${esc(d ? (d.u || []).join('\n') : '')}</textarea></label>
@@ -172,6 +175,8 @@
     note(last[0], last[1]);
     box.querySelectorAll('[data-alt]').forEach((b) => b.addEventListener('click', () => sendPhoto({ url: list[Number(b.dataset.alt)] })));
     document.getElementById('imFile').addEventListener('change', (ev) => phoneFile(ev.target.files && ev.target.files[0]));
+    document.getElementById('imActFile').addEventListener('change', (ev) => { const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; if (f) askRead(f); });
+    if (readState && readState.item === id) renderRead(); else loadLatestRead();
     const on = (bid, f) => { const b = document.getElementById(bid); if (b) b.addEventListener('click', f); };
     on('imNoImg', async () => { if (await save({ img_off: true })) note('الصورة اتشالت ✔'); });
     on('imImgBack', async () => { if (await save({ img: null, img_off: false })) note('رجعت الصورة الأصلية ✔'); });
@@ -211,16 +216,92 @@
     if (name && name.length < 2) return note('الاسم قصير قوي', true);
     if (!nameChanged && !activeChanged && !descChanged) return note('مفيش تغيير');
     busy = true; note('بيحفظ…');
+    // a photo reading he is checking counts as used once he saves the active ingredient (set before the save: the panel is drawn again inside it and must not fill the fields from the reading again)
+    const usesRead = activeChanged && readState && readState.item === id && readState.status === 'done' && !readState.applied;
+    if (usesRead) readState.applied = true;
     try {
       if (nameChanged) await saveName(id, cur.en, name);
       const patch = {};
       if (activeChanged) { patch.active_ar = aAr || null; patch.active_en = aEn || null; }
       if (descChanged) { patch.descr = editLib().descFromForm(form); patch.desc_off = false; }
       busy = false;
-      if (Object.keys(patch).length) { if (!(await save(patch))) return; } else await draw(true);
+      if (Object.keys(patch).length) { if (!(await save(patch))) { if (usesRead) readState.applied = false; return; } } else await draw(true);
+      if (usesRead) markRead(readState.row, 'applied');
       note('اتحفظ ✔');
-    } catch (err) { note('ماتحفظش: ' + ((err && err.message) || err), true); } finally { busy = false; }
+    } catch (err) { if (usesRead) readState.applied = false; note('ماتحفظش: ' + ((err && err.message) || err), true); } finally { busy = false; }
   }
+  // ---------- the active ingredient by photo (owner 2026-11-21, ar_item_reads + Hub\reader\ITEM_ACTIVE_READER.ps1) ----------
+  // the box photo goes to the server as a request; the laptop's Claude reads what is PRINTED (English and Arabic, translated both ways) and answers; the two fields are filled and he checks and saves
+  let readState = null, pollGen = 0;
+  const pollMs = () => Number(root.__imPollMs) || 3000, lateMs = () => Number(root.__imLateMs) || 90000;
+  const PRINTED = { en: 'مكتوب بالإنجليزي على العلبة', ar: 'مكتوب بالعربي على العلبة', both: 'مكتوب بالعربي والإنجليزي على العلبة' };
+  function renderRead() {
+    const box = document.getElementById('imRead'), rs = readState;
+    if (!box) return;
+    if (!rs || rs.item !== (cur && cur.id) || rs.applied) { box.innerHTML = ''; return; }
+    const r = rs.result || {}, sm = (t) => `<small>${t}</small>`;
+    if (rs.status === 'sending') box.innerHTML = '<div class="im-read"><span class="im-spin"></span><div><b>بيبعت الصورة…</b></div></div>';
+    else if (rs.status === 'pending' || rs.status === 'reading') box.innerHTML = `<div class="im-read"><span class="im-spin"></span><div><b>بيتقرا…</b>${sm('اللاب بيقرا الصورة ويترجمها (حوالي نص دقيقة). تقدر تقفل الشاشة، والنتيجة هتلاقيها هنا لما تفتح الصنف تاني.')}${rs.late ? sm('اللاب يمكن مش شغال دلوقتي: الطلب مستني وهيتقري أول ما يرجع.') : ''}</div></div>`;
+    else if (rs.status === 'done' && r.found && (r.ar || r.en)) {
+      box.innerHTML = `<div class="im-read ok"><div><b>اتقرا من الصورة</b> <span class="im-tag">${PRINTED[r.printed] || ''}</span>${sm('راجعه وصحّحه لو فيه غلط، وبعدين اضغط «احفظ». لحد ما تحفظ مفيش حاجة اتغيّرت.')}${r.confidence && r.confidence !== 'high' ? sm('مش متأكد 100%: راجع الحروف والأرقام كويس.') : ''}${r.note ? `<small translate="no">${esc(r.note)}</small>` : ''}</div></div>`;
+      for (const [fid, v] of [['imActAr', r.ar], ['imActEn', r.en]]) { const f = document.getElementById(fid); if (f && v) { f.value = String(v).slice(0, 200); f.classList.add('im-fresh'); } }
+    } else if (rs.status === 'done') box.innerHTML = `<div class="im-read bad"><div><b>مقدرتش أقرا المادة الفعالة من الصورة</b>${sm('مش مكتوبة في الجنب ده أو الصورة مش واضحة. صوّر الجنب التاني أو قرّب. السيستم بيقرا المكتوب بس، مش بيخمّن من اسم الدوا.')}${r.note ? `<small translate="no">${esc(r.note)}</small>` : ''}</div></div>`;
+    else box.innerHTML = `<div class="im-read bad"><div><b>القراية فشلت</b>${sm('جرّب تصوّر تاني.')}${rs.error ? `<small translate="no">${esc(rs.error)}</small>` : ''}</div></div>`;
+  }
+  async function askRead(file) {
+    if (!cur || !file) return;
+    const id = cur.id, en = cur.en;
+    readState = { row: null, item: id, status: 'sending' }; pollGen++; renderRead();
+    const fail = (msg) => { if (cur && cur.id === id) { readState = { row: null, item: id, status: 'failed', error: msg }; renderRead(); } };
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onerror = () => { URL.revokeObjectURL(url); fail('الملف ده مش صورة.'); };
+    img.onload = async () => {
+      URL.revokeObjectURL(url);
+      try {
+        const { w, h } = editLib().fitSize(img.naturalWidth, img.naturalHeight, 1300);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+        const b64 = cv.toDataURL('image/jpeg', 0.82).split(',')[1];
+        const { data, error } = await app().from('ar_item_reads').insert({ item_id: Number(id), item_name: en || null, img_b64: b64 }).select('id');
+        if (error) throw error;
+        if (!cur || cur.id !== id) return;
+        readState = { row: data && data[0] && data[0].id, item: id, status: 'pending' }; renderRead(); pollRead();
+      } catch (e) { fail('ما اتبعتتش: ' + ((e && e.message) || e)); }
+    };
+    img.src = url;
+  }
+  // asks the server every few seconds until the laptop has answered (it reads once a minute: about half a minute); after 90 s it says the laptop may be off, after 10 minutes it stops
+  function pollRead() {
+    const gen = ++pollGen, rs = readState, t0 = Date.now();
+    if (!rs || rs.row == null) return;
+    const tick = async () => {
+      if (gen !== pollGen || readState !== rs || !cur || cur.id !== rs.item) return;
+      let r = null;
+      try { const q = await app().from('ar_item_reads').select('id,status,result,error').eq('id', rs.row).limit(1); r = q.data && q.data[0]; } catch (e) { r = null; }
+      if (gen !== pollGen || readState !== rs) return;
+      if (r && r.status !== rs.status) { rs.status = r.status; rs.result = r.result; rs.error = r.error; renderRead(); }
+      if (r && r.status !== 'pending' && r.status !== 'reading') return;
+      if (Date.now() - t0 > lateMs() && !rs.late) { rs.late = true; renderRead(); }
+      if (Date.now() - t0 > 10 * 60 * 1000) return;
+      setTimeout(tick, pollMs());
+    };
+    setTimeout(tick, pollMs());
+  }
+  // the latest reading asked for this item in the last 24 hours (he may have closed the sheet and come back): still waiting = keep waiting, answered and not saved yet = show it
+  async function loadLatestRead() {
+    const id = cur && cur.id;
+    if (!id) return;
+    try {
+      const { data, error } = await app().from('ar_item_reads').select('id,status,result,error,created_at').eq('item_id', Number(id)).order('created_at', { ascending: false }).limit(1);
+      const r = !error && data && data[0];
+      if (!r || !cur || cur.id !== id || readState) return;
+      if (r.status === 'applied' || r.status === 'cancelled' || Date.now() - Date.parse(r.created_at) > 24 * 3600 * 1000) return;
+      readState = { row: r.id, item: id, status: r.status, result: r.result, error: r.error };
+      renderRead();
+      if (r.status === 'pending' || r.status === 'reading') pollRead();
+    } catch (e) { /* the table is not there yet (before its migration), or no right to read it: no reading to show */ }
+  }
+  function markRead(row, status) { if (row == null) return; try { Promise.resolve(app().from('ar_item_reads').update({ status }).eq('id', row)).catch(() => {}); } catch (e) { /* best effort */ } }
   async function save(patch) {
     const id = cur.id;
     const row = Object.assign({ item_id: Number(id), img: null, img_off: false, descr: null, desc_off: false }, edits[id] || {}, patch, { updated_at: new Date().toISOString() });
