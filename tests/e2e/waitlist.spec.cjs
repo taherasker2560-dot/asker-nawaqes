@@ -421,15 +421,24 @@ run('Waiting list: «📲 ابعت للتليسيلز» on a waiting item, and O
  assert.ok(await page.$('[data-wl-act="cancelled"]'),'the page itself is still there');
 });
 
-run('Waiting list: the phone app block is not drawn when the server part is not there yet',async({page})=>{
+run('Waiting list: the phone app block STAYS when its status cannot be read (owner 2026-11-21: it must not disappear after linking), and reads it again',async({page})=>{
  await seed(page);
  await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false}]});
  await open(page);
  await page.click('[data-wl-bk]');
  await page.waitForSelector('#wlBkChips');
  await page.waitForFunction(()=>document.getElementById('wlPhoneApp')&&!/بحمّل/.test(document.getElementById('wlPhoneApp').textContent),null,{timeout:5000});
- assert.equal((await txt(page,'#wlPhoneApp')),'','no ar_phone_status on the server: nothing');
+ // no ar_phone_status on the server: the block says so and keeps its two buttons
+ assert.match(await txt(page,'#wlPhoneApp'),/📱 تطبيق الموبايل/);assert.match(await txt(page,'#wlPhoneApp'),/مقدرتش أجيب حالة التطبيق/);
+ assert.ok(await page.$('#wlPhoneApp [data-wl-applink]'),'the link button is still there');assert.ok(await page.$('#wlPhoneApp a[href*="asker-contacts.apk"]'),'and the download');
  assert.ok(await page.$('#wlBkChips'),'the book itself works as before');
+ // the server answers later (a linked phone that has not talked yet): the same block now shows it, and a status that was read is NOT wiped by a failed read after it
+ await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_phone_status:()=>({pending:0,last_sync:null,phones:[{label:'phone 2026-11-21',created_at:'2026-11-21T08:11:33Z',last_used_at:null}]})});document.dispatchEvent(new Event('visibilitychange'))});
+ await page.waitForFunction(()=>/موبايل مربوط، آخر اتصال: لسه/.test(document.getElementById('wlPhoneApp').textContent),null,{timeout:5000});
+ await page.evaluate(()=>{window.__fakeRpcs.ar_phone_status=()=>{throw new Error('offline')};document.dispatchEvent(new Event('visibilitychange'))});
+ await page.waitForTimeout(600);
+ assert.match(await txt(page,'#wlPhoneApp'),/موبايل مربوط، آخر اتصال: لسه/,'the status already on screen stays');
+ assert.ok(await page.$('#wlPhoneApp [data-wl-applink]'));
 });
 
 run('Waiting list in English: no Arabic left on the screen except names, and the words read right',async({page})=>{

@@ -11,8 +11,8 @@ android {
         applicationId = "com.askerpharmacy.contacts"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     // one signing key for every build (made once and kept in the build's cache), so a new build updates the old one in place;

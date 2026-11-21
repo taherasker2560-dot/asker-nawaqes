@@ -29,12 +29,12 @@
         </activity>
 
         <!-- the system's «اربط التطبيق» button (askercontacts://link?k=<this phone's key>): asks him once, then keeps the key.
-             The server's address is NOT taken from the link, so no page can send this phone's contacts anywhere else. -->
+             The server's address is NOT taken from the link, so no page can send this phone's contacts anywhere else.
+             It lives in the app's own task, NOT in a task of its own that is left out of the recent apps: the app's screen opens from it, and
+             a task left out of the recents made the app disappear from the recent apps right after linking (owner 2026-11-21). -->
         <activity
             android:name=".LinkActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:taskAffinity="">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
