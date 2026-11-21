@@ -264,7 +264,9 @@
       : `عندك ${num(x.have)} · اتباع في شهر ${num(x.sold30)} · المطلوب ${num(x.need)}`;
     const since = num(x.days) > 1 ? `ناقص بقاله ${num(x.days)} يوم` : 'ناقص من النهارده';
     const k = String(x.id), inPo = po.some((p) => String(p.item_id) === k);
+    // the item's small photo between the tick and the name (ar/item-media.js, owner 2026-11-21); a tap on it opens «تعديل الصنف» and does not tick the item
     return `<label class="al-item bg-it${late ? ' late' : ''}${picked.has(k) ? ' on' : ''}"><input type="checkbox" data-pick="${esc(k)}"${picked.has(k) ? ' checked' : ''} />` +
+      (root.AskerItemMedia ? root.AskerItemMedia.thumb(x.id, x.name, x.name) : '') +
       `<div><strong dir="auto" class="notr">${esc(x.name)}</strong>` +
       (x.pending ? ` <span class="bg-pend">⏳ لسه في فارمافلاي</span>` : '') +
       (inPo ? ` <span class="bg-po-tag">🛒 في أمر الشرا</span>` : '') +
@@ -397,10 +399,13 @@
     if (!same.length) return '';
     const bagName = (id) => ((data && data.bags && data.bags.all) || []).find((b) => b.id === String(id || '')) || null;
     return `<details class="bg-dups" open><summary>${esc(`🗂 مكررات تتشال من نواقص فارمافلاي (${same.length})`)}</summary>` +
-      same.map((d) => `<div class="bg-dups-row"><strong class="notr" dir="auto">${esc(d.item_name || '#' + d.item_id)}</strong>` +
-        (bagName(d.bag) ? ` <small>(<bdi class="notr">${esc(bagName(d.bag).name)}</bdi>)</small>` : '') +
-        `<div><span>نفس:</span> <bdi class="notr" dir="auto">${esc(d.other_name || '#' + d.other_id)}</bdi> · <span class="bg-pend">⏳ لسه في فارمافلاي</span> ` +
-        `<button type="button" class="small secondary" data-dup-undo="${esc(d.id)}">تراجع</button></div></div>`).join('') + '</details>';
+      same.map((d) => {
+        const inner = `<strong class="notr" dir="auto">${esc(d.item_name || '#' + d.item_id)}</strong>` +
+          (bagName(d.bag) ? ` <small>(<bdi class="notr">${esc(bagName(d.bag).name)}</bdi>)</small>` : '') +
+          `<div><span>نفس:</span> <bdi class="notr" dir="auto">${esc(d.other_name || '#' + d.other_id)}</bdi> · <span class="bg-pend">⏳ لسه في فارمافلاي</span> ` +
+          `<button type="button" class="small secondary" data-dup-undo="${esc(d.id)}">تراجع</button></div>`;
+        return `<div class="bg-dups-row">${root.AskerItemMedia ? root.AskerItemMedia.row(d.item_id, d.item_name, d.item_name, inner) : inner}</div>`;
+      }).join('') + '</details>';
   }
   // his answers; a «نفس الصنف» card the laptop's copy no longer shows short anywhere is done (he took it out in PharmaFly)
   async function loadDups() {
@@ -460,7 +465,8 @@
     const rows = poDone.map((p) => {
       const q = Number(p.qty) || 0, r = Number(p.received_qty) || 0;
       const less = q > 0 && r < q - 0.001;
-      return `<li><bdi class="notr" dir="auto">${esc(p.item_name || p.item_id)}</bdi> <b>${esc(less ? `وصل ${n(r)} من ${n(q)}` : `وصل ${n(r)}`)}</b> <span>الفاتورة:</span> <bdi class="notr">${esc(p.inv_code || '')}</bdi> <bdi class="notr">${esc(p.vendor || '')}</bdi></li>`;
+      const inner = `<bdi class="notr" dir="auto">${esc(p.item_name || p.item_id)}</bdi> <b>${esc(less ? `وصل ${n(r)} من ${n(q)}` : `وصل ${n(r)}`)}</b> <span>الفاتورة:</span> <bdi class="notr">${esc(p.inv_code || '')}</bdi> <bdi class="notr">${esc(p.vendor || '')}</bdi>`;
+      return `<li>${root.AskerItemMedia ? root.AskerItemMedia.row(p.item_id, p.item_name, p.item_name, inner) : inner}</li>`;
     }).join('');
     return `<details class="bg-po-done"><summary>${esc(`✅ وصل من أمر الشرا (آخر 3 أيام): ${poDone.length} صنف`)}</summary><ul>${rows}</ul></details>`;
   }

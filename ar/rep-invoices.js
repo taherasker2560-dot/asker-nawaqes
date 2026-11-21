@@ -106,7 +106,9 @@
   const chip = ([t, tone]) => `<span class="rep-chip ${tone}">${esc(t)}</span>`;
   function lineHtml(l) {
     const cs = chips(l);
-    return `<div class="rep-line"><div class="rep-ln"><b class="notr" dir="auto">${esc(l.n)}</b>${l.item ? `<small class="notr" dir="ltr">${esc(l.item.name)}</small>` : ''}</div>` +
+    // the line's item (matched by the laptop) gets its small photo (ar/item-media.js, owner 2026-11-21); a line that is not matched has none
+    const ln = `<div class="rep-ln"><b class="notr" dir="auto">${esc(l.n)}</b>${l.item ? `<small class="notr" dir="ltr">${esc(l.item.name)}</small>` : ''}</div>`;
+    return `<div class="rep-line">${root.AskerItemMedia && l.item ? root.AskerItemMedia.row(l.item.id, l.item.name, l.item.name, ln) : ln}` +
       `<div class="rep-nums"><span>${esc(`${pct(l.qty)} × ${pct(l.price)}`)}</span> <span>${esc(`${pct(l.disc)}%`)}</span> <b>${esc(money(l.total))}</b></div>` +
       (cs.length ? `<div class="rep-chips">${cs.map(chip).join('')}</div>` : '<div class="rep-chips"><span class="rep-chip good">✓</span></div>') + '</div>';
   }

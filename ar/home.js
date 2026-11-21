@@ -266,10 +266,28 @@
     return reread();
   }
   function keepCatalog() { if (catalog && cache()) cache().set('hs-catalog-v1', { at: Date.now(), rows: catalog }); }
+  // the item that has exactly a PharmaFly name (owner 2026-11-21: the lists that carry only the NAME, like the shortages, show the item's photo too): nk(name) -> id; of two cards with the same name
+  // the one that is not cancelled (parseCancel) wins, else the first. Rebuilt when the items or the cancelled lists arrive; the lists that looked ids up are told to draw again.
+  let catIds = null;
+  function indexIds() {
+    if (!catalog) return;
+    const L = root.AskerApp && root.AskerApp.lookup ? root.AskerApp.lookup() : null;
+    const key = L && L.nk ? L.nk : (s) => String(s || '').toUpperCase().trim();
+    const m = new Map(), spare = new Map();
+    for (const r of catalog) {
+      if (!r || r.id == null || !r.name) continue;
+      const k = key(r.name), gone = !!(cancelMap && cancelMap.has(String(r.id)));
+      if (gone) { if (!spare.has(k)) spare.set(k, r.id); } else if (!m.has(k)) m.set(k, r.id);
+    }
+    for (const [k, id] of spare) if (!m.has(k)) m.set(k, id);
+    catIds = { m, key };
+    if (root.AskerItemMedia && root.AskerItemMedia.refresh) root.AskerItemMedia.refresh();
+  }
+  const idOf = (name) => (catIds && name ? catIds.m.get(catIds.key(name)) ?? null : null);
   function loadCatalog() {
     if (catalog || catLoading || !db()) return;
-    catLoading = keptOrRead('hs-catalog-v1', readCatalog, (all) => { catalog = all; draw(); })
-      .then((all) => { catalog = all; catFail = ''; })
+    catLoading = keptOrRead('hs-catalog-v1', readCatalog, (all) => { catalog = all; indexIds(); draw(); })
+      .then((all) => { catalog = all; catFail = ''; indexIds(); })
       .catch((e) => { catFail = 'أصناف السيستم ماتحمّلتش: ' + ((e && e.message) || e); })
       .finally(() => { catLoading = null; draw(); });
   }
@@ -302,7 +320,7 @@
       keepCancel();
     })()
       .catch(() => { if (!cancelRows) { cancelRows = []; cancelMap = new Map(); } }) // not there yet (before its migration) or no line: the kept copy stays, else nothing is cancelled
-      .finally(() => { cancelLoading = null; draw(); });
+      .finally(() => { cancelLoading = null; indexIds(); draw(); });
   }
   // «الملغى» is the owner's button (staff never see it)
   function showScopeChip() { const b = document.querySelector('#hsScope [data-scope="cancelled"]'); if (b) b.classList.toggle('hidden', !isOwner()); }
@@ -578,7 +596,7 @@
     const box = $('hsQ');
     if (box && box.value) { box.value = ''; editing = null; draw(); }
   }
-  root.AskerHome = { draw, close, open: () => {} };
+  root.AskerHome = { draw, close, open: () => {}, idOf };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 })(typeof window === 'undefined' ? globalThis : window);

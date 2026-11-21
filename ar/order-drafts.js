@@ -306,6 +306,8 @@
   const target = () => chooseContact(contactsFor(toId(), saved), choice[toId()]);
 
   function thumb(i) {
+    // the shared small photo (ar/item-media.js, owner 2026-11-21): a tap opens «تعديل الصنف»; the older plain one stays when that file is not there
+    if (root.AskerItemMedia && i.item_id != null) return root.AskerItemMedia.thumb(i.item_id, i.name_pf, i.name_pf);
     const f = pics[String(i.item_id)];
     if (f) return `<span class="od-thumb"><img src="store/img/${esc(f)}" alt="" loading="lazy"></span>`;
     return `<span class="od-thumb icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[shapeOf(i.name_pf)]}</svg></span>`;
@@ -467,7 +469,7 @@
     const no = noOfDoor(door);
     $('odNoBox').classList.toggle('hidden', !no.length);
     $('odNoTitle').textContent = `مفيش عليهم عرض (${no.length})`;
-    $('odNo').innerHTML = no.map((i) => `<div class="od-row"><strong dir="ltr">${esc(i.name_pf)}</strong> <span>× ${esc(i.qty)}</span></div>`).join('');
+    $('odNo').innerHTML = no.map((i) => `<div class="od-row">${root.AskerItemMedia ? root.AskerItemMedia.row(i.item_id, i.name_pf, i.name_pf, `<strong dir="ltr">${esc(i.name_pf)}</strong> <span>× ${esc(i.qty)}</span>`) : `<strong dir="ltr">${esc(i.name_pf)}</strong> <span>× ${esc(i.qty)}</span>`}</div>`).join('');
   }
   async function soft(p, d) {
     try {

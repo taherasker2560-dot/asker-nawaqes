@@ -166,7 +166,9 @@
   function rowHtml(r, withWhy, final) {
     const [txt, tone] = reason(r), a = withWhy ? arrival(r, final) : null, qc = qtyChip(r);
     const qty = r.qty != null && num(r.qty) > 0 ? ` <span class="cmp-qty">× ${esc(String(num(r.qty)))}</span>` : '';
-    return `<div class="cmp-row"><strong dir="ltr" class="notr">${esc(r.name)}</strong>${qty}${withWhy && txt ? ` <span class="cmp-why ${tone}">${esc(txt)}</span>` : ''}${a ? ` <span class="cmp-why ${a[1]}">${esc(a[0])}</span>` : ''}${qc ? ` <span class="cmp-why ${qc[1]}">${esc(qc[0])}</span>` : ''}</div>`;
+    const inner = `<strong dir="ltr" class="notr">${esc(r.name)}</strong>${qty}${withWhy && txt ? ` <span class="cmp-why ${tone}">${esc(txt)}</span>` : ''}${a ? ` <span class="cmp-why ${a[1]}">${esc(a[0])}</span>` : ''}${qc ? ` <span class="cmp-why ${qc[1]}">${esc(qc[0])}</span>` : ''}`;
+    // the item's small photo on the side (ar/item-media.js, owner 2026-11-21)
+    return `<div class="cmp-row">${root.AskerItemMedia ? root.AskerItemMedia.row(r.id, r.name, r.name, inner) : inner}</div>`;
   }
   function drawGroups(n) {
     $('cmpGroups').innerHTML = GROUPS.map(([id, title, list, why]) => {
