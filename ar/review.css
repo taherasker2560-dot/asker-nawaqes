@@ -35,10 +35,10 @@
 .rv-tot { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0; padding: 9px 12px; border-radius: 12px; font-weight: 600; background: var(--rose); color: var(--crimson-ink); }
 .rv-tot.bad { background: var(--bad-bg); color: var(--bad); }
 #reviewPanel h4 { margin: 14px 0 8px; font-size: 15px; color: var(--muted); }
-.rv-note { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 0 0 10px; background: var(--card); }
-.rv-note.done { background: var(--rose); border-color: var(--rose-line); }
-.rv-note p { margin: 0 0 6px; }
-.rv-mine { color: var(--muted); font-size: 14px; }
+.rv-note { border-bottom: 1px solid var(--line); padding: 8px 2px; margin: 0; }
+.rv-note.done .rv-nl p { color: var(--muted); }
+.rv-note p { margin: 0; flex: 1; min-width: 0; font-size: 14px; }
+.rv-mine { display: block; color: var(--muted); font-size: 12.5px; }
 .rv-row { display: flex; gap: 8px; margin-top: 8px; }
 .rv-row button { flex: 1; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 9px; font: inherit; cursor: pointer; box-shadow: none; }
 .rv-row button.rv-yes.on, .rv-row button.rv-yes:hover { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); }
@@ -58,9 +58,48 @@
 .rv-shot-img { flex: 1; overflow: auto; display: grid; place-items: center; padding: 8px; }
 .rv-shot-img img { max-width: 100%; max-height: 100%; transition: transform 0.2s; }
 .rv-lines small.rv-info { display: block; color: var(--muted); font-size: 12.5px; }
-.rv-lines tr.rv-asked td { background: var(--rose); border-bottom: 0; }
-.rv-lines tr.rv-askrow td { background: var(--rose); padding: 2px 4px 9px; }
-.rv-pl { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
-.rv-pl input { width: 96px; padding: 6px 8px; border: 1.5px solid var(--crimson); border-radius: 10px; background: var(--card); color: var(--ink); text-align: left; font: inherit; }
-.rv-disc { color: var(--crimson-ink); font-size: 14px; }
-.rv-chg { color: var(--crimson-ink); font-size: 13px; font-weight: 600; }
+/* the compact cosmetics list (his mockup mockups/invoice_review_compact_2026-11-21): name / cost / the public price box; Enter goes to the next box */
+.rv-nl { display: flex; gap: 8px; align-items: center; }
+.rv-nb { display: flex; gap: 6px; flex: none; }
+.rv-nb button { border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; box-shadow: none; min-height: 0; width: auto; }
+.rv-nb button.rv-yes { border-color: var(--crimson); color: var(--crimson-ink); background: var(--rose); }
+.rv-nb button.rv-yes.on { font-weight: 700; }
+#reviewPanel h4.rv-ph4 { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 2px 4px; font-size: 14px; }
+.rv-ph4 em { font-style: normal; color: var(--crimson-ink); font-weight: 700; }
+.rv-hint { font-size: 12.5px; color: var(--muted); margin: 0 2px 8px; }
+.rv-pg, .rv-pr, .rv-sr { display: grid; grid-template-columns: 1fr 62px 78px; gap: 8px; align-items: center; }
+.rv-pg { font-size: 12px; color: var(--muted); padding: 0 2px 4px; border-bottom: 1px solid var(--line); }
+.rv-pg span:not(:first-child) { text-align: center; }
+.rv-pr, .rv-sr { padding: 7px 2px; border-bottom: 1px solid var(--line); }
+.rv-sr { grid-template-columns: 1fr 56px 48px; padding: 6px 12px; }
+.rv-pr.rv-flag, .rv-sr.rv-flag { background: var(--rose); }
+.rv-nm { min-width: 0; }
+.rv-nm b { display: block; font-weight: 600; font-size: 14.5px; color: var(--ink); }
+.rv-sr .rv-nm b { font-size: 13.5px; }
+.rv-nm small { display: block; color: var(--muted); font-size: 12px; }
+.rv-nm small i { font-style: normal; color: var(--crimson-ink); font-weight: 600; }
+.rv-nm small i.dn { color: var(--muted); }
+.rv-new { font-size: 11px; color: var(--crimson-ink); border: 1px solid var(--crimson); border-radius: 6px; padding: 0 5px; margin-inline-start: 4px; font-weight: 600; }
+.rv-cost { text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--ink); }
+.rv-sr .rv-cost { font-size: 13px; color: var(--muted); }
+.rv-sr .rv-pc { color: var(--ink); }
+.rv-box { width: 100%; height: 38px; border: 1.5px solid var(--line); border-radius: 12px; text-align: center; font: inherit; font-size: 16px; font-weight: 600; color: var(--ink); background: var(--card); outline: none; padding: 0 4px; }
+.rv-box::placeholder { color: var(--muted); opacity: 0.6; font-weight: 400; }
+.rv-box:focus { border-color: var(--crimson); box-shadow: 0 0 0 3px var(--rose-line); background: var(--rose); }
+.rv-box.done { border-color: var(--crimson); color: var(--crimson-ink); }
+.rv-box[disabled] { opacity: 0.6; }
+.rv-chg { grid-column: 1 / -1; color: var(--crimson-ink); font-size: 12px; font-weight: 600; margin-top: -2px; }
+.rv-same { border: 1px solid var(--line); border-radius: 14px; margin-top: 12px; }
+.rv-same summary { cursor: pointer; padding: 10px 12px; font-size: 14px; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+.rv-same summary::-webkit-details-marker { display: none; }
+.rv-same summary span { color: var(--muted); font-size: 12.5px; }
+/* the expiry and its «رفض»: short (under 18 months) in the color, very short (under 6) in the warning color; a rejected line is struck through and goes back */
+.rv-exp { white-space: nowrap; }
+.rv-exp.near { color: var(--crimson-ink); font-weight: 600; }
+.rv-exp.bad { color: var(--bad); font-weight: 700; }
+.rv-rej { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 8px; padding: 0 7px; font: inherit; font-size: 11.5px; line-height: 18px; cursor: pointer; box-shadow: none; min-height: 0; width: auto; }
+.rv-rej.on { border-color: var(--bad); color: var(--bad); background: var(--bad-bg); }
+.rv-rejd .rv-nm b, .rv-lines tr.rv-rejd td:nth-child(2) > :first-child { text-decoration: line-through; color: var(--muted); }
+.rv-lines small.rv-info, .rv-lines small.rv-ex { display: block; color: var(--muted); font-size: 12.5px; }
+.rv-nm small.rv-sug { color: var(--crimson-ink); }
+.rv-sug b { font-weight: 700; }

@@ -15,9 +15,11 @@
   const answersOf = (r) => (r && r.answers && typeof r.answers === 'object' ? r.answers : {});
   // the notes he has not answered yet
   const openNotes = (r) => notesOf(r).filter((n) => !answersOf(r)[n.id]);
-  // «سعر الجمهور» (owner 2026-11-21: the public prices of cosmetics are estimates and HIS call, never the paper's, never mine): a line with ask:'price' carries the unit net, the card's CURRENT price in
-  // PharmaFly («card») and the paper's printed price («pub», for information only). The box shows the card's price: he leaves it (nothing changes in PharmaFly and the discount is worked out from the card's
-  // price) or types another (saved as answers['L<line>'] = {v:'price', t:'<number>'}; only then the card follows). A line with no card price yet (a new item) waits for the price he gives.
+  // «سعر الجمهور» (owner 2026-11-21: the public prices of cosmetics are estimates and HIS call, never the paper's, never mine). A cosmetics invoice (lines with «cosm») is drawn COMPACT (his mockup
+  // mockups/invoice_review_compact_2026-11-21, «ابنيها»): the lines whose unit cost moved more than about a pound from the last purchase, and new items, carry ask:'price' with the unit net (the cost he
+  // judges by, never the discount), the card's CURRENT price («card») and the last cost («prev»); each has a box: he types a price and Enter (saved as answers['L<line>'] = {v:'price', t:'<number>'}; the
+  // card follows only when it differs), or Enter on the empty box = keep the card's price. The other lines sit folded under «زي آخر مرة» (the card's price stays). Every line with an expiry can be
+  // REJECTED for its expiry (answers['R<line>'] = {v:'reject'}: the laptop returns that line instead of keeping it).
   const parseNum = (s) => { const t = String(s == null ? '' : s).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫,،]/g, '.').replace(/[^\d.]/g, ''); const n = parseFloat(t); return isFinite(n) ? n : NaN; };
   const askLines = (r) => linesOf(r).filter((l) => l && l.ask === 'price');
   // the price he typed for the line (none if he left it)
@@ -27,7 +29,15 @@
   const effPrice = (r, l) => { const p = priceOf(r, l); if (p) return p; const c = Number(l.card); return c > 0 && validPrice(c, l.net) ? c : null; };
   // a price he changed from the card's: the card has to follow (nothing else in PharmaFly is touched)
   const changedPrice = (r, l) => { const p = priceOf(r, l); return p && p !== Number(l.card) ? p : null; };
-  const openPrices = (r) => askLines(r).filter((l) => effPrice(r, l) == null);
+  // a line he rejected for its expiry (it goes back to the supplier: no price needed)
+  const rejected = (r, l) => { const a = answersOf(r)['R' + l.n]; return !!(a && a.v === 'reject'); };
+  // an asked line waits until he answers it (his price, or the card's kept with Enter)
+  const openPrices = (r) => askLines(r).filter((l) => !rejected(r, l) && priceOf(r, l) == null);
+  // a cosmetics invoice: drawn as the compact price list
+  const compact = (r) => linesOf(r).some((l) => l && (l.cosm || l.ask === 'price'));
+  // months from this month to the expiry's month (the short-dated rule: under 18 = short, under 6 = very short)
+  function expMonths(x, now) { const s = String(x == null ? '' : x); if (!/^\d{6}$/.test(s)) return null; const d = now || new Date(); return (Number(s.slice(2)) - d.getFullYear()) * 12 + (Number(s.slice(0, 2)) - (d.getMonth() + 1)); }
+  const expKind = (x, now) => { const m = expMonths(x, now); return m == null ? '' : m < 6 ? 'bad' : m < 18 ? 'near' : ''; };
   // everything still waiting for his answer on a card: notes and prices nobody knows yet
   const needs = (r) => openNotes(r).length + openPrices(r).length;
   const validPrice = (price, net) => price > 0 && price >= Number(net) && price <= Number(net) * 10;
@@ -48,7 +58,7 @@
   // what he answered, in words
   function answerText(note, a) {
     if (!a) return '';
-    if (a.v === 'ok') return 'ماشي كده ✓';
+    if (a.v === 'ok') return 'تمام ✓';
     if (a.v === 'alt') return 'هتتعمل: ' + (a.t || (((note && note.alts) || []).find((x) => x.k === a.k) || {}).t || '');
     if (a.v === 'text') return 'هتتعمل: ' + (a.t || '');
     return '';
@@ -88,7 +98,7 @@
   // the number on the badge: the invoices waiting for his yes
   const need = (rows) => (rows || []).filter((r) => r.status === 'ready').length;
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours() % 12 || 12) + ':' + pad(d.getMinutes()) + (d.getHours() < 12 ? ' ص' : ' م'); };
-  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, openPrices, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when };
+  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when };
   root.AskerInvReviewLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -111,22 +121,59 @@
 
   function chipHtml(r) {
     const c = chip(r);
-    const text = c.t === 'N_NOTES' ? `<span class="rv-n">${esc(c.n)}</span> ${c.n === 1 ? 'ملاحظة' : 'ملاحظات'}` : esc(c.t);
+    const onlyPrices = c.t === 'N_NOTES' && !openNotes(r).length;
+    const text = c.t === 'N_NOTES' ? `<span class="rv-n">${esc(c.n)}</span> ${onlyPrices ? (c.n === 1 ? 'محتاج سعرك' : 'محتاجين سعرك') : c.n === 1 ? 'ملاحظة' : 'ملاحظات'}` : esc(c.t);
     return `<span class="rv-chip rv-${c.kind}">${text}</span>`;
   }
+  // the expiry of a line and its «رفض» (he rejects the line for its expiry: it goes back to the supplier)
+  function expHtml(r, l) {
+    if (!l.exp) return '<span class="rv-exp">من غير صلاحية</span>';
+    const rej = rejected(r, l), locked = !WAITING.includes(r.status), k = expKind(l.exp);
+    return `<span class="rv-exp${k ? ' ' + k : ''}" dir="ltr">${esc(expiryText(l.exp))}</span>` +
+      (locked ? (rej ? ' <span class="rv-rej on">مرفوض: هيترجع</span>' : '') : ` <button type="button" class="rv-rej${rej ? ' on' : ''}" data-rv-rej="${esc(r.id)}|${esc(l.n)}">${rej ? 'مرفوض: هيترجع ✕' : 'رفض'}</button>`);
+  }
+  // a drug invoice: one row per line as before (the discount is how he reads drugs), with the expiry's «رفض»
   function lineRow(r, l) {
-    const flag = flagged(r, l), ask = l.ask === 'price', d = discOf(r, l), locked = !WAITING.includes(r.status);
-    const price = (d ? `${esc(String(d))}% · ` : ask && d == null ? '؟ · ' : '') + (l.exp ? esc(expiryText(l.exp)) : 'من غير صلاحية');
-    const row = `<tr class="${flag ? 'rv-flag' : ''}${ask ? ' rv-asked' : ''}"><td class="rv-ln">${esc(l.n)}</td><td>${esc(l.paper)}<small class="notr" dir="ltr">${esc(l.name || '')}${l.id ? ' · ' + esc(l.id) : ' · جديد'}</small>` +
-      (l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : '') + '</td>' +
+    const flag = flagged(r, l), d = discOf(r, l), rej = rejected(r, l);
+    const price = (d ? `${esc(String(d))}% · ` : '') + (l.exp ? esc(expiryText(l.exp)) : 'من غير صلاحية');
+    return `<tr class="${flag ? 'rv-flag' : ''}${rej ? ' rv-rejd' : ''}"><td class="rv-ln">${esc(l.n)}</td><td>${esc(l.paper)}<small class="notr" dir="ltr">${esc(l.name || '')}${l.id ? ' · ' + esc(l.id) : ' · جديد'}</small>` +
+      (l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : '') + (l.exp ? `<small class="rv-ex">${expHtml(r, l)}</small>` : '') + '</td>' +
       `<td class="rv-num" dir="ltr">${esc(l.qty)} × ${price}<br><b>${esc(money(l.total))}</b></td></tr>`;
-    if (!ask) return row;
-    // the public price: the box shows the card's price in PharmaFly (he leaves it, or types another: only then the card follows); the paper's printed price is one tap away
-    const e = effPrice(r, l), ch = changedPrice(r, l), pub = Number(l.pub) > 0 ? Number(l.pub) : null;
-    return row + `<tr class="rv-askrow"><td></td><td colspan="2"><label class="rv-pl">سعر الجمهور <input type="text" inputmode="decimal" dir="ltr" maxlength="12" data-rv-price="${esc(r.id)}|${esc(l.n)}" value="${e ? esc(String(e)) : ''}" placeholder="اكتبه هنا"${locked ? ' disabled' : ''}></label>` +
-      (!locked && pub && pub !== e ? ` <button type="button" class="rv-link" data-rv-pub="${esc(r.id)}|${esc(l.n)}|${esc(pub)}">خد سعر الورقة (${esc(pub)})</button>` : '') +
-      (e ? ` <span class="rv-disc" dir="ltr">الخصم ${esc(String(discFor(e, l.net)))}% · التكلفة ${esc(money(l.net))}</span>` : '') +
-      (ch ? ` <span class="rv-chg" dir="ltr">هيتغيّر في الكارت: ${esc(l.card || 'جديد')} ← ${esc(ch)}</span>` : '') + '</td></tr>';
+  }
+  // the small line under an item: its last cost and how much it moved (or «new»), the quantity
+  function moveHtml(l) {
+    const parts = [];
+    if (!l.id) parts.push('صنف جديد');
+    else if (Number(l.prev) > 0) { const dv = Math.round((Number(l.net) - Number(l.prev)) * 100) / 100; parts.push(`آخر مرة ${esc(money(l.prev))} ← <i dir="ltr" class="${dv < 0 ? 'dn' : ''}">${dv > 0 ? '+' : dv < 0 ? '−' : ''}${esc(money(Math.abs(dv)))}</i>`); }
+    else parts.push('أول مرة نشتريه');
+    parts.push(`<span dir="ltr">×${esc(l.qty)}</span>`);
+    return parts.join(' · ');
+  }
+  // a cosmetics invoice (his mockup): the lines that need his price as a list of boxes (name, the cost, the public price), Enter goes to the next; the rest folded «زي آخر مرة»
+  function compactHtml(r) {
+    const locked = !WAITING.includes(r.status), asks = askLines(r), rest = linesOf(r).filter((l) => l.ask !== 'price');
+    let h = '';
+    if (asks.length) {
+      const left = openPrices(r).length;
+      h += `<h4 class="rv-ph4">محتاج سعرك <em>${left ? 'فاضل ' + esc(left) : 'خلصت ✓'}</em></h4>` +
+        (locked ? '' : '<p class="rv-hint">التكلفة اتغيرت أكتر من جنيه عن آخر مرة، أو صنف جديد. الرقم الرمادي هو السعر المقترح بطريقتك: Enter يوافق عليه، أو اكتب سعر تاني ودوس Enter، والمؤشر ينزل على اللي بعده.</p>') +
+        '<div class="rv-pg"><span>الصنف</span><span>التكلفة</span><span>الجمهور</span></div>' +
+        asks.map((l) => {
+          const p = priceOf(r, l), ch = changedPrice(r, l), rej = rejected(r, l), card = Number(l.card) > 0 ? Number(l.card) : null, sug = Number(l.sug) > 0 ? Number(l.sug) : null, hint = sug || card;
+          return `<div class="rv-pr${flagged(r, l) ? ' rv-flag' : ''}${rej ? ' rv-rejd' : ''}" data-line="${esc(l.n)}"><div class="rv-nm"><b class="notr">${esc(l.name || l.paper)}</b>${l.id ? '' : '<span class="rv-new">جديد</span>'}` +
+            `<small>${moveHtml(l)} · ${expHtml(r, l)}</small>${sug && sug !== card && !p ? `<small class="rv-sug">المقترح <b dir="ltr">${esc(sug)}</b>${card ? ` (الكارت <span dir="ltr">${esc(card)}</span>)` : ''}</small>` : ''}${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
+            `<div class="rv-cost" dir="ltr">${esc(money(l.net))}</div>` +
+            `<input class="rv-box${p ? ' done' : ''}" type="text" inputmode="decimal" dir="ltr" maxlength="12" enterkeyhint="next" data-rv-price="${esc(r.id)}|${esc(l.n)}" value="${p ? esc(String(p)) : ''}" placeholder="${hint ? esc(String(hint)) : 'سعره'}" aria-label="سعر الجمهور"${locked || rej ? ' disabled' : ''}>` +
+            (ch && !rej ? `<div class="rv-chg">${card ? `الكارت هيتغير: <span dir="ltr">${esc(card)} ← ${esc(ch)}</span>` : `سعره: <span dir="ltr">${esc(ch)}</span>`}</div>` : '') + '</div>';
+        }).join('');
+    }
+    if (rest.length) {
+      const near = rest.filter((l) => expKind(l.exp) || rejected(r, l) || flagged(r, l)).length;
+      h += `<details class="rv-same"${near || !asks.length ? ' open' : ''}><summary>زي آخر مرة (${esc(rest.length)}) <span>${near ? `فيه ${esc(near)} صلاحية قريبة` : 'سعر الكارت فاضل زي ما هو'}</span></summary>` +
+        rest.map((l) => `<div class="rv-sr${rejected(r, l) ? ' rv-rejd' : ''}${flagged(r, l) ? ' rv-flag' : ''}"><div class="rv-nm"><b class="notr">${esc(l.name || l.paper)}</b><small>${moveHtml(l)} · ${expHtml(r, l)}</small>${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
+          `<div class="rv-cost" dir="ltr">${esc(money(l.net != null ? l.net : Number(l.total) / (Number(l.qty) || 1)))}</div><div class="rv-cost rv-pc" dir="ltr">${esc(l.card || l.price || l.pub || '')}</div></div>`).join('') + '</details>';
+    }
+    return h;
   }
   function linesHtml(r) {
     const ls = linesOf(r), cap = 20, all = showAllLines[r.id] || ls.length <= cap + 1;
@@ -143,10 +190,11 @@
   function noteHtml(r, n) {
     const a = answersOf(r)[n.id], locked = !WAITING.includes(r.status);
     const alts = (Array.isArray(n.alts) ? n.alts : []).map((x) => `<label><input type="radio" name="rv-${esc(r.id)}-${esc(n.id)}" data-rv-alt="${esc(r.id)}|${esc(n.id)}|${esc(x.k)}"${a && a.v === 'alt' && a.k === x.k ? ' checked' : ''}> <span class="notr">${esc(x.t)}</span></label>`).join('');
-    return `<div class="rv-note${a ? ' done' : ''}" data-note="${esc(n.id)}"><p><b>${n.line != null ? 'سطر ' + esc(n.line) + ': ' : ''}</b><span class="notr">${esc(n.text)}</span></p>` +
-      (n.mine ? `<p class="rv-mine">هعمل: <span class="notr">${esc(n.mine)}</span></p>` : '') +
-      (locked ? '' : `<div class="rv-row"><button type="button" class="rv-yes${a && a.v === 'ok' ? ' on' : ''}" data-rv-ok="${esc(r.id)}|${esc(n.id)}">ماشي كده ✓</button><button type="button" data-rv-chg="${esc(r.id)}|${esc(n.id)}">غيّرها ✎</button></div>` +
-        `<div class="rv-alt${a && a.v !== 'ok' ? ' on' : ''}" data-rv-box="${esc(r.id)}|${esc(n.id)}">${alts}<input type="text" maxlength="200" placeholder="أو اكتب اللي عايزه…" value="${a && a.v === 'text' ? esc(a.t) : ''}" data-rv-text="${esc(r.id)}|${esc(n.id)}"></div>`) +
+    // one short row (his mockup): what I found, what I will do under it, «تمام» / «غيّر» at the side; «غيّر» opens the choices and a line for his own words
+    return `<div class="rv-note${a ? ' done' : ''}" data-note="${esc(n.id)}"><div class="rv-nl"><p><b>${n.line != null ? 'سطر ' + esc(n.line) + ': ' : ''}</b><span class="notr">${esc(n.text)}</span>` +
+      (n.mine ? `<small class="rv-mine">هعمل: <span class="notr">${esc(n.mine)}</span></small>` : '') + '</p>' +
+      (locked ? '' : `<div class="rv-nb"><button type="button" class="rv-yes${a && a.v === 'ok' ? ' on' : ''}" data-rv-ok="${esc(r.id)}|${esc(n.id)}">تمام</button><button type="button" data-rv-chg="${esc(r.id)}|${esc(n.id)}">غيّر</button></div>`) + '</div>' +
+      (locked ? '' : `<div class="rv-alt${a && a.v !== 'ok' ? ' on' : ''}" data-rv-box="${esc(r.id)}|${esc(n.id)}">${alts}<input type="text" maxlength="200" placeholder="أو اكتب اللي عايزه…" value="${a && a.v === 'text' ? esc(a.t) : ''}" data-rv-text="${esc(r.id)}|${esc(n.id)}"></div>`) +
       (a ? `<div class="rv-chosen notr">${esc(answerText(n, a))}</div>` : '') + '</div>';
   }
   function photosHtml(r) {
@@ -177,8 +225,8 @@
     const sub = [r.paper_date, 'صافي ' + money(r.total), linesOf(r).length + ' سطر'].filter(Boolean).join(' · ');
     return `<div class="rv-card${open ? ' open' : ''}" data-rv="${esc(r.id)}"><div class="rv-hd" role="button" tabindex="0" data-rv-toggle="${esc(r.id)}">` +
       `<span class="rv-ord">${r.ord == null ? '·' : esc(r.ord)}</span><span class="rv-t"><strong class="notr">${esc(r.supplier)} · ${esc(r.doc_no)}</strong><span dir="ltr">${esc(sub)}</span></span>${chipHtml(r)}</div>` +
-      `<div class="rv-body">${photosHtml(r)}${linesHtml(r)}${checkHtml(r)}` +
-      (notesOf(r).length ? `<h4>ملاحظاتي${WAITING.includes(r.status) ? ' (محتاجة رأيك)' : ''}</h4>${notesOf(r).map((n) => noteHtml(r, n)).join('')}` : '') +
+      `<div class="rv-body">${photosHtml(r)}${compact(r) ? compactHtml(r) : linesHtml(r)}${checkHtml(r)}` +
+      (notesOf(r).length ? `<h4>ملاحظات${WAITING.includes(r.status) ? ' (محتاجة رأيك)' : ''}</h4>${notesOf(r).map((n) => noteHtml(r, n)).join('')}` : '') +
       footHtml(r) + '</div></div>';
   }
   function draw() {
@@ -236,18 +284,44 @@
     if (!r || busy) return;
     busy = true;
     try {
-      const next = { ...answersOf(r), [nid]: a };
+      const next = { ...answersOf(r) };
+      if (a == null) delete next[nid]; else next[nid] = a; // null takes an answer back (a «رفض» pressed again)
       await patch(rid, { answers: next });
       openState[rid] = true; // the card he is answering stays open
       sig = signature(); draw();
     } catch (e) { say('الرد ماتحفظش: ' + (e.message || e), 'bad'); } finally { busy = false; }
   }
-  // the public price he typed (or took from the card) for an asked line: it cannot be below the paper's net (the discount would be negative)
-  function setPrice(rid, n, v) {
+  const boxOf = (rid, n) => document.querySelector(`[data-rv-price="${CSS.escape(rid + '|' + n)}"]`);
+  // after a price: the next empty box of the same invoice (then the first empty one above), else its approve button (Enter there approves)
+  function focusAfter(rid, n) {
+    const boxes = [...document.querySelectorAll(`[data-rv="${CSS.escape(String(rid))}"] [data-rv-price]:not([disabled])`)];
+    const i = boxes.findIndex((b) => b.dataset.rvPrice === rid + '|' + n);
+    const nx = boxes.slice(i + 1).find((b) => !b.value) || boxes.slice(0, Math.max(i, 0)).find((b) => !b.value);
+    if (nx) { nx.focus(); return; }
+    const ap = document.querySelector(`[data-rv-approve="${CSS.escape(String(rid))}"]`);
+    if (ap && !ap.disabled) ap.focus();
+  }
+  // the public price he typed (or the card's, kept with Enter on the empty box) for an asked line: never below the paper's cost (the discount would be negative)
+  async function setPrice(rid, n, v, move) {
     const r = find(rid), l = r && linesOf(r).find((x) => String(x.n) === String(n));
     if (!l) return;
-    if (!validPrice(v, l.net)) { say(`سعر الجمهور لازم يكون ${money(l.net)} أو أكتر (سعر الورقة)`, 'bad'); draw(); return; } // the box goes back to the price in force
-    return answer(rid, 'L' + n, { v: 'price', t: String(v) });
+    if (!validPrice(v, l.net)) { // the box goes back to what is saved and keeps the cursor
+      say(`سعر الجمهور لازم يكون ${money(l.net)} أو أكتر (التكلفة)`, 'bad'); draw();
+      const b = boxOf(rid, n); if (b) { b.focus(); b.select && b.select(); }
+      return;
+    }
+    await answer(rid, 'L' + n, { v: 'price', t: String(v) });
+    if (move) focusAfter(rid, n);
+  }
+  // Enter in a price box: his number, or (empty) the card's price kept; a new item has no card price: it needs his
+  function priceEnter(t) {
+    const [rid, n] = split(t.dataset.rvPrice), r = find(rid), l = r && linesOf(r).find((x) => String(x.n) === String(n));
+    if (!l) return;
+    const raw = t.value.trim();
+    if (!raw) { const c = Number(l.sug) > 0 ? Number(l.sug) : Number(l.card); if (c > 0) return setPrice(rid, n, c, true); say('الصنف ده جديد: اكتب سعره', 'bad'); return; } // empty = the suggested price (his way, from the study), else the card's
+    const v = parseNum(raw);
+    if (!(v > 0)) { say('اكتب رقم', 'bad'); return; }
+    return setPrice(rid, n, v, true);
   }
   async function approve(ids) {
     if (busy) return;
@@ -295,7 +369,7 @@
     if ((el = g('data-rv-allok'))) return approve(cleanReady(rows).map((r) => r.id));
     if ((el = g('data-rv-hold'))) return setStatus(el.dataset.rvHold, 'held', 'استنيت عليها: مش هتتدخل لحد ما توافق');
     if ((el = g('data-rv-back'))) return setStatus(el.dataset.rvBack, 'ready', 'رجعتها جاهزة');
-    if ((el = g('data-rv-pub'))) { const [r, n, v] = split(el.dataset.rvPub); return setPrice(r, n, Number(v)); }
+    if ((el = g('data-rv-rej'))) { const [r, n] = split(el.dataset.rvRej), row = find(r), l = row && linesOf(row).find((x) => String(x.n) === n); return l ? answer(r, 'R' + n, rejected(row, l) ? null : { v: 'reject' }) : undefined; }
     if ((el = g('data-rv-all'))) { showAllLines[el.dataset.rvAll] = true; return draw(); }
     if ((el = g('data-rv-shot'))) { const [r, i] = split(el.dataset.rvShot); return viewer(r, Number(i)); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
@@ -314,15 +388,22 @@
       if (b) { e.preventDefault(); b.click(); }
     } else if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-rv-toggle]')) e.target.click();
   }
+  // when the screen opens: the cursor waits in the first empty price box (his «مكان للرقم متحفز»)
+  function focusFirst() {
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return;
+    const b = document.querySelector('#rvMain .rv-card.open .rv-box:not([disabled]):not(.done)');
+    if (b) b.focus();
+  }
   function open() {
     if (!db()) return;
-    load(true);
+    load(true).then(focusFirst);
     clearInterval(timer);
     timer = setInterval(() => { if (panelOn() && !document.hidden) load(false); }, 20000);
   }
   function close() { clearInterval(timer); timer = null; shot && shot.remove(); shot = null; }
   const main = $('rvMain');
-  if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
+  if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
   document.addEventListener('keydown', onKey);
   $('rvRefresh')?.addEventListener('click', () => load(true));
   // the badge / home row: how many invoices wait for his yes (asked by ar/notify.js with the other counts)
