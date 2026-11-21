@@ -17,7 +17,7 @@
     ['gold', 'دهبي', '#9a7414'], ['orange', 'برتقالي', '#a8501a'], ['copper', 'نحاسي', '#8d4e2a'],
     ['brown', 'بني', '#5d4037'], ['gray', 'رمادي', '#3f4650'], ['slate', 'رصاصي', '#455a64'], ['charcoal', 'فحمي', '#263238'],
   ].map(([id, name, hex]) => ({ id, name, hex }));
-  const KEY = 'asker-accent', NIGHT = 'asker-night', DEFAULT_ID = 'calmsky'; // the calm sky blue (owner 2026-11-19 night); the calm orange (2026-11-17) and «برتقالي فاقع» stay in the list
+  const KEY = 'asker-accent', NIGHT = 'asker-night', STRIPS = 'asker-strips', DEFAULT_ID = 'calmsky'; // the calm sky blue (owner 2026-11-19 night); the calm orange (2026-11-17) and «برتقالي فاقع» stay in the list
   // the dark surfaces of the new look (the bottom bar, the greeting, the balance card, the footer). Owner 2026-11-16: the navy was «مش حلو», then the aqua green
   // («أخضر مائي»); 2026-11-17: «عاوز استخدم ال calm orange بدل الأورانج والأخضر المائي في جميع المواضع»: the calm orange is the DEFAULT surface now (white text on it
   // reads, 4.7:1) and the aqua green is gone (a phone that kept it falls back to the default). Four sets, none of them blue or green, plus any color of his own;
@@ -137,9 +137,10 @@
     s.setProperty('--glow', hexToRgb(t.main).join(', ')); // for soft colored shadows: rgba(var(--glow), .5)
     document.documentElement.dataset.accent = c.id;
     document.documentElement.classList.toggle('night', c.night);
-    // the phone's top bar = the top of the header: white by day (the header is white now, ar/airy.css), the dark page at night
+    // the phone's top bar AND the three Android buttons at the bottom take this color: the header is the system color again (owner 2026-11-21, ar/airy.css), day and night
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff');
+    // the switch «الشريط الرفيع وأزرار الأندرويد بلون التطبيق» (owner 2026-11-21: «ولو مفتاح للنافيجيشن بار»): on = the color, off = white by day / the dark page at night; the two strips share this one color
+    if (meta) meta.setAttribute('content', read(STRIPS, '1') !== '0' ? t.main : (c.night ? t.tint : '#ffffff'));
     return c;
   }
   root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice, DARKS, DARK_DEFAULT, darkOf, applyDark };
@@ -155,6 +156,7 @@
     if ($('accentCustom')) $('accentCustom').value = c.hex;
     $('accentCustomRow')?.classList.toggle('on', c.id === 'custom');
     if ($('nightMode')) $('nightMode').checked = c.night;
+    if ($('stripsColor')) $('stripsColor').checked = read(STRIPS, '1') !== '0';
     drawDark();
   }
   function drawDark() {
@@ -199,6 +201,8 @@
     $('accentCustom')?.addEventListener('input', custom);
     $('accentCustom')?.addEventListener('change', custom);
     $('nightMode')?.addEventListener('change', (e) => { write(NIGHT, e.target.checked ? '1' : '0'); apply(); drawPick(); });
+    if ($('stripsColor')) $('stripsColor').checked = read(STRIPS, '1') !== '0';
+    $('stripsColor')?.addEventListener('change', (e) => { write(STRIPS, e.target.checked ? '1' : '0'); apply(); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();

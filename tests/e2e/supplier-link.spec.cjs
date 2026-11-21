@@ -74,19 +74,14 @@ run('Supplier link: he opens it and sees only his own account: invoices with ite
  await open(page,base+'supplier.html#v='+TOK);
  await page.waitForSelector('#spBody:not([hidden]) .mv');
  assert.equal(await text(page,'#spTitle'),'كشف حساب A M group');
- // the maker's thin line (owner 2026-11-19: «تصميم شركة أجزا لبرمجة سوق الدواء بالذكاء الاصطناعي»): the very top, thin, small, plain text, above the pharmacy's header
- // «خليها اجزاء بالانجليزي، وعلامة التريد مارك … في دايرة رفيعة، وبعدها بمسافة اي اي كبير بحروف كبيرة» (2026-11-20): Agza, the trademark sign in a thin circle (TM, never ® because the name is not registered), a space, a big capital AI
- assert.equal(await page.$eval('#spCredit .sp-agza',e=>e.textContent),'Agza');
- assert.equal(await page.$eval('#spCredit .sp-tm',e=>e.textContent),'TM');
- assert.equal(await page.$eval('#spCredit .sp-ai',e=>e.textContent),'AI');
- // 2026-11-20: «شيل الكلام اللي بالعربي … وخلي اجزاء AI بس لوحدها»: the name alone, no Arabic words
- assert.equal(await page.$eval('#spCredit',e=>e.textContent.replace(/\s+/g,' ').trim()),'AgzaTM AI');
- assert.doesNotMatch(await page.$eval('#spCredit',e=>e.textContent),/[\u0600-\u06FF]/,'no Arabic in the line');
- assert.equal(await page.$eval('#spCredit',e=>getComputedStyle(e,'::after').content!=='none'),true,'the shimmering line under it stays');
- assert.equal(await page.evaluate(()=>{const fs=s=>parseFloat(getComputedStyle(document.querySelector(s)).fontSize),tm=getComputedStyle(document.querySelector('#spCredit .sp-tm'));return fs('#spCredit .sp-ai')>fs('#spCredit .sp-agza')&&fs('#spCredit .sp-agza')>fs('#spCredit')&&tm.borderTopLeftRadius==='50%'&&parseFloat(tm.borderTopWidth)<=1&&parseFloat(tm.borderTopWidth)>0}),true,'AI bigger than the name, the name bigger than the line; the sign in a thin round outline');
- assert.equal(await page.evaluate(()=>{const b=document.querySelector('#spCredit .sp-brand').getBoundingClientRect(),c=document.getElementById('spCredit').getBoundingClientRect();return b.left>=c.left&&b.right<=c.right}),true,'the whole line fits at phone width');
- assert.equal(await page.evaluate(()=>{const c=document.getElementById('spCredit').getBoundingClientRect(),h=document.querySelector('.sp-head').getBoundingClientRect();return c.top<=1&&c.bottom<=h.top+1&&c.height<40}),true,'the very top, thin, above the header');
- assert.equal(await page.$eval('#spCredit',e=>parseFloat(getComputedStyle(e).fontSize)<=12),true,'small: a margin, not a banner');
+ // the maker's signature (owner 2026-11-21: «Agza» alone, a thin circle with «tm» inside just after the last letter and above its level, small, at the END of the page; the top line of 11-20 with «AI» is gone)
+ assert.equal(await page.$$eval('#spCredit, .sp-credit',n=>n.length),0,'the top line is gone');
+ assert.equal(await page.$eval('.agza-sign span',e=>e.firstChild.textContent),'Agza','the name alone: no «By», no «AI»');
+ assert.equal(await page.$eval('.agza-sign b',e=>e.textContent),'tm','tm in the thin circle');
+ assert.doesNotMatch(await page.$eval('.agza-sign',e=>e.textContent),/[\u0600-\u06FF]|AI|By/,'no Arabic, no «AI», no «By» in it');
+ assert.equal(await page.evaluate(()=>{const b=getComputedStyle(document.querySelector('.agza-sign b'));return b.borderTopLeftRadius==='50%'&&parseFloat(b.borderTopWidth)<=1&&parseFloat(b.borderTopWidth)>0&&b.backgroundColor==='rgba(0, 0, 0, 0)'}),true,'a thin round outline with an empty (see-through) center');
+ assert.equal(await page.evaluate(()=>{const a=getComputedStyle(document.querySelector('.agza-sign')),h=getComputedStyle(document.querySelector('.sp-head h1'));return parseFloat(a.fontSize)<=12&&parseFloat(a.fontSize)<parseFloat(h.fontSize)/1.4}),true,'small: much smaller than the title');
+ assert.equal(await page.evaluate(()=>{const s=document.querySelector('.agza-sign').getBoundingClientRect(),m=document.getElementById('spApp').getBoundingClientRect();return s.bottom<=m.bottom+1&&s.top>m.top+m.height/2}),true,'at the end of the page');
  assert.match(await text(page,'#spBal'),/مستحق لكم عندنا ?الرصيد الحالي ?3,120 ج/);
  // from the first dealing: all the sums with the opening and closing balance
  assert.match(await text(page,'#spSum'),/من أول تعامل \(.*\): فواتير 5,300 \(3\) · مرتجعات 180 \(1\) · مدفوعات 2,000 \(1\)/);
@@ -149,7 +144,7 @@ run('Supplier link: a dead link, no link, the owner\'s own look, many moves (old
  await open(page,base+'supplier.html');
  await page.waitForFunction(()=>/الرابط ده مبقاش شغال/.test(document.getElementById('spStatus').textContent));
  assert.equal(await page.isVisible('#spBody'),false);
- assert.equal(await page.isVisible('#spCredit'),true,'the maker\'s line is there even on a dead link');
+ assert.equal(await page.isVisible('.agza-sign'),true,'the maker\'s signature is there even on a dead link');
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_vendor_link')),null);
  // no link at all
  await open(page,base+'supplier.html');

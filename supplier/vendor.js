@@ -98,7 +98,7 @@
     const abs = (p) => new URL(p, page).href;
     return {
       id: 'supplier.html', name: 'كشف حساب شركتكم · صيدلية عسكر', short_name: 'حساب الشركة', description: 'كشف حساب شركتكم عند صيدلية عسكر', lang: 'ar', dir: 'rtl',
-      start_url: page.href + '#v=' + token, scope: abs('./'), display: 'standalone', background_color: '#ffffff', theme_color: '#ffffff',
+      start_url: page.href + '#v=' + token, scope: abs('./'), display: 'standalone', background_color: '#ffffff', theme_color: '#217bab',
       icons: [
         { src: abs('icons/arabic-192.png?v=logo2'), sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: abs('icons/arabic-512.png?v=logo2'), sizes: '512x512', type: 'image/png', purpose: 'any' },

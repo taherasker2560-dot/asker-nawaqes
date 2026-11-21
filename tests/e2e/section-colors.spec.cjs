@@ -21,22 +21,23 @@ run('airy look: a white header and bar, a light pill behind the page you are on,
  same(own,[33,123,171],'the calm sky blue by default');
  const x=await page.evaluate(()=>{const cs=(e)=>getComputedStyle(e),hd=document.querySelector('.appbar'),nav=document.querySelector('.bottomnav'),bs=[...nav.querySelectorAll('button[data-group]')],on=nav.querySelector('button:not(.secondary)'),off=nav.querySelector('button.secondary'),hero=document.querySelector('.hero'),h2=document.querySelector('.hero h2'),link=document.querySelector('.hero-link');
   return {hd:window.__rgb(cs(hd).backgroundColor),hdTitle:window.__rgb(cs(hd.querySelector('h1')).color),nav:window.__rgb(cs(nav).backgroundColor),segs:bs.map(b=>cs(b).backgroundColor),onGroup:on.dataset.group,onSvg:window.__rgb(cs(on.querySelector('svg')).backgroundColor),onSvgColor:window.__rgb(cs(on.querySelector('svg')).color),onText:window.__rgb(cs(on).color),offSvgBg:cs(off.querySelector('svg')).backgroundColor,offText:window.__rgb(cs(off).color),hero:window.__rgb(cs(hero).backgroundColor),heroR:cs(hero).borderTopLeftRadius,h2:window.__rgb(cs(h2).color),link:window.__rgb(cs(link).color),linkBg:window.__rgb(cs(link).backgroundColor)}});
- same(x.hd,[255,255,255],'the header is white');
- assert.ok(contrast(x.hdTitle,x.hd)>=7,'the name reads on it');
- same(x.nav,[255,255,255],'the bar is white');
+ same(x.hd,own,'the header is the system color (owner 2026-11-21)');
+ assert.ok(contrast(x.hdTitle,x.hd)>=4.5,'the name reads on it');
+ assert.ok(lum(x.nav)>225&&lum(x.nav)<254,'the bar is the light tint of the color: '+x.nav);
  assert.ok(x.segs.every(c=>c==='rgba(0, 0, 0, 0)'),'no colored segments in the bar: '+x.segs.join(' | '));
  assert.equal(x.onGroup,'home');
- assert.ok(lum(x.onSvg)>230&&lum(x.onSvg)<255,'a light pill behind the page you are on: '+x.onSvg);
- same(x.onSvgColor,own,'its icon in the color');
- assert.ok(contrast(x.onText,[255,255,255])>=4.5,'its words read');
+ same(x.onSvg,own,'«الرئيسية» is the round button in the system color (tests/e2e/bars.spec.cjs)');
+ same(x.onSvgColor,[255,255,255],'with a white icon');
+ assert.ok(contrast(x.onText,x.nav)>=4.5,'its words read');
  assert.equal(x.offSvgBg,'rgba(0, 0, 0, 0)','the other icons have no pill');
- assert.ok(contrast(x.offText,[255,255,255])>=4.5,'and quiet words that still read');
+ assert.ok(contrast(x.offText,x.nav)>=4.5,'and quiet words that still read');
  assert.ok(lum(x.hero)>225&&lum(x.hero)<255,'the greeting is a very light tint: '+x.hero);assert.equal(x.heroR,'16px');
  assert.ok(contrast(x.h2,x.hero)>=7,'the greeting reads');
  same(x.linkBg,own,'«الموقع» is the one solid button of the greeting');assert.ok(contrast(x.link,x.linkBg)>=4.5,'and reads');
  // the section you open gets the pill
  await page.click('[data-group="accounts"]');await still(page);
  assert.equal(await page.evaluate(()=>document.querySelector('.bottomnav button:not(.secondary)').dataset.group),'accounts');
+ same(await page.evaluate(()=>window.__rgb(getComputedStyle(document.querySelector('.bottomnav button[data-group="accounts"] svg')).backgroundColor)),[255,255,255],'a white pill behind the page you are on');
 },{home:true});
 
 run('airy look: the small tabs of a section keep the one-color brand (the chosen tab a light fill with the color)',async({page})=>{
@@ -99,6 +100,6 @@ run('airy look: a different system color changes the tints, the icons and the ma
  await page.evaluate(()=>{document.documentElement.style.removeProperty('--crimson');localStorage.setItem('asker-night','1')});
  await page.reload();await ready(page);await still(page);
  const n=await page.evaluate(()=>{const e=document.querySelector('#homePanel [data-qa="short"]');return {page:window.__rgb(getComputedStyle(document.body).backgroundColor),nav:window.__rgb(getComputedStyle(document.querySelector('.bottomnav')).backgroundColor),btn:window.__rgb(getComputedStyle(e).backgroundColor),mark:!!e.querySelector('.qa-mk'),hd:window.__rgb(getComputedStyle(document.querySelector('.appbar')).backgroundColor)}});
- assert.ok(lum(n.page)<60&&lum(n.nav)<60&&lum(n.hd)<80,'the page, the bar and the header are dark at night: '+JSON.stringify(n));
+ assert.ok(lum(n.page)<60&&lum(n.nav)<60,'the page and the bar are dark at night: '+JSON.stringify(n));same(n.hd,[33,123,171],'the header stays the system color at night');
  assert.ok(lum(n.btn)<110,'a dark tint button at night: '+n.btn);assert.ok(n.mark);
 },{home:true});

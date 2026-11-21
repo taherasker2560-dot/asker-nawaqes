@@ -71,6 +71,6 @@ assert.equal(S.PRESETS[0].id, 'calmsky');
 assert.equal(S.PRESETS[0].hex, '#217bab');
 assert.equal(S.DARK_DEFAULT, 'calmsky');
 assert.ok(S.PRESETS.some((p) => p.id === 'terra'), 'the calm orange stays in the list');
-for (const f of ['store.html', 'asker-nawaqes-arabic.html', 'supplier.html']) assert.match(fs.readFileSync(path.join(root, f), 'utf8'), /<meta name="theme-color" content="#ffffff"/, f + ': the phone bar is white (the airy header)');
-for (const f of ['manifest-store.json', 'manifest-arabic.json']) { const m = JSON.parse(fs.readFileSync(path.join(root, f), 'utf8')); assert.equal(m.theme_color, '#ffffff', f); assert.equal(m.background_color, '#ffffff', f); }
+for (const f of ['store.html', 'asker-nawaqes-arabic.html', 'supplier.html']) assert.match(fs.readFileSync(path.join(root, f), 'utf8'), /<meta name="theme-color" content="#217bab"/, f + ': the phone bar and the three Android buttons are the system color (owner 2026-11-21)');
+for (const f of ['manifest-store.json', 'manifest-arabic.json']) { const m = JSON.parse(fs.readFileSync(path.join(root, f), 'utf8')); assert.equal(m.theme_color, '#217bab', f); assert.equal(m.background_color, '#ffffff', f); }
 console.log('one-color ok');

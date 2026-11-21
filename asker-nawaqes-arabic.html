@@ -6,10 +6,10 @@
          color and follows it (Chrome 135+, owner 2026-11-12: «الشريط … شوفلك حل تخليه يتغير مع الالوان») -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="manifest" href="manifest-arabic.json" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#217bab" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&family=Cormorant+Garamond:ital,wght@1,700&display=swap" rel="stylesheet" />
     <link rel="icon" href="icons/arabic-192.png?v=logo2" />
     <link rel="apple-touch-icon" href="icons/apple-touch-180.png?v=logo2" />
     <title>سيستم نواقص صيدلية عسكر</title>
@@ -20,10 +20,11 @@
     <link rel="stylesheet" href="ar/capsule.css?v=airy-20261119a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
     <link rel="stylesheet" href="ar/brand.css?v=nobless-20261117a" />
-    <link rel="stylesheet" href="ar/airy.css?v=airy-20261119b" />
+    <link rel="stylesheet" href="ar/bars.css?v=bars-20261121a" />
+    <link rel="stylesheet" href="ar/airy.css?v=bars-20261121f" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=read-20261121a"></script>
+    <script src="ar/i18n-en.js?v=bars-20261121g"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -73,6 +74,15 @@
           <input id="darkCustom" type="color" value="#217bab" />
         </div>
         <p class="hint">بيغيّر لون الشريط اللي تحت وكارت الترحيب.</p>
+        <!-- the bars slide away while you scroll down a list: one switch for the header, one for the five spare buttons, one for the bottom bar (ar/barhide.js) -->
+        <h3>يستخبوا وأنا نازل في القايمة</h3>
+        <label class="check night-row"><input id="hideHead" type="checkbox" checked /> الهيدر</label>
+        <label class="check night-row"><input id="hideSpare" type="checkbox" checked /> صف الخمس خانات</label>
+        <label class="check night-row"><input id="hideBottom" type="checkbox" /> الشريط اللي تحت</label>
+        <p class="hint">كل واحد بمفتاحه، وبيرجعوا لما تسحب لفوق شوية.</p>
+        <!-- the phone's own strips (the status bar on top, the three Android buttons at the bottom): one color for both, the system color or plain white (ar/settings.js) -->
+        <label class="check night-row"><input id="stripsColor" type="checkbox" checked /> الشريط الرفيع وأزرار الأندرويد بلون التطبيق</label>
+        <p class="hint">الاتنين بياخدوا لون واحد (التليفون مش بيسمح بلونين).</p>
         
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
         <!-- notifications (owner 2026-11-12: «لما يكون قسم محتاج شغل يظهر إشعار ونخصصله صوت»), ar/notify.js -->
@@ -175,6 +185,8 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-2v-6h4M4 13v4a2 2 0 0 0 2 2h2v-6H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>خدمة العملاء</span></button>
         </nav>
+    <!-- the five spare buttons (owner 2026-11-21, owner only; ar/shortcuts.js): the very bottom, under the bottom bar; an empty slot is a dashed «+», a full one opens its section -->
+    <nav id="spareBar" class="spare-bar" aria-label="خانات احتياطي"></nav>
         <!-- the small tabs of each section. «المشتريات» has three groups (owner 2026-11-12): نواقص (النواقص، الوارد، الترجمة)،
              طلبيات (الطلبيات، الفواتير، قوايم المخازن)، مخزون (المخزون، جرد المخزون); each group remembers its small tab -->
         <div class="subbar" data-for="purchases" hidden>
@@ -1009,9 +1021,10 @@
           </details>
         </section>
       </div>
-    </main>
+      <p class="agza-sign" dir="ltr"><i></i><span>Agza<b>tm</b></span><i></i></p>
+</main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="ar/settings.js?v=airy-20261119a"></script>
+    <script src="ar/settings.js?v=bars-20261121e"></script>
     <script src="ar/autoupdate.js?v=upd-20261119a" defer></script>
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
@@ -1035,8 +1048,9 @@
     <script src="ar/item-media.js?v=lists2-20261121a"></script>
     <script src="ar/stock.js?v=edit-20261121a"></script>
     <script src="ar/home.js?v=lists2-20261121a"></script>
-    <script src="ar/look.js?v=marks-20261119a"></script>
-    <script src="ar/shortcuts.js?v=marks-20261119a"></script>
+    <script src="ar/look.js?v=bars-20261121a"></script>
+    <script src="ar/shortcuts.js?v=bars-20261121a"></script>
+    <script src="ar/barhide.js?v=bars-20261121f" defer></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=lists2-20261121a"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>

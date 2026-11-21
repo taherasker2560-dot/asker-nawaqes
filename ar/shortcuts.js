@@ -115,7 +115,15 @@
     [out[i], out[j]] = [out[j], out[i]];
     return out;
   }
-  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, SEC, APP_SEC, clean, parse, toggle, move };
+  // «الخانات الاحتياطي» (owner 2026-11-21: «٥ أزرار احتياطيين تحت الهيدر»; the system's owner only): five slots under the header, each EMPTY (a dashed «+») or holding one of the sections above
+  const SPARE_KEY = 'asker-spare-buttons', SPARE_N = 5;
+  function spareParse(raw) {
+    let v = null;
+    try { v = JSON.parse(raw); } catch (e) { /* nothing kept */ }
+    const out = Array.isArray(v) ? v.slice(0, SPARE_N) : [];
+    while (out.length < SPARE_N) out.push(null);
+    return out.map((t) => (typeof t === 'string' && LABEL[t] ? t : null));
+  }  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, SEC, APP_SEC, SPARE_KEY, SPARE_N, clean, parse, toggle, move, spareParse };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -311,6 +319,7 @@
 
   function onClick(e) {
     const t = e.target;
+    if (onSpareClick(e)) return;
     if (t.closest('#qaEdit')) return openSheet();
     if (t.closest('[data-pin]')) return flip(current, true);
     const u = t.closest('[data-qa-undo]');
@@ -323,17 +332,72 @@
     if (up || down) { mine = move(mine, (up || down).dataset[up ? 'qaUp' : 'qaDown'], up ? -1 : 1); save(); drawHome(); return drawSheet(); }
     if (f) return flip(f.dataset.qaFlip, false);
   }
+  // 3) the five spare buttons: a tap on a full one opens its section (ar/look.js, data-go / data-app), a tap on an empty one or a long press on a full one opens the picker; kept on this phone
+  const PLUS = 'M12 5v14M5 12h14';
+  let spare = spareParse(null);
+  try { spare = spareParse(localStorage.getItem(SPARE_KEY)); } catch (e) {}
+  const saveSpare = () => { try { localStorage.setItem(SPARE_KEY, JSON.stringify(spare)); } catch (e) {} };
+  let spareAt = -1, spareSwallow = 0;
+  function drawSpare() {
+    const box = $('spareBar');
+    if (!box) return;
+    box.innerHTML = spare.map((t, i) => (t
+      ? `<button type="button" class="sp-slot on" data-sp="${i}" ${APP_OF[t] ? `data-app="${APP_OF[t]}"` : `data-go="${TAB_OF[t]}"`}${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`
+      : `<button type="button" class="sp-slot" data-sp="${i}" aria-label="خانة فاضية: اضغط واختار شاشة">${svg(PLUS)}</button>`)).join('');
+  }
+  function drawSpareSheet() {
+    let sh = $('spSheet');
+    if (!sh) { sh = document.createElement('div'); sh.id = 'spSheet'; sh.className = 'bg-sheet qa-sheet hidden'; document.body.appendChild(sh); }
+    const cur = spare[spareAt];
+    const groups = GROUPS.map((g) => {
+      const rows = ALL.filter((x) => x[2] === g);
+      return rows.length ? `<h4>${esc(g)}</h4>` + rows.map(([t, l]) => `<div class="sp-sheet-row"><span class="qa-l">${esc(l)}</span><button type="button" class="small qa-add${t === cur ? ' on' : ''}" data-sp-pick="${t}">اختار</button></div>`).join('') : '';
+    }).join('');
+    sh.innerHTML = `<div class="bg-sheet-in qa-sheet-in" role="dialog" aria-label="خانة احتياطي"><h3><span>اختار شاشة للخانة دي</span></h3>` + groups +
+      `<div class="bg-sheet-btns">${cur ? '<button type="button" class="secondary" id="spClear">فضّي الخانة</button>' : ''}<button type="button" class="secondary" id="spCancel">إلغاء</button></div></div>`;
+  }
+  function openSpare(i) { spareAt = i; drawSpareSheet(); $('spSheet').classList.remove('hidden'); }
+  function closeSpare() { $('spSheet')?.classList.add('hidden'); spareAt = -1; }
+  function bindSpare() {
+    const box = $('spareBar');
+    if (!box) return;
+    let timer = 0;
+    const stop = () => { clearTimeout(timer); timer = 0; };
+    box.addEventListener('pointerdown', (e) => {
+      const b = e.target.closest ? e.target.closest('.sp-slot.on') : null;
+      if (!b) return;
+      stop();
+      timer = setTimeout(() => { timer = 0; spareSwallow = Date.now() + 700; openSpare(Number(b.dataset.sp)); }, 500);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'pointermove'].forEach((ev) => box.addEventListener(ev, stop));
+    box.addEventListener('click', (e) => { if (Date.now() < spareSwallow) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    box.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  function onSpareClick(e) {
+    const t = e.target;
+    const slot = t.closest ? t.closest('#spareBar .sp-slot') : null;
+    if (slot) { if (!slot.classList.contains('on')) openSpare(Number(slot.dataset.sp)); return true; }
+    const sp = $('spSheet');
+    if (!sp || !sp.contains(t)) return false;
+    if (t === sp || t.closest('#spCancel')) { closeSpare(); return true; }
+    if (t.closest('#spClear')) { spare[spareAt] = null; saveSpare(); drawSpare(); closeSpare(); return true; }
+    const pk = t.closest('[data-sp-pick]');
+    if (pk) { spare[spareAt] = pk.dataset.spPick; saveSpare(); drawSpare(); closeSpare(); return true; }
+    return true;
+  }
   // ar/app.js tells us each tab it opens (the 📌 shows whether that section is on the home)
   function onTab(tab) { current = tab; drawPins(); }
 
   function start() {
     drawHome();
+    drawSpare();
+    bindSpare();
     pinRows();
     drawPins();
     document.addEventListener('click', onClick);
     bindDrag();
   }
-  Object.assign(api, { onTab, open: openSheet, mine: () => mine.slice() });
+  Object.assign(api, { onTab, open: openSheet, mine: () => mine.slice(), spare: () => spare.slice() });
   root.AskerShortcuts = api;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
