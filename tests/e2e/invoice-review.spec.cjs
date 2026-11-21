@@ -57,7 +57,7 @@ run('Invoice review: the notes, each answer saved, the button works only when al
  assert.ok(await page.isVisible('[data-rv="11"] .rv-body'),'it opens by itself');assert.ok(!(await page.isVisible('[data-rv="12"] .rv-body')),'a ready one is closed');
  assert.equal(await page.$$eval('[data-rv="11"] tr.rv-flag',(b)=>b.length),2,'lines 1 and 2 are flagged (the third note is general)');
  assert.equal(await page.isDisabled('[data-rv-approve="11"]'),true);
- assert.match(await txt(page,'[data-rv="11"] .rv-h'),/رد على 3 ملاحظات الأول وبعدين الزرار يشتغل/);
+ assert.match(await txt(page,'[data-rv="11"] .rv-h'),/كمّل 3 حاجة الأول وبعدين الزرار يشتغل/);
  assert.match(await txt(page,'[data-rv="11"] [data-note="n1"]'),/سطر 1: بات: الأمر ١ والمندوب باعت ١٣ هعمل: هدخل ١ وأرجّع ١٢/);
  // «ماشي كده» saves {v:'ok'}
  await page.click('[data-rv-ok="11|n1"]');
@@ -75,7 +75,7 @@ run('Invoice review: the notes, each answer saved, the button works only when al
  await page.waitForFunction(()=>window.__tables.ar_invoice_reviews.find(r=>r.id===11).answers.n2,null,{timeout:5000});
  assert.deepEqual((await row(page,11)).answers.n2,{v:'text',t:'KYRATOVER 3% بسعر 30'});
  assert.equal(await page.isDisabled('[data-rv-approve="11"]'),true,'one note is still open');
- assert.match(await txt(page,'[data-rv="11"] .rv-h'),/رد على 1 ملاحظة الأول وبعدين الزرار يشتغل/);
+ assert.match(await txt(page,'[data-rv="11"] .rv-h'),/كمّل 1 حاجة الأول وبعدين الزرار يشتغل/);
  assert.match(await txt(page,'[data-rv="11"] .rv-chip'),/1\s*ملاحظة/);
  await page.click('[data-rv-ok="11|n3"]');
  await page.waitForFunction(()=>!document.querySelector('[data-rv-approve="11"]').disabled,null,{timeout:5000});
@@ -130,4 +130,45 @@ run('Invoice review: hold, the laptop\'s results, the paper\'s photo and its vie
  // a staff member with the invoices switch sees the photos, never this card (the table is the owner's)
  await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;window.AskerApp.showTab('home');window.AskerApp.showTab('docs')});
  assert.ok(!(await page.isVisible('#reviewPanel')),'hidden for staff');assert.ok(await page.isVisible('#docsPanel'));
+});
+
+run('Invoice review: the public price he types for a line the paper gives none for (owner 2026-11-21): the box, the card price, the rule, the discount, the approval',async({page})=>{
+ await page.evaluate(()=>{
+  const mk=(id,doc,lines,total)=>({id,batch:'2026-11-21',ord:null,supplier:'مخزن مثال',doc_no:doc,paper_date:'2026-11-17',total,photos:[],lines,notes:[],answers:{},owner_note:null,status:'ready',result:null,created_at:new Date().toISOString(),done_at:null});
+  const L1=(n,total)=>({n,paper:'دوا مثال '+n,qty:2,net:45.5,pub:70,disc:35,exp:'112028',id:100+n,name:'EXAMPLE '+n,total,card:70,info:'سعر الكارت 60 ← 70'});
+  const L2=(n,total,x)=>({n,paper:'دوا مثال '+n,qty:4,net:27.25,ask:'price',card:40,disc:null,exp:'',id:100+n,name:'EXAMPLE '+n,total,info:'جمهور الورقة 0.00',...x});
+  window.__tables.ar_invoice_reviews=[mk(21,'149233',[L1(1,91),L2(2,109)],200),mk(22,'149234',[L2(1,109)],109)];
+ });
+ await open(page);
+ // both cards open by themselves (something is asked); the line with a price on the paper has its discount and the card's note, the asked one a «؟» and the empty box
+ assert.ok(await page.isVisible('[data-rv="21"] .rv-body'));
+ assert.match(await txt(page,'[data-rv="21"] tr.rv-asked'),/دوا مثال 2.*4 × ؟ ·/);
+ assert.match(await txt(page,'[data-rv="21"] .rv-lines'),/دوا مثال 1.*سعر الكارت 60 ← 70.*2 × 35% · 11\/2028/);
+ assert.equal(await page.inputValue('[data-rv-price="21|2"]'),'');assert.equal(await page.getAttribute('[data-rv-price="21|2"]','placeholder'),'اكتبه هنا');
+ assert.match(await txt(page,'[data-rv="21"] .rv-askrow'),/سعر الجمهور\s*خد سعر الكارت \(40\)/);
+ assert.equal(await page.isDisabled('[data-rv-approve="21"]'),true);assert.match(await txt(page,'[data-rv="21"] .rv-h'),/كمّل 1 حاجة الأول وبعدين الزرار يشتغل/);
+ assert.match(await txt(page,'[data-rv="21"] .rv-chip'),/1\s*ملاحظة/,'the chip counts it');
+ // below the paper's net: refused, nothing saved
+ await page.fill('[data-rv-price="21|2"]','20');await page.press('[data-rv-price="21|2"]','Tab');
+ await page.waitForFunction(()=>/سعر الجمهور لازم يكون 27\.25 أو أكتر/.test(document.getElementById('rvStatus').textContent),null,{timeout:5000});
+ assert.equal((await row(page,21)).answers.L2,undefined);assert.equal(await page.isDisabled('[data-rv-approve="21"]'),true);
+ // Arabic digits and the Arabic decimal mark are fine: saved as a number, the discount and the cost shown
+ await page.fill('[data-rv-price="21|2"]','٣٩٫٥');await page.press('[data-rv-price="21|2"]','Tab');
+ await page.waitForFunction(()=>{const r=window.__tables.ar_invoice_reviews.find(x=>x.id===21);return r.answers.L2},null,{timeout:5000});
+ assert.deepEqual((await row(page,21)).answers.L2,{v:'price',t:'39.5'});
+ assert.equal(await page.inputValue('[data-rv-price="21|2"]'),'39.5');
+ assert.match(await txt(page,'[data-rv="21"] .rv-disc'),/الخصم 31\.0127% · التكلفة 27\.25/);
+ assert.match(await txt(page,'[data-rv="21"] tr.rv-asked'),/4 × 31\.0127% ·/);
+ assert.equal(await page.isDisabled('[data-rv-approve="21"]'),false);assert.match(await txt(page,'[data-rv="21"] .rv-chip'),/جاهزة ✓/);
+ // «خد سعر الكارت (40)» takes the card's price in one tap
+ await page.click('[data-rv-card="22|1|40"]');
+ await page.waitForFunction(()=>{const r=window.__tables.ar_invoice_reviews.find(x=>x.id===22);return r.answers.L1},null,{timeout:5000});
+ assert.deepEqual((await row(page,22)).answers.L1,{v:'price',t:'40'});assert.match(await txt(page,'[data-rv="22"] .rv-disc'),/الخصم 31\.875% · التكلفة 27\.25/);
+ // «وافق على الجاهز» takes the one whose price was typed (no notes, the lines add up) and both are clean now
+ assert.match((await page.textContent('[data-rv-allok]')).replace(/\s+/g,' '),/\(2\)/);
+ await page.click('[data-rv-approve="21"]');
+ await page.waitForFunction(()=>window.__tables.ar_invoice_reviews.find(r=>r.id===21).status==='approved',null,{timeout:5000});
+ assert.deepEqual((await row(page,21)).answers.L2,{v:'price',t:'39.5'},'his price travels with the approval');
+ // after the approval the box is locked
+ assert.equal(await page.isDisabled('[data-rv-price="21|2"]'),true);assert.equal(await page.$('[data-rv-card="21|2|40"]'),null);
 });
