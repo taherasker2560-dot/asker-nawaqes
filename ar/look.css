@@ -2574,3 +2574,21 @@ body.ia-lock { overflow: hidden; }
 .ia-mq { flex: none; min-width: 56px; text-align: end; font-size: 14.5px; }
 html.night .ia-sheet { background: rgba(0, 0, 0, 0.6); }
 html.night .ia-mv.open, html.night .ia-tile.op, html.night .ia-lines tr.me td { background: var(--tint-2, var(--rose)); }
+
+/* «📞 اتصل» بالعميل (owner 2026-11-22: «عايزين اوبشن اتصال من داخل السيستم بالعملاء»): a link that opens the phone's dialer on his number; the customers' list, the statement and the site orders */
+.cu-rowc { display: flex; align-items: stretch; gap: 8px; margin: 0 0 8px; }
+.cu-rowc .cu-row { flex: 1; width: auto; min-width: 0; margin: 0; }
+.cu-oldrow .cu-rowc { margin-bottom: 0; }
+.cu-ico { width: 18px; height: 18px; flex: none; }
+a.cu-call { display: flex; align-items: center; justify-content: center; flex: none; align-self: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); text-decoration: none; }
+a.cu-callbtn, button.cu-callbtn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin: 12px 0 0; border-radius: 14px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-size: 15px; font-weight: 700; text-decoration: none; box-shadow: none; }
+button.cu-callbtn.on { background: var(--card); }
+.cu-callsheet { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--crimson); border-radius: 14px; background: var(--card); }
+.cu-callsheet .hint { margin: 0 2px 4px; font-weight: 700; }
+a.cu-callnum { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 4px; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.cu-callsheet .hint + a.cu-callnum { border-top: 0; }
+a.cu-callnum b { font-variant-numeric: tabular-nums; }
+a.cu-callnum small { display: block; color: var(--muted); font-size: 12px; }
+a.cu-callnum > span:last-child { display: flex; align-items: center; justify-content: center; width: 40px; height: 36px; border-radius: 12px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); }
+a.so-call { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 700; text-decoration: none; }
+html.night a.cu-call, html.night a.cu-callbtn, html.night button.cu-callbtn, html.night a.so-call, html.night a.cu-callnum > span:last-child { color: var(--ink); }

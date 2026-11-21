@@ -1768,6 +1768,7 @@ window.AskerEN = {
   "مفيش طلبات انتظار دلوقتي. لما عميل يسأل على دوا مش موجود، دوس «طلب مش موجود».": "No waiting requests now. When a customer asks for a medicine you do not have, tap «Item not in stock».",
   "📦 حطه في مكان الانتظار، مش مع الرف العادي": "📦 Put it on the waiting shelf, not with the regular shelf",
   "اتصل": "Call",
+  "اتصل على أنهي رقم؟": "Call which number?",
   "مش وصل لسه": "Not here yet",
   "متأكد؟ دوس تاني": "Sure? Tap again",
   "رجّعته للمورد": "Returned to the supplier",

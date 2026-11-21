@@ -231,6 +231,14 @@
     if (/^20\d{10}$/.test(d)) { const l = '0' + d.slice(2); return `${l.slice(0, 4)} ${l.slice(4, 7)} ${l.slice(7)}`; }
     return d ? '+' + d : '';
   }
+  // a number as the phone's dialer wants it (owner 2026-11-22: «عايزين اوبشن اتصال من داخل السيستم بالعملاء»): an Egyptian number saved as 201012345678 → tel:+201012345678, another country's
+  // → tel:+<digits>, a number written the local way (01…, a landline 0…) as it is; '' when it is not a number
+  function telHref(p) {
+    const d = String(p == null ? '' : p).replace(/\D/g, '');
+    if (/^20\d{10}$/.test(d)) return 'tel:+' + d;
+    if (/^0\d{7,14}$/.test(d)) return 'tel:' + d;
+    return /^[1-9]\d{7,14}$/.test(d) ? 'tel:+' + d : '';
+  }
   // the customer's personal link (owner 2026-11-13, IDEAS row 1): his own account on the store site, store.html#me=<secret>
   function linkUrl(base, token) {
     return new URL('store.html#me=' + token, String(base || '').replace(/#.*$/, '')).href;
@@ -252,7 +260,7 @@
     const m = /\p{L}/u.exec(bare) || /\p{L}/u.exec(full);
     return m ? m[0].toUpperCase() : '•';
   }
-  const api = { isPickup, creditOnly, OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, numbersIn, linkUrl, linkMessage, initialOf };
+  const api = { isPickup, creditOnly, OLD_DAYS, OLD_DEFAULT, daysSince, isOld, oldCounts, reminderMessage, money, balanceText, norm, counts, pick, parseAt, dayLabel, whenText, moveTitle, afterText, itemsWord, lineValue, discountOf, monthSums, movesFor, sortMoves, isOver, isNear, KIND_WORD, intlPhone, showPhone, telHref, numbersIn, linkUrl, linkMessage, initialOf };
   root.AskerCustomersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -271,6 +279,8 @@
   const DAYS_KEY = 'asker-cu-old-days';
   let oldDays = (() => { try { const v = Number(localStorage.getItem(DAYS_KEY)); return OLD_DAYS.includes(v) ? v : OLD_DEFAULT; } catch (e) { return OLD_DEFAULT; } })();
   const note = (t) => { const el = $('cuNote'); if (el) el.textContent = t || ''; };
+  // the phone handset of the call buttons: one line drawing in the text color (the emoji is a red handset, which is not the system's one color)
+  const PHONE_ICON = '<svg class="cu-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>';
   // the customers' WhatsApp numbers (ar_customer_phones, owner 2026-11-12); null = not there (the send part stays hidden)
   let phones = null;
   // who is stopped (ar_customer_stops, owner 2026-11-13 «وقّف الآجل»): Map id -> row; null = the table is not there yet
@@ -346,10 +356,13 @@
     const b = balanceText(c.balance), lim = limitOf(c);
     const pct = lim ? Math.max(0, Math.min(100, Math.round(100 * num(c.balance) / lim))) : 0;
     const last = c.last_at ? `<small>آخر حركة ${esc(whenText(c.last_at, new Date()))} (${esc(KIND_WORD[c.last_kind] || 'بيع')})</small>` : '<small>مفيش حركات</small>';
-    return `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}${isPickup(c) ? ' cu-pick' : ''}" data-cu="${esc(c.id)}" data-ini="${esc(initialOf(c.name))}">` +
+    const row = `<button type="button" class="cu-row${isOver(c) ? ' warn' : ''}${isPickup(c) ? ' cu-pick' : ''}" data-cu="${esc(c.id)}" data-ini="${esc(initialOf(c.name))}">` +
       `<span class="cu-main"><strong class="notr">${esc(c.name)}${phones && phones.has(String(c.id)) ? ' 📱' : ''}${isStopped(c.id) ? ' ⛔' : ''}</strong>${isPickup(c) ? '<i class="cu-kind">توصيل</i>' : ''}${last}` +
       (lim && owes(c) ? `<i class="cu-bar"><b class="${isOver(c) ? 'r' : ''}" style="width:${pct}%"></b></i>` : '') + '</span>' +
       `<span class="cu-amt ${b.cls}">${esc(b.text)}${lim ? `<small>الحد ${esc(money(lim))}</small>` : ''}</span></button>`;
+    // «📞» beside the row (not inside it: a link inside a button does not work): one tap opens the dialer on his number (the one a statement was last sent to, else the first)
+    const tel = telHref(linkNumber(c.id));
+    return tel ? `<div class="cu-rowc">${row}<a class="cu-call" href="${esc(tel)}" aria-label="اتصل" title="اتصل">${PHONE_ICON}</a></div>` : row;
   }
   // an old debt: the customer's row, how long nothing moved, and the reminder (WhatsApp when his number is saved, else copied)
   function oldRowHtml(c) {
@@ -511,6 +524,17 @@
   const numbersOf = (id) => (phones && phones.get(String(id))) || [];
   // a text for a browser dialog (confirm) in the bot's language
   const tr = (s) => (root.AskerI18n && root.AskerI18n.lang && root.AskerI18n.lang() === 'en' ? root.AskerI18n.translate(s) : s);
+  // «📞 اتصل» (owner 2026-11-22): one number = one link that opens the dialer on it; several = a button that opens the list of his numbers, each one a link (the dialer needs one more tap: a page cannot dial by itself)
+  function callHtml(list) {
+    const ok = list.filter((p) => telHref(p.phone));
+    if (!ok.length) return '';
+    const label = PHONE_ICON + ' <span>اتصل</span>';
+    if (ok.length === 1) return `<a class="cu-callbtn" href="${esc(telHref(ok[0].phone))}">${label}</a>`;
+    const open = !!st.callOpen;
+    return `<button type="button" class="cu-callbtn${open ? ' on' : ''}" data-cu-call aria-expanded="${open}">${label}</button>` +
+      (open ? '<div class="cu-callsheet"><p class="hint">اتصل على أنهي رقم؟</p>' +
+        ok.map((p) => `<a class="cu-callnum" href="${esc(telHref(p.phone))}"><span><b dir="ltr" class="notr">${esc(showPhone(p.phone))}</b>${p.contact_name ? `<small class="notr">${esc(p.contact_name)}</small>` : ''}</span>${PHONE_ICON}</a>`).join('') + '</div>' : '');
+  }
   function phoneHtml() {
     if (!phones) return ''; // the numbers' table is not on the server (yet)
     const list = numbersOf(st.c.id);
@@ -520,7 +544,7 @@
       (p.last_sent_at ? `<small>آخر كشف اتبعت ${esc(whenText(localIso(p.last_sent_at), new Date()))}</small>` : '') + '</span>' +
       `<button type="button" class="linklike" data-cu-phone-del="${esc(p.phone)}">شيله</button></div>`).join('');
     if (list.length && !st.phoneEdit) {
-      return rows +
+      return callHtml(list) + rows +
         (list.length < MAX_NUMBERS ? '<button type="button" class="linklike cu-add" data-cu-phone-edit>+ ضيف رقم تاني</button>' : '') +
         (st.send ? '' : '<button type="button" class="cu-send" data-cu-send>ابعت كشف الحساب على الواتس</button>') + note;
     }
@@ -981,6 +1005,7 @@
       if (e.target.closest('[data-cu-older]')) { loadMoves(); return; }
       // the customer's WhatsApp number
       if (!st) return;
+      if (e.target.closest('[data-cu-call]')) { st.callOpen = !st.callOpen; drawStatement(); return; }
       const keepDraft = () => { const i = $('cuPhoneIn'); if (i) st.phoneDraft = i.value; };
       if (e.target.closest('[data-cu-phone-edit]')) { Object.assign(st, { phoneEdit: true, phoneMsg: '', tels: null }); drawStatement(); return; }
       if (e.target.closest('[data-cu-phone-cancel]')) { Object.assign(st, { phoneEdit: false, phoneMsg: '', tels: null, phoneDraft: '' }); drawStatement(); return; }

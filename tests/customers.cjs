@@ -99,6 +99,14 @@ assert.equal(L.intlPhone('+966 50 123 4567'),'966501234567','another country sta
 assert.equal(L.intlPhone('123'),'');assert.equal(L.intlPhone(''),'');
 assert.equal(L.showPhone('201012345678'),'0101 234 5678');
 assert.equal(L.showPhone('966501234567'),'+966501234567');
+// «📞 اتصل» (owner 2026-11-22): a number as the phone's dialer wants it
+assert.equal(L.telHref('201012345678'),'tel:+201012345678','an Egyptian number saved as 201…: +20');
+assert.equal(L.telHref('01012345678'),'tel:01012345678','written the local way: as it is');
+assert.equal(L.telHref('0225551234'),'tel:0225551234','a landline');
+assert.equal(L.telHref('966501234567'),'tel:+966501234567','another country: +');
+assert.equal(L.telHref('٠١٠١٢٣٤٥٦٧٨'),'','Arabic digits are not a saved number');
+for (const bad of ['', null, undefined, 'abc', '123', '0101', '1234567890123456']) assert.equal(L.telHref(bad),'','not a number: '+bad);
+assert.equal(L.telHref(' 0101 234-5678 '),'tel:01012345678','spaces and dashes go');
 // what a phone's contacts app shares: plain text, or a contact card (vCard, the Arabic name quoted-printable)
 assert.deepEqual(L.numbersIn('جار الصيدلية\n+20 101 111 2222\nموبايل: 0101 111 2222\n0222334455'),[{p:'201011112222',name:'جار الصيدلية'},{p:'20222334455',name:'جار الصيدلية'}]);
 assert.deepEqual(L.numbersIn('BEGIN:VCARD\r\nVERSION:2.1\r\nFN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=D8=A7=D9=84=D8=A7=D8=A8=D9=86\r\nTEL;CELL:010-4444-5555\r\nitem1.TEL;TYPE=WORK:+20 2 2233 4455\r\nEND:VCARD'),[{p:'201044445555',name:'الابن'},{p:'20222334455',name:'الابن'}]);
