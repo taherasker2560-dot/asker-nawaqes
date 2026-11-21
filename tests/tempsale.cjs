@@ -99,4 +99,9 @@ assert.deepEqual(cb.bills[0].cart.map(l=>[l.c,l.q,l.w,l.p,l.pu,l.x]),[[1,2,0,10,
 assert.deepEqual(T.cleanBills(null),{cur:0,bills:[T.blankBill()]},'nothing kept: one empty bill');
 const four=T.cleanBills({cur:2,bills:[1,2,3,4].map(()=>({cart:[]}))});assert.equal(four.bills.length,T.MAX_BILLS);assert.equal(T.MAX_BILLS,3);assert.equal(four.cur,2);
 assert.equal(T.cleanBills({bills:[{cart:[{c:1,q:0,w:0,p:5}]}]}).bills[0].cart.length,0,'a line that sells nothing is dropped');
-console.log('PASS: temp sale: sticker = 100000 + code, boxes + units, expiry lines, the bill, the limit, the row, the bills, the list');
+// an expiry typed by hand, as PharmaFly writes it: month and year (owner 2026-11-21); a wrong one is refused
+const n0=new Date(2026,10,21);
+for(const [typed,want] of [['03/2028','2028-03'],['3/28','2028-03'],['03-2028','2028-03'],['03.28','2028-03'],['0328','2028-03'],['032028','2028-03'],['328','2028-03'],['١٢/٢٠٢٧','2027-12'],[' 12 / 27 ','2027-12'],['1228','2028-12']])assert.equal(T.parseExp(typed,n0),want,typed);
+for(const bad of ['','abc','13/2028','00/2028','03/2050','03/2010','3','03/20','2028','03/2028/1','٣/٢٨ ب'])assert.equal(T.parseExp(bad,n0),null,'refused: '+bad);
+assert.equal(T.parseExp('11/2026',n0),'2026-11','this month is read (a sale refuses it later: it is «gone»)');assert.equal(T.expInfo('2026-11',n0).gone,true);
+console.log('PASS: temp sale: sticker = 100000 + code, boxes + units, expiry lines, the bill, the limit, the row, the bills, the typed expiry, the list');
