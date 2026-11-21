@@ -1630,6 +1630,7 @@ window.AskerEN = {
   "📱 تطبيق الموبايل": "📱 Phone app",
   "بيحفظ الأرقام الجديدة في جهات اتصال موبايلك وجوجل لوحده، وكل 10 أيام بيبعت جهات اتصالك هنا (وبتيجي مقفولة على الموظفين).": "It saves the new numbers into your phone's contacts and Google's by itself, and every 10 days it sends your contacts here (they come closed to the staff).",
   "لسه مفيش موبايل مربوط.": "No phone is linked yet.",
+  "مقدرتش أجيب حالة التطبيق دلوقتي، وبحاول تاني. الزرارين شغالين.": "I could not read the app's status now, and I am trying again. Both buttons work.",
   "موبايل مربوط، آخر اتصال:": "A phone is linked, last contact:",
   "آخر إرسال لجهات الاتصال:": "Last sending of the contacts:",
   "جهة اتصال": "contacts",

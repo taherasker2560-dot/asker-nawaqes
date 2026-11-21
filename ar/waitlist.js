@@ -261,16 +261,18 @@
   // ---- «📱 تطبيق الموبايل» (owner 2026-11-20, option «أ»; migration 202611201900, contacts-android/): the phone app that writes the numbers saved here into his phone's contacts (and so Google's)
   // and sends the phone's contacts here every 10 days (the laptop merges them: new ones come CLOSED to the staff) ----
   const APP_URL = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/contacts-build/asker-contacts.apk';
-  let phoneApp = null;   // null = not asked yet; {data} = the status; {error} = the server part is not there yet (nothing is shown)
+  // null = not asked yet; {data} = the status; {error} = it could not be read now (a slow net, the phone app just took the screen). The block STAYS (owner 2026-11-21: «مش مفروض بعد ما اربطه يختفي»):
+  // it says so and keeps its two buttons, and the status is asked again
+  let phoneApp = null, phoneTries = 0;
   const go = (u) => { root.open(u, '_self'); };   // a custom-scheme link (the phone app's own): the same tab; e2e replaces window.open
   const dayTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   function phoneAppHtml() {
-    if (phoneApp && phoneApp.error) return '';
     const p = phoneApp && phoneApp.data, lines = [];
-    if (!p) lines.push('<span>بحمّل…</span>');
+    if (phoneApp && phoneApp.error) lines.push('<span>مقدرتش أجيب حالة التطبيق دلوقتي، وبحاول تاني. الزرارين شغالين.</span>');
+    else if (!p) lines.push('<span>بحمّل…</span>');
     else {
       const last = (p.phones || []).map((x) => x.last_used_at).filter(Boolean).sort().pop();
-      lines.push((p.phones || []).length ? `<span>موبايل مربوط، آخر اتصال:</span> <b dir="ltr">${esc(last ? dayTime(last) : '—')}</b>` : '<span>لسه مفيش موبايل مربوط.</span>');
+      lines.push((p.phones || []).length ? `<span>موبايل مربوط، آخر اتصال:</span> <b dir="ltr">${last ? esc(dayTime(last)) : '<span>لسه</span>'}</b>` : '<span>لسه مفيش موبايل مربوط.</span>');
       if (p.last_sync) lines.push(`<span>آخر إرسال لجهات الاتصال:</span> <b>${esc(p.last_sync.n)}</b> <span>جهة اتصال</span>${p.last_sync.merged_at ? ' ✓' : ' <span>(لسه ما اتدمجتش على اللاب)</span>'}`);
       if (Number(p.pending) > 0) lines.push(`<span>أرقام مستنية تنزل على الموبايل:</span> <b>${esc(p.pending)}</b>`);
     }
@@ -282,8 +284,13 @@
   const paintPhoneApp = () => { const el = $('wlPhoneApp'); if (el && mgr) el.innerHTML = phoneAppHtml(); };
   async function loadPhoneApp() {
     if (!db() || isStaff()) return;
-    try { const { data: d, error } = await db().rpc('ar_phone_status'); phoneApp = error || !d ? { error: true } : { data: d }; } catch (e) { phoneApp = { error: true }; }
+    const had = phoneApp && phoneApp.data;
+    let ok = false;
+    try { const { data: d, error } = await db().rpc('ar_phone_status'); if (!error && d) { phoneApp = { data: d }; ok = true; } } catch (e) { /* the status could not be read now */ }
+    if (!ok && !had) phoneApp = { error: true };   // a status already on screen stays as it was
     paintPhoneApp();
+    // not read: again in a few seconds (the page coming back from the phone app has no net for a moment), three times at most
+    if (!ok && mgr && phoneTries < 3) { phoneTries++; setTimeout(loadPhoneApp, 5000); } else if (ok) phoneTries = 0;
   }
   // «اربط التطبيق»: a new key for this phone (the server keeps only its hash), then the phone app opens with it (it asks him once). On Android an intent: link (the app's page if it is not installed).
   async function linkApp() {
@@ -294,6 +301,7 @@
       if (error || !/^[0-9a-f]{64}$/.test(String(k || ''))) throw new Error(error ? error.message : 'key');
       go(/Android/i.test(root.navigator.userAgent) ? `intent://link?k=${k}#Intent;scheme=askercontacts;package=com.askerpharmacy.contacts;S.browser_fallback_url=${encodeURIComponent(APP_URL)};end` : `askercontacts://link?k=${k}`);
       note = '';
+      phoneTries = 0;
       setTimeout(loadPhoneApp, 4000);
     } catch (e) { note = 'ماتغيّرش: ' + (e && e.message ? e.message : ''); }
     busy = false;
@@ -574,6 +582,8 @@
     const panel = $('waitPanel');
     if (!panel || panel.dataset.wlBound) return;
     panel.dataset.wlBound = '1';
+    // back from the phone app (or from any other app): the number book is still open, so its phone-app status is read again
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && mgr && !isStaff()) { phoneTries = 0; loadPhoneApp(); } });
     $('wlRefresh')?.addEventListener('click', () => { note = ''; load(); });
     panel.addEventListener('input', (e) => {
       if (e.target.id === 'wlItem' && form) { form.q = e.target.value; clearTimeout(searchTimer); searchTimer = setTimeout(search, 250); }
