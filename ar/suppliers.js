@@ -162,8 +162,7 @@
   function rowHtml(r) {
     const tag = r.match_status === 'good' ? '<span class="pill warn">كويس</span>' : '<span class="pill bad">ضعيف</span>';
     const meta = [r.price != null ? r.price + ' ج' : '', r.discount_pct != null ? 'خصم ' + r.discount_pct + '%' : ''].filter(Boolean).join(' · ');
-    return (
-      `<div class="item" data-sp-row="${r.id}">` +
+    const inner =
       `<div>${tag} ${esc(r.supplier_name)}</div>` +
       `<div class="hint">${esc(meta)}</div>` +
       (r.pharmafly_name ? `<div class="en">${esc(r.pharmafly_name)}</div>` : '<div class="hint">مفيش اقتراح</div>') +
@@ -171,8 +170,9 @@
       (r.item_id ? `<button type="button" class="small" data-sp-act="accepted">صح ✓</button> ` : '') +
       `<button type="button" class="small secondary" data-sp-act="rejected">غلط</button> ` +
       `<button type="button" class="small secondary" data-sp-act="not_stocked">مش عندنا</button>` +
-      '</div></div>'
-    );
+      '</div>';
+    // the SUGGESTED item's small photo on the side (ar/item-media.js, owner 2026-11-21): the box to compare with the warehouse's line before «صح»
+    return `<div class="item" data-sp-row="${r.id}">${root.AskerItemMedia && r.pharmafly_name ? root.AskerItemMedia.row(r.item_id, r.pharmafly_name, r.pharmafly_name, inner) : inner}</div>`;
   }
   async function more() {
     if (!current) return;
@@ -473,7 +473,10 @@
     else if (r.review === 'accepted' && r.item_id) acts = '<button type="button" class="small secondary" data-sp-found="undo">غلط، رجّعه</button>';
     else if (r.review === 'pending' && r.item_id && r.match_status !== 'none')
       acts = '<button type="button" class="small" data-sp-found="accepted">صح ✓</button> <button type="button" class="small secondary" data-sp-found="rejected">غلط</button>';
-    return `<div class="item" data-sp-found-row="${r.id}"><div>${esc(r.supplier_name)}</div><div class="hint">${esc(meta)}</div>${pf}${acts ? '<div class="sp-actions">' + acts + '</div>' : ''}</div>`;
+    const inner = `<div>${esc(r.supplier_name)}</div><div class="hint">${esc(meta)}</div>${pf}${acts ? '<div class="sp-actions">' + acts + '</div>' : ''}`;
+    // the matched / suggested item's small photo on the side (ar/item-media.js, owner 2026-11-21); a line that matches no item of ours has none
+    const matched = r.pharmafly_name && (r.review === 'accepted' || (r.review === 'pending' && r.match_status !== 'none'));
+    return `<div class="item" data-sp-found-row="${r.id}">${root.AskerItemMedia && matched ? root.AskerItemMedia.row(r.item_id, r.pharmafly_name, r.pharmafly_name, inner) : inner}</div>`;
   }
   // Undo an accepted line: it becomes «غلط», and the warehouse forgets that name (only if it still points at this item),
   // so the next list from the same warehouse does not accept it again by itself.

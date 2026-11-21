@@ -37,8 +37,9 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
  await page.click('#odEdit');assert.ok(await page.isVisible('#odEditBox'));assert.match(await text(page,'#odEdit'),/اقفل التعديل/);
  assert.equal(await page.$$eval('#odItems .od-item',x=>x.length),2);
  // photo when the owner approved one for the store (12163), a shape otherwise; the monthly average, stock and last discount beside it
- assert.equal(await page.$$eval('#odItems .od-item:nth-child(1) .od-thumb img',x=>x.length),1,'approved photo');
- assert.equal(await page.$$eval('#odItems .od-item:nth-child(2) .od-thumb.icon svg',x=>x.length),1,'a shape for an item without a photo');
+ // 2026-11-21: the photo is the item's shared small photo (ar/item-media.js): a tap opens «تعديل الصنف»; an item without a photo gets the square with the first letters of its name
+ assert.equal(await page.$$eval('#odItems .od-item:nth-child(1) .im-th img',x=>x.length),1,'approved photo');
+ assert.equal(await page.$$eval('#odItems .od-item:nth-child(2) .im-th.im-none',x=>x.length),1,'the first letters of the name for an item without a photo');
  assert.match(await text(page,'#odItems .od-item:nth-child(1)'),/SALINE 0\.9% 500CC RCقديم المتوسط الشهري 84 · الرصيد 19 آخر خصم 30% · قايمة 08\/11/);
  assert.match(await text(page,'#odItems .od-item:nth-child(2)'),/المتوسط الشهري 6\.5 · الرصيد 0 آخر خصم 21\.2% · آخر شرا 19\/10 · فيه بونص القايمة 35% وآخر شرا 21\.2% \(19\/10\)/);
  assert.equal(await page.inputValue('#odItems .od-item:nth-child(1) [data-qty]'),'23');

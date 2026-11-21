@@ -90,11 +90,13 @@
   function row(x) {
     const ar = arName.get(x.i);
     const t = times(x);
-    return `<div class="ni-row"><div class="ni-main"><b class="notr" dir="auto">${esc(ar || x.n)}</b>${ar ? `<small class="ni-meta notr" dir="ltr">${esc(x.n)}</small>` : ''}` +
+    const main = `<div class="ni-main"><b class="notr" dir="auto">${esc(ar || x.n)}</b>${ar ? `<small class="ni-meta notr" dir="ltr">${esc(x.n)}</small>` : ''}` +
       `<small class="ni-meta"><span>${esc(`السنة اللي فاتت بعت ${fmt(x.y1)} في الفترة دي (المعتاد في الشهر ${fmt(x.avg)})`)}</span>` +
       (x.y2 > 0 ? ` <span>${esc(`وقبلها بسنة بعت ${fmt(x.y2)}`)}</span>` : '') + '</small>' +
       `<small class="ni-meta"><b>${esc(`ورصيدك دلوقتي ${fmt(x.have)}`)}</b>${x.strong ? ' <span class="pill good">اتكرر سنتين</span>' : ''}${t >= 1.8 ? ` <span class="pill">${esc(`${fmt(t)}× المعتاد`)}</span>` : ''}</small>` +
-      tail(x) + '</div></div>';
+      tail(x) + '</div>';
+    // the item's small photo on the side (ar/item-media.js, owner 2026-11-21)
+    return `<div class="ni-row">${root.AskerItemMedia ? root.AskerItemMedia.row(x.i, x.n, ar || x.n, main) : main}</div>`;
   }
   // «➕ ضيفه» (owner 2026-11-16: «اصناف موسم مفيش امكانيه لاضافتها لامر الشرا»): the quantity box (what the season still needs) and the add button; once in the order, the line and «رجّعه»
   function tail(x) {

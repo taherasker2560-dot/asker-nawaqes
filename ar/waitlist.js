@@ -180,8 +180,10 @@
     return `<button type="button" class="${cls || 'secondary'} small" data-wl-act="${esc(action)}" data-id="${esc(id)}">${esc(ask ? 'متأكد؟ دوس تاني' : label)}</button>`;
   }
 
+  // the item's small photo on the side of a card's first line (ar/item-media.js, owner 2026-11-21); no item id (a typed unknown item) = the line as it was
+  const withPhoto = (id, name, line) => (root.AskerItemMedia ? root.AskerItemMedia.row(id, name, name, line) : line);
   function callCard(g) {
-    let html = `<div class="py-card py-wait"><div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(g.item)}</bdi></span></div>` +
+    let html = `<div class="py-card py-wait">${withPhoto(g.rows[0] && g.rows[0].item_id, g.item, `<div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(g.item)}</bdi></span></div>`)}` +
       '<div class="py-l2">📦 حطه في مكان الانتظار، مش مع الرف العادي</div>';
     for (const r of g.rows) {
       const wa = waLink(r.phone, customerMsg(r.item));
@@ -193,7 +195,7 @@
     return html + '</div>';
   }
   function waitCard(r) {
-    return `<div class="py-card"><div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>` +
+    return `<div class="py-card">${withPhoto(r.item_id, r.item, `<div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>`)}` +
       `<div class="py-l2">${person(r)} · ${qtySpan(r)} · <span>${esc(ago('اتطلب', r.days))}</span>` + (r.item_id == null ? ` · <span>${esc('صنف مش معروف للسيستم: دوس «وصل» بإيدك')}</span>` : '') + '</div>' +
       (r.vendor_id == null && !isStaff() ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
       `<div class="py-acts">${isStaff() ? '' : act(r.id, 'arrived', 'وصل', 'py-p')}${teleBtn(r)}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
@@ -211,7 +213,7 @@
   function leftCard(r) {
     const left = r.left_days, hot = left != null && left <= 2;
     const nums = [`اتباع آخر سنة: ${num(r.sold_year)} علبة`, r.price != null ? `السعر ${num(r.price)} ج` : '', r.exp_near ? `أقرب صلاحية في المخزن ${String(r.exp_near).slice(0, 7)}` : ''].filter(Boolean);
-    return `<div class="py-card${hot ? ' py-look' : ''}"><div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>` +
+    return `<div class="py-card${hot ? ' py-look' : ''}">${withPhoto(r.item_id, r.item, `<div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>`)}` +
       `<div class="py-l2">${person(r)} · ${qtySpan(r)}${r.called ? ` · <span>${esc('اتكلم')}</span>` : ''}</div>` +
       `<div class="py-l2"><span>${esc(ago('وصل', r.days_here))}</span> · <b>${esc(leftText(left))}</b></div>` +
       `<div class="py-l2">${nums.map((n) => `<span>${esc(n)}</span>`).join(' · ')}${r.exp_short ? ' ' + tag('صلاحيته أقل من سنة ونص') : ''}</div>` +
@@ -310,7 +312,11 @@
     const f = form, v = isStaff() ? null : vendorOf(f.vendor), staff = isStaff();
     const picked = f.item ? `<div class="py-field"><span dir="ltr"><bdi class="notr">${esc(f.item.name)}</bdi></span><button type="button" class="secondary small" data-wl-unpick>✕</button></div>`
       : `<input id="wlItem" type="search" dir="ltr" placeholder="اسم الدوا (إنجليزي أو عربي)" aria-label="اسم الدوا" value="${esc(f.q)}" autocomplete="off" />` +
-        (f.q.trim().length >= 2 ? `<div class="py-picks">${f.results.map((r) => `<button type="button" class="py-pick" data-wl-pick="${esc(r.id)}"><b dir="ltr"><bdi class="notr">${esc(r.name)}</bdi></b>${r.arabic_name ? `<small>${esc(r.arabic_name)}</small>` : ''}</button>`).join('')}` +
+        (f.q.trim().length >= 2 ? `<div class="py-picks">${f.results.map((r) => {
+          const pick = `<button type="button" class="py-pick" data-wl-pick="${esc(r.id)}"><b dir="ltr"><bdi class="notr">${esc(r.name)}</bdi></b>${r.arabic_name ? `<small>${esc(r.arabic_name)}</small>` : ''}</button>`;
+          // the photo BESIDE the button (a button inside a button does not work): a tap on the photo opens «تعديل الصنف», a tap on the name picks the item
+          return root.AskerItemMedia ? root.AskerItemMedia.row(r.id, r.name, r.arabic_name || r.name, pick) : pick;
+        }).join('')}` +
           `<button type="button" class="py-pick" data-wl-typed><b>اكتبه زي ما هو</b><small dir="ltr"><bdi class="notr">${esc(f.q.trim())}</bdi></small></button></div>` : '');
     return `<div class="py-card py-confirm"><span class="py-lab">الدوا</span>${picked}` +
       `<span class="py-lab">العميل</span><div class="py-seg" style="grid-template-columns:2fr 1fr"><input id="wlPhone" type="tel" dir="ltr" placeholder="01xxxxxxxxx" aria-label="رقم العميل" value="${esc(f.phone)}" />` +

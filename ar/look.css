@@ -1942,6 +1942,12 @@ html.night .ve-lines td.exp { color: var(--crimson-ink); }
 .im-in.ro { background: var(--tint); color: var(--muted); }
 .im-two { display: grid; grid-template-columns: 1fr; gap: 2px; } /* one under the other: a drug's full name does not fit in half a phone */
 .im-btn.main { background: var(--tint); color: var(--crimson-ink); border: 1px solid var(--crimson); }
+/* the item's small photo on the side of a row in the other lists (ar/item-media.js row() / rowByName(), owner 2026-11-21: a tap on it opens «تعديل الصنف») */
+.im-lrow { display: flex; align-items: flex-start; }
+.im-lrow > .im-th, .bg-it > .im-th, .od-item > .im-th { flex: 0 0 46px; width: 46px; height: 46px; margin-inline-end: 8px; }
+.im-lmain { flex: 1 1 0; min-width: 0; }
+.srow > .im-lrow { flex: 1 1 0; min-width: 0; }
+.im-lrow .py-pick { width: 100%; }
 /* «📷 صوّر المادة الفعالة» (owner 2026-11-21): the reading's state under the button: waiting (a small spinner), read (soft green: the fields below are filled, he checks them), could not read (soft red) */
 .im-read { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); font-size: 13.5px; }
 .im-read b { display: block; font-size: 14px; }
