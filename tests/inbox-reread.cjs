@@ -2,7 +2,7 @@
 // filled in only while it is still not read. Fake Supabase, storage and Gemini; nothing real is called.
 const assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
-const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
+const F=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts')).href);
 const ORIGIN='https://taherasker2560-dot.github.io',env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon'};
 const JPG=new Uint8Array([0xff,0xd8,0xff,0xe0,1,2,3]);
 function fake(row,{gem=()=>({rows:[{name:'فلاجيل شراب ١٢٥',english:''}]}),gemStatus=200,file=200}={}){const calls=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));

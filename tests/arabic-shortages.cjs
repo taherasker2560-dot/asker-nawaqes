@@ -1,7 +1,7 @@
 // Trial bot function (supabase/functions/arabic-shortages): translate and read with fake Supabase and Gemini.
 const assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
-const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
+const F=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts')).href);
 const ORIGIN='https://taherasker2560-dot.github.io',env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon'};
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'},{id:'s3',product_name:'JANUVIA 50MG 28TAB'},{id:'s4',product_name:'JANUVIA 100MG 28TAB'}];
 function fake({names=[],decisions=[],gem,fixes=[],ignored=[],v10aliases=[],v10rej=[],v10fixes=[],fresh=null}){const calls=[];const f=async(url,o={})=>{calls.push({url,o});

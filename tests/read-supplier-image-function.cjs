@@ -1,7 +1,7 @@
 // Tests the Supabase function with Node (22.18+ strips the TypeScript types). No network: fetch is faked.
 const assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
-const {handle,parseRows,decodeBase64Length,PROMPT,arabicLetters,annotate,resetCatalogCache}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','index.ts'));
+const {handle,parseRows,decodeBase64Length,PROMPT,arabicLetters,annotate,resetCatalogCache}=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','read-supplier-image','index.ts')).href);
 const ORIGIN='https://taherasker2560-dot.github.io';
 const env={GEMINI_API_KEY:'test-key',ALLOWED_EMAILS:'Owner@Example.com, second@example.com',SUPABASE_URL:'https://proj.supabase.co/',SUPABASE_ANON_KEY:'anon'};
 const png=Buffer.from('fake image bytes').toString('base64');
@@ -72,7 +72,7 @@ assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
  r=await json(await handle(req(),{...env,GEMINI_MODEL:'gemini-fix-test'},fakeFetch({gemini:gem,catalogResponse:cat,fixesResponse:async()=>new Response(JSON.stringify([{read_key:'جانوفيا 500 مجم 28 قرص',corrected_text:'جانوفيا ٥٠ مجم ٢٨ قرص'}]),{status:200})})));
  assert.equal(r.body.rows[0].corrected,'جانوفيا ٥٠ مجم ٢٨ قرص');assert.equal(r.body.rows[0].name,'جانوفيا ٥٠٠ مجم ٢٨ قرص','text as read is kept for display');assert.equal(r.body.rows[0].match.name,'JANUVIA 50MG 28TAB','matched on the corrected text');}
 // a rejected item is never suggested again for that name (match action and image reading)
-{const {Catalog}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','match.ts'));
+{const {Catalog}=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','read-supplier-image','match.ts')).href);
  const c=new Catalog([['1','NEUROTON 30TAB'],['2','NEUROTON 6AMP'],['3','NEUROTONE GEL 30GM']]);
  const rows=annotate([{name:'نيوروتون',english:'NEUROTON',unclear:false}],c,[],[],[{alias_key:'نيوروتون',target_name:'NEUROTON 30TAB'}]);
  assert.ok(!rows[0].candidates.some(x=>x.name==='NEUROTON 30TAB'),'rejected item removed');assert.equal(rows[0].candidates.length,2);
@@ -86,7 +86,7 @@ assert.ok(f.calls.every(c=>c.opts.signal),'every outgoing call has a timeout');
  x=await json(await handle(req({body:{action:'match',name:'نيوتون جل',english:'NEUROTONE GEL'}}),env,fakeFetch({catalogResponse:cat2,fixesResponse:fx})));
  assert.equal(x.body.row.corrected,'نيوروتون جل','reading fix applied in the review list');assert.equal(x.body.row.candidates[0].name,'NEUROTONE GEL 30GM');resetCatalogCache();}
 // a name written a little differently from one the owner confirmed is recognised; a different form or number is not
-{const {Catalog}=await import(path.join(__dirname,'..','supabase','functions','read-supplier-image','match.ts'));
+{const {Catalog}=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','read-supplier-image','match.ts')).href);
  const c=new Catalog([['63858','GLUOKAN 5/500MG TABLETS'],['9','GLUCOPHAGE 500MG 50TAB']]);
  const al=[{alias_key:'جلوجان 500/5 اقراص',target_name:'GLUOKAN 5/500MG TABLETS',target_code:'63858'}];
  let x=annotate([{name:'جلوجان ٥/٥٠٠ قرص',english:'',unclear:false}],c,al);assert.equal(x[0].match.name,'GLUOKAN 5/500MG TABLETS');assert.equal(x[0].match.via,'alias');assert.equal(x[0].match.confidence,'high');
