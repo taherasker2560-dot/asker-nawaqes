@@ -1,31 +1,43 @@
-/* «الشكل الهادي» for the customers' app (owner 2026-11-19 night, the look session: «هختار اللبني وعاوزك تمشي النمط ده حالا في كل تفاصيل المشروع»; same look as ar/airy.css):
-   white pages with air, cool neutrals, the color (the calm sky blue by default, store/theme.js) only in small touches: the cart, the numbers, the main buttons, the page you are on.
-   No solid-color header, no solid-color footer. This file is the LAST stylesheet of store.html. */
+/* «الشكل الهادي» for the customers' site and app (owner 2026-11-19 night, the look session: «هختار اللبني وعاوزك تمشي النمط ده حالا في كل تفاصيل المشروع»; same look as ar/airy.css),
+   and the bars of 2026-11-21 («الهيدر ونافيجيشن بار بلون التطبيق الأساسي»، الموجة، دايرة الرئيسية، التوقيع Agza في آخر الصفحة):
+   white pages with air, cool neutrals, the color only in small touches and in the two bars: the header (the color, with the wave closing its bottom edge) and the bottom bar (the light tint
+   of the color, the wave rising on its top edge, «الرئيسية» a round button in the middle). The phone's own strips (the status bar, the three Android buttons) take the color from theme-color.
+   This file is the LAST stylesheet of store.html. */
 html:not(.night) { --soft-bg: #f3f7fa; --field: #f3f7fa; --line: #e1e8ee; --muted: #55606b; --ink: #1c2229; }
 
-/* the header: white with a thin line, the name in ink, the cart in the color */
-html body .top, html body .bar { background: var(--card) !important; color: var(--ink); border-bottom: 1px solid var(--line); box-shadow: 0 0 0 100vmax var(--card); }
-.brand img { border: 0; }
-.brand strong { color: var(--ink); font-weight: 700; }
-.brand span { color: var(--muted); }
-.top .cart-btn, .top .cart-btn.bot-btn { background: transparent; color: var(--ink); }
-.top .cart-btn svg { stroke: var(--accent); }
-.cart-n { background: var(--accent); color: #fff; }
-.bar h1, .bar .back { color: var(--ink); }
-.bar .back svg { stroke: var(--ink); }
-.top .acct-site { background: var(--accent-soft); color: var(--accent-text); }
-.rg-top { background: var(--card); color: var(--ink); border-bottom: 1px solid var(--line); }
-.rg-back { color: var(--ink); }
+/* 1) the header (brand.css: the color, white words): the wave inside its bottom edge, on phones (a wide screen keeps it flat: the header's color runs edge to edge there) */
+@media (max-width: 759px) {
+  html body .top, html body .bar { position: relative; padding-bottom: 30px; }
+  html body .top::after, html body .bar::after { content: ''; display: block !important; position: absolute; left: 0; right: 0; top: auto; bottom: -1px; width: auto; height: 22px; background: var(--card); -webkit-mask: var(--wave-mask) center bottom / 412px 100% repeat-x; mask: var(--wave-mask) center bottom / 412px 100% repeat-x; pointer-events: none; }
+}
 
-/* the greeting: a very light tint of the color, a thin line, rounded */
+/* 2) the greeting: a very light tint of the color, a thin line, rounded */
 html body .hero { background: var(--accent-soft) !important; border: 1px solid var(--accent-line); border-radius: 16px; }
 
-/* the footer: light by day (the dark surface only at night), the words in ink, the links in the color */
+/* 3) the footer: light by day (the dark surface only at night), the words in ink, the links in the color */
 html:not(.night) .ft { --ft-bg: var(--accent-soft); background: var(--ft-bg); color: var(--muted); border-top: 1px solid var(--accent-line); }
 html:not(.night) .ft strong { color: var(--ink); }
 html:not(.night) .ft a { color: var(--accent-text); }
 html:not(.night) .ft-low { border-top-color: var(--accent-line); color: var(--muted); }
 html:not(.night) .ft .data-age { color: var(--muted); }
 
-/* the BIG buttons are soft like the home's tiles (the tint, a line in the color); the small ones stay solid (the color only in small touches) */
+/* 4) the BIG buttons are soft like the home's tiles (the tint, a line in the color); the small ones stay solid (the color only in small touches) */
 html body #acctBox .ac-order, html body #chatBox .ch-start, html body .pay-main, html body #acctBox .ac-paybtn, html body .al-btn, html body .al-save, html body .scan-go { background: var(--accent-soft); color: var(--accent-text); border: 1.5px solid var(--accent); box-shadow: none; font-weight: 800; }
+
+/* 5) the bottom bar: the light tint (the same as the buttons of the pages), the wave on its top edge, quiet icons; the page you are on = a white pill behind its icon and the color on its words;
+      «الرئيسية» = a round button in the middle (the color, a white icon) raised over the bar; the other tabs around it (search, messages | orders, cart; «حسابي» first when it shows) */
+html body .tabbar { background: var(--bar-bg); border-top: 0; overflow: visible; box-shadow: none; }
+html body .tabbar::before { content: ''; display: block; position: absolute; left: 0; right: 0; top: -21px; bottom: auto; width: auto; height: 22px; margin: 0; padding: 0; transform: none; transition: none; border-radius: 0; opacity: 1; background: var(--bar-bg); -webkit-mask: var(--wave-mask) center bottom / 412px 100% repeat-x; mask: var(--wave-mask) center bottom / 412px 100% repeat-x; pointer-events: none; }
+html body .tabbar a { color: var(--muted); font-weight: 600; }
+html body .tabbar a.on, html.night .tabbar a.on { color: var(--accent-text, var(--accent)); font-weight: 700; }
+html body .tabbar svg, html body .tabbar a.on svg { box-sizing: content-box; width: 22px; height: 22px; padding: 3px 17px; border-radius: 999px; background: none; color: inherit; stroke: currentColor; box-shadow: none; transform: none; }
+html body .tabbar a.on svg { background: var(--card); color: var(--accent); }
+html body .tabbar a[data-acct] { order: 0; }
+html body .tabbar a[data-go="search"] { order: 1; }
+html body .tabbar a[data-go="chat"] { order: 2; }
+html body .tabbar a[data-go="home"] { order: 3; padding-top: 30px; color: var(--accent-text, var(--accent)); font-weight: 700; }
+html body .tabbar a[data-go="orders"] { order: 4; }
+html body .tabbar a[data-go="cart"] { order: 5; }
+html body .tabbar a[data-go="home"] svg, html body .tabbar a[data-go="home"].on svg { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); box-sizing: border-box; width: 54px; height: 54px; padding: 14px; border-radius: 50%; background: var(--accent); color: #fff; border: 4px solid var(--card); box-shadow: 0 2px 8px rgba(10, 40, 60, 0.28); stroke: currentColor; }
+html.night body .tabbar a[data-go="home"] svg { border-color: var(--dark-deep); }
+html body .tabbar .cart-n { box-shadow: 0 0 0 2px var(--bar-bg); }

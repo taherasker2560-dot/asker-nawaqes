@@ -20,13 +20,13 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,0,'no blessing strip in the bot (owner 2026-11-17: «شيل صلى عالنبى»)');
  assert.equal(look.blessText,false,'and no blessing text anywhere on the page');
- assert.equal(look.barBg,'rgb(255, 255, 255)','the header is white (the airy look, 2026-11-19 night)');
- assert.equal(look.barRadius,'0px');assert.equal(look.wave,'none','no wave');
+ assert.equal(look.barBg,'rgb(33, 123, 171)','the header is the system color again (owner 2026-11-21: «الهيدر ونافيجيشن بار بلون التطبيق الأساسي»)');
+ assert.equal(look.barRadius,'0px');assert.equal(look.wave,'block','the wave closes the header (owner 2026-11-21)');
  assert.equal(look.hero,'rgb(235, 244, 249)','the greeting is a very light tint of the calm sky blue');
  assert.equal(look.heroRadius,'16px');
  assert.ok(contrast(look.h2,look.hero)>=4.5,'the greeting reads');
  assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);assert.equal(look.linkBg,'rgb(33, 123, 171)','and it is the one solid button');
- assert.equal(look.navBg,'rgb(255, 255, 255)');assert.equal(look.navPos,'fixed');assert.equal(look.navBottom,'0px','the bar is docked');
+ assert.notEqual(look.navBg,'rgb(255, 255, 255)','the bar is the light tint of the color, no longer white');assert.equal(look.navPos,'fixed');assert.equal(look.navBottom,'0px','the bar is docked');
  assert.equal(look.navRadius,'0px','and flat');
  // since 2026-11-19 (owner: five shades of the system color, tests/e2e/section-colors.spec.cjs) every section of the bar is a filled segment of its own shade; «الرئيسية» is the system color itself
  assert.equal(look.onGroup,'home');assert.equal(look.onBg,'rgba(0, 0, 0, 0)','the section you are in has no colored segment: a light pill behind its icon (tests/e2e/section-colors.spec.cjs)');
@@ -35,7 +35,7 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  assert.equal(look.qaRadius,'14px','rounded rectangles on the home, no longer ovals');assert.ok(contrast(look.qaColor,'rgb(255, 255, 255)')>=7,'the words of a home button are ink: '+look.qaColor);
  assert.equal(look.card,'2px');
  assert.equal(look.accent,'#217bab','the calm sky blue by default');
- assert.equal(look.meta,'#ffffff','the phone bar is white (the header is white)');
+ assert.equal(look.meta,'#217bab','the phone bar (and the three Android buttons) are the system color');
  assert.match(await text(page,'.hero h2'),/صيدلية عسكر/);
  // the bar follows the section you open
  await page.click('[data-group="accounts"]');

@@ -7,13 +7,26 @@
 /* 0) cool neutrals by day (the warm beige / brown-gray of the orange days sat badly next to the blue): the lines, the quiet surfaces, the words */
 html:not(.night) { --soft-bg: #f4f7fa; --line: #e1e8ee; --muted: #55606b; --ink: #1c2229; --tint-2: #f1f6f9 !important; }
 
-/* 1) the header: white (the page's own surface), thin line, the name in ink, the icons quiet */
-html body .appbar { background: var(--card); color: var(--ink); border-bottom: 1px solid var(--line); box-shadow: none; padding-top: 8px; padding-bottom: 8px; }
-html body .appbar h1 { color: var(--ink); font-weight: 700; }
-html body .appbar p, html body .appbar .brand p { color: var(--muted); }
-html body .appbar .icon-btn { background: transparent; color: var(--muted); border: 0; box-shadow: none; }
-html body .appbar .mark { border: 0; box-shadow: none; }
 
+/* 1) the header: the system color again (owner 2026-11-21: «الهيدر ونافيجيشن بار بلون التطبيق الأساسي»), the wave closing its bottom edge (the same curve rises on the bottom bar: they move
+      together), and under the wave, for the OWNER only, the five spare buttons on the light tint of the bar (the staff's header has no row, and none before the sign-in). The phone's own
+      strips (the status bar on top, the three Android buttons at the bottom) take the same color from theme-color. */
+:root { --spare-h: 56px; }
+html.staff { --spare-h: 0px; }
+html body .appbar { --wave-fill: var(--bar-bg); padding-bottom: calc(var(--spare-h) + 24px); background-color: var(--crimson); background-image: linear-gradient(to bottom, transparent 0, transparent calc(100% - var(--spare-h)), var(--bar-bg) calc(100% - var(--spare-h))); color: #fff; border-bottom: 0; box-shadow: none; }
+html body .appbar:has(#logoutBtn.hidden) { --spare-h: 0px; --wave-fill: var(--card); }
+html.staff body .appbar { --wave-fill: var(--card); }
+html body .appbar::after { content: ''; display: block !important; position: absolute; left: 0; right: 0; top: auto; bottom: calc(var(--spare-h) - 1px); width: auto; height: 22px; margin: 0; transform: none; border-radius: 0; opacity: 1; filter: none; z-index: 0; background: var(--wave-fill); -webkit-mask: var(--wave-mask) center bottom / 412px 100% repeat-x; mask: var(--wave-mask) center bottom / 412px 100% repeat-x; animation: none; pointer-events: none; }
+#spareBar { position: absolute; left: 0; right: 0; bottom: 0; height: var(--spare-h); box-sizing: border-box; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 8px 10px; border-bottom: 1px solid var(--rose-line); }
+html.staff #spareBar, html body .appbar:has(#logoutBtn.hidden) #spareBar { display: none; }
+#spareBar .sp-slot { min-width: 0; min-height: 0; height: 40px; margin: 0; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 1.5px dashed color-mix(in srgb, var(--crimson) 50%, var(--card)); border-radius: 12px; background: color-mix(in srgb, var(--card) 60%, transparent); color: var(--crimson); box-shadow: none; font-size: 10.5px; font-weight: 700; line-height: 1.15; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+#spareBar .sp-slot svg { width: 18px; height: 18px; stroke-width: 2.2; }
+#spareBar .sp-slot.on { border: 1px solid var(--t-line, var(--rose-line)); background: var(--card); color: var(--ink); }
+#spareBar .sp-slot.on span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#spareBar .sp-slot:active { filter: brightness(0.95); }
+.sp-sheet-row { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-bottom: 1px solid var(--line); }
+.sp-sheet-row .qa-l { flex: 1; min-width: 0; font-weight: 600; }
+.sp-sheet-row .qa-add.on { background: var(--rose); border: 1.5px solid var(--crimson); color: var(--crimson-ink); }
 /* 2) the greeting: a very light tint of the color with a thin line and the ink on it (a dark surface only at night) */
 html:not(.night) body .hero, html:not(.night) body .card .hero { background: var(--rose) !important; border: 1px solid var(--rose-line); border-radius: 16px !important; box-shadow: none; }
 html:not(.night) body .hero .hello, html:not(.night) body .hero .since { color: var(--muted); opacity: 1; }
@@ -22,14 +35,22 @@ html:not(.night) body .hero-link { background: var(--crimson); color: #fff; box-
 html:not(.night) body .hero-link svg { color: #fff; stroke: #fff; }
 html:not(.night) body .hero-badge { box-shadow: none; }
 
-/* 3) the bottom bar: white, thin line, quiet icons; the page you are on = the color + a light pill behind its icon */
-html:not(.night) body .bottomnav { background: var(--card); border-top: 1px solid var(--line); box-shadow: none; }
-html:not(.night) body .bottomnav::before { display: none; }
+/* 3) the bottom bar: the light tint of the color (the same as the home's buttons), the wave rising on its top edge, quiet icons; the page you are on = a white pill behind its icon and the
+      color on its words; «الرئيسية» is a ROUND button in the middle (the color, white icon), raised over the bar. Five buttons only (a staff bar with fewer keeps the plain look). */
+html body .bottomnav { background: var(--bar-bg); border-top: 0; box-shadow: none; overflow: visible; }
+html body .bottomnav::before { content: ''; display: block; position: absolute; left: 0; right: 0; top: -21px; bottom: auto; width: auto; height: 22px; margin: 0; padding: 0; transform: none; transition: none; border-radius: 0; box-shadow: none; opacity: 1; background: var(--bar-bg); -webkit-mask: var(--wave-mask) center bottom / 412px 100% repeat-x; mask: var(--wave-mask) center bottom / 412px 100% repeat-x; pointer-events: none; }
 html:not(.night) body .bottomnav button, html:not(.night) body .bottomnav button.secondary { background: none; color: var(--muted); font-weight: 600; box-shadow: none; }
 html:not(.night) body .bottomnav button svg, html:not(.night) body .bottomnav:has(> button:nth-child(5)) button svg { box-sizing: content-box; width: 22px; height: 22px; padding: 3px 17px; border-radius: 999px; background: none; color: inherit; stroke: currentColor; }
 html:not(.night) body .bottomnav button:not(.secondary), html:not(.night):not(.cap-ind) body .bottomnav button:not(.secondary) { background: none; color: var(--crimson-ink); font-weight: 700; }
-html:not(.night) body .bottomnav button:not(.secondary) svg, html:not(.night) body .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg { background: var(--rose); color: var(--crimson); }
-html:not(.night) body .bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--card); }
+html:not(.night) body .bottomnav button:not(.secondary) svg, html:not(.night) body .bottomnav:has(> button:nth-child(5)) button:not(.secondary) svg { background: var(--card); color: var(--crimson); }
+html body .bottomnav button[data-badge]::after { box-shadow: 0 0 0 2px var(--bar-bg); }
+html body .bottomnav:has(> button:nth-child(5)) button[data-group="purchases"] { order: 1; }
+html body .bottomnav:has(> button:nth-child(5)) button[data-group="accounts"] { order: 2; }
+html body .bottomnav:has(> button:nth-child(5)) button[data-group="home"] { order: 3; position: relative; padding-top: 30px; color: var(--crimson-ink); font-weight: 700; }
+html body .bottomnav:has(> button:nth-child(5)) button[data-group="sales"] { order: 4; }
+html body .bottomnav:has(> button:nth-child(5)) button[data-group="care"] { order: 5; }
+html:not(.night) body .bottomnav:has(> button:nth-child(5)) button[data-group="home"] svg, html body .bottomnav:has(> button:nth-child(5)) button[data-group="home"] svg { position: absolute; top: -24px; left: 50%; transform: translateX(-50%); box-sizing: border-box; width: 54px; height: 54px; padding: 14px; border-radius: 50%; background: var(--crimson); color: #fff; border: 4px solid var(--card); box-shadow: 0 2px 8px rgba(10, 40, 60, 0.28); stroke: currentColor; }
+html.night body .bottomnav:has(> button:nth-child(5)) button[data-group="home"] svg { background: var(--crimson); color: #fff; border-color: var(--dark-deep); }
 
 /* 4) the home's quick buttons: SOFT, a light tint of the color by section (the more important, the deeper: purchases, accounts, home, sales, care), a thin line, the words in ink,
       the icon in the color; rounded rectangles (14px, not ovals: «مش هنعملها دواير»); a small mark on the top edge = the section's own icon of the bar (.qa-mk, ar/shortcuts.js:

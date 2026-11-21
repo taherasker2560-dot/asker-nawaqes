@@ -31,20 +31,20 @@ run('Brand look: the account — white page, no blessing strip, no wave, a quiet
  assert.equal(look.body,'rgb(255, 255, 255)','the page is white');
  assert.equal(look.bless,0,'no blessing strip on the site (owner 2026-11-17: «شيل كلمة اللهم صل على النبي من الموقع»)');
  assert.equal(look.blessText,false,'and no blessing text anywhere on the page');
- assert.equal(look.topBg,'rgb(255, 255, 255)','the header is white (the airy look, 2026-11-19 night)');
+ assert.equal(look.topBg,'rgb(33, 123, 171)','the header is the system color again (owner 2026-11-21)');
  assert.equal(look.topRadius,'0px');
- assert.equal(look.wave,'none','no wave');
+ assert.equal(look.wave,'block','the wave closes the header (owner 2026-11-21): it is drawn on phones');
  assert.equal(look.balBg,'rgb(243, 247, 250)','a quiet balance card (no dark surface)');
  assert.equal(look.balRadius,'2px');
  assert.ok(contrast(look.big,look.balBg)>=4.5,'the big balance reads on the card: '+look.big);
  assert.equal(look.barPos,'fixed');assert.equal(look.barBottom,'0px','the bar is docked');
  assert.equal(look.barRadius,'0px','and flat');
- assert.equal(look.barBg,'rgb(255, 255, 255)');
+ assert.notEqual(look.barBg,'rgb(255, 255, 255)','the bottom bar is the light tint of the color');
  assert.equal(look.accent,'#217bab','the calm sky blue by default');
  assert.equal(look.orderBg,'rgb(235, 244, 249)','the account\'s main button is a big one, so it is SOFT: the tint of the calm sky blue with a line in the color (owner 2026-11-19 night)');
  assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
  if(look.payBg){assert.equal(look.payBg,'rgb(235, 244, 249)','the pay button is a big one too: soft');}
- assert.equal(look.meta,'#ffffff','the phone\'s top bar is white (the header is white)');
+ assert.equal(look.meta,'#217bab','the phone\'s top bar (and the three Android buttons) are the system color');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours
  await page.click('.tabbar a[data-go="home"]');
  await page.waitForSelector('[data-view="home"]:not([hidden]) .hero');

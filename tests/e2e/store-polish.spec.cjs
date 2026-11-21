@@ -95,7 +95,7 @@ run('A wide screen: the header and the footer reach the screen\'s edges, and the
  await page.goto(base+'store.html');
  await page.waitForSelector('#sections .sec');
  const w=await page.evaluate(()=>{const t=getComputedStyle(document.querySelector('[data-view="home"] .top')),f=getComputedStyle(document.querySelector('.ft')),tiles=[...document.querySelectorAll('#sections .sec')].map(x=>Math.round(x.getBoundingClientRect().top));return {top:t.clipPath+' '+t.boxShadow,ft:f.clipPath+' '+f.boxShadow,rows:new Set(tiles).size,n:tiles.length}});
- assert.match(w.top,/inset\(0px -?\d+px\)/);assert.match(w.top,/rgb\(255, 255, 255\) 0px 0px 0px 1400px/,'the white header runs to both edges');
+ assert.match(w.top,/inset\(0px -?\d+px\)/);assert.match(w.top,/rgb\(33, 123, 171\) 0px 0px 0px 1400px/,'the header\'s color runs to both edges');
  assert.match(w.ft,/inset\(0px -?\d+px\)/);
  assert.equal(w.n,6);assert.equal(w.rows,1,'six tiles, one row');
 });

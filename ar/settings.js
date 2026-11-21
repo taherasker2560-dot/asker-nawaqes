@@ -137,9 +137,9 @@
     s.setProperty('--glow', hexToRgb(t.main).join(', ')); // for soft colored shadows: rgba(var(--glow), .5)
     document.documentElement.dataset.accent = c.id;
     document.documentElement.classList.toggle('night', c.night);
-    // the phone's top bar = the top of the header: white by day (the header is white now, ar/airy.css), the dark page at night
+    // the phone's top bar AND the three Android buttons at the bottom take this color: the header is the system color again (owner 2026-11-21, ar/airy.css), day and night
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff');
+    if (meta) meta.setAttribute('content', t.main);
     return c;
   }
   root.AskerSettings = { PRESETS, DEFAULT_ID, palette, contrast, apply, choice, DARKS, DARK_DEFAULT, darkOf, applyDark };

@@ -1,0 +1,19 @@
+/* The pieces the three pages share of «الشكل الهادي» bars (owner 2026-11-21, the look session):
+   - the WAVE that closes the header at the bottom and rises on the top edge of the bottom bar: the same curve on both, so they move together (his words: «يمشوا مع بعض»);
+   - the colors of the bars (the light tint of the color: the same as the home's buttons) and the round home button;
+   - the small «Agza» signature at the END of every page (his words: «آخر الصفحة»): the name in a small refined italic, and a thin circle with «tm» inside, empty at the center, just after
+     the last letter and above the letter's level. «Agza» alone (no «By», no «AI»); the pharmacy's logo carries no mark.
+   Loaded before ar/airy.css, store/airy.css and supplier/vendor.css, which place them. */
+:root {
+  --wave-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 412 22' preserveAspectRatio='none'%3E%3Cpath d='M0.0 11.0 L6.9 12.3 L13.7 13.5 L20.6 14.6 L27.5 15.7 L34.3 16.7 L41.2 17.5 L48.1 18.1 L54.9 18.6 L61.8 18.9 L68.7 19.0 L75.5 18.9 L82.4 18.6 L89.3 18.1 L96.1 17.5 L103.0 16.7 L109.9 15.7 L116.7 14.6 L123.6 13.5 L130.5 12.3 L137.3 11.0 L144.2 9.7 L151.1 8.5 L157.9 7.4 L164.8 6.3 L171.7 5.3 L178.5 4.5 L185.4 3.9 L192.3 3.4 L199.1 3.1 L206.0 3.0 L212.9 3.1 L219.7 3.4 L226.6 3.9 L233.5 4.5 L240.3 5.3 L247.2 6.3 L254.1 7.4 L260.9 8.5 L267.8 9.7 L274.7 11.0 L281.5 12.3 L288.4 13.5 L295.3 14.6 L302.1 15.7 L309.0 16.7 L315.9 17.5 L322.7 18.1 L329.6 18.6 L336.5 18.9 L343.3 19.0 L350.2 18.9 L357.1 18.6 L363.9 18.1 L370.8 17.5 L377.7 16.7 L384.5 15.7 L391.4 14.6 L398.3 13.5 L405.1 12.3 L412.0 11.0 V22 H0 Z'/%3E%3C/svg%3E");
+  --bar-bg: var(--rose, var(--accent-soft, #ebf4f9));
+  --agza-ink: #7d97a7;
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  :root { --bar-bg: color-mix(in srgb, var(--crimson, var(--accent, #217bab)) 13%, var(--card, #fff)); }
+}
+html.night { --bar-bg: var(--dark-deep, #0d2631); --agza-ink: #6f8794; }
+.agza-sign { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 22px 0 14px; direction: ltr; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 12px; line-height: 1; letter-spacing: 1.6px; color: var(--agza-ink); user-select: none; }
+.agza-sign i { display: block; width: 34px; height: 1px; background: currentColor; opacity: 0.45; }
+.agza-sign b { display: inline-flex; align-items: center; justify-content: center; width: 10px; height: 10px; margin-left: 1px; border: 1px solid currentColor; border-radius: 50%; background: transparent; font: 700 5.2px/1 Arial, sans-serif; font-style: normal; letter-spacing: 0; vertical-align: 5px; }
+@media print { .agza-sign { display: none; } }

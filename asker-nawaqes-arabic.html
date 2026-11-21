@@ -6,10 +6,10 @@
          color and follows it (Chrome 135+, owner 2026-11-12: «الشريط … شوفلك حل تخليه يتغير مع الالوان») -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="manifest" href="manifest-arabic.json" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#217bab" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&family=Cormorant+Garamond:ital,wght@1,700&display=swap" rel="stylesheet" />
     <link rel="icon" href="icons/arabic-192.png?v=logo2" />
     <link rel="apple-touch-icon" href="icons/apple-touch-180.png?v=logo2" />
     <title>سيستم نواقص صيدلية عسكر</title>
@@ -20,10 +20,11 @@
     <link rel="stylesheet" href="ar/capsule.css?v=airy-20261119a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
     <link rel="stylesheet" href="ar/brand.css?v=nobless-20261117a" />
-    <link rel="stylesheet" href="ar/airy.css?v=airy-20261119b" />
+    <link rel="stylesheet" href="ar/bars.css?v=bars-20261121a" />
+    <link rel="stylesheet" href="ar/airy.css?v=bars-20261121a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=edit-20261121a"></script>
+    <script src="ar/i18n-en.js?v=bars-20261121a"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -40,6 +41,8 @@
       <button id="logoutBtn" class="icon-btn hidden" aria-label="خروج" title="خروج">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
+      <!-- the five spare buttons (owner 2026-11-21, owner only; ar/shortcuts.js): an empty slot is a dashed «+», a full one opens its section -->
+      <nav id="spareBar" class="spare-bar" aria-label="خانات احتياطي"></nav>
     </header>
     <button id="dataAge" type="button" class="dataage hidden" aria-expanded="false" aria-controls="dataAgeMore">
       <span class="row"><span class="dot" aria-hidden="true"></span><span id="dataAgeText"></span><small id="dataAgeAgo"></small></span>
@@ -1009,9 +1012,10 @@
           </details>
         </section>
       </div>
-    </main>
+      <p class="agza-sign" dir="ltr"><i></i><span>Agza<b>tm</b></span><i></i></p>
+</main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="ar/settings.js?v=airy-20261119a"></script>
+    <script src="ar/settings.js?v=bars-20261121a"></script>
     <script src="ar/autoupdate.js?v=upd-20261119a" defer></script>
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>
@@ -1035,8 +1039,8 @@
     <script src="ar/item-media.js?v=edit-20261121a"></script>
     <script src="ar/stock.js?v=edit-20261121a"></script>
     <script src="ar/home.js?v=edit-20261121a"></script>
-    <script src="ar/look.js?v=marks-20261119a"></script>
-    <script src="ar/shortcuts.js?v=marks-20261119a"></script>
+    <script src="ar/look.js?v=bars-20261121a"></script>
+    <script src="ar/shortcuts.js?v=bars-20261121a"></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=po-20261117a"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>

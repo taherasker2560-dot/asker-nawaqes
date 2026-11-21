@@ -40,7 +40,7 @@
     el.classList.toggle('night', c.night);
     el.dataset.accent = c.id;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', c.night ? t.tint : '#ffffff'); // the header is white by day now (store/airy.css), the dark page at night
+    if (meta) meta.setAttribute('content', t.main); // the header is the color (store/brand.css) and the phone's strips (status bar, the three Android buttons) take it, day and night (owner 2026-11-21)
     return c;
   }
   // the owner's default (from ar_store_settings, read by store.js); kept on the phone so the next visit paints right away
