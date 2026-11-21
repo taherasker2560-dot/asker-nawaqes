@@ -163,8 +163,26 @@
   }
   // a number as WhatsApp wants it (a mobile 01… gets 20 in front)
   const waDigits = (p) => { const d = String(p || '').replace(/\D/g, ''); return /^01\d{9}$/.test(d) ? '2' + d : /^\d{8,15}$/.test(d) ? d : ''; };
+  // a number he TYPES (owner 2026-11-21: «مش عارف اضيف رقم المخزن … مش عارف اضيف رقم واحد منهم»: the picker only offered people already in «الوارد» or in his phone's book):
+  // Arabic digits, spaces, dashes, brackets, +20 and 0020 are fine; the phone comes back as the book writes it (01xxxxxxxxx) and a name (may be empty); null when it is not a number (8 to 15 digits)
+  function typedPerson(phoneText, nameText) {
+    const AR = '٠١٢٣٤٥٦٧٨٩', FA = '۰۱۲۳۴۵۶۷۸۹';
+    const digits = String(phoneText || '').replace(/[٠-٩۰-۹]/g, (c) => String(AR.includes(c) ? AR.indexOf(c) : FA.indexOf(c))).replace(/[\s\-().]/g, '').replace(/^\+/, '').replace(/^00/, '');
+    const phone = /^\d+$/.test(digits) ? normBook(digits) : '';
+    if (!phone) return null;
+    return { phone, name: String(nameText || '').replace(/\s+/g, ' ').trim().slice(0, 120) };
+  }
+  // what the number picker shows for a company (one place for the company's card and the missing-item form): the people saved in «الوارد» (the company's own first; a search covers them)
+  // and the contacts of the book (a suggestion from the name, or a search); book = null when the book is not loaded; nIn / nBk cap the two lists
+  function pickList(inbox, book, v, q, nIn, nBk) {
+    const s = String(q || '').trim(), search = s.length >= 2, ib = inbox || [];
+    const inRows = search && WL() ? WL().bookView({ list: ib }, 'all', s).slice(0, nIn || 10) : ib.slice(0, nIn || 13);
+    const inPhones = new Set(ib.map((c) => c.phone));
+    const bk = book ? (search ? findInBook(book, s, nBk || 10) : suggestFor(book, v, nBk || 10)).filter((c) => !inPhones.has(c.phone)) : null;
+    return { inbox: inRows, book: bk, search };
+  }
   const api = { money, parseAt, dayText, expText, balanceText, defaultRange, saveRange, restoreRange, lateInvoice, rangeArgs, qtyText, lineValue, pickVendors, totals, linkUrl, linkMessage, KIND,
-    VN_ROLES, vendorTokens, suggestFor, guessRole, findInBook, waDigits, normBook, inboxPeople };
+    VN_ROLES, vendorTokens, suggestFor, guessRole, findInBook, waDigits, normBook, inboxPeople, typedPerson, pickList };
   root.AskerVendorsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -334,19 +352,21 @@
   };
   // the picker: first the people saved in «الوارد» (the sales people, the company's name first), then the number book
   function pickRows() {
-    const me = st, q = me.pq.trim(), search = q.length >= 2, inbox = me.inbox || [];
-    const inRows = search && WL() ? WL().bookView({ list: inbox }, 'all', q).slice(0, 10) : inbox.slice(0, 13);
-    const inPhones = new Set(inbox.map((c) => c.phone));
+    const me = st, q = me.pq.trim(), L = pickList(me.inbox || [], me.book, me.v, q);
     let html = '';
-    if (inRows.length) html += `<p class="vn-h">مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات</p>` + inRows.map((c) => sgRow(me, c, true)).join('');
-    if (!me.book) return html + `<p class="hint">${esc(me.bookFail ? 'دفتر الأرقام مش متاح دلوقتي.' : 'بحمّل دفترك…')}</p>`;
-    const rows = (search ? findInBook(me.book, q, 10) : suggestFor(me.book, me.v, 10)).filter((c) => !inPhones.has(c.phone));
-    if (rows.length) return html + (inRows.length ? '<p class="vn-h">من دفترك</p>' : '') + rows.map((c) => sgRow(me, c)).join('');
-    return html + (inRows.length ? '' : `<p class="hint">${esc(search ? 'مفيش حد بالاسم ده في دفترك.' : 'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.')}</p>`);
+    if (L.inbox.length) html += `<p class="vn-h">مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات</p>` + L.inbox.map((c) => sgRow(me, c, true)).join('');
+    if (!L.book) return html + `<p class="hint">${esc(me.bookFail ? 'دفتر الأرقام مش متاح دلوقتي.' : 'بحمّل دفترك…')}</p>`;
+    if (L.book.length) return html + (L.inbox.length ? '<p class="vn-h">من دفترك</p>' : '') + L.book.map((c) => sgRow(me, c)).join('');
+    return html + (L.inbox.length ? '' : `<p class="hint">${esc(L.search ? 'مفيش حد بالاسم ده في دفترك.' : 'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.')}</p>`);
   }
+  // «أو اكتب الرقم»: a number that is not in his phone or in «الوارد»; the name is optional, one tap on the job saves it (the typed text stays in the state, the card is redrawn)
+  const typedHtml = () => '<p class="vn-h">أو اكتب الرقم</p>' +
+    `<div class="vn-typed"><input id="vnTP" type="tel" dir="ltr" inputmode="tel" placeholder="01xxxxxxxxx" aria-label="رقم الموبايل" value="${esc(st.tp || '')}" autocomplete="off" />` +
+    `<input id="vnTN" type="text" maxlength="80" placeholder="الاسم (اختياري)" aria-label="الاسم" value="${esc(st.tn || '')}" autocomplete="off" /></div>` +
+    '<div class="vn-sg"><span class="hint">دوس على وظيفته:</span>' + VN_ROLES.map(([k, label]) => `<button type="button" class="vn-pk" data-vn-typed="${k}">${esc(label)}</button>`).join('') + '</div>';
   const pickHtml = () => '<div class="vn-pick"><p class="hint">دوس على وظيفة الرقم. المقترح من الاسم بلون مميز، والقرار ليك.</p>' +
     `<input id="vnQ" type="search" placeholder="دوّر في دفترك بالاسم أو الرقم" aria-label="دوّر في دفترك بالاسم أو الرقم" value="${esc(st.pq)}" autocomplete="off" /><div id="vnRows">${pickRows()}</div>` +
-    '<button type="button" class="linklike" data-vn-pick-close>قفل</button></div>';
+    typedHtml() + '<button type="button" class="linklike" data-vn-pick-close>قفل</button></div>';
   function numsHtml() {
     if (!st || !ownerHere() || st.numsOff || !st.nums) return '';
     const slots = VN_ROLES.map(([k, label, use]) => {
@@ -354,7 +374,7 @@
       return `<div class="vn-slot${n ? ' set' : ''}"><div class="vn-lab"><b>${esc(label)}</b> <small>${esc(use)}</small></div>` +
         (n ? `<div class="vn-val"><span class="notr">${esc(n.name || '')}</span><span class="vn-num" dir="ltr"><bdi class="notr">${esc(n.phone)}</bdi></span><button type="button" class="linklike" data-vn-clear="${k}">شيله</button></div>` : '<div class="vn-val vn-none">لسه ما اتحددش</div>') + '</div>';
     }).join('');
-    return `<div class="vn-card"><h3>📇 أرقام الشركة</h3>${slots}` + (st.pick ? pickHtml() : '<button type="button" class="secondary small" data-vn-pick>اختار من دفترك</button>') +
+    return `<div class="vn-card"><h3>📇 أرقام الشركة</h3>${slots}` + (st.pick ? pickHtml() : '<button type="button" class="secondary small" data-vn-pick>+ ضيف رقم</button>') +
       (st.numsMsg ? `<p class="status bad">${esc(st.numsMsg)}</p>` : '') + '</div>';
   }
   async function openPick() {
@@ -378,15 +398,28 @@
     await loadBook();
     if (st === me) drawSt();
   }
-  async function setNum(role, phone) {
+  function setNum(role, phone) {
     // the person: an inbox person (his name as saved there) or a contact of the book
     const me = st, c = me ? (me.inbox || []).find((x) => x.phone === phone) || (me.book ? me.book.byPhone.get(phone) : null) : null;
+    return savePerson(role, c);
+  }
+  // a number he typed: the phone must be a number (8 to 15 digits), the name may stay empty
+  function setTyped(role) {
+    const me = st;
+    if (!me || me.numsBusy) return;
+    const c = typedPerson(me.tp, me.tn);
+    if (!c) { me.numsMsg = 'الرقم لازم يكون أرقام بس، من 8 لـ 15 رقم.'; drawSt(); return; }
+    return savePerson(role, c, true);
+  }
+  async function savePerson(role, c, typed) {
+    const me = st;
     if (!me || !c || me.numsBusy || !VN_ROLES.some((r) => r[0] === role)) return;
     me.numsBusy = true; me.numsMsg = '';
     try {
-      const { error } = await db().from('ar_vendor_contacts').upsert({ vendor_id: me.v.id, role, phone: c.phone, name: c.name.slice(0, 120), updated_at: new Date().toISOString() }, { onConflict: 'vendor_id,role' });
+      const { error } = await db().from('ar_vendor_contacts').upsert({ vendor_id: me.v.id, role, phone: c.phone, name: c.name ? c.name.slice(0, 120) : null, updated_at: new Date().toISOString() }, { onConflict: 'vendor_id,role' });
       if (error) throw error;
       me.nums[role] = { phone: c.phone, name: c.name };
+      if (typed) { me.tp = ''; me.tn = ''; }   // saved: the boxes are empty for the next one
     } catch (e) { me.numsMsg = 'ماتحفظش: ' + errText(e); }
     me.numsBusy = false;
     if (st === me) drawSt();
@@ -609,6 +642,8 @@
       if (e.target.closest('[data-vn-pick-close]') && st) { st.pick = false; drawSt(); return; }
       const vs = e.target.closest('[data-vn-set]');
       if (vs) { setNum(vs.dataset.vnSet, vs.dataset.phone); return; }
+      const vt = e.target.closest('[data-vn-typed]');
+      if (vt) { setTyped(vt.dataset.vnTyped); return; }
       const vc = e.target.closest('[data-vn-clear]');
       if (vc) { clearNum(vc.dataset.vnClear); return; }
       if (e.target.closest('[data-ve-link-send]')) { sendLink(false); return; }
@@ -634,6 +669,8 @@
     // what he types in the number picker: only the list under it is redrawn (the box keeps its focus)
     panel.addEventListener('input', (e) => {
       if (e.target.id === 'vnQ' && st) { st.pq = e.target.value; const r = $('vnRows'); if (r) r.innerHTML = pickRows(); }
+      else if (e.target.id === 'vnTP' && st) st.tp = e.target.value;
+      else if (e.target.id === 'vnTN' && st) st.tn = e.target.value;
     });
     panel.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-ve-move]')) { e.preventDefault(); e.target.click(); } });
     const range = () => {

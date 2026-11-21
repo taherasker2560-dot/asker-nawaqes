@@ -338,6 +338,7 @@
       `<div id="wlPicks">${picksHtml()}</div>` +
       (staff ? '' : `<span class="py-lab">المورد اللي هتبعتله</span>${vendorSelect('id="wlVendor"', f.vendor)}`) +
       (v && !v.kind ? `<span class="py-lab">المورد ده مخزن ولا مركز توزيع؟ (مرة واحدة بس)</span><div class="py-seg" style="grid-template-columns:1fr 1fr"><button type="button" class="${f.kind === 'warehouse' ? 'on' : ''}" data-wl-kind="warehouse">مخزن · رجوع 30 يوم</button><button type="button" class="${f.kind === 'center' ? 'on' : ''}" data-wl-kind="center">مركز توزيع · رجوع 7 أيام</button></div>` : '') +
+      `<div id="wlTele">${teleInner()}</div>` +
       (f.msg ? `<p class="status bad" id="wlMsg">${esc(f.msg)}</p>` : '') +
       `<div class="py-acts" id="wlActs">${actsHtml()}</div></div>`;
   }
@@ -347,10 +348,76 @@
     const f = form, staff = isStaff(), tele = teleOf(f), off = busy ? ' disabled' : '';
     return (tele ? `<button type="button" class="py-p" data-wl-save="wa"${off}>سجّل وابعت للتليسيلز على واتساب</button>` : '') +
       (staff ? '' : `<button type="button" class="${tele ? 'secondary' : 'py-p'}" data-wl-save="copy"${off}>سجّل وانسخ رسالة المورد</button>`) +
-      `<button type="button" class="${staff ? 'py-p' : 'secondary'}" data-wl-save="only"${off}>سجّل بس</button><button type="button" class="secondary" data-wl-close>إلغاء</button>` +
-      (tele ? `<p class="hint">التليسيلز: <b class="notr">${esc(tele.name || tele.phone)}</b></p>` : '');
+      `<button type="button" class="${staff ? 'py-p' : 'secondary'}" data-wl-save="only"${off}>سجّل بس</button><button type="button" class="secondary" data-wl-close>إلغاء</button>`;
   }
   const paintActs = () => { const el = $('wlActs'); if (el && form) el.innerHTML = actsHtml(); };
+  // ---- the supplier's telesales number, added right here (owner 2026-11-21: «مش عارف اضيف رقم المخزن … مش عارف اضيف رقم واحد منهم، مش عارف احنا جهزنا لكده ولا لا»).
+  // The number was only settable in «الموردين ← أرقام الشركة» and only from his phone's book or «الوارد». Here: the people of «الوارد» (the supplier's own first), his book, or a number typed.
+  // It is saved once per supplier in ar_vendor_contacts (the same row that card edits) and the first save button then opens WhatsApp on it. Owner only. ----
+  let inboxRows = null;   // ar_suppliers: the people saved in «الوارد», read when the first picker opens
+  const VL = () => root.AskerVendorsLib || null;
+  function teleInner() {
+    const f = form;
+    if (!f || isStaff() || !f.vendor || vnumsState !== 'ready' || !vendorOf(f.vendor)) return '';
+    const tele = vnums.get(String(f.vendor)), msg = f.numMsg ? `<p class="status bad">${esc(f.numMsg)}</p>` : '';
+    if (!f.numOpen) {
+      return (tele ? `<div class="py-tele set"><span>التليسيلز: <b class="notr">${esc(tele.name || tele.phone)}</b>${tele.name ? ` <bdi dir="ltr" class="notr">${esc(tele.phone)}</bdi>` : ''}</span><button type="button" class="linklike" data-wl-numopen>غيّره</button></div>`
+        : '<div class="py-tele"><span>مفيش رقم للتليسيلز عند المورد ده</span><button type="button" class="secondary small" data-wl-numopen>+ ضيف رقم</button></div>') + msg;
+    }
+    return '<div class="vn-pick"><input id="wlNQ" type="search" placeholder="دوّر في دفترك بالاسم أو الرقم" aria-label="دوّر في دفترك بالاسم أو الرقم" value="' + esc(f.nq || '') + '" autocomplete="off" />' +
+      `<div id="wlNumRows">${numRowsHtml()}</div><p class="vn-h">أو اكتب الرقم</p>` +
+      `<div class="vn-typed"><input id="wlNP" type="tel" dir="ltr" inputmode="tel" placeholder="01xxxxxxxxx" aria-label="رقم الموبايل" value="${esc(f.tp || '')}" autocomplete="off" />` +
+      `<input id="wlNN" type="text" maxlength="80" placeholder="الاسم (اختياري)" aria-label="الاسم" value="${esc(f.tn || '')}" autocomplete="off" /></div>` +
+      '<div class="py-acts"><button type="button" class="py-p" data-wl-numtyped>احفظ كتليسيلز المورد ده</button><button type="button" class="linklike" data-wl-numclose>قفل</button></div></div>' + msg;
+  }
+  // the people to tap: «الوارد» (the supplier's own first), then the book; each row has ONE button, the telesales job (the people who answer the missing-item requests)
+  function numRowsHtml() {
+    const f = form, lib = VL();
+    f.numPeople = new Map();
+    if (!lib || !lib.pickList) return '';
+    const L = lib.pickList(f.inboxList || [], bookState === 'ready' ? book : null, vendorOf(f.vendor), f.nq, 6, 6);
+    const row = (c) => { f.numPeople.set(c.phone, c); return `<div class="vn-sg"><div class="vn-who"><b class="notr">${esc(c.name)}</b><small dir="ltr"><bdi class="notr">${esc(c.phone)}</bdi></small></div><button type="button" class="vn-pk guess" data-wl-numset="${esc(c.phone)}">التليسيلز</button></div>`; };
+    let html = '';
+    if (L.inbox.length) html += '<p class="vn-h">مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات</p>' + L.inbox.map(row).join('');
+    if (!L.book) return html + `<p class="hint">${esc(bookState === 'loading' ? 'بحمّل دفترك…' : 'دفتر الأرقام مش متاح دلوقتي.')}</p>`;
+    if (L.book.length) return html + (L.inbox.length ? '<p class="vn-h">من دفترك</p>' : '') + L.book.map(row).join('');
+    return html + (L.inbox.length ? '' : `<p class="hint">${esc(L.search ? 'مفيش حد بالاسم ده في دفترك.' : 'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.')}</p>`);
+  }
+  const paintTele = () => { const el = $('wlTele'); if (el && form) el.innerHTML = teleInner(); paintActs(); };
+  const paintNumRows = () => { const el = $('wlNumRows'); if (el && form && form.numOpen) el.innerHTML = numRowsHtml(); };
+  async function openNumPick() {
+    const f = form;
+    if (!f || !f.vendor || isStaff() || !db()) return;
+    f.numOpen = true; f.nq = ''; f.numMsg = ''; f.inboxList = []; paintTele();
+    if (bookState === 'none') loadBook();
+    if (inboxRows === null) {
+      try { const { data: rows, error } = await db().from('ar_suppliers').select('name,phone').order('name'); inboxRows = error ? [] : rows || []; } catch (e) { inboxRows = []; }
+    }
+    if (form === f && f.numOpen) { const lib = VL(); f.inboxList = lib && lib.inboxPeople ? lib.inboxPeople(inboxRows, vendorOf(f.vendor)) : []; paintNumRows(); }
+  }
+  // save a person as this supplier's telesales: one row per supplier and job (the card «أرقام الشركة» edits the same row); the name may be empty
+  async function saveTele(c) {
+    const f = form;
+    if (!f || busy || !f.vendor || !c || isStaff() || !db()) return;
+    const vid = Number(f.vendor);
+    busy = true; f.numMsg = ''; paintActs();
+    try {
+      const { error } = await db().from('ar_vendor_contacts').upsert({ vendor_id: vid, role: 'telesales', phone: c.phone, name: c.name ? c.name.slice(0, 120) : null, updated_at: new Date().toISOString() }, { onConflict: 'vendor_id,role' });
+      if (error) throw error;
+      vnums.set(String(vid), { phone: c.phone, name: c.name || '' });
+      f.numOpen = false; f.nq = ''; f.tp = ''; f.tn = '';
+    } catch (e) { f.numMsg = 'ماتحفظش: ' + (e && e.message ? e.message : ''); }
+    busy = false;
+    if (form === f) paintTele();
+    drawLists();   // the waiting cards of this supplier get their «ابعت للتليسيلز» button
+  }
+  function saveTyped() {
+    const f = form, lib = VL();
+    if (!f || busy) return;
+    const c = lib && lib.typedPerson ? lib.typedPerson(f.tp, f.tn) : null;
+    if (!c) { f.numMsg = 'الرقم لازم يكون أرقام بس، من 8 لـ 15 رقم.'; paintTele(); return; }
+    saveTele(c);
+  }
   async function loadVNums() {
     if (vnumsState !== 'none' || !db() || isStaff()) return;
     vnumsState = 'loading';
@@ -359,7 +426,7 @@
       if (error) throw error;
       vnums = new Map((rows || []).map((r) => [String(r.vendor_id), { phone: String(r.phone), name: r.name || '' }]));
     } catch (e) { vnums = new Map(); /* the table is not there yet: the form works as before */ }
-    vnumsState = 'ready'; paintActs(); drawLists();   // the buttons of the waiting cards need the numbers too
+    vnumsState = 'ready'; paintTele(); drawLists();   // the buttons of the waiting cards need the numbers too (paintTele also repaints the save buttons)
   }
   // «📲 ابعت للتليسيلز»: one request, or one supplier's whole waiting list as ONE message; WhatsApp opens on his telesales number with it ready, he presses send (a list too long for a link is copied and the chat opens bare)
   function sendTele(vendorId, rows) {
@@ -475,7 +542,7 @@
       }
       book = makeBook(all); bookState = 'ready';
     } catch (e) { bookState = 'none'; if (mgr) draw(); return; }   // the table is not there yet (or no right to it): the form works as before
-    if (form) { readForm(); onPhone(); onName(); }
+    if (form) { readForm(); onPhone(); onName(); paintNumRows(); }
     if (mgr) paintBook();
   }
   // mark numbers private (true) or open (false): one or many at once, the server (owner only) does it; the local book follows
@@ -594,14 +661,18 @@
       else if (e.target.id === 'wlPhone' && form) { form.phone = e.target.value; onPhone(); }
       else if (e.target.id === 'wlName' && form) { form.name = e.target.value; form.nameAuto = false; onName(); }
       else if (e.target.id === 'wlBkQ' && mgr) { mgr.q = e.target.value; mgr.shown = MGR_STEP; mgr.sure = false; paintBook(); }
+      // the supplier's number picker: the search redraws only its rows (the box keeps its focus); the typed number and name only go to the state
+      else if (e.target.id === 'wlNQ' && form) { form.nq = e.target.value; paintNumRows(); }
+      else if (e.target.id === 'wlNP' && form) form.tp = e.target.value;
+      else if (e.target.id === 'wlNN' && form) form.tn = e.target.value;
     });
     panel.addEventListener('change', (e) => {
       const t = e.target;
-      if (t.id === 'wlVendor' && form) { readForm(); form.kind = ''; form.msg = ''; draw(); }
+      if (t.id === 'wlVendor' && form) { readForm(); form.kind = ''; form.msg = ''; form.numOpen = false; form.numMsg = ''; draw(); }
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-appmore],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-appmore],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock],[data-wl-numopen],[data-wl-numclose],[data-wl-numset],[data-wl-numtyped]');
       if (!t) return;
       const d = t.dataset;
       // the number book screen and the «🔒 خاص» marks (owner only)
@@ -636,6 +707,10 @@
       if ('wlUnpick' in d) { form.item = null; form.q = ''; form.results = []; draw(); $('wlItem')?.focus(); return; }
       if ('wlContact' in d) { const c = book.byPhone.get(d.wlContact); if (c) { form.phone = c.phone; form.name = c.name; form.nameAuto = true; form.known = c; form.hist = []; form.picks = []; form.msg = ''; draw(); loadHist(c.phone); $('wlQty')?.focus(); } return; }
       if ('wlKind' in d) { form.kind = d.wlKind; form.msg = ''; draw(); return; }
+      if ('wlNumopen' in d) { openNumPick(); return; }
+      if ('wlNumclose' in d) { form.numOpen = false; form.numMsg = ''; paintTele(); return; }
+      if ('wlNumset' in d) { const c = form.numPeople && form.numPeople.get(d.wlNumset); if (c) saveTele(c); return; }
+      if ('wlNumtyped' in d) { saveTyped(); return; }
       if ('wlSave' in d) save(d.wlSave);
     });
   }

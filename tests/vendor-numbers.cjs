@@ -62,6 +62,29 @@ assert.equal(V.waDigits('447710173736'), '447710173736');
 assert.equal(V.waDigits('0471234567'), '0471234567', 'a landline as it is (8 to 15 digits)');
 assert.equal(V.waDigits('123'), ''); assert.equal(V.waDigits(null), '');
 
+// a number he TYPES (owner 2026-11-21: «مش عارف اضيف رقم المخزن … مش عارف اضيف رقم واحد منهم»): the phone as the book writes it, a name that may be empty, null when it is not a number
+assert.deepEqual(V.typedPerson('01012345678', 'أحمد'), { phone: '01012345678', name: 'أحمد' });
+assert.deepEqual(V.typedPerson('٠١٠١٢٣٤٥٦٧٨', '  مخزن   النور  '), { phone: '01012345678', name: 'مخزن النور' }, 'Arabic digits; the name is tidied');
+assert.deepEqual(V.typedPerson('+20 10 1234-5678', ''), { phone: '01012345678', name: '' }, '+20, spaces and dashes; no name is fine');
+assert.deepEqual(V.typedPerson('0020 (10) 1234 5678', null), { phone: '01012345678', name: '' });
+assert.deepEqual(V.typedPerson('۰۱۰۱۲۳۴۵۶۷۸', 'x'), { phone: '01012345678', name: 'x' }, 'Persian digits too');
+assert.deepEqual(V.typedPerson('0471234567', 'خط أرضي'), { phone: '0471234567', name: 'خط أرضي' }, 'a landline stays as typed (8 to 15 digits)');
+assert.deepEqual(V.typedPerson('+44 7710 173736', 'برة'), { phone: '447710173736', name: 'برة' }, 'an international number stays');
+for (const bad of ['', '   ', 'abc', '0101234', '01012345678901234', '010-ab-345678', null, undefined]) assert.equal(V.typedPerson(bad, 'x'), null, 'not a number: ' + bad);
+assert.equal(V.typedPerson('01012345678', 'x'.repeat(300)).name.length, 120, 'the name is cut at 120 (the table allows 120)');
+// what the picker shows (the company's card and the missing-item form share it): «الوارد» first, the book after; a search covers both; book = null while it is not loaded
+const L1 = V.pickList(inbox, book, { name: 'رضا عطية' }, '');
+assert.deepEqual(L1.inbox.map((p) => p.phone), ['01096957316', '01069051541', '01069048503', '01033645645'], 'no search: the people of «الوارد», the company\'s own first');
+assert.deepEqual(L1.book.map((c) => c.name), ['المحاسب رضا عطيه', 'تليسيلز رضا عطيه', 'موزع رضا عطيه الجديد', 'مخزن رضا عطيه (احمد)', 'مكتب رضا عطيه الأرضي'], 'the book\'s suggestions (the same list as before)');
+const dup = V.pickList([{ phone: '01000000004', name: 'مخزن رضا عطيه (احمد)', key: 'مخزن رضا عطيه احمد', kind: 'other', private: false, fit: 2 }], book, { name: 'رضا عطية' }, '');
+assert.ok(!dup.book.some((c) => c.phone === '01000000004'), 'a person already shown from «الوارد» (same number) is not shown again from the book');
+assert.equal(L1.search, false);
+const L2 = V.pickList(inbox, book, { name: 'رضا عطية' }, 'بكر');
+assert.deepEqual(L2.inbox.map((p) => p.name), ['مخزن رضا عطيه (بكر)']); assert.equal(L2.search, true);
+assert.equal(V.pickList(inbox, null, { name: 'رضا عطية' }, '').book, null, 'the book is not loaded yet');
+assert.equal(V.pickList(inbox, book, { name: 'رضا عطية' }, '', 2, 1).inbox.length, 2, 'limits'); assert.equal(V.pickList(inbox, book, { name: 'رضا عطية' }, '', 2, 1).book.length, 1);
+assert.deepEqual(V.pickList(null, book, { name: 'مخزن الدكتور مستحضرات' }, '').inbox, []);
+
 // ---- English: every text the screen draws comes out with no Arabic left ----
 global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js');
 const I = global.AskerI18n; I._use(global.AskerEN);
@@ -72,6 +95,7 @@ for (const s of ['📇 أرقام الشركة', 'التليسيلز', 'المو
   'مالقيتش حد بالاسم ده في دفترك: دوّر بالاسم أو الرقم.', 'هيروح للمحاسب:', 'ماتحفظش: boom', 'ماتشالش: boom', 'سجّل وابعت للتليسيلز على واتساب', 'التليسيلز:',
   'اتسجّل. اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.', 'الطلب ده كان مسجّل قبل كده. اتفتح الواتس على التليسيلز ومعاه الرسالة: دوس إرسال هناك.',
   'مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات', 'من دفترك',
+  '+ ضيف رقم', 'مفيش رقم للتليسيلز عند المورد ده', 'أو اكتب الرقم', 'دوس على وظيفته:', 'رقم الموبايل', 'الاسم (اختياري)', 'احفظ كتليسيلز المورد ده', 'الرقم لازم يكون أرقام بس، من 8 لـ 15 رقم.', 'غيّره',
   '📲 ابعت للموزع على واتساب', 'الموزع:', 'الكشف طويل: اتنسخ، الزقه في المحادثة اللي اتفتحت.', 'اتفتحت محادثة الموزع ومعاها الكشف: دوس إرسال هناك.']) check(s);
 for (const [, label, use] of V.VN_ROLES) { check(label); check(use); }
 assert.deepEqual(bad, [], 'texts left in Arabic:\n' + bad.join('\n'));
