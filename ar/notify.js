@@ -23,6 +23,8 @@
   const KINDS = [
     { key: 'incoming', group: 'purchases', tab: 'read', sound: 'pop', title: 'وارد جديد من المخازن', body: (n) => `${n} جديد في الوارد` },
     { key: 'docs', group: 'purchases', tab: 'docs', sound: 'ding', title: 'فاتورة جديدة مستنية', body: (n) => `${n} صورة مستنية في الفواتير` },
+    // «🧾 مراجعة الفواتير» (ar/invoice-review.js, owner 2026-11-21): invoices Claude prepared and is waiting for his yes before entering them
+    { key: 'review', group: 'purchases', tab: 'review', sound: 'ding', title: 'فاتورة جاهزة مستنية موافقتك', body: (n) => `${n} فاتورة متجهزة مستنية موافقتك قبل ما تتدخل` },
     { key: 'expiry', group: 'purchases', tab: 'expiry', sound: 'double', title: 'صلاحيات محتاجة شغل', body: (n) => `${n} صنف النهارده: صلاحيات اتلخبطت من البيع أو بيع بالسالب` },
     { key: 'customers', group: 'accounts', tab: 'customers', sound: 'alert', title: 'عميل عدّى الحد', body: (n) => `${n} عميل عدّوا حدهم` },
     { key: 'store', group: 'sales', tab: 'storeorders', sound: 'bell', title: 'طلب جديد من الموقع', body: (n) => `${n} طلب جديد من الموقع` },
@@ -61,7 +63,7 @@
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const SEEN = 'asker-notify-seen', PICK = 'asker-notify-sounds', ON = 'asker-notify-on';
-  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب', pay: 'المدفوعات' };
+  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', review: 'مراجعة الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب', pay: 'المدفوعات' };
   let counts = {}, timer = null, ctx = null, busy = false;
 
   const picks = () => { try { return JSON.parse(read(PICK, '{}')) || {}; } catch (e) { return {}; } };
@@ -125,13 +127,14 @@
     const c = db();
     if (!c) return null;
     if (ticks++ > 0 && $('inboxRefresh')) { $('inboxRefresh').click(); await new Promise((r) => setTimeout(r, 1200)); }
-    const [docs, store, care, od, pay, wait] = await Promise.all([
+    const [docs, store, care, od, pay, wait, review] = await Promise.all([
       count(c.from('ar_documents').select('id').eq('status', 'new')),
       count(c.from('ar_store_orders').select('id').eq('status', 'new')),
       count(c.from('ar_chats').select('id').gte('waiting', 1)),
       oldDebts(c, oldDays()),
       payOrders(c),
       waitCounts(),
+      count(c.from('ar_invoice_reviews').select('id').eq('status', 'ready')),
     ]);
     const a = root.AskerAlerts && root.AskerAlerts.data();
     const today = (l) => (l || []).filter((x) => Number(x.today) > 0).length;
@@ -139,6 +142,7 @@
     const inc = incomingNow();
     if (inc !== undefined) out.incoming = inc;
     if (docs != null) out.docs = docs;
+    if (review != null) out.review = review;
     if (store != null) out.store = store;
     if (care != null) out.care = care;
     // «💸 المدفوعات» (owner 2026-11-19): a difference or late = the red number and the ring; waiting for his yes = a home row only
@@ -178,6 +182,7 @@
     if (!box) return;
     const rows = [];
     if (counts.incoming) rows.push({ tab: 'read', n: counts.incoming, text: 'جديد في الوارد' });
+    if (counts.review) rows.push({ tab: 'review', n: counts.review, text: 'فاتورة متجهزة مستنية موافقتك' });
     if (counts.docs) rows.push({ tab: 'docs', n: counts.docs, text: 'صورة مستنية في الفواتير' });
     if (counts.store) rows.push({ tab: 'storeorders', n: counts.store, text: 'طلب جديد من الموقع' });
     for (const t of (root.AskerAlerts && root.AskerAlerts.todo()) || []) rows.push(t);

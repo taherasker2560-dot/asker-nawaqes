@@ -19,7 +19,7 @@ run('bottom bar: five sections, «الرئيسية» first, «المشتريات
  assert.deepEqual(await names(page,'[data-pgroup]'),['نواقص','طلبيات','مخزون']);
  // «الحقائب» (2026-11-15): the other bags' shortages, owner only
  assert.deepEqual(await names(page,'[data-pfor="short"] [data-tab]'),['النواقص','الوارد','الترجمة','الحقائب']);
- assert.deepEqual(await names(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن','الانتظار'],'«الانتظار» (2026-11-19) sits with the orders');
+ assert.deepEqual(await names(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','مراجعة الفواتير','قوايم المخازن','الانتظار'],'«الانتظار» (2026-11-19) sits with the orders');
  assert.deepEqual(await names(page,'[data-pfor="stock"] [data-tab]'),['المخزون','جرد المخزون','الصلاحيات'],'«الصلاحيات» (2026-11-12) sits with the stock');
  assert.ok(await page.isVisible('[data-pfor="short"]'));assert.ok(!(await page.isVisible('[data-pfor="orders"]')));
  await page.click('[data-tab="translate"]');assert.ok(await vis(page,'translatePanel'));assert.ok(!(await vis(page,'shortPanel')));

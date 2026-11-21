@@ -1,0 +1,59 @@
+/* «🧾 مراجعة الفواتير» (ar/invoice-review.js, owner 2026-11-21, mockup mockups/invoice_review_2026-11-21): the airy look: white cards with air, the system color only in small touches
+   (the number circle, the chips, the numbers, the soft main button). No green and no amber (the one-color rule): «جاهزة ✓» is the color's ink on its quiet tint, a card that needs him has the color's line. */
+#reviewPanel .rv-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.rv-pill { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 14px; color: var(--ink); }
+.rv-pill b, .rv-n { color: var(--crimson-ink); }
+.rv-link { background: none; border: 0; box-shadow: none; padding: 6px 2px; color: var(--crimson-ink); font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; min-height: 0; width: auto; }
+#reviewPanel .py-h { margin-top: 16px; }
+.rv-all, .rv-go { display: block; width: 100%; margin: 0 0 14px; padding: 12px 14px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); border-radius: 14px; font: inherit; font-weight: 600; cursor: pointer; box-shadow: none; }
+.rv-go { margin: 12px 0 4px; }
+.rv-go[disabled] { opacity: 0.45; cursor: not-allowed; }
+.rv-card { border: 1px solid var(--line); border-radius: 18px; margin: 0 0 12px; background: var(--card); overflow: hidden; }
+.rv-hd { display: flex; align-items: center; gap: 10px; padding: 11px 12px; cursor: pointer; }
+.rv-ord { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--crimson); color: var(--crimson-ink); display: grid; place-items: center; font-weight: 700; }
+.rv-t { flex: 1; min-width: 0; }
+.rv-t strong { display: block; color: var(--ink); }
+.rv-t > span { color: var(--muted); font-size: 14px; }
+.rv-chip { border-radius: 999px; padding: 3px 10px; font-size: 13px; white-space: nowrap; background: var(--rose); color: var(--crimson-ink); border: 1px solid transparent; }
+.rv-chip.rv-warn { border-color: var(--crimson); }
+.rv-chip.rv-run { border-style: dashed; border-color: var(--crimson); }
+.rv-chip.rv-bad { background: var(--bad-bg); color: var(--bad); }
+.rv-chip.rv-quiet { background: var(--card); color: var(--muted); border-color: var(--line); }
+.rv-body { display: none; border-top: 1px solid var(--line); padding: 12px; }
+.rv-card.open .rv-body { display: block; }
+.rv-photos { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.rv-ph { width: 76px; height: 100px; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--rose); overflow: hidden; display: grid; place-items: center; cursor: pointer; box-shadow: none; }
+.rv-ph img { max-width: 100%; max-height: 100%; object-fit: cover; }
+.rv-ph.rv-none { width: auto; height: auto; padding: 8px 10px; font-size: 13px; color: var(--muted); cursor: default; }
+.rv-lines { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rv-lines td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.rv-lines .rv-ln { color: var(--muted); width: 22px; }
+.rv-lines small { display: block; color: var(--muted); text-align: right; }
+.rv-lines .rv-num { text-align: left; white-space: nowrap; }
+.rv-lines tr.rv-flag td { background: var(--rose); }
+.rv-lines .rv-more td { text-align: center; border-bottom: 0; }
+.rv-tot { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0; padding: 9px 12px; border-radius: 12px; font-weight: 600; background: var(--rose); color: var(--crimson-ink); }
+.rv-tot.bad { background: var(--bad-bg); color: var(--bad); }
+#reviewPanel h4 { margin: 14px 0 8px; font-size: 15px; color: var(--muted); }
+.rv-note { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 0 0 10px; background: var(--card); }
+.rv-note.done { background: var(--rose); border-color: var(--rose-line); }
+.rv-note p { margin: 0 0 6px; }
+.rv-mine { color: var(--muted); font-size: 14px; }
+.rv-row { display: flex; gap: 8px; margin-top: 8px; }
+.rv-row button { flex: 1; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 9px; font: inherit; cursor: pointer; box-shadow: none; }
+.rv-row button.rv-yes.on, .rv-row button.rv-yes:hover { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); }
+.rv-alt { display: none; margin-top: 8px; }
+.rv-alt.on { display: block; }
+.rv-alt label { display: block; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; margin: 0 0 6px; }
+.rv-alt input[type=text] { width: 100%; }
+.rv-chosen { margin-top: 6px; color: var(--crimson-ink); font-size: 14px; }
+.rv-lbl { display: block; margin: 12px 0 4px; font-size: 14px; color: var(--muted); }
+.rv-body textarea { width: 100%; min-height: 56px; }
+.rv-h { text-align: center; margin: 4px 0; }
+.rv-done { margin-top: 10px; padding: 9px 12px; border-radius: 12px; background: var(--rose); color: var(--crimson-ink); }
+.rv-done.bad { background: var(--bad-bg); color: var(--bad); }
+.rv-shot { position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; }
+.rv-shot-bar { display: flex; gap: 8px; padding: 10px; justify-content: center; }
+.rv-shot-bar button { padding: 8px 18px; border-radius: 12px; border: 1px solid #fff; background: transparent; color: #fff; font: inherit; }
+.rv-shot-img { flex: 1; overflow: auto; display: grid; place-items: center; padding: 8px; }
+.rv-shot-img img { max-width: 100%; max-height: 100%; transition: transform 0.2s; }
