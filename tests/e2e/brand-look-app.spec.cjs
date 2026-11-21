@@ -26,7 +26,7 @@ run('Brand look (bot): white page, no blessing strip, no wave, the soft green gr
  assert.equal(look.heroRadius,'16px');
  assert.ok(contrast(look.h2,look.hero)>=4.5,'the greeting reads');
  assert.ok(contrast(look.link,look.linkBg)>=4.5,'«الموقع» reads on the greeting by day: '+look.link+' on '+look.linkBg);assert.equal(look.linkBg,'rgb(33, 123, 171)','and it is the one solid button');
- assert.notEqual(look.navBg,'rgb(255, 255, 255)','the bar is the light tint of the color, no longer white');assert.equal(look.navPos,'fixed');assert.equal(look.navBottom,'0px','the bar is docked');
+ assert.notEqual(look.navBg,'rgb(255, 255, 255)','the bar is the light tint of the color, no longer white');assert.equal(look.navPos,'fixed');assert.equal(look.navBottom,'56px','the bar is docked right above the row of the five spare buttons (56px high, the very bottom)');
  assert.equal(look.navRadius,'0px','and flat');
  // since 2026-11-19 (owner: five shades of the system color, tests/e2e/section-colors.spec.cjs) every section of the bar is a filled segment of its own shade; «الرئيسية» is the system color itself
  assert.equal(look.onGroup,'home');assert.equal(look.onBg,'rgba(0, 0, 0, 0)','the section you are in has no colored segment: a light pill behind its icon (tests/e2e/section-colors.spec.cjs)');

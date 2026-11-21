@@ -82,7 +82,7 @@ run('bars: the header and the spare row slide away when you scroll down and come
 },{home:true});
 
 run('bars: three switches in the settings (the header, the five spare buttons, the bottom bar), each decides what hides while you scroll down; the phone remembers',async({page})=>{
- await ready(page);
+ await ready(page);await still(page);
  await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px'});
  const cls=()=>page.evaluate(()=>['hd-away','sp-away','bt-away'].filter(c=>document.documentElement.classList.contains(c)));
  const ty=(sel)=>page.evaluate((s)=>{const m=/matrix\(1, 0, 0, 1, 0, (-?[\d.]+)\)/.exec(getComputedStyle(document.querySelector(s)).transform);return m?parseFloat(m[1]):0},sel);
