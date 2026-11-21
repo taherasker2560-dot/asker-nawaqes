@@ -57,6 +57,9 @@ run('Install for anyone: Chrome with NO offer is sent to a normal Chrome tab (no
  assert.ok(went.startsWith('intent://localhost:'),went);
  assert.ok(went.includes('package=com.android.chrome')&&went.includes('install=1'),went);
  assert.ok(!/[?&]me=/.test(went),'a visitor: no secret in it');
+ // the hand-off may fail without a word (a browser that ignores the link, no Chrome on the phone): the page is still on the screen a moment later, so the words come (owner: «مش كل الناس مثبته كروم عاملاها الاساسي»)
+ await page.waitForSelector('#installNote:not([hidden])',{timeout:6000});
+ assert.match(await text(page,'#installNote'),/ماقدرتش أفتحه في كروم لوحدي\. من قايمة المتصفح/);
  // back in Chrome from that hand-off with still no offer (the app is installed already): the button pulses, the steps say so in words
  await page.goto(base+'store.html?install=1');
  await page.waitForSelector('#installBox:not([hidden])');
@@ -73,6 +76,32 @@ run('Install for anyone: Chrome with NO offer is sent to a normal Chrome tab (no
  await page.$eval('#installBtn',b=>b.click());
  await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
  await page.waitForFunction(()=>/اتنزّل/.test(document.getElementById('installNote').textContent),null,{timeout:5000});
+},{home:true});
+// owner 2026-11-21: «انا ببعت لهم من الواتس، وهم بيدوسوا وما بشوفش المتصفح اللي فتح ايه … مش كل الناس مثبته كروم عاملاها الاساسي»: a link from WhatsApp opens in whatever browser the phone has
+run('Install for anyone: another browser (Samsung Internet, Firefox …) hands the page to Chrome at once; if the page is still on the screen a moment later the tap gets its words, and if Chrome took the page nothing is said',async({page,base})=>{
+ await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua});window.__fakeRpcs={ar_store_pay_info:()=>null};window.__askerGoIntent=(u)=>{window.__went=u}});
+ for(const [name,ua] of [['Samsung Internet',UAS.samsung],['Firefox',UAS.firefox]]){
+  await page.evaluate(([ua])=>sessionStorage.setItem('__ua',ua),[ua]);
+  await page.goto(base+'store.html?x=9');
+  await page.waitForSelector('#installBox:not([hidden])');
+  // the tap hands the page over AT ONCE (no waiting for an offer this browser cannot give)
+  await page.click('#installBtn');
+  await page.waitForFunction(()=>window.__went,null,{timeout:1500});
+  assert.ok((await page.evaluate(()=>window.__went)).includes('package=com.android.chrome'),name);
+  assert.equal(await page.$eval('#installNote',e=>e.hidden),true,name+': no words while the hand-off may still be working');
+  // the page is still here after a moment (the browser ignored the link / no Chrome): the words say what to do from its own menu
+  await page.waitForSelector('#installNote:not([hidden])',{timeout:6000});
+  assert.match(await text(page,'#installNote'),/ماقدرتش أفتحه في كروم لوحدي\. من قايمة المتصفح \(⋮ أو ≡\) اختار «فتح في كروم» لو موجودة، أو «إضافة إلى الشاشة الرئيسية»/,name);
+ }
+ // Chrome took the page (this one goes to the background at once): nothing is said
+ await page.evaluate(([ua])=>sessionStorage.setItem('__ua',ua),[UAS.samsung]);
+ await page.goto(base+'store.html?x=10');
+ await page.waitForSelector('#installBox:not([hidden])');
+ await page.click('#installBtn');
+ await page.waitForFunction(()=>window.__went);
+ await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{get:()=>'hidden',configurable:true});Object.defineProperty(document,'hidden',{get:()=>true,configurable:true})});
+ await page.waitForTimeout(3200);
+ assert.equal(await page.$eval('#installNote',e=>e.hidden),true,'Chrome has the page: no words behind it');
 },{home:true});
 run('Install for anyone: Firefox gets its steps back from the hand-off, Chrome installs on its offer, a customer has his own button, a computer needs an offer',async({page,base})=>{
  await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua});window.__fakeRpcs={ar_store_pay_info:()=>null}});
