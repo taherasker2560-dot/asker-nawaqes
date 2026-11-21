@@ -101,3 +101,5 @@
 .rv-rej.on { border-color: var(--bad); color: var(--bad); background: var(--bad-bg); }
 .rv-rejd .rv-nm b, .rv-lines tr.rv-rejd td:nth-child(2) > :first-child { text-decoration: line-through; color: var(--muted); }
 .rv-lines small.rv-info, .rv-lines small.rv-ex { display: block; color: var(--muted); font-size: 12.5px; }
+.rv-nm small.rv-sug { color: var(--crimson-ink); }
+.rv-sug b { font-weight: 700; }

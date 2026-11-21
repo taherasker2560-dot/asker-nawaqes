@@ -138,7 +138,7 @@ run('Invoice review: a cosmetics invoice is compact (owner 2026-11-21 mockup): n
   const ym=(m)=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+m);return String(d.getMonth()+1).padStart(2,'0')+d.getFullYear()}; // expiries relative to today: the test must not age
   const S=(n,total,x)=>({n,paper:'مستحضر ورقة '+n,qty:2,net:45.5,price:70,card:70,prev:45.5,cosm:true,disc:35,exp:'112030',id:100+n,name:'كريم مثال '+n,total,...x});
   const A=(n,total,x)=>({n,paper:'مستحضر ورقة '+n,qty:4,net:27.25,ask:'price',card:40,prev:25,cosm:true,disc:null,exp:'',id:100+n,name:'كريم مثال '+n,total,...x});
-  window.__tables.ar_invoice_reviews=[mk(21,'149233',[S(1,91,{exp:ym(9)}),A(2,109,{exp:ym(32)}),A(3,109,{prev:30})],309),mk(22,'149234',[A(1,109,{card:null,id:0,prev:null,name:'كوب مثال جديد'})],109)];
+  window.__tables.ar_invoice_reviews=[mk(21,'149233',[S(1,91,{exp:ym(9)}),A(2,109,{exp:ym(32)}),A(3,109,{prev:30}),A(4,109,{prev:20,sug:45})],418),mk(22,'149234',[A(1,109,{card:null,id:0,prev:null,name:'كوب مثال جديد'})],109)];
  });
  await open(page);
  // the cursor waits in the first empty box; the asked lines show name, cost, last time and how much it moved, the card's price as the grey hint; the rest folded «زي آخر مرة»
@@ -152,8 +152,10 @@ run('Invoice review: a cosmetics invoice is compact (owner 2026-11-21 mockup): n
  assert.match(await txt(page,'[data-rv="21"] .rv-same summary'),/زي آخر مرة \(1\) فيه 1 صلاحية قريبة/,'a short expiry opens the fold and says so');
  assert.ok(await page.isVisible('[data-rv="21"] .rv-sr'));assert.match(await txt(page,'[data-rv="21"] .rv-sr'),/كريم مثال 1.*\d\d\/\d{4}.*45\.50 70/);
  assert.ok(await page.$('[data-rv="21"] .rv-sr .rv-exp.near'),'nine months is under 18: in the color');
- assert.match(await txt(page,'[data-rv="21"] .rv-ph4'),/محتاج سعرك فاضل 2/);assert.match(await txt(page,'[data-rv="21"] .rv-chip'),/2\s*محتاجين سعرك/);
- assert.equal(await page.isDisabled('[data-rv-approve="21"]'),true);assert.match(await txt(page,'[data-rv="21"] .rv-h'),/كمّل 2 حاجة الأول/);
+ assert.match(await txt(page,'[data-rv="21"] .rv-ph4'),/محتاج سعرك فاضل 3/);assert.match(await txt(page,'[data-rv="21"] .rv-chip'),/3\s*محتاجين سعرك/);
+ // the suggested price (his way, from the study) is the grey hint and says so
+ assert.equal(await page.getAttribute('[data-rv-price="21|4"]','placeholder'),'45');assert.match(await txt(page,'[data-rv="21"] .rv-pr[data-line="4"] .rv-sug'),/المقترح 45 \(الكارت 40 ?\)/);
+ assert.equal(await page.isDisabled('[data-rv-approve="21"]'),true);assert.match(await txt(page,'[data-rv="21"] .rv-h'),/كمّل 3 حاجة الأول/);
  // below the cost: refused, nothing saved, the cursor stays
  await page.fill('[data-rv-price="21|2"]','20');await page.press('[data-rv-price="21|2"]','Enter');
  await page.waitForFunction(()=>/سعر الجمهور لازم يكون 27\.25 أو أكتر/.test(document.getElementById('rvStatus').textContent),null,{timeout:5000});
@@ -165,11 +167,16 @@ run('Invoice review: a cosmetics invoice is compact (owner 2026-11-21 mockup): n
  assert.deepEqual((await row(page,21)).answers.L2,{v:'price',t:'39.5'});
  await page.waitForFunction(()=>document.activeElement&&document.activeElement.dataset.rvPrice==='21|3',null,{timeout:5000});
  assert.match(await txt(page,'[data-rv="21"] .rv-pr[data-line="2"] .rv-chg'),/الكارت هيتغير: 40 ← 39\.5/);
- assert.match(await txt(page,'[data-rv="21"] .rv-ph4'),/فاضل 1/);
- // Enter on the empty box keeps the card's price (saved as the card's price, no change line), and the cursor goes to the approve button
+ assert.match(await txt(page,'[data-rv="21"] .rv-ph4'),/فاضل 2/);
+ // Enter on the empty box keeps the card's price when nothing else is suggested (saved as the card's price, no change line)
  await page.press('[data-rv-price="21|3"]','Enter');
  await page.waitForFunction(()=>window.__tables.ar_invoice_reviews.find(x=>x.id===21).answers.L3,null,{timeout:5000});
  assert.deepEqual((await row(page,21)).answers.L3,{v:'price',t:'40'});assert.equal(await page.$('[data-rv="21"] .rv-pr[data-line="3"] .rv-chg'),null);
+ // with a suggestion, Enter on the empty box takes it (the card follows), and after the last box the cursor goes to the approve button
+ await page.waitForFunction(()=>document.activeElement&&document.activeElement.dataset.rvPrice==='21|4',null,{timeout:5000});
+ await page.press('[data-rv-price="21|4"]','Enter');
+ await page.waitForFunction(()=>window.__tables.ar_invoice_reviews.find(x=>x.id===21).answers.L4,null,{timeout:5000});
+ assert.deepEqual((await row(page,21)).answers.L4,{v:'price',t:'45'});assert.match(await txt(page,'[data-rv="21"] .rv-pr[data-line="4"] .rv-chg'),/الكارت هيتغير: 40 ← 45/);
  await page.waitForFunction(()=>document.activeElement&&document.activeElement.dataset.rvApprove==='21',null,{timeout:5000});
  assert.match(await txt(page,'[data-rv="21"] .rv-chip'),/جاهزة ✓/);assert.match(await txt(page,'[data-rv="21"] .rv-ph4'),/خلصت ✓/);
  // «رفض» on an expiry: saved as R<line>, the line is struck and says it goes back; pressed again it is taken back

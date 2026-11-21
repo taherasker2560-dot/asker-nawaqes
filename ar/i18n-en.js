@@ -2334,7 +2334,6 @@ window.AskerEN = {
   "محتاجين سعرك": "need your price",
   "فاضل {0}": "{0} left",
   "خلصت ✓": "Done ✓",
-  "التكلفة اتغيرت أكتر من جنيه عن آخر مرة، أو صنف جديد. اكتب سعر الجمهور ودوس Enter، والمؤشر ينزل على اللي بعده. لو سبت الخانة فاضية، يفضل سعر الكارت (الرقم الرمادي).": "The cost moved more than a pound since last time, or a new item. Type the public price and press Enter: the cursor goes to the next one. Left empty, the card's price stays (the grey number).",
   "الجمهور": "Public",
   "صنف جديد": "New item",
   "آخر مرة {0} ←": "last time {0} →",
@@ -2351,7 +2350,10 @@ window.AskerEN = {
   "تمام ✓": "OK ✓",
   "الصنف ده جديد: اكتب سعره": "This item is new: type its price",
   "اكتب رقم": "Type a number",
-  "سعر الجمهور لازم يكون {0} أو أكتر (التكلفة)": "The public price must be {0} or more (the cost)"
+  "سعر الجمهور لازم يكون {0} أو أكتر (التكلفة)": "The public price must be {0} or more (the cost)",
+  "التكلفة اتغيرت أكتر من جنيه عن آخر مرة، أو صنف جديد. الرقم الرمادي هو السعر المقترح بطريقتك: Enter يوافق عليه، أو اكتب سعر تاني ودوس Enter، والمؤشر ينزل على اللي بعده.": "The cost moved more than a pound since last time, or a new item. The grey number is the price suggested your way: Enter accepts it, or type another and press Enter; the cursor goes to the next one.",
+  "المقترح": "suggested",
+  "(الكارت": "(card"
  },
  "phrases": {
   "آخر خصم": "last discount",

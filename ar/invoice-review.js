@@ -156,14 +156,14 @@
     if (asks.length) {
       const left = openPrices(r).length;
       h += `<h4 class="rv-ph4">محتاج سعرك <em>${left ? 'فاضل ' + esc(left) : 'خلصت ✓'}</em></h4>` +
-        (locked ? '' : '<p class="rv-hint">التكلفة اتغيرت أكتر من جنيه عن آخر مرة، أو صنف جديد. اكتب سعر الجمهور ودوس Enter، والمؤشر ينزل على اللي بعده. لو سبت الخانة فاضية، يفضل سعر الكارت (الرقم الرمادي).</p>') +
+        (locked ? '' : '<p class="rv-hint">التكلفة اتغيرت أكتر من جنيه عن آخر مرة، أو صنف جديد. الرقم الرمادي هو السعر المقترح بطريقتك: Enter يوافق عليه، أو اكتب سعر تاني ودوس Enter، والمؤشر ينزل على اللي بعده.</p>') +
         '<div class="rv-pg"><span>الصنف</span><span>التكلفة</span><span>الجمهور</span></div>' +
         asks.map((l) => {
-          const p = priceOf(r, l), ch = changedPrice(r, l), rej = rejected(r, l), card = Number(l.card) > 0 ? Number(l.card) : null;
+          const p = priceOf(r, l), ch = changedPrice(r, l), rej = rejected(r, l), card = Number(l.card) > 0 ? Number(l.card) : null, sug = Number(l.sug) > 0 ? Number(l.sug) : null, hint = sug || card;
           return `<div class="rv-pr${flagged(r, l) ? ' rv-flag' : ''}${rej ? ' rv-rejd' : ''}" data-line="${esc(l.n)}"><div class="rv-nm"><b class="notr">${esc(l.name || l.paper)}</b>${l.id ? '' : '<span class="rv-new">جديد</span>'}` +
-            `<small>${moveHtml(l)} · ${expHtml(r, l)}</small>${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
+            `<small>${moveHtml(l)} · ${expHtml(r, l)}</small>${sug && sug !== card && !p ? `<small class="rv-sug">المقترح <b dir="ltr">${esc(sug)}</b>${card ? ` (الكارت <span dir="ltr">${esc(card)}</span>)` : ''}</small>` : ''}${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
             `<div class="rv-cost" dir="ltr">${esc(money(l.net))}</div>` +
-            `<input class="rv-box${p ? ' done' : ''}" type="text" inputmode="decimal" dir="ltr" maxlength="12" enterkeyhint="next" data-rv-price="${esc(r.id)}|${esc(l.n)}" value="${p ? esc(String(p)) : ''}" placeholder="${card ? esc(String(card)) : 'سعره'}" aria-label="سعر الجمهور"${locked || rej ? ' disabled' : ''}>` +
+            `<input class="rv-box${p ? ' done' : ''}" type="text" inputmode="decimal" dir="ltr" maxlength="12" enterkeyhint="next" data-rv-price="${esc(r.id)}|${esc(l.n)}" value="${p ? esc(String(p)) : ''}" placeholder="${hint ? esc(String(hint)) : 'سعره'}" aria-label="سعر الجمهور"${locked || rej ? ' disabled' : ''}>` +
             (ch && !rej ? `<div class="rv-chg">${card ? `الكارت هيتغير: <span dir="ltr">${esc(card)} ← ${esc(ch)}</span>` : `سعره: <span dir="ltr">${esc(ch)}</span>`}</div>` : '') + '</div>';
         }).join('');
     }
@@ -318,7 +318,7 @@
     const [rid, n] = split(t.dataset.rvPrice), r = find(rid), l = r && linesOf(r).find((x) => String(x.n) === String(n));
     if (!l) return;
     const raw = t.value.trim();
-    if (!raw) { const c = Number(l.card); if (c > 0) return setPrice(rid, n, c, true); say('الصنف ده جديد: اكتب سعره', 'bad'); return; }
+    if (!raw) { const c = Number(l.sug) > 0 ? Number(l.sug) : Number(l.card); if (c > 0) return setPrice(rid, n, c, true); say('الصنف ده جديد: اكتب سعره', 'bad'); return; } // empty = the suggested price (his way, from the study), else the card's
     const v = parseNum(raw);
     if (!(v > 0)) { say('اكتب رقم', 'bad'); return; }
     return setPrice(rid, n, v, true);
