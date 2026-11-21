@@ -220,10 +220,11 @@
     const e = lastOf().get(it.i), editing = editId === it.i, lines = sysLines(it);
     const who = e ? (e.created_by && root.AskerStaff && root.AskerStaff.nameOf(e.created_by)) || '' : '';
     const tag = !e ? '' : e.result === 'ok' ? '<span class="ct-tag ok">مظبوط</span>' : '<span class="ct-tag diff">فيه فرق</span>';
-    let html = `<div class="ct-item${e ? (e.result === 'ok' ? ' ok' : ' diff') : ''}" data-ct="${esc(it.i)}">
-      <div class="ct-h"><strong class="notr">${esc(nameOf(it))}</strong>${tag}</div>
+    // the item's small photo on the head of the card (owner 2026-11-21: every list that shows an item name shows its photo; a tap opens «تعديل الصنف»): the lines and buttons stay full width below it
+    const head = `<div class="ct-h"><strong class="notr">${esc(nameOf(it))}</strong>${tag}</div>
       ${arName.get(it.i) ? `<div class="ct-en notr" dir="ltr">${esc(it.n)}</div>` : ''}
       <small class="hint">كود ${esc(it.i)}${e ? ` · اتجرد${who ? ' · ' + esc(who) : ''}${isQueued(e) ? ' · لسه ما اتبعتش' : ''}` : ''}</small>`;
+    let html = `<div class="ct-item${e ? (e.result === 'ok' ? ' ok' : ' diff') : ''}" data-ct="${esc(it.i)}">${root.AskerItemMedia ? root.AskerItemMedia.row(it.i, it.n, nameOf(it), head) : head}`;
     if (withSec && !editing) html += `<label class="ct-where">القسم: <select data-ct-move aria-label="القسم">${secOptions(e && e.section_to != null ? e.section_to : it.s)}</select></label>`;
     if (!editing) {
       html += lines.map((l) => `<div class="ct-b"><span>${esc(l.text)}</span></div>`).join('');
@@ -313,8 +314,9 @@
     $('ctResSum').textContent = rows.length ? `${pend} صنف فيهم فرق مستنيين يتطبقوا` : '';
     $('ctResRows').innerHTML = rows.map((e) => {
       const it = byId.get(e.item_id), name = it ? nameOf(it) : e.item_name, who = e.created_by && root.AskerStaff ? root.AskerStaff.nameOf(e.created_by) : '';
+      const head = `<div class="ct-h"><strong class="notr">${esc(name)}</strong><small class="hint">${who ? 'جرده ' + esc(who) : 'جردته انت'}${e.status === 'applied' ? ' · اتطبق' : ''}${e.queued ? ' · لسه ما اتبعتش' : ''}</small></div>`;
       return `<div class="ct-r${e.status === 'applied' ? ' done' : ''}" data-ct-entry="${esc(e.id)}">
-        <div class="ct-h"><strong class="notr">${esc(name)}</strong><small class="hint">${who ? 'جرده ' + esc(who) : 'جردته انت'}${e.status === 'applied' ? ' · اتطبق' : ''}${e.queued ? ' · لسه ما اتبعتش' : ''}</small></div>
+        ${root.AskerItemMedia ? root.AskerItemMedia.row(e.item_id, it ? it.n : e.item_name, name, head) : head}
         ${(e.diffs || []).map((d) => `<div class="${d.d < 0 ? 'neg' : 'pos'}">${esc(diffLine(d, e.parts || 1))}</div>`).join('')}
         ${mixedDates(e.diffs) ? '<small class="hint">= التاريخ متلخبط، العدد نفسه مظبوط</small>' : ''}
         ${e.section_to != null ? movedLine(e.section_from, e.section_to) : ''}

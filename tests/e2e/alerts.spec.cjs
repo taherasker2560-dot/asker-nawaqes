@@ -165,12 +165,19 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.waitForFunction(()=>!document.getElementById('expiryPanel').classList.contains('hidden')&&/SOLONAL/.test(document.getElementById('alExpiry').textContent));
  assert.match(await text(page,'#alExpiry'),/منتهية وليها رصيد 1 SOLONAL FACIAL WASH 06\/2026 · 1 علبة · حوالي 150 ج 06\/2026: 1/);
  assert.equal(await page.$eval('[data-tab="expiry"]',b=>b.dataset.badge),'2','the small tab has its number');
+ // the item's small photo beside its name (owner 2026-11-21), the batches stay full width below
+ assert.equal(await page.$eval('#alExpiry .al-item > .im-lrow > .im-th',b=>b.dataset.im),'68195','«منتهية»: the photo of the item, by its number');
+ assert.equal(await page.$$eval('#alExpiry .al-item > .al-batches',b=>b.length),1);
  // today: the mix-up with its batches, the negative sale; the older one under «آخر 7 أيام»
  await page.click('[data-al-view="today"]');
  const today=await text(page,'#alExpiry');
  assert.match(today,/صلاحيات اتلخبطت من البيع 1 LAMIFEN CREAM 15GM النهارده 2 مرة · 5 في 7 أيام · آخر مرة 10:34 م 07\/2028: 2 .* 09\/2028: 3/);
  assert.match(today,/بيع بالسالب 1 EZAPRIL-CO 72 TAB/);assert.match(today,/آخر 7 أيام \(قبل النهارده\): 1 صنف/);
+ assert.deepEqual(await page.$$eval('#alExpiry .al-item > .im-lrow > .im-th',b=>b.map(x=>x.dataset.im)),['20731','66358','2'],'«النهارده»: a photo on every card, the older one under «آخر 7 أيام» too');
  await page.click('[data-al-view="soon"]');assert.match(await text(page,'#alExpiry'),/هتخلص خلال 3 شهور 1 SOON ITEM 01\/2027/);
+ assert.equal(await page.$eval('#alExpiry .al-item > .im-lrow > .im-th',b=>b.dataset.im),'9','«هتخلص»: the photo of the item');
+ // a tap on the photo opens «تعديل الصنف» and writes nothing
+ await page.click('#alExpiry .al-item .im-th[data-im="9"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
  // customers above the limit, and close to it
  await page.click('[data-group="accounts"]');await page.waitForFunction(()=>/عميل تجربة/.test(document.getElementById('alCustomers').textContent));
  const cust=await text(page,'#alCustomers');
@@ -187,8 +194,8 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.evaluate(()=>window.AskerNotify.tick());
  assert.equal(await page.$eval('[data-group="sales"]',b=>b.dataset.badge),'2');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-notify-seen')).store),2);
- // nothing else was written to the server (only his moves between bags)
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items|ar_item_dups/.test(JSON.stringify(w)))),[]);
+ // nothing else was written to the server (only his moves between bags; the item sheet only asks whether he may edit: ar_staff_can)
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items|ar_item_dups|ar_staff_can/.test(JSON.stringify(w)))),[]);
 },{home:true});
 run('alerts: no file yet',async({page})=>{
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');

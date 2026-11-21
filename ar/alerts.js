@@ -186,8 +186,9 @@
   function itemCard(x, line, warn) {
     const q = qtyText();
     const bs = (x.batches || []).map((b) => `<span class="al-batch">${esc(batchText(b, q, x.parts))}</span>`).join('');
-    return `<div class="al-item${warn ? ' warn' : ''}"><strong dir="ltr">${esc(x.name)}</strong>` +
-      (line ? `<div class="al-line">${esc(line)}</div>` : '') +
+    // the small photo beside the name and the line; the batches stay full width below (owner 2026-11-21: a tap on it opens «تعديل الصنف»)
+    const head = `<strong dir="ltr">${esc(x.name)}</strong>` + (line ? `<div class="al-line">${esc(line)}</div>` : '');
+    return `<div class="al-item${warn ? ' warn' : ''}">${root.AskerItemMedia ? root.AskerItemMedia.row(x.id, x.name, x.name, head) : head}` +
       (bs ? `<div class="al-batches">${bs}</div>` : '<div class="hint">مفيش رصيد على أي تشغيلة دلوقتي</div>') + '</div>';
   }
   function list(title, items, line, empty, warn) {

@@ -62,6 +62,7 @@ run('Return marks: mark a line, the statement for WhatsApp, the tick «اتجه�
  await page.click('#alViews [data-al-view="returns"]');await page.waitForSelector('#alExpiry .rm-row');
  assert.equal((await text(page,'#alReturnsN')),'2');
  rows=await names(page,'#alExpiry .rm-row');assert.equal(rows.length,2);
+ assert.deepEqual((await page.$$eval('#alExpiry .rm-row > .im-th',b=>b.map(x=>x.dataset.im))).sort(),['101','103'],'the marks have the item\'s photo (owner 2026-11-21)');
  assert.match(rows.join('|'),/PANADOL EXTRA 24 TAB.*فاتورة رقم 474411 · اتدخلت \d\d\/\d\d\/\d{4}.*مطلوب إرجاعه/);
  assert.match(rows.join('|'),/فلاجيل ١٢٥ شراب.*فاتورة رقم 474411/,'item FLAGYL: 1 of the 2 boxes');
  const heads=await names(page,'#alExpiry .rm-group > .al-h');assert.equal(heads.length,1,'one supplier: AMG (the other line was taken off)');
