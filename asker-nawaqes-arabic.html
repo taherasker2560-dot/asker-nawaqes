@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="ar/brand.css?v=nobless-20261117a" />
     <link rel="stylesheet" href="ar/bars.css?v=bars-20261121a" />
     <link rel="stylesheet" href="ar/airy.css?v=bars-20261121f" />
+<link rel="stylesheet" href="ar/review.css?v=review-20261121a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
     <script src="ar/i18n-en.js?v=zero-20261121a"></script>
@@ -533,6 +534,15 @@
             ><input id="spDate" type="date" style="width: 100%; padding: 10px; font-size: 16px" />
             <button id="spUpload" type="button">ارفع القايمة</button>
           </details>
+        </section>
+
+        <!-- «🧾 مراجعة الفواتير» (owner 2026-11-21, ar/invoice-review.js): the invoices Claude has read and prepared, before they are entered in PharmaFly; he answers the notes and approves; owner only -->
+        <section id="reviewPanel" class="card hidden">
+          <h2>مراجعة الفواتير قبل الإدخال</h2>
+          <p class="hint">الفواتير اللي قريتها وجهّزتها. راجعها، ورد على الملاحظات، وبعدين «وافق ودخّلها» أو Enter. مش هدخّل حاجة في فارمافلاي قبل موافقتك.</p>
+          <button id="rvRefresh" type="button" class="rv-link">تحديث</button>
+          <p id="rvStatus" class="status"></p>
+          <div id="rvMain"></div>
         </section>
 
         <section id="docsPanel" class="card hidden">
@@ -1062,6 +1072,7 @@
 <script src="ar/cash.js?v=op50-20261119a"></script>
 <script src="ar/pay.js?v=apps-20261119a"></script>
 <script src="ar/waitlist.js?v=phoneapp-20261121b"></script>
+<script src="ar/invoice-review.js?v=review-20261121a"></script>
 <script src="ar/item-actions.js?v=ia-20261120c"></script>
 <script src="ar/music.js?v=advert-20261119b"></script>
 <script src="ar/notes.js?v=music-20261119b"></script>
