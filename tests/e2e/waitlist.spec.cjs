@@ -107,6 +107,12 @@ run('Waiting list: a new request: search, the supplier\'s kind asked once, the n
  await page.fill('#wlItem','augm');
  await page.waitForSelector('[data-wl-pick="5"]');
  assert.match(await txt(page,'[data-wl-pick="5"]'),/AUGMENTIN 1GM 14 TAB اوجمنتين/);
+ // 2026-11-21: the item's small photo BESIDE the pick button (a button inside a button does not work): a tap on it opens «تعديل الصنف» and does not pick the item
+ assert.equal(await page.$$eval('.py-picks .im-lrow > button.im-th[data-im="5"]',x=>x.length),1,'the photo sits beside the button');
+ assert.equal(await page.$$eval('.py-picks button.py-pick button',x=>x.length),0,'never a button inside a button');
+ await page.click('.py-picks .im-th[data-im="5"]');await page.waitForSelector('#imSheet:not([hidden])');
+ assert.ok(await page.isVisible('[data-wl-pick="5"]'),'the item was not picked by the tap on the photo');
+ await page.click('#imSheet .im-x');
  await page.click('[data-wl-pick="5"]');
  await page.click('[data-wl-save="only"]');
  assert.equal(await page.textContent('#wlMsg'),'رقم الموبايل لازم يكون 11 رقم ويبدأ بـ 01.');

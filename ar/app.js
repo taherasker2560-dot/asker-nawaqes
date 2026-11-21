@@ -409,7 +409,13 @@
     return /\d/.test(c) ? '١٢٣' : /[ا-ي]/.test(c) ? c : 'A-Z';
   };
   const LETTER_ORDER = (l) => (l === '١٢٣' ? 0 : l === 'A-Z' ? 2 : 1);
+  // the system's items arrived (ar/home.js) or a photo/name was fixed in the item sheet: the shortages draw again, so the rows that look their photo up by name get it (owner 2026-11-21)
+  let shortHooked = false;
   function drawShort() {
+    if (!shortHooked && window.AskerItemMedia && window.AskerItemMedia.onChange) {
+      shortHooked = true;
+      window.AskerItemMedia.onChange(() => { if ($('shList') && $('shList').children.length) drawShort(); });
+    }
     // the companies each item was ordered from today (same answer as orderedFrom, worked out once for the whole list)
     const ordBy = new Map();
     orders.forEach((o) => ordBy.set(o.name_key, [...(ordBy.get(o.name_key) || []), o.supplier || '']));
@@ -454,7 +460,9 @@
         ar = aName(s.id),
         pill = from.length ? ` <span class="pill good">اتطلب${esc(who(from))}</span>` : '',
         miss = ar ? '' : ' <span class="pill warn">لسه ماتترجمش</span>';
-      return `<div class="srow"><div class="sr-main"><div class="sr-ar" dir="auto">${esc(ar || s.product_name)}${pill}${miss}</div>${ar ? `<div class="sr-en" dir="ltr">${esc(s.product_name)}</div>` : ''}</div>${q === null ? '' : `<div class="qty${written(s) ? ' own' : ''}"${written(s) ? ' title="الكمية اللي كتبتها"' : ''}>${esc(fmtQty(q))}</div>`}</div>`;
+      const main = `<div class="sr-main"><div class="sr-ar" dir="auto">${esc(ar || s.product_name)}${pill}${miss}</div>${ar ? `<div class="sr-en" dir="ltr">${esc(s.product_name)}</div>` : ''}</div>`;
+      // the item's small photo on the side (ar/item-media.js, owner 2026-11-21): the shortage carries only the PharmaFly NAME, so the item is the one that has exactly that name; none found = the row as it was
+      return `<div class="srow">${window.AskerItemMedia ? window.AskerItemMedia.rowByName(s.product_name, ar || s.product_name, main) : main}${q === null ? '' : `<div class="qty${written(s) ? ' own' : ''}"${written(s) ? ' title="الكمية اللي كتبتها"' : ''}>${esc(fmtQty(q))}</div>`}</div>`;
     };
     let html = '';
     if (shView === 'alpha' && !words.length) {
@@ -635,7 +643,9 @@
                 ? ' <span class="pill warn">محتاجة مراجعة</span>'
                 : ' <span class="pill bad">لسه ماتترجمتش</span>'
             : '';
-          return `<div class="item" data-id="${esc(s.id)}"><div class="en">${esc(s.product_name)}${pill}</div>${n ? `<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><input type="text" dir="auto" class="say" value="${esc(n.spoken_name || '')}" placeholder="النطق (اختياري): الموبايل يقول الصنف كده" data-say><button data-ok>${n.status === 'approved' ? 'احفظ التعديل' : 'تمام'}</button>` : '<p class="hint">لسه ماتترجمش.</p>'}</div>`;
+          // the item's small photo beside the name (ar/item-media.js, owner 2026-11-21), looked up by the PharmaFly name
+          const enLine = `<div class="en">${esc(s.product_name)}${pill}</div>`;
+          return `<div class="item" data-id="${esc(s.id)}">${window.AskerItemMedia ? window.AskerItemMedia.rowByName(s.product_name, n?.arabic_name || s.product_name, enLine) : enLine}${n ? `<input type="text" dir="auto" value="${esc(n.arabic_name)}" data-ar><input type="text" dir="auto" class="say" value="${esc(n.spoken_name || '')}" placeholder="النطق (اختياري): الموبايل يقول الصنف كده" data-say><button data-ok>${n.status === 'approved' ? 'احفظ التعديل' : 'تمام'}</button>` : '<p class="hint">لسه ماتترجمش.</p>'}</div>`;
         })
         .join('') || '<p class="hint">مفيش.</p>';
     $('trMore').classList.toggle('hidden', list.length <= shown);
@@ -1071,7 +1081,7 @@
       ([...arrived]
         .map(
           ([id, ix]) =>
-            `<div class="item"><div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>${orderedFrom(id).length ? `<div><span class="pill good">اتطلب النهارده${esc(who(orderedFrom(id)))}</span> <button class="secondary small" data-unorder="${esc(id)}">لغي «اتطلب»</button></div>` : ''}${ix
+            `<div class="item">${window.AskerItemMedia ? window.AskerItemMedia.rowByName(sName(id), aName(id) || sName(id), `<div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>`) : `<div class="en">${esc(sName(id))}</div><div class="hint">${esc(aName(id))}</div>`}${orderedFrom(id).length ? `<div><span class="pill good">اتطلب النهارده${esc(who(orderedFrom(id)))}</span> <button class="secondary small" data-unorder="${esc(id)}">لغي «اتطلب»</button></div>` : ''}${ix
               .map((i) => {
                 const r = results[i];
                 return `<div class="hint">في الصورة: <span dir="auto">${esc(r.name)}</span> · ${conf[r.match.via === 'alias' ? 'near' : r.match.confidence] || ''} <button class="secondary" data-no="${i}:${esc(id)}">مش ده</button></div>${fixedLine(r)}`;

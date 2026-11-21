@@ -86,7 +86,9 @@
     if (d && d.kind === 'added') tail = `<div class="st-done ok"><span>✓ اتضاف لأمر الشرا (${esc(r.qty)})</span><button type="button" class="st-undo" data-st-undo="${esc(r.id)}">رجّعه</button></div>`;
     else if (d && d.kind === 'skipped') tail = `<div class="st-done skip"><span>مش دلوقتي: مش هيتطلب لوحده 7 أيام</span><button type="button" class="st-undo" data-st-undo="${esc(r.id)}">رجّعه للبيان</button></div>`;
     else tail = `<div class="st-btns"><button type="button" data-st-add="${esc(r.id)}"${busy ? ' disabled' : ''}>➕ ضيفه</button><button type="button" class="secondary" data-st-skip="${esc(r.id)}"${busy ? ' disabled' : ''}>مش دلوقتي</button></div>`;
-    return `<div class="st-item" data-st="${esc(r.id)}"><strong dir="ltr" class="notr">${esc(r.name)}</strong><div class="st-chips">${ch}</div>${tail}</div>`;
+    const inner = `<strong dir="ltr" class="notr">${esc(r.name)}</strong><div class="st-chips">${ch}</div>${tail}`;
+    // the item's small photo on the side (ar/item-media.js, owner 2026-11-21)
+    return `<div class="st-item" data-st="${esc(r.id)}">${root.AskerItemMedia ? root.AskerItemMedia.row(r.id, r.name, r.name, inner) : inner}</div>`;
   }
   function draw() {
     const box = $('stBox');

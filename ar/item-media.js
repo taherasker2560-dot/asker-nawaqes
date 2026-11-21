@@ -356,5 +356,17 @@
     // the active ingredient to show under an item's name in a list (his text, in the page's language); '' until the edits are read (onChange then redraws the list)
     active(id) { load(); return id == null ? '' : activeOf(id, edits, lang()); },
     onChange(f) { listeners.push(f); },
+    // ---- the other lists (owner 2026-11-21: «اي قايمة فيها اسم الصنف بتتعرض جوة السيستم يكون معروض فيها الصورة، ادوس عليها تفتح تعديل الاسم والصورة والمادة الفعالة») ----
+    // a list row with the item's small photo on its side; `inner` is the row's own html. No id (an item not in PharmaFly yet, or a name that matches no item) = the row as it was
+    row(id, en, title, inner) {
+      if (id == null || id === '') return inner;
+      return `<div class="im-lrow">${root.AskerItemMedia.thumb(id, en, title)}<div class="im-lmain">${inner}</div></div>`;
+    },
+    // the id of the item that has exactly this PharmaFly name (the system's items home.js read); null until they are read, or when no item has that name
+    idOf(name) { const H = root.AskerHome; return H && H.idOf && name ? H.idOf(name) : null; },
+    // rows that carry only the PharmaFly NAME (the shortages): the id is looked up by that name
+    rowByName(name, title, inner) { const id = root.AskerItemMedia.idOf(name); return root.AskerItemMedia.row(id, name, title || name, inner); },
+    // the system's items arrived (home.js): the lists that looked ids up by name draw again
+    refresh() { changed(); },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

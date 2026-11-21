@@ -68,7 +68,7 @@ run('statement in English: texts translate, item names stay',async({page})=>{
  const chips=await page.$$eval('#stList .st-item',r=>r.map(x=>[...x.querySelectorAll('.st-chip')].map(c=>c.textContent.trim()).join(' | ')));
  assert.equal(chips[0],'New: created 20 days ago | Stock 0 | Sold this month 3 | Suggested quantity 2');
  assert.equal(chips[1],'On request: the last 3 buys sold within two days | Stock 0.5 | Suggested quantity 1');
- assert.deepEqual(await page.$$eval('[data-st="101"] button',b=>b.map(x=>x.textContent.trim())),['➕ Add it','Not now']);
+ assert.deepEqual(await page.$$eval('[data-st="101"] .st-btns button',b=>b.map(x=>x.textContent.trim())),['➕ Add it','Not now']);
  await page.click('[data-st-add="101"]');await page.waitForSelector('[data-st="101"] .st-done.ok');
  assert.match(await text(page,'[data-st="101"] .st-done'),/✓ Added to the purchase order \(2\)/);
  await page.click('[data-st-skip="102"]');await page.waitForSelector('[data-st="102"] .st-done.skip');
