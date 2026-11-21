@@ -2307,8 +2307,6 @@ window.AskerEN = {
   "اكتب أي حاجة عايزني أعملها فيها…": "Write anything you want me to do about it…",
   "✅ وافق ودخّلها": "✅ Approve and enter",
   "اضغط الزرار أو Enter": "Press the button or Enter",
-  "رد على {0} ملاحظة الأول وبعدين الزرار يشتغل": "Answer {0} note first, then the button works",
-  "رد على {0} ملاحظات الأول وبعدين الزرار يشتغل": "Answer {0} notes first, then the button works",
   "موقوفة: هتتدخل لما توافق.": "On hold: it will be entered when you approve.",
   "استنى عليها": "Hold it",
   "وافقت، واللاب بيبدأ دلوقتي.": "Approved, the laptop starts now.",
@@ -2328,7 +2326,13 @@ window.AskerEN = {
   "الملاحظة ماتحفظتش: {0}": "The note was not saved: {0}",
   "فاتورة جاهزة مستنية موافقتك": "Invoice ready, waiting for your approval",
   "{0} فاتورة متجهزة مستنية موافقتك قبل ما تتدخل": "{0} prepared invoice(s) waiting for your approval before entry",
-  "فاتورة متجهزة مستنية موافقتك": "prepared invoices waiting for your approval"
+  "فاتورة متجهزة مستنية موافقتك": "prepared invoices waiting for your approval",
+  "اكتبه هنا": "Type it here",
+  "الخصم {0}% · التكلفة {1}": "Discount {0}% · cost {1}",
+  "سعر الجمهور لازم يكون {0} أو أكتر (سعر الورقة)": "The public price must be {0} or more (the paper's price)",
+  "كمّل {0} حاجة الأول وبعدين الزرار يشتغل": "Finish {0} item(s) first, then the button works",
+  "خد سعر الورقة ({0})": "Use the paper's price ({0})",
+  "هيتغيّر في الكارت: {0} ← {1}": "The card will change: {0} ← {1}"
  },
  "phrases": {
   "آخر خصم": "last discount",

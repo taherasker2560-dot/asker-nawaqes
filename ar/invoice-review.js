@@ -15,6 +15,25 @@
   const answersOf = (r) => (r && r.answers && typeof r.answers === 'object' ? r.answers : {});
   // the notes he has not answered yet
   const openNotes = (r) => notesOf(r).filter((n) => !answersOf(r)[n.id]);
+  // «سعر الجمهور» (owner 2026-11-21: the public prices of cosmetics are estimates and HIS call, never the paper's, never mine): a line with ask:'price' carries the unit net, the card's CURRENT price in
+  // PharmaFly («card») and the paper's printed price («pub», for information only). The box shows the card's price: he leaves it (nothing changes in PharmaFly and the discount is worked out from the card's
+  // price) or types another (saved as answers['L<line>'] = {v:'price', t:'<number>'}; only then the card follows). A line with no card price yet (a new item) waits for the price he gives.
+  const parseNum = (s) => { const t = String(s == null ? '' : s).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫,،]/g, '.').replace(/[^\d.]/g, ''); const n = parseFloat(t); return isFinite(n) ? n : NaN; };
+  const askLines = (r) => linesOf(r).filter((l) => l && l.ask === 'price');
+  // the price he typed for the line (none if he left it)
+  const priceOf = (r, l) => { const a = answersOf(r)['L' + l.n]; const n = a && a.v === 'price' ? Number(a.t) : NaN; return n > 0 ? n : null; };
+  // the price the line will be entered with: his, else the card's
+  // (a card price below the net or ten times above it is no price to enter with: it waits for his, like a new item)
+  const effPrice = (r, l) => { const p = priceOf(r, l); if (p) return p; const c = Number(l.card); return c > 0 && validPrice(c, l.net) ? c : null; };
+  // a price he changed from the card's: the card has to follow (nothing else in PharmaFly is touched)
+  const changedPrice = (r, l) => { const p = priceOf(r, l); return p && p !== Number(l.card) ? p : null; };
+  const openPrices = (r) => askLines(r).filter((l) => effPrice(r, l) == null);
+  // everything still waiting for his answer on a card: notes and prices nobody knows yet
+  const needs = (r) => openNotes(r).length + openPrices(r).length;
+  const validPrice = (price, net) => price > 0 && price >= Number(net) && price <= Number(net) * 10;
+  const discFor = (price, net) => Math.round((1 - Number(net) / Number(price)) * 1e6) / 1e4;
+  // the line's discount as it will be entered (for an asked line: from the price it will have)
+  function discOf(r, l) { if (l.ask === 'price') { const p = effPrice(r, l); return p ? discFor(p, l.net) : null; } return l.disc == null ? null : Number(l.disc); }
   // «082029» -> «08/2029» (the month then the whole year, as typed in PharmaFly)
   const expiryText = (x) => { const s = String(x == null ? '' : x); return /^\d{6}$/.test(s) ? s.slice(0, 2) + '/' + s.slice(2) : s; };
   const sumLines = (r) => Math.round(linesOf(r).reduce((s, l) => s + (Number(l.total) || 0), 0) * 100) / 100;
@@ -23,7 +42,7 @@
     const sum = sumLines(r), total = Number(r && r.total) || 0;
     return { ok: Math.abs(sum - total) <= 0.011, sum, total, diff: Math.round((sum - total) * 100) / 100 };
   }
-  const canApprove = (r) => !!r && WAITING.includes(r.status) && openNotes(r).length === 0;
+  const canApprove = (r) => !!r && WAITING.includes(r.status) && needs(r) === 0;
   // a line is flagged when one of the notes is about it
   const flagged = (r, l) => notesOf(r).some((n) => n.line != null && Number(n.line) === Number(l.n));
   // what he answered, in words
@@ -36,7 +55,7 @@
   }
   // the chip on a card: its words and its kind (good / warn / run / bad / quiet)
   function chip(r) {
-    const open = openNotes(r).length;
+    const open = needs(r);
     switch (r.status) {
       case 'ready': return open ? { t: 'N_NOTES', n: open, kind: 'warn' } : { t: 'جاهزة ✓', kind: 'good' };
       case 'held': return { t: 'موقوفة', kind: 'quiet' };
@@ -59,17 +78,17 @@
     };
   }
   // the ready ones with nothing to ask and a clean check: «وافق على الجاهز»
-  const cleanReady = (rows) => (rows || []).filter((r) => r.status === 'ready' && notesOf(r).length === 0 && check(r).ok);
+  const cleanReady = (rows) => (rows || []).filter((r) => r.status === 'ready' && notesOf(r).length === 0 && openPrices(r).length === 0 && check(r).ok);
   const summary = (rows) => ({
     waiting: (rows || []).filter((r) => WAITING.includes(r.status)).length,
-    withNotes: (rows || []).filter((r) => r.status === 'ready' && openNotes(r).length > 0).length,
+    withNotes: (rows || []).filter((r) => r.status === 'ready' && needs(r) > 0).length,
     clean: cleanReady(rows).length,
     laptop: (rows || []).filter((r) => LAPTOP.includes(r.status)).length,
   });
   // the number on the badge: the invoices waiting for his yes
   const need = (rows) => (rows || []).filter((r) => r.status === 'ready').length;
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours() % 12 || 12) + ':' + pad(d.getMinutes()) + (d.getHours() < 12 ? ' ص' : ' م'); };
-  const api = { STATUS, money, openNotes, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when };
+  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, openPrices, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when };
   root.AskerInvReviewLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -88,7 +107,7 @@
     el.className = 'status' + (kind ? ' ' + kind : '');
   }
   const panelOn = () => { const p = $('reviewPanel'); return !!p && !p.classList.contains('hidden'); };
-  const isOpen = (r) => (r.id in openState ? openState[r.id] : WAITING.includes(r.status) && openNotes(r).length > 0);
+  const isOpen = (r) => (r.id in openState ? openState[r.id] : WAITING.includes(r.status) && (needs(r) > 0 || askLines(r).length > 0));
 
   function chipHtml(r) {
     const c = chip(r);
@@ -96,14 +115,22 @@
     return `<span class="rv-chip rv-${c.kind}">${text}</span>`;
   }
   function lineRow(r, l) {
-    const flag = flagged(r, l);
-    const price = (Number(l.disc) ? `${esc(String(l.disc))}% · ` : '') + (l.exp ? esc(expiryText(l.exp)) : 'من غير صلاحية');
-    return `<tr${flag ? ' class="rv-flag"' : ''}><td class="rv-ln">${esc(l.n)}</td><td>${esc(l.paper)}<small class="notr" dir="ltr">${esc(l.name || '')}${l.id ? ' · ' + esc(l.id) : ''}</small></td>` +
+    const flag = flagged(r, l), ask = l.ask === 'price', d = discOf(r, l), locked = !WAITING.includes(r.status);
+    const price = (d ? `${esc(String(d))}% · ` : ask && d == null ? '؟ · ' : '') + (l.exp ? esc(expiryText(l.exp)) : 'من غير صلاحية');
+    const row = `<tr class="${flag ? 'rv-flag' : ''}${ask ? ' rv-asked' : ''}"><td class="rv-ln">${esc(l.n)}</td><td>${esc(l.paper)}<small class="notr" dir="ltr">${esc(l.name || '')}${l.id ? ' · ' + esc(l.id) : ' · جديد'}</small>` +
+      (l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : '') + '</td>' +
       `<td class="rv-num" dir="ltr">${esc(l.qty)} × ${price}<br><b>${esc(money(l.total))}</b></td></tr>`;
+    if (!ask) return row;
+    // the public price: the box shows the card's price in PharmaFly (he leaves it, or types another: only then the card follows); the paper's printed price is one tap away
+    const e = effPrice(r, l), ch = changedPrice(r, l), pub = Number(l.pub) > 0 ? Number(l.pub) : null;
+    return row + `<tr class="rv-askrow"><td></td><td colspan="2"><label class="rv-pl">سعر الجمهور <input type="text" inputmode="decimal" dir="ltr" maxlength="12" data-rv-price="${esc(r.id)}|${esc(l.n)}" value="${e ? esc(String(e)) : ''}" placeholder="اكتبه هنا"${locked ? ' disabled' : ''}></label>` +
+      (!locked && pub && pub !== e ? ` <button type="button" class="rv-link" data-rv-pub="${esc(r.id)}|${esc(l.n)}|${esc(pub)}">خد سعر الورقة (${esc(pub)})</button>` : '') +
+      (e ? ` <span class="rv-disc" dir="ltr">الخصم ${esc(String(discFor(e, l.net)))}% · التكلفة ${esc(money(l.net))}</span>` : '') +
+      (ch ? ` <span class="rv-chg" dir="ltr">هيتغيّر في الكارت: ${esc(l.card || 'جديد')} ← ${esc(ch)}</span>` : '') + '</td></tr>';
   }
   function linesHtml(r) {
-    const ls = linesOf(r), cap = 6, all = showAllLines[r.id] || ls.length <= cap + 1;
-    const show = all ? ls : ls.filter((l, i) => i < 3 || flagged(r, l));
+    const ls = linesOf(r), cap = 20, all = showAllLines[r.id] || ls.length <= cap + 1;
+    const show = all ? ls : ls.filter((l, i) => i < 3 || flagged(r, l) || l.ask === 'price');
     const hidden = ls.length - show.length;
     return `<table class="rv-lines">${show.map((l) => lineRow(r, l)).join('')}` +
       (hidden > 0 ? `<tr class="rv-more"><td colspan="3"><button type="button" class="rv-link" data-rv-all="${esc(r.id)}">… و${hidden} سطر تانيين مطابقين (دوس تشوفهم)</button></td></tr>` : '') + '</table>';
@@ -132,11 +159,11 @@
   }
   function footHtml(r) {
     if (WAITING.includes(r.status)) {
-      const open = openNotes(r).length, ok = canApprove(r);
+      const open = needs(r), ok = canApprove(r);
       return `<label class="rv-lbl" for="rvNote${esc(r.id)}">ملاحظتك على الفاتورة دي (اختياري)</label>` +
         `<textarea id="rvNote${esc(r.id)}" maxlength="1000" placeholder="اكتب أي حاجة عايزني أعملها فيها…" data-rv-own="${esc(r.id)}">${esc(r.owner_note || '')}</textarea>` +
         `<button type="button" class="rv-go" data-rv-approve="${esc(r.id)}"${ok ? '' : ' disabled'}>✅ وافق ودخّلها</button>` +
-        `<div class="hint rv-h">${ok ? 'اضغط الزرار أو Enter' : `رد على ${open} ${open === 1 ? 'ملاحظة' : 'ملاحظات'} الأول وبعدين الزرار يشتغل`}</div>` +
+        `<div class="hint rv-h">${ok ? 'اضغط الزرار أو Enter' : `كمّل ${open} حاجة الأول وبعدين الزرار يشتغل`}</div>` +
         (r.status === 'held' ? '<div class="hint rv-h">موقوفة: هتتدخل لما توافق.</div>' : `<button type="button" class="rv-link" data-rv-hold="${esc(r.id)}">استنى عليها</button>`);
     }
     if (r.status === 'approved') return `<div class="hint rv-h">وافقت، واللاب بيبدأ دلوقتي.</div><button type="button" class="rv-link" data-rv-back="${esc(r.id)}">رجّعها جاهزة (قبل ما اللاب يبدأ)</button>`;
@@ -215,6 +242,13 @@
       sig = signature(); draw();
     } catch (e) { say('الرد ماتحفظش: ' + (e.message || e), 'bad'); } finally { busy = false; }
   }
+  // the public price he typed (or took from the card) for an asked line: it cannot be below the paper's net (the discount would be negative)
+  function setPrice(rid, n, v) {
+    const r = find(rid), l = r && linesOf(r).find((x) => String(x.n) === String(n));
+    if (!l) return;
+    if (!validPrice(v, l.net)) { say(`سعر الجمهور لازم يكون ${money(l.net)} أو أكتر (سعر الورقة)`, 'bad'); draw(); return; } // the box goes back to the price in force
+    return answer(rid, 'L' + n, { v: 'price', t: String(v) });
+  }
   async function approve(ids) {
     if (busy) return;
     busy = true;
@@ -261,6 +295,7 @@
     if ((el = g('data-rv-allok'))) return approve(cleanReady(rows).map((r) => r.id));
     if ((el = g('data-rv-hold'))) return setStatus(el.dataset.rvHold, 'held', 'استنيت عليها: مش هتتدخل لحد ما توافق');
     if ((el = g('data-rv-back'))) return setStatus(el.dataset.rvBack, 'ready', 'رجعتها جاهزة');
+    if ((el = g('data-rv-pub'))) { const [r, n, v] = split(el.dataset.rvPub); return setPrice(r, n, Number(v)); }
     if ((el = g('data-rv-all'))) { showAllLines[el.dataset.rvAll] = true; return draw(); }
     if ((el = g('data-rv-shot'))) { const [r, i] = split(el.dataset.rvShot); return viewer(r, Number(i)); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
@@ -268,6 +303,7 @@
   function onChange(e) {
     const t = e.target;
     if (t.matches('[data-rv-alt]')) { const [r, n, k] = split(t.dataset.rvAlt); const row = find(r), note = row && notesOf(row).find((x) => x.id === n); const alt = note && (note.alts || []).find((x) => x.k === k); return answer(r, n, { v: 'alt', k, t: alt ? alt.t : '' }); }
+    if (t.matches('[data-rv-price]')) { const [r, n] = split(t.dataset.rvPrice); const v = parseNum(t.value); return v > 0 ? setPrice(r, n, v) : undefined; }
     if (t.matches('[data-rv-text]')) { const [r, n] = split(t.dataset.rvText); const v = t.value.trim().slice(0, 200); return v ? answer(r, n, { v: 'text', t: v }) : undefined; }
     if (t.matches('[data-rv-own]')) { const v = t.value.trim().slice(0, 1000); const r = find(t.dataset.rvOwn); if (r && (r.owner_note || '') !== v) patch(r.id, { owner_note: v || null }).then(() => say('ملاحظتك اتبعتت', 'good')).catch((er) => say('الملاحظة ماتحفظتش: ' + (er.message || er), 'bad')); }
   }
