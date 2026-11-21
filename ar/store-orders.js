@@ -17,6 +17,15 @@
     const intl = /^01\d{9}$/.test(d) ? '2' + d : d;
     return `https://wa.me/${intl}?text=${encodeURIComponent(text || '')}`;
   }
+  // the phone handset of the call button: one line drawing in the text color (the emoji is a red handset, which is not the system's one color)
+  const PHONE_ICON = '<svg class="cu-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>';
+  // «📞 اتصل» on an order (owner 2026-11-22): the number the customer typed (01xxxxxxxxx) opens the phone's dialer; '' when it is not a number
+  function telLink(phone) {
+    const d = String(phone == null ? '' : phone).replace(/\D/g, '');
+    if (/^20\d{10}$/.test(d)) return 'tel:+' + d;
+    if (/^0\d{7,14}$/.test(d)) return 'tel:' + d;
+    return /^[1-9]\d{7,14}$/.test(d) ? 'tel:+' + d : '';
+  }
   function confirmMessage(o) {
     // طلب روشتة بس: الأسعار بيكتبها صاحب الصيدلية بعد ما يقرا الروشتة
     if (!(o.items || []).length) {
@@ -41,7 +50,7 @@
       'نأكد الطلب؟',
     ].join('\n');
   }
-  const api = { STATUS, money, waLink, confirmMessage };
+  const api = { STATUS, money, waLink, telLink, confirmMessage };
   root.AskerStoreOrdersLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -83,6 +92,7 @@
       ${items ? `<ul class="so-lines">${items}</ul>
       <div class="so-total">الإجمالي ${esc(money(o.total))} ج${rx || later ? ' (' + [rx ? 'من غير الروشتة' : '', later ? `${later} صنف بالطلب لسه من غير سعر` : ''].filter(Boolean).join('، ') + ')' : ''}</div>` : ''}
       <div class="so-actions">
+        ${telLink(o.phone) ? `<a class="so-call" href="${esc(telLink(o.phone))}">${PHONE_ICON} <span>اتصل</span></a>` : ''}
         <a class="so-wa" href="${esc(waLink(o.phone, confirmMessage(o)))}" target="_blank" rel="noopener">واتساب</a>
         ${o.status === 'new' ? `<button type="button" class="small" data-set="confirmed">اتأكد</button>` : ''}
         ${o.status === 'confirmed' ? `<button type="button" class="small" data-set="done">اتسلّم</button>` : ''}

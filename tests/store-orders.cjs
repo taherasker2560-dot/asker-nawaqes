@@ -15,6 +15,10 @@ const link=O.waLink(o.phone,msg);
 assert.ok(link.startsWith('https://wa.me/201012345678?text='),'Egyptian number with 20');
 assert.equal(decodeURIComponent(link.split('?text=')[1]),msg);
 assert.equal(O.waLink('201012345678',''),'https://wa.me/201012345678?text=');
+// «📞 اتصل» on an order (owner 2026-11-22)
+assert.equal(O.telLink('01012345678'),'tel:01012345678');assert.equal(O.telLink('201012345678'),'tel:+201012345678');assert.equal(O.telLink(' 0101 234 5678'),'tel:01012345678');
+assert.equal(O.telLink('0225551234'),'tel:0225551234');assert.equal(O.telLink('966501234567'),'tel:+966501234567');
+for (const bad of ['', null, undefined, 'abc', '12', '0101']) assert.equal(O.telLink(bad),'','not a number: '+bad);
 assert.equal(O.money(1234.5),'1,234.5');
 // prescription-only order: the owner writes the medicines and prices himself
 const rxMsg=O.confirmMessage({id:13,customer_name:'منى',items:[],total:0,rx_paths:['rx/2026-11-09/a.jpg']});
