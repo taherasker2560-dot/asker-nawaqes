@@ -1,7 +1,7 @@
 // Spoken company names: «شركه» → «شركة», «(المندوب)» → «، المندوب»; only what is said changes.
 const assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
-const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
+const F=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts')).href);
 assert.equal(F.sayCompany('مخزن رضا عطيه (بكر)'),'مخزن رضا عطيه، بكر');
 assert.equal(F.sayCompany('شركه المتحدة (احمد)'),'شركة المتحدة، احمد');
 assert.equal(F.sayCompany('مخزن الفتح(شريف)'),'مخزن الفتح، شريف');
