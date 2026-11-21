@@ -1948,6 +1948,8 @@ html.night .ve-lines td.exp { color: var(--crimson-ink); }
 .im-lmain { flex: 1 1 0; min-width: 0; }
 .srow > .im-lrow { flex: 1 1 0; min-width: 0; }
 .im-lrow .py-pick { width: 100%; }
+.sd-row > .im-th { flex: 0 0 46px; width: 46px; height: 46px; margin-inline-end: 0; }   /* «اتقبلت قصيرة» and «↩️ مرتجعات»: the photo first, the row's own gap after it */
+.ct-item > .im-lrow, .ct-r > .im-lrow, .al-item > .im-lrow { margin-bottom: 2px; }
 /* «📷 صوّر المادة الفعالة» (owner 2026-11-21): the reading's state under the button: waiting (a small spinner), read (soft green: the fields below are filled, he checks them), could not read (soft red) */
 .im-read { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); font-size: 13.5px; }
 .im-read b { display: block; font-size: 14px; }

@@ -40,6 +40,10 @@ run('Short-dated: accepted and not returned, under 18 months, shortest first, a 
  assert.match(await page.textContent('#alExpiry .al-h'),/3/);
  // colours: under 6 months red, under 12 amber, the rest plain
  assert.deepEqual(await page.$$eval('#alExpiry .sd-row',r=>r.map(x=>x.classList.contains('red')?'red':x.classList.contains('amber')?'amber':'')),['red','amber','']);
+ // the item's small photo first in every row (owner 2026-11-21); a tap opens «تعديل الصنف» and marks nothing
+ assert.deepEqual(await page.$$eval('#alExpiry .sd-row > .im-th',b=>b.map(x=>x.dataset.im)),['103','101','104']);
+ await page.click('#alExpiry .sd-row > .im-th[data-im="103"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.equal(await page.$('#alExpiry [data-sd-qty]'),null,'the photo did not open the «إرجاع» box');
  // «النهارده»: only today's invoice
  await page.click('#alExpiry [data-sd-period="today"]');
  await page.waitForFunction(()=>document.querySelectorAll('#alExpiry .sd-row').length===2);

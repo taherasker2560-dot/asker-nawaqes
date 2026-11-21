@@ -18,6 +18,12 @@ run('Count: sections, correct or the difference per batch, a wrong section, rand
  // inside a section: the batches as PharmaFly holds them
  await page.click('#ctSecList [data-ct-open="3"]');
  assert.match(await text(page,'#ctItems [data-ct="63476"]'),/صلاحية 07\/2029 · الجهاز: 2[\s\S]*صلاحية 08\/2029 · الجهاز: 9/);
+ // the item's small photo on the head of the card (owner 2026-11-21); the lines and the buttons stay below it
+ assert.equal(await page.$eval('#ctItems [data-ct="63476"] > .im-lrow > .im-th',b=>b.dataset.im),'63476');
+ assert.ok(await page.$('#ctItems [data-ct="63476"] > [data-ct-where], #ctItems [data-ct="63476"] .ct-where'));
+ // a tap on the photo opens «تعديل الصنف» and does nothing to the count
+ await page.click('#ctItems [data-ct="63476"] .im-th');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.equal(await page.evaluate(()=>window.__tables.ar_count_entries.length),0,'looking at the photo counts nothing');
  // the section box is on every card of the section list too (owner 2026-11-13), set to the item's own section
  assert.equal(await page.$eval('#ctItems [data-ct="63476"] [data-ct-move]',e=>e.options[e.selectedIndex].textContent),'أقراص وكبسول');
  // the dates are mixed up: one box less of 07/2029, one more of 08/2029
@@ -66,6 +72,7 @@ run('Count: sections, correct or the difference per batch, a wrong section, rand
  assert.match(await text(page,'#ctResSum'),/3 صنف فيهم فرق/);
  const one=await text(page,`#ctResRows [data-ct-entry="${e1.id}"]`);
  assert.match(one,/ناقص علبة من صلاحية 07\/2029[\s\S]*زايد علبة في صلاحية 08\/2029[\s\S]*التاريخ متلخبط/);
+ assert.equal(await page.$eval(`#ctResRows [data-ct-entry="${e1.id}"] > .im-lrow > .im-th`,b=>b.dataset.im),'63476','the result rows have the item\'s photo too');
  assert.match(await text(page,`#ctResRows [data-ct-entry="${e3.id}"]`),/القسم اتغير من كريمات لـ أقراص وكبسول/);
  await page.click(`#ctResRows [data-ct-entry="${e1.id}"] [data-ct-applied]`);
  assert.equal((await table('ar_count_entries')).find(e=>e.id===e1.id).status,'applied');

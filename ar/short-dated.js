@@ -193,7 +193,9 @@
   function row(q) {
     const it = items.get(String(q.item)) || {}, v = vendors.get(String(q.vendor_id));
     const cls = q.months < 6 ? ' red' : q.months < 12 ? ' amber' : '';
-    return `<div class="sd-row${cls}"><div class="sd-main"><span class="sd-name notr" dir="auto">${esc(it.arabic_name || it.name || '#' + q.item)}</span>` +
+    // the small photo first (owner 2026-11-21): a tap opens «تعديل الصنف»; the expiry stays on the other end
+    const photo = root.AskerItemMedia ? root.AskerItemMedia.thumb(q.item, it.name || '', it.arabic_name || it.name || '') : '';
+    return `<div class="sd-row${cls}">${photo}<div class="sd-main"><span class="sd-name notr" dir="auto">${esc(it.arabic_name || it.name || '#' + q.item)}</span>` +
       (it.arabic_name && it.name ? `<small class="notr" dir="ltr">${esc(it.name)}</small>` : '') +
       // what he needs to send it back: the supplier, the supplier's invoice number and the day the item was entered (with the year)
       `<small class="sd-doc">${v ? `<bdi class="notr">${esc(v.short || v.name)}</bdi> · ` : ''}${q.code ? `<span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invoiceNo(q.code))}</bdi> · ` : ''}<span>اتدخلت</span> <bdi class="notr" dir="ltr">${esc(fullDayText(q.at))}</bdi></small>${retBlock(q)}</div>` +
