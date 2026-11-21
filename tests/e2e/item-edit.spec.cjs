@@ -16,7 +16,7 @@ const seed=(page)=>page.evaluate(()=>{
 const first=(page)=>page.$eval('#hsItems .hs-item',e=>({name:e.querySelector('strong').textContent.trim(),act:(e.querySelector('.hs-act')||{}).textContent||''}));
 run('item sheet: name + photo + active ingredient + description in one place, one «احفظ», only what changed is written',async({page})=>{
  await seed(page);await page.reload();await ready(page);
- await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_staff_can:()=>true});}); // the sheet is for the owner / «storeorders» staff
+ await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_is_staff:()=>true});}); // the sheet is for the owner and any active staff member (2026-11-21)
  // the search card: the active ingredient he wrote shows under the name; an item with none shows nothing
  await page.fill('#hsQ','كتافلام');
  await page.waitForFunction(()=>/💊 ديكلوفيناك بوتاسيوم ٥٠ مجم/.test(document.getElementById('hsItems').textContent),null,{timeout:15000});
@@ -68,4 +68,22 @@ run('item sheet: the English page shows the English active ingredient (and the o
  await page.waitForFunction(()=>/💊 Diclofenac potassium 50 mg/.test(document.getElementById('hsItems').textContent),null,{timeout:15000});
  await page.click('#hsItems .hs-item .im-th');await page.waitForSelector('#imSheet:not([hidden]) .im-act');
  assert.match(await page.textContent('#imBody .im-act'),/Active ingredient: Diclofenac potassium 50 mg/);
+},{home:true});
+
+run('item sheet: who may edit: a signed-in person who is NOT staff and not the owner sees the item but no «تعديل الصنف»; an active staff member sees it',async({page})=>{
+ // not staff: the sheet shows the item (photo, ingredient, description) and nothing to edit
+ await seed(page);await page.reload();await ready(page);
+ await page.fill('#hsQ','كتافلام');await page.waitForFunction(()=>/كتافلام/.test(document.getElementById('hsItems').textContent));
+ await page.click('#hsItems .hs-item .im-th');await page.waitForSelector('#imSheet:not([hidden]) .im-title');
+ assert.match(await page.textContent('#imBody .im-act'),/ديكلوفيناك/,'the ingredient is shown to anyone');
+ assert.equal(await page.$('#imEditBtn'),null,'no edit for someone who is not staff');
+ // any ACTIVE staff member (no «الموقع» needed): the edit button, and the same one «احفظ» works for him
+ await seed(page);await page.reload();await ready(page);
+ await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_is_staff:()=>true,ar_staff_can:()=>false});});
+ await page.fill('#hsQ','كتافلام');await page.waitForFunction(()=>/كتافلام/.test(document.getElementById('hsItems').textContent));
+ await page.click('#hsItems .hs-item .im-th');await page.waitForSelector('#imSheet:not([hidden]) #imEditBtn');
+ await page.click('#imEditBtn');await page.waitForSelector('#imActAr');
+ await page.fill('#imActAr','ديكلوفيناك صوديوم ٥٠ مجم');await page.click('#imSaveAll');
+ await page.waitForFunction(()=>/اتحفظ/.test(document.getElementById('imNote').textContent));
+ assert.equal((await page.evaluate(()=>window.__tables.ar_store_edits)).find(r=>r.item_id===101).active_ar,'ديكلوفيناك صوديوم ٥٠ مجم');
 },{home:true});

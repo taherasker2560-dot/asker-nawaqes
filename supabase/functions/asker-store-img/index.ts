@@ -3,7 +3,7 @@
 // depends on another website.
 //   POST {id, url}   one of the photos the night search found (a normal download, no tricks) -> {img}
 //   POST {id, data}  a photo from his phone, already made small by the page (base64 JPEG)     -> {img}
-// Only the owner or a staff member with «storeorders» (public.ar_staff_can). Writes public.ar_store_edits.img.
+// Only the owner or an active staff member (public.ar_is_staff; was «storeorders» only until 2026-11-21). Writes public.ar_store_edits.img.
 // Secrets used: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the caller is checked here).
 
@@ -57,15 +57,15 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   const base = env.SUPABASE_URL.replace(/\/$/, ''), sh = serviceHeaders(service);
   const call = (path: string, init: RequestInit = {}) => fetchImpl(base + path, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
 
-  // who is asking: the owner, or a staff member with «storeorders»
+  // who is asking: the owner, or any active staff member (owner 2026-11-21: «افتح لهم عادي»; was «storeorders» only)
   const auth = req.headers.get('authorization') || '';
   if (!/^Bearer \S+$/.test(auth)) return reply(401, { error: 'auth', message: 'ادخل السيستم الأول.' }, headers);
   const me = await call('/auth/v1/user', { headers: { Authorization: auth, apikey: anon } });
   const user = me.ok ? await me.json().catch(() => null) as { id?: string } | null : null;
   if (!user?.id) return reply(401, { error: 'auth', message: 'ادخل السيستم الأول.' }, headers);
   if (user.id !== (env.OWNER_ID || OWNER_ID)) {
-    const c = await call('/rest/v1/rpc/ar_staff_can', { method: 'POST', headers: { Authorization: auth, apikey: anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ ps: ['storeorders'] }) });
-    if (!c.ok || (await c.json().catch(() => false)) !== true) return reply(403, { error: 'forbidden', message: 'التعديل ده لصاحب الصيدلية بس.' }, headers);
+    const c = await call('/rest/v1/rpc/ar_is_staff', { method: 'POST', headers: { Authorization: auth, apikey: anon, 'Content-Type': 'application/json' }, body: '{}' });
+    if (!c.ok || (await c.json().catch(() => false)) !== true) return reply(403, { error: 'forbidden', message: 'التعديل ده لصاحب الصيدلية وفريقه بس.' }, headers);
   }
 
   let body: { id?: unknown; url?: unknown; data?: unknown };

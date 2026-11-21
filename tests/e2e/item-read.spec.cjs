@@ -22,7 +22,7 @@ const laptop=(page,patch)=>page.evaluate(p=>{Object.assign(window.__tables.ar_it
 const text=(page,sel)=>page.textContent(sel).then(t=>t.replace(/\s+/g,' ').trim());
 run('active ingredient by photo: asked, read, the two fields filled, he checks and saves once; the request is marked applied',async({page})=>{
  await seed(page);await page.reload();await ready(page);
- await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_staff_can:()=>true});window.__imPollMs=50;});
+ await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_is_staff:()=>true});window.__imPollMs=50;});
  await openPanel(page);
  assert.equal(await page.$eval('#imActFile',e=>e.accept+'|'+e.getAttribute('capture')),'image/*|environment','the phone\'s camera opens');
  await ask(page);
@@ -50,7 +50,7 @@ run('active ingredient by photo: asked, read, the two fields filled, he checks a
 },{home:true});
 run('active ingredient by photo: not printed / could not read / failed say so and fill nothing; a slow laptop is told; a closed sheet finds the answer when it is opened again',async({page})=>{
  await seed(page);await page.reload();await ready(page);
- await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_staff_can:()=>true});window.__imPollMs=50;window.__imLateMs=400;});
+ await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_is_staff:()=>true});window.__imPollMs=50;window.__imLateMs=400;});
  await openPanel(page);await ask(page);
  // the laptop is slow: after a while the sheet says it may be off, and keeps waiting
  await page.waitForFunction(()=>/اللاب يمكن مش شغال دلوقتي/.test(document.getElementById('imRead').textContent),null,{timeout:10000});

@@ -194,8 +194,8 @@ run('alerts: home card, red numbers, «الصلاحيات», customers, sounds',
  await page.evaluate(()=>window.AskerNotify.tick());
  assert.equal(await page.$eval('[data-group="sales"]',b=>b.dataset.badge),'2');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-notify-seen')).store),2);
- // nothing else was written to the server (only his moves between bags; the item sheet only asks whether he may edit: ar_staff_can)
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items|ar_item_dups|ar_staff_can/.test(JSON.stringify(w)))),[]);
+ // nothing else was written to the server (only his moves between bags; the item sheet only asks whether he may edit: ar_is_staff)
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>!/ar_sync_log|ar_bag_moves|ar_po_items|ar_item_dups|ar_is_staff/.test(JSON.stringify(w)))),[]);
 },{home:true});
 run('alerts: no file yet',async({page})=>{
  await page.click('[data-group="purchases"]');await page.click('[data-pgroup="stock"]');await page.click('[data-tab="expiry"]');

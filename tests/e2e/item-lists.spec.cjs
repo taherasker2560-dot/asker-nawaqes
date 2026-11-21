@@ -36,6 +36,6 @@ run('shortages: the item\'s photo by the PharmaFly name (the live card of two wi
  assert.match(await page.textContent('#imBody .im-title'),/بروفين ٤٠٠ مجم|BRUFEN 400MG 30TAB/);
  await page.click('#imSheet .im-x');
  // nothing was written by looking at the list
- assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc!=='ar_staff_can')),[],'no writes (the sheet only asks whether he may edit)');
+ assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc!=='ar_is_staff')),[],'no writes (the sheet only asks whether he may edit)');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen');
 });
