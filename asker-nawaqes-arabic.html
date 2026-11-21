@@ -21,7 +21,7 @@
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
     <link rel="stylesheet" href="ar/brand.css?v=nobless-20261117a" />
     <link rel="stylesheet" href="ar/bars.css?v=bars-20261121a" />
-    <link rel="stylesheet" href="ar/airy.css?v=bars-20261121d" />
+    <link rel="stylesheet" href="ar/airy.css?v=bars-20261121f" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
     <script src="ar/i18n-en.js?v=bars-20261121e"></script>
@@ -41,8 +41,6 @@
       <button id="logoutBtn" class="icon-btn hidden" aria-label="خروج" title="خروج">
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M15 8l4 4-4 4M19 12H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <!-- the five spare buttons (owner 2026-11-21, owner only; ar/shortcuts.js): an empty slot is a dashed «+», a full one opens its section -->
-      <nav id="spareBar" class="spare-bar" aria-label="خانات احتياطي"></nav>
     </header>
     <button id="dataAge" type="button" class="dataage hidden" aria-expanded="false" aria-controls="dataAgeMore">
       <span class="row"><span class="dot" aria-hidden="true"></span><span id="dataAgeText"></span><small id="dataAgeAgo"></small></span>
@@ -187,6 +185,8 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13a8 8 0 0 1 16 0v4a2 2 0 0 1-2 2h-2v-6h4M4 13v4a2 2 0 0 0 2 2h2v-6H4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
             <span>خدمة العملاء</span></button>
         </nav>
+    <!-- the five spare buttons (owner 2026-11-21, owner only; ar/shortcuts.js): the very bottom, under the bottom bar; an empty slot is a dashed «+», a full one opens its section -->
+    <nav id="spareBar" class="spare-bar" aria-label="خانات احتياطي"></nav>
         <!-- the small tabs of each section. «المشتريات» has three groups (owner 2026-11-12): نواقص (النواقص، الوارد، الترجمة)،
              طلبيات (الطلبيات، الفواتير، قوايم المخازن)، مخزون (المخزون، جرد المخزون); each group remembers its small tab -->
         <div class="subbar" data-for="purchases" hidden>
@@ -1050,7 +1050,7 @@
     <script src="ar/home.js?v=edit-20261121a"></script>
     <script src="ar/look.js?v=bars-20261121a"></script>
     <script src="ar/shortcuts.js?v=bars-20261121a"></script>
-    <script src="ar/barhide.js?v=bars-20261121d" defer></script>
+    <script src="ar/barhide.js?v=bars-20261121f" defer></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=po-20261117a"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>

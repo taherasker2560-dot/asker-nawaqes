@@ -1,6 +1,6 @@
 /* The bars of the system slide away when you scroll DOWN a list and come back when you scroll UP a little, when you are at the top of a page, and when you tap a section or a button of the bars
    (owner 2026-11-21: «متتطبقه عالصفين ده يدي مساحة أكبر», then «عاوز مفتاح للهيدر ومفتاح لكل بوتوم»): THREE switches in ⚙️ الإعدادات, one for each bar:
-   the header (on by default), the row of the five spare buttons (on by default) and the bottom bar (off by default: it stays where it is until he asks).
+   the header (on by default), the row of the five spare buttons under the bottom bar (on by default) and the bottom bar itself (off by default: it stays where it is until he asks).
    This file only keeps the choices and puts the classes on <html>: «bars-away» (any bar is away), «hd-away», «sp-away», «bt-away»; ar/airy.css does the sliding and puts the sticky tabs of a section
    up to what is still showing (--sticky-top). */
 (function (root) {
@@ -20,10 +20,8 @@
     } catch (e) { /* private window */ }
     return d;
   }
-  function measure() { const h = document.querySelector('.appbar'); if (h) html.style.setProperty('--appbar-h', h.offsetHeight + 'px'); }
   function apply() {
     const hd = away && opt('head'), sp = away && opt('spare'), bt = away && opt('bottom');
-    if (hd || sp) measure();
     html.classList.toggle('hd-away', hd);
     html.classList.toggle('sp-away', sp);
     html.classList.toggle('bt-away', bt);
@@ -40,7 +38,7 @@
   }
   root.addEventListener('scroll', () => { if (!raf) raf = root.requestAnimationFrame(onScroll); }, { passive: true });
   // a tap on a section or on a button of the bars brings them back; so does focusing something in the header
-  document.addEventListener('click', (e) => { if (away && e.target.closest && e.target.closest('.bottomnav, [data-go], .appbar')) set(false); }, true);
+  document.addEventListener('click', (e) => { if (away && e.target.closest && e.target.closest('.bottomnav, #spareBar, [data-go], .appbar')) set(false); }, true);
   document.addEventListener('focusin', (e) => { if (away && e.target.closest && e.target.closest('.appbar')) set(false); });
   function bindSwitches() {
     Object.keys(OPT).forEach((n) => {

@@ -1,6 +1,6 @@
-// The bars (owner 2026-11-21, the look session: «الهيدر ونافيجيشن بار بلون التطبيق الأساسي»، «البوتوم بنفس لون الأزرار الفاتح ماعدا الرئيسية في النص أزرق ومدوّر»، «٥ أزرار احتياطيين تحت الهيدر»،
+// The bars (owner 2026-11-21, the look session: «الهيدر ونافيجيشن بار بلون التطبيق الأساسي»، «البوتوم بنفس لون الأزرار الفاتح ماعدا الرئيسية في النص أزرق ومدوّر»، «٥ أزرار احتياطيين»، «كفاية العشرة… ممكن نخليهم كلهم تحت»،
 // «الموجتين يمشوا مع بعض»، «Agza في آخر الصفحة»): the header is the system color with the wave closing its bottom edge, the bottom bar is the light tint with the same wave rising on its
-// top edge, «الرئيسية» is a ROUND button in the middle, the owner has five spare buttons under the header (each empty or holding a section, kept on the phone; staff and customers have none), and
+// top edge, «الرئيسية» is a ROUND button in the middle, the owner has five spare buttons at the very bottom, under the bottom bar (each empty or holding a section, kept on the phone; staff and customers have none), and
 // «Agza» + a thin circle with tm sits at the END of every page. The same bars in the customers' site. Colors are read through a canvas.
 const {run,assert}=require('./harness.cjs');
 const ready=(page)=>page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
@@ -24,9 +24,12 @@ run('bars: the system\'s header is the color with the wave, the bar is the tint 
  assert.equal(s.txt,'Agzatm','«Agza» alone, then tm');assert.ok(s.font<=12,'small: '+s.font);assert.match(s.ff,/Cormorant|Georgia|serif/);assert.equal(s.r,'50%');assert.ok(s.bw>0&&s.bw<=1,'a thin outline');assert.equal(s.bg,'rgba(0, 0, 0, 0)','empty center');assert.match(s.va,/px|super/,'above the letter\'s level: '+s.va);
 },{home:true});
 
-run('bars: five spare buttons under the owner\'s header: empty slots, picked from the sections, a tap opens, a long press changes, kept on the phone',async({page})=>{
+run('bars: five spare buttons at the very bottom, under the bottom bar: empty slots, picked from the sections, a tap opens, a long press changes, kept on the phone',async({page})=>{
  await ready(page);
  assert.equal(await page.$$eval('#spareBar .sp-slot',n=>n.length),5,'five slots');
+ // the row is the very bottom of the screen, the bottom bar sits right above it, and the header has no spare row any more
+ const g=await page.evaluate(()=>{const r=(s)=>document.querySelector(s).getBoundingClientRect(),sp=r('#spareBar'),nav=r('.bottomnav'),hd=r('.appbar');return {spBottom:sp.bottom,spH:sp.height,navBottom:nav.bottom,spTop:sp.top,vh:window.innerHeight,inHead:!!document.querySelector('.appbar #spareBar'),hdH:hd.height}});
+ assert.ok(Math.abs(g.spBottom-g.vh)<=1,'the spare row is the last thing at the bottom: '+g.spBottom+' of '+g.vh);assert.equal(Math.round(g.spH),56,'the row is 56px high');assert.ok(Math.abs(g.navBottom-g.spTop)<=1,'the bottom bar sits right on top of the row: '+g.navBottom+' vs '+g.spTop);assert.equal(g.inHead,false,'not in the header any more');assert.ok(g.hdH<130,'the header is slim again: '+g.hdH);
  assert.equal(await page.$$eval('#spareBar .sp-slot.on',n=>n.length),0,'all empty at first');
  // an empty slot opens the picker; picking «الفواتير» fills it
  await page.click('#spareBar .sp-slot >> nth=2');assert.ok(await page.isVisible('#spSheet .qa-sheet-in'),'the picker opens');
@@ -62,13 +65,13 @@ run('bars: the customers\' site has the same bars: the header with the wave, the
  assert.equal(await page.$$eval('#spareBar',n=>n.length),0,'the spare buttons are for the system only');
 },{home:true});
 
-run('bars: the two rows at the top slide away when you scroll down and come back when you scroll up a little, at the top and when you tap the bar',async({page})=>{
+run('bars: the header and the spare row slide away when you scroll down and come back when you scroll up a little, at the top and when you tap the bar',async({page})=>{
  await ready(page);
  await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px'});
  const state=()=>page.evaluate(()=>({away:document.documentElement.classList.contains('bars-away'),tf:getComputedStyle(document.querySelector('.appbar')).transform,st:getComputedStyle(document.documentElement).getPropertyValue('--sticky-top').trim()}));
- let s=await state();assert.equal(s.away,false,'the rows are there at the top');assert.equal(s.tf,'none');
+ let s=await state();assert.equal(s.away,false,'the bars are there at the top');assert.equal(s.tf,'none');
  await page.evaluate(()=>window.scrollTo(0,700));await page.waitForTimeout(450);
- s=await state();assert.equal(s.away,true,'scrolling down hides the two rows');assert.match(s.tf,/^matrix\(1, 0, 0, 1, 0, -\d+/,'they slid up: '+s.tf);assert.equal(s.st,'0px','the sticky tabs go up under the screen\'s edge');
+ s=await state();assert.equal(s.away,true,'scrolling down hides the header and the spare row');assert.match(s.tf,/^matrix\(1, 0, 0, 1, 0, -\d+/,'the header slid up: '+s.tf);assert.equal(s.st,'0px','the sticky tabs go up under the screen\'s edge');
  await page.evaluate(()=>window.scrollTo(0,650));await page.waitForTimeout(450);
  s=await state();assert.equal(s.away,false,'scrolling up a little brings them back');assert.equal(s.tf,'none');
  await page.evaluate(()=>window.scrollTo(0,1400));await page.waitForTimeout(450);assert.equal((await state()).away,true);
@@ -88,17 +91,17 @@ run('bars: three switches in the settings (the header, the five spare buttons, t
  assert.deepEqual(await page.evaluate(()=>['hideHead','hideSpare','hideBottom'].map(i=>document.getElementById(i).checked)),[true,true,false],'the header and the spare row hide by default, the bottom bar stays');
  const H=await page.evaluate(()=>document.querySelector('.appbar').offsetHeight);
  await page.evaluate(()=>window.scrollTo(0,800));await page.waitForTimeout(450);
- assert.deepEqual(await cls(),['hd-away','sp-away'],'by default the header and the spare row go');assert.equal(await ty('.bottomnav'),0,'the bottom bar stays');
- // the bottom bar's own switch: it goes down and out at once
+ assert.deepEqual(await cls(),['hd-away','sp-away'],'by default the header and the spare row go');assert.ok((await ty('.appbar'))<0,'the header slid up');assert.ok((await ty('#spareBar'))>0,'the spare row slid down');assert.equal(Math.round(await ty('.bottomnav')),56,'the bottom bar stays on screen, down on the row\'s place');assert.equal(await st(),'0px','the sticky tabs go up to the screen\'s edge');
+ // the bottom bar's own switch: it goes down and out too (behind the row's place)
  await sw('hideBottom',true);await page.waitForTimeout(350);
- assert.deepEqual(await cls(),['hd-away','sp-away','bt-away']);assert.ok((await ty('.bottomnav'))>60,'the bottom bar slid down');
- await sw('hideBottom',false);await page.waitForTimeout(350);assert.equal(await ty('.bottomnav'),0,'and comes back when its switch is off');
- // the header off, the spare row on: only the spare row slides (up by its own height)
+ assert.deepEqual(await cls(),['hd-away','sp-away','bt-away']);assert.ok((await ty('.bottomnav'))>100,'the bottom bar slid all the way down: '+await ty('.bottomnav'));
+ await sw('hideBottom',false);await page.waitForTimeout(350);assert.equal(Math.round(await ty('.bottomnav')),56,'and comes back when its switch is off');
+ // the header off, the spare row on: the row slides down, the bar takes its place, the header stays
  await sw('hideHead',false);await page.waitForTimeout(350);
- assert.deepEqual(await cls(),['sp-away']);assert.equal(Math.round(await ty('.appbar')),0,'the header stays where it is');assert.match(await page.evaluate(()=>getComputedStyle(document.querySelector('.appbar')).clipPath),/inset\(0px 0px 56px/,'the spare row\'s strip is cut off at the bottom');assert.equal(await st(),'calc('+H+'px - 56px)','the sticky tabs sit under the header only (the header\'s height minus the spare row\'s)');
- // the header on, the spare row off: the header slides up and the spare row stays at the top
+ assert.deepEqual(await cls(),['sp-away']);assert.equal(Math.round(await ty('.appbar')),0,'the header stays where it is');assert.equal(await st(),H+'px','the sticky tabs sit under the header');assert.equal(Math.round(await ty('.bottomnav')),56,'the bar takes the row\'s place');
+ // the header on, the spare row off: the header slides up, the spare row stays at the bottom with the bar above it
  await sw('hideHead',true);await sw('hideSpare',false);await page.waitForTimeout(350);
- assert.deepEqual(await cls(),['hd-away']);assert.equal(Math.round(await ty('.appbar')),-(H-56),'the header slides out, the spare row stays');assert.equal(await st(),'56px','the sticky tabs sit under the spare row');
+ assert.deepEqual(await cls(),['hd-away']);assert.ok(Math.round(await ty('.appbar'))<=-H+1,'the header slides out');assert.equal(Math.round(await ty('.bottomnav')),0,'the bar stays above the spare row');assert.equal(Math.round(await ty('#spareBar')),0,'the spare row stays');assert.equal(await st(),'0px','the sticky tabs go up to the screen\'s edge');
  // everything off: nothing hides
  await sw('hideHead',false);await page.waitForTimeout(350);
  assert.deepEqual(await cls(),[]);assert.equal(await ty('.appbar'),0);

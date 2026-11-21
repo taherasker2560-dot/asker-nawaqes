@@ -8,22 +8,13 @@
 html:not(.night) { --soft-bg: #f4f7fa; --line: #e1e8ee; --muted: #55606b; --ink: #1c2229; --tint-2: #f1f6f9 !important; }
 
 
-/* 1) the header: the system color again (owner 2026-11-21: «الهيدر ونافيجيشن بار بلون التطبيق الأساسي»), the wave closing its bottom edge (the same curve rises on the bottom bar: they move
-      together), and under the wave, for the OWNER only, the five spare buttons on the light tint of the bar (the staff's header has no row, and none before the sign-in). The phone's own
-      strips (the status bar on top, the three Android buttons at the bottom) take the same color from theme-color. */
-:root { --spare-h: 56px; }
-html.staff { --spare-h: 0px; }
-html body .appbar { --wave-fill: var(--bar-bg); padding-bottom: calc(var(--spare-h) + 24px); background-color: var(--crimson); background-image: linear-gradient(to bottom, transparent 0, transparent calc(100% - var(--spare-h)), var(--bar-bg) calc(100% - var(--spare-h))); color: #fff; border-bottom: 0; box-shadow: none; }
-html body .appbar:has(#logoutBtn.hidden) { --spare-h: 0px; --wave-fill: var(--card); }
-html.staff body .appbar { --wave-fill: var(--card); }
-html body .appbar::after { content: ''; display: block !important; position: absolute; left: 0; right: 0; top: auto; bottom: calc(var(--spare-h) - 1px); width: auto; height: 22px; margin: 0; transform: none; border-radius: 0; opacity: 1; filter: none; z-index: 0; background: var(--wave-fill); -webkit-mask: var(--wave-mask) center bottom / 412px 100% repeat-x; mask: var(--wave-mask) center bottom / 412px 100% repeat-x; animation: none; pointer-events: none; }
-#spareBar { position: absolute; left: 0; right: 0; bottom: 0; height: var(--spare-h); box-sizing: border-box; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 8px 10px; border-bottom: 1px solid var(--rose-line); }
-html.staff #spareBar, html body .appbar:has(#logoutBtn.hidden) #spareBar { display: none; }
-#spareBar .sp-slot { min-width: 0; min-height: 0; height: 40px; margin: 0; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 1.5px dashed color-mix(in srgb, var(--crimson) 50%, var(--card)); border-radius: 12px; background: color-mix(in srgb, var(--card) 60%, transparent); color: var(--crimson); box-shadow: none; font-size: 10.5px; font-weight: 700; line-height: 1.15; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-#spareBar .sp-slot svg { width: 18px; height: 18px; stroke-width: 2.2; }
-#spareBar .sp-slot.on { border: 1px solid var(--t-line, var(--rose-line)); background: var(--card); color: var(--ink); }
-#spareBar .sp-slot.on span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#spareBar .sp-slot:active { filter: brightness(0.95); }
+/* 1) the header: the system color (owner 2026-11-21: «الهيدر ونافيجيشن بار بلون التطبيق الأساسي»), slim again, with the wave closing its bottom edge (the same curve rises on the bottom bar: they move
+      together). The five spare buttons are NOT up here any more (his words: «كفاية العشرة، خمسة فوق وخمسة تحت، ممكن نخليهم كلهم تحت»): they are the row under the bottom bar (section 3).
+      The phone's own strips (the status bar on top, the three Android buttons at the bottom) take the same color from theme-color. */
+:root { --spare-h: 0px; }
+html:not(.staff):has(#logoutBtn:not(.hidden)) { --spare-h: 56px; }
+html body .appbar { --wave-fill: var(--card); padding-bottom: 24px; background-color: var(--crimson); color: #fff; border-bottom: 0; box-shadow: none; }
+html body .appbar::after { content: ''; display: block !important; position: absolute; left: 0; right: 0; top: auto; bottom: -1px; width: auto; height: 22px; margin: 0; transform: none; border-radius: 0; opacity: 1; filter: none; z-index: 0; background: var(--wave-fill); -webkit-mask: var(--wave-mask) center bottom / 412px 100% repeat-x; mask: var(--wave-mask) center bottom / 412px 100% repeat-x; animation: none; pointer-events: none; }
 .sp-sheet-row { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-bottom: 1px solid var(--line); }
 .sp-sheet-row .qa-l { flex: 1; min-width: 0; font-weight: 600; }
 .sp-sheet-row .qa-add.on { background: var(--rose); border: 1.5px solid var(--crimson); color: var(--crimson-ink); }
@@ -103,16 +94,31 @@ html body .pgroups button { min-height: 40px; background: var(--card); border: 1
 html body .pgroups button.on { background: var(--rose); border-color: var(--crimson); color: var(--crimson-ink); font-weight: 700; box-shadow: none; }
 html body #niAdd, html body .dc-pick, html body .py-new, html body .ct-scan, html body .ts-save, html body button.cu-send { background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); box-shadow: none; font-weight: 800; }
 
+/* 3b) the row of the five spare buttons: the very bottom of the screen, under the bottom bar (the owner only, once signed in; the staff and the sign-in screen have none). An empty slot is a
+       dashed «+», a full one holds a section. Everything that sat above the bottom bar moves up by the row's height (--spare-h). */
+#spareBar { display: none; }
+html:not(.staff):has(#logoutBtn:not(.hidden)) #spareBar { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) - var(--safe-b)); z-index: 19; box-sizing: border-box; height: calc(var(--spare-h) + var(--safe-b)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; padding: 7px 10px var(--safe-b); background: var(--bar-bg); border-top: 1px solid var(--rose-line); }
+#spareBar .sp-slot { min-width: 0; min-height: 0; height: 40px; margin: 0; padding: 0 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 1.5px dashed color-mix(in srgb, var(--crimson) 50%, var(--card)); border-radius: 12px; background: color-mix(in srgb, var(--card) 60%, transparent); color: var(--crimson); box-shadow: none; font-size: 10.5px; font-weight: 700; line-height: 1.15; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+#spareBar .sp-slot svg { width: 18px; height: 18px; stroke-width: 2.2; }
+#spareBar .sp-slot.on { border: 1px solid var(--t-line, var(--rose-line)); background: var(--card); color: var(--ink); }
+#spareBar .sp-slot.on span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#spareBar .sp-slot:active { filter: brightness(0.95); }
+html:not(.staff):has(#logoutBtn:not(.hidden)) body .bottomnav { bottom: calc(env(safe-area-inset-bottom, 0px) + var(--spare-h)); height: var(--nav-h); padding-bottom: 0; z-index: 18; }
+html:not(.staff):has(#logoutBtn:not(.hidden)) body { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 22px + var(--spare-h)); }
+html:not(.staff):has(#logoutBtn:not(.hidden)) .mus-btn { bottom: calc(76px + env(safe-area-inset-bottom, 0px) + var(--spare-h)); }
+html:not(.staff):has(#logoutBtn:not(.hidden)) .mus-vol-btn { bottom: calc(116px + env(safe-area-inset-bottom, 0px) + var(--spare-h)); }
+html:not(.staff):has(#logoutBtn:not(.hidden)) .mus-pop { bottom: calc(110px + env(safe-area-inset-bottom, 0px) + var(--spare-h)); }
+html:not(.staff):has(#logoutBtn:not(.hidden)) .qa-toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 84px + var(--spare-h)); }
+html:not(.staff):has(#logoutBtn:not(.hidden)) .bg-bar { bottom: calc(env(safe-area-inset-bottom, 0px) + 72px + var(--spare-h)); }
 /* 7) the bars slide away when you scroll down a list and come back when you scroll up a little (ar/barhide.js adds hd-away / sp-away / bt-away to <html>, one switch each in the settings):
-      more room to read. The header and the spare row are one box (.appbar): both away = up and out; only the header away = up until the spare row is what is left at the top; only the spare
-      row away = its strip is cut off at the bottom (the header with its wave stays; the wave takes the page's white). The sticky tabs of a section follow what is still showing (--sticky-top). */
-html body .appbar { transition: transform 0.22s ease, clip-path 0.22s ease; will-change: transform; clip-path: inset(0 0 0 0); }
-html body .bottomnav { transition: transform 0.22s ease; }
-html.hd-away.sp-away body .appbar { transform: translateY(-100%); }
-html.hd-away:not(.sp-away) body .appbar { transform: translateY(calc(var(--spare-h) - 100%)); }
-html.sp-away:not(.hd-away) body .appbar { clip-path: inset(0 0 var(--spare-h) 0); --wave-fill: var(--card); }
-html.hd-away.sp-away { --sticky-top: 0px !important; }
-html.hd-away:not(.sp-away) { --sticky-top: var(--spare-h) !important; }
-html.sp-away:not(.hd-away) { --sticky-top: calc(var(--appbar-h, 130px) - var(--spare-h)) !important; }
-html.bt-away body .bottomnav { transform: translateY(calc(100% + 32px)); }
-@media (prefers-reduced-motion: reduce) { html body .appbar, html body .bottomnav { transition: none; } }
+      more room to read. The header slides up; the row of the five spare buttons slides down (and the bottom bar takes its place); the bottom bar slides down behind it. The sticky tabs of
+      a section follow what is still showing (--sticky-top). */
+html body .appbar { transition: transform 0.22s ease; will-change: transform; }
+html body .bottomnav, #spareBar { transition: transform 0.22s ease; }
+html.hd-away body .appbar { transform: translateY(-100%); }
+html.hd-away { --sticky-top: 0px !important; }
+html.sp-away #spareBar { transform: translateY(100%); }
+html.sp-away:not(.bt-away) body .bottomnav { transform: translateY(var(--spare-h)); }
+html.bt-away:not(.sp-away) body .bottomnav { transform: translateY(calc(100% + 32px)); }
+html.bt-away.sp-away body .bottomnav { transform: translateY(calc(100% + 32px + var(--spare-h))); }
+@media (prefers-reduced-motion: reduce) { html body .appbar, html body .bottomnav, #spareBar { transition: none; } }
