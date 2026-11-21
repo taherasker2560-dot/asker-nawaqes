@@ -2275,6 +2275,7 @@ window.AskerEN = {
   "ما اتشراش قبل كده.": "Never bought before.",
   "مقدرتش أجيب مشتريات الصنف: {0}": "Could not load the item's purchases: {0}",
   "مراجعة الفواتير": "Invoice review",
+  "المراجعة": "Review",
   "مراجعة الفواتير قبل الإدخال": "Invoice review before entry",
   "الفواتير اللي قريتها وجهّزتها. راجعها، ورد على الملاحظات، وبعدين «وافق ودخّلها» أو Enter. مش هدخّل حاجة في فارمافلاي قبل موافقتك.": "The invoices I have read and prepared. Review them, answer the notes, then «Approve and enter» or press Enter. I will not enter anything in PharmaFly before your approval.",
   "مفيش فواتير متجهزة دلوقتي. أول ما تيجي فواتير جديدة هجهّزها وهتظهر هنا.": "No prepared invoices right now. When new invoices arrive I will prepare them and they will appear here.",

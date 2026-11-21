@@ -29,7 +29,7 @@ const row=async(page,id)=>(await rows(page)).find(r=>r.id===id);
 run('Invoice review: the cards in box order, chips, summary, «وافق على الجاهز»',async({page})=>{
  await seed(page);await open(page);
  assert.ok(await page.isVisible('#reviewPanel'));
- assert.deepEqual(await texts(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','مراجعة الفواتير','قوايم المخازن','الانتظار'],'the tab sits with the orders, after «الفواتير»');
+ assert.deepEqual(await texts(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','المراجعة','قوايم المخازن','الانتظار'],'the tab sits with the orders, after «الفواتير»');
  assert.deepEqual(await texts(page,'#rvMain .py-h'),['مستنية موافقتك 4','وافقت عليها (بتتدخل) 1','وقفت 1','اتدخلت 1']);
  // the waiting ones in the box order 1, 2, 3, 9 (the number is in the circle)
  const ords=await page.$$eval('#rvMain .rv-card .rv-ord',(b)=>b.map(x=>x.textContent));

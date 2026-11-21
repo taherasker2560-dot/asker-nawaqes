@@ -44,7 +44,7 @@ run('Waiting list: call these (call / WhatsApp / handed over), the waiting ones,
  assert.match(rows,/2\s*دوا وصل لعملاء مستنيينه: كلّمهم/);assert.match(rows,/1\s*دوا ميعاد رجوعه للمورد قرب \(يومين أو أقل\)/);
  await open(page);
  assert.ok(await page.isVisible('#waitPanel'));
- assert.deepEqual(await texts(page,'.subbar [data-pfor="orders"] [data-tab], [data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','مراجعة الفواتير','قوايم المخازن','الانتظار'],'the tab is with the orders');
+ assert.deepEqual(await texts(page,'.subbar [data-pfor="orders"] [data-tab], [data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','المراجعة','قوايم المخازن','الانتظار'],'the tab is with the orders');
  assert.deepEqual(await texts(page,'#wlMain .py-h'),['📞 كلّم دول 2','مستنيين الدوا 2','↩️ قرار الرجوع 2']);
  // call these: one card for the medicine, two customers; a card's name loses the number glued to it; the link, the WhatsApp message
  const call=await texts(page,'#wlMain .py-card.py-wait');
