@@ -28,9 +28,18 @@
     html.classList.toggle('bars-away', hd || sp || bt);
   }
   function set(on) { if (on === away) return; away = on; apply(); }
+  // a box he is writing in (owner 2026-11-21: «بكتب كل شويه الاقي الزراير تطلع وتنزل»): the phone scrolls the page by itself when the keyboard opens and as the box moves into view, and that
+  // used to slide the bars in and out under his thumb. While he writes the bars stay as they are.
+  const typing = () => {
+    const a = document.activeElement;
+    if (!a || a === document.body) return false;
+    if (a.isContentEditable || a.tagName === 'TEXTAREA') return true;
+    return a.tagName === 'INPUT' && !/^(button|checkbox|radio|submit|reset|range|color|file|image)$/i.test(a.type || '');
+  };
   function onScroll() {
     raf = 0;
     const y = Math.max(0, root.scrollY || 0), dy = y - last;
+    if (typing()) { last = y; return; }
     if (y <= AT_TOP) set(false);
     else if (dy >= DOWN) set(true);
     else if (dy <= -UP) set(false);

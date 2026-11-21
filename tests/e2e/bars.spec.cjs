@@ -81,6 +81,26 @@ run('bars: the header and the spare row slide away when you scroll down and come
  assert.equal((await state()).away,false,'a tap on the bottom bar brings them back');
 },{home:true});
 
+// owner 2026-11-21: «بكتب كل شويه الاقي الزراير تطلع وتنزل مني»: the phone scrolls the page by itself when the keyboard opens and the box moves into view, and that slid the bars in and out under his thumb
+run('bars: while a box is being written in, the page scrolling by itself does not slide the bars in or out; after he leaves the box they work as before',async({page})=>{
+ await ready(page);
+ await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px';const i=document.createElement('input');i.id='tstBox';i.type='text';document.querySelector('main').prepend(i)});
+ const away=()=>page.evaluate(()=>document.documentElement.classList.contains('bars-away'));
+ const go=async(y)=>{await page.evaluate((y)=>window.scrollTo(0,y),y);await page.waitForTimeout(450)};
+ await page.evaluate(()=>document.getElementById('tstBox').focus());
+ await go(700);assert.equal(await away(),false,'writing: scrolling down does not hide the bars');
+ await go(1500);assert.equal(await away(),false,'still writing: they stay');
+ await page.evaluate(()=>document.getElementById('tstBox').blur());
+ await go(2300);assert.equal(await away(),true,'not writing: scrolling down hides them as before');
+ await page.evaluate(()=>document.getElementById('tstBox').focus());
+ await go(1900);assert.equal(await away(),true,'writing: scrolling up does not bring them back either (they stay as they were)');
+ await page.evaluate(()=>document.getElementById('tstBox').blur());
+ await go(1500);assert.equal(await away(),false,'not writing: scrolling up brings them back as before');
+ // a tick box or a button taking the focus is not «writing»
+ await page.evaluate(()=>{const c=document.createElement('input');c.type='checkbox';c.id='tstTick';document.querySelector('main').prepend(c);c.focus()});
+ await go(2400);assert.equal(await away(),true,'a focused tick box does not freeze the bars');
+},{home:true});
+
 run('bars: three switches in the settings (the header, the five spare buttons, the bottom bar), each decides what hides while you scroll down; the phone remembers',async({page})=>{
  await ready(page);await still(page);
  await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px'});

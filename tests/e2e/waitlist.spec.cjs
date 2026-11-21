@@ -160,6 +160,35 @@ run('Waiting list: a new request: search, the supplier\'s kind asked once, the n
  assert.ok(await page.isVisible('[data-wl-new]'));
 },{permissions:['clipboard-read','clipboard-write']});
 
+// owner 2026-11-21: «انا فاتح الانتظار وبكتب كل شويه الاقي الزراير تطلع وتنزل مني كده وتبوظ لي الكتابه من اول وجديد»: every answer of the drug search rebuilt the WHOLE form (the box he was typing in
+// included): the phone's keyboard closed and opened again and the word was cut. Now only the list under the box is drawn again.
+run('Waiting list: typing the drug name never rebuilds the form — the same boxes, the focus stays in the box, what is typed in the other boxes stays, the list under it comes and goes',async({page})=>{
+ await seed(page);
+ await open(page);
+ await page.click('[data-wl-new]');
+ // the other boxes are filled first (the quantity is only read when something is saved: it must survive an answer of the search)
+ await page.fill('#wlPhone','01012345678');await page.fill('#wlQty','3');await page.fill('#wlName','محمد');
+ await page.focus('#wlItem');
+ await page.evaluate(()=>{window.__nodes={item:document.getElementById('wlItem'),phone:document.getElementById('wlPhone'),qty:document.getElementById('wlQty'),name:document.getElementById('wlName'),form:document.querySelector('#wlForm .py-confirm')};window.__rebuilt=0;
+  new MutationObserver(()=>{window.__rebuilt++}).observe(document.getElementById('wlForm'),{childList:true})});
+ // typed like a person types: letter by letter, the search answering in between
+ await page.keyboard.type('augm',{delay:140});
+ await page.waitForSelector('[data-wl-pick="5"]');
+ await page.keyboard.type('en',{delay:140});
+ await page.waitForFunction(()=>document.getElementById('wlItem').value==='augmen');
+ await page.waitForTimeout(500);
+ const same=await page.evaluate(()=>({item:document.getElementById('wlItem')===window.__nodes.item,phone:document.getElementById('wlPhone')===window.__nodes.phone,qty:document.getElementById('wlQty')===window.__nodes.qty,name:document.getElementById('wlName')===window.__nodes.name,
+  focus:document.activeElement===window.__nodes.item,pos:window.__nodes.item.selectionStart,value:window.__nodes.item.value,qtyValue:document.getElementById('wlQty').value,nameValue:document.getElementById('wlName').value,rebuilt:window.__rebuilt,picks:document.querySelectorAll('[data-wl-pick]').length}));
+ assert.deepEqual(same,{item:true,phone:true,qty:true,name:true,focus:true,pos:6,value:'augmen',qtyValue:'3',nameValue:'محمد',rebuilt:0,picks:1},'the form was not rebuilt while he typed');
+ // wiping the box clears the list and still keeps the box
+ await page.fill('#wlItem','');
+ await page.waitForFunction(()=>!document.querySelector('[data-wl-pick]'));
+ assert.equal(await page.evaluate(()=>document.getElementById('wlItem')===window.__nodes.item),true);
+ // a tap on an answer still picks it, and the quantity he typed is still there
+ await page.fill('#wlItem','augm');await page.waitForSelector('[data-wl-pick="5"]');await page.click('[data-wl-pick="5"]');
+ assert.equal(await page.inputValue('#wlQty'),'3');assert.equal(await page.inputValue('#wlPhone'),'01012345678');
+});
+
 run('Waiting list: the number book (owner 2026-11-20): a number shows the name and his requests, a name fills the number, a new number is kept, a known one is never changed',async({page})=>{
  await seed(page);
  await page.evaluate(()=>{
