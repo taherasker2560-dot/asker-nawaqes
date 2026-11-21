@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="ar/airy.css?v=bars-20261121b" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=bars-20261121a"></script>
+    <script src="ar/i18n-en.js?v=bars-20261121c"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -76,6 +76,9 @@
           <input id="darkCustom" type="color" value="#217bab" />
         </div>
         <p class="hint">بيغيّر لون الشريط اللي تحت وكارت الترحيب.</p>
+        <!-- the two rows at the top (the header and the five spare buttons) slide away while you scroll down a list: on by default, here is the switch (ar/barhide.js) -->
+        <label class="check night-row"><input id="barHide" type="checkbox" checked /> الهيدر وصف الخانات يستخبوا وأنا نازل في القايمة</label>
+        <p class="hint">بيرجعوا لما تسحب لفوق شوية.</p>
         
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
         <!-- notifications (owner 2026-11-12: «لما يكون قسم محتاج شغل يظهر إشعار ونخصصله صوت»), ar/notify.js -->
@@ -1041,7 +1044,7 @@
     <script src="ar/home.js?v=edit-20261121a"></script>
     <script src="ar/look.js?v=bars-20261121a"></script>
     <script src="ar/shortcuts.js?v=bars-20261121a"></script>
-    <script src="ar/barhide.js?v=bars-20261121b" defer></script>
+    <script src="ar/barhide.js?v=bars-20261121c" defer></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=po-20261117a"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>

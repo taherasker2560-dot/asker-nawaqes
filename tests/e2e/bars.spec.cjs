@@ -77,3 +77,19 @@ run('bars: the two rows at the top slide away when you scroll down and come back
  await page.evaluate(()=>document.querySelector('.bottomnav [data-group="accounts"]').click());await page.waitForTimeout(300);
  assert.equal((await state()).away,false,'a tap on the bottom bar brings them back');
 },{home:true});
+
+run('bars: a switch in the settings turns the hiding off and on, and the phone remembers',async({page})=>{
+ await ready(page);
+ await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px'});
+ const away=()=>page.evaluate(()=>document.documentElement.classList.contains('bars-away'));
+ assert.equal(await page.isChecked('#barHide'),true,'on by default');
+ await page.evaluate(()=>window.scrollTo(0,800));await page.waitForTimeout(450);assert.equal(await away(),true);
+ // off: they come back at once and stay while scrolling
+ await page.evaluate(()=>{const b=document.getElementById('barHide');b.checked=false;b.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(await away(),false,'turning it off brings the rows back');assert.equal(await page.evaluate(()=>localStorage.getItem('asker-bars-hide')),'0','kept on the phone');
+ await page.evaluate(()=>window.scrollTo(0,1600));await page.waitForTimeout(450);assert.equal(await away(),false,'off: scrolling down does not hide them');
+ // after a reload the switch shows what was chosen
+ await page.reload();await ready(page);assert.equal(await page.isChecked('#barHide'),false,'still off after a reload');
+ await page.evaluate(()=>{const b=document.getElementById('barHide');b.checked=true;b.dispatchEvent(new Event('change',{bubbles:true}))});
+ await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px';window.scrollTo(0,900)});await page.waitForTimeout(450);assert.equal(await away(),true,'on again: they hide');
+},{home:true});

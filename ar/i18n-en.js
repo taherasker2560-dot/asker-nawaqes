@@ -1479,6 +1479,8 @@ window.AskerEN = {
   "خانات احتياطي": "Spare buttons",
   "خانة احتياطي": "Spare button",
   "خانة فاضية: اضغط واختار شاشة": "Empty slot: tap to pick a screen",
+  "الهيدر وصف الخانات يستخبوا وأنا نازل في القايمة": "Hide the header and the spare buttons while I scroll down a list",
+  "بيرجعوا لما تسحب لفوق شوية.": "They come back when you scroll up a little.",
   "برتقالي هادي": "Calm orange",
   "برتقالي فاقع": "bright orange",
   "نحاسي": "copper",
