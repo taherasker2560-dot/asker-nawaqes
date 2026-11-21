@@ -32,8 +32,12 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  assert.match(await text(page,'[data-sa-inv="5003"]'),/مرتجع ?-116/);
  // a tap opens the items with their names, quantities and values
  await page.click('[data-sa-inv="5004"]');
- assert.deepEqual(await page.$$eval('[data-sa-inv="5004"] .sa-lines tr',x=>x.map(e=>[...e.cells].map(c=>c.innerText.replace(/\s+/g,' ').trim()).join('|'))),
+ assert.deepEqual(await page.$$eval('[data-sa-inv="5004"] .sa-lines tr',x=>x.map(e=>[...e.cells].slice(1).map(c=>c.innerText.replace(/\s+/g,' ').trim()).join('|'))),
   ['PANADOL EXTRA 24 TAB بانادول اكسترا|1 علبة|116','VIDROP 15ML|1 وحدة|29']);
+ // group 4: each line has the item's small photo (by the item number); a tap on it opens «تعديل الصنف», the invoice stays open
+ assert.deepEqual(await page.$$eval('[data-sa-inv="5004"] .sa-lines td.ph > .im-th',b=>b.map(x=>x.dataset.im)),['101','103']);
+ await page.click('[data-sa-inv="5004"] .sa-lines .im-th[data-im="101"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.equal(await page.$$eval('[data-sa-inv="5004"].open .sa-lines tr',x=>x.length),2,'the invoice is still open');
  // cash / credit / returns
  await page.click('[data-sa-kind="cash"]');await page.waitForFunction(()=>document.querySelectorAll('#saList [data-sa-inv]').length===2);
  assert.deepEqual(await ids(page),[5004,5001]);
@@ -48,8 +52,14 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  await page.fill('#saQ','panadol');
  await page.waitForSelector('#saFind [data-sa-item]');
  assert.match(await text(page,'#saFind [data-sa-item="101"]'),/PANADOL EXTRA 24 TAB.*5 فاتورة في السنة/);
+ // group 4: the photo sits BESIDE the button; a tap on it opens the sheet and chooses nothing
+ assert.equal(await page.$$eval('#saFind .im-lrow > button.im-th[data-im="101"]',x=>x.length),1);
+ await page.click('#saFind .im-th[data-im="101"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.equal(await page.evaluate(()=>window.AskerSales.state().item),null,'the photo does not pick the item');
+ assert.equal(await page.$$eval('#saFind [data-sa-item]',x=>x.length),1,'the hits are still there');
  await page.click('#saFind [data-sa-item="101"]');
  await page.waitForSelector('#saSum .sa-item');
+ assert.equal(await page.$eval('#saSum .sa-item > .im-lrow > .im-th',b=>b.dataset.im),'101','the chosen item has its photo on the head');
  assert.match(await text(page,'#saSum .sa-item'),/اتباع منه 3 علب \+ 1 وحدة في 4 فاتورة · بقيمة 377 ج/);
  assert.match(await text(page,'#saSum .sa-item .hint'),/نقدي 3 · آجل 1 · مرتجع 1/);
  assert.deepEqual(await ids(page),[5004,5003,5002,5001,4001]);
@@ -65,6 +75,8 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  assert.match(await text(page,'#saWho'),/عميل تجربة واحد · كود 7/);
  assert.match(await text(page,'#saSum'),/446 ?اشترى بـ · 2 فاتورة ?223 ?متوسط الفاتورة/);
  assert.match(await text(page,'#saSum .sa-top3'),/CONCOR 5MG 30 TAB \(2\)/);
+ assert.equal(await page.$eval('#saSum .sa-top3 .sa-t3 .im-th',b=>b.dataset.im),'102','the most taken item has its photo');
+ await page.click('#saSum .sa-top3 .sa-t3 .im-th');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
  assert.deepEqual(await ids(page),[5002,3001]);
  assert.ok(await page.$eval('[data-sa-kind="cash"]',b=>b.hidden),'no «cash» for a credit customer');
  assert.ok(await page.$eval('#saFindBox',b=>b.classList.contains('hidden')));
@@ -73,4 +85,6 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  await page.evaluate(()=>{delete window.__tables.ar_sales;window.AskerSales.open(true)});
  await page.waitForFunction(()=>/لسه مش متاحة/.test(document.getElementById('saStatus').textContent));
  assert.equal(await page.$$eval('#saList [data-sa-inv]',x=>x.length),0);
+ // nothing was written by all those photo taps (the sheet only asks «who may edit»)
+ assert.deepEqual((await page.evaluate(()=>window.__fakeWrites)).filter(w=>!/^(ar_staff_can|ar_people_list|ar_sales_(summary|list|find_items))$/.test(w.rpc||'')).map(w=>w.rpc||JSON.stringify(w).slice(0,80)),[]);
 });
