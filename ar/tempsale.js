@@ -81,6 +81,21 @@
     const n = now || new Date(), months = (+m[1] - n.getFullYear()) * 12 + (+m[2] - 1 - n.getMonth());
     return { text: `صلاحية ${m[2]}/${m[1]}`, soon: months <= 3, gone: months <= 0 };
   }
+  // an expiry typed by hand, as it is written in PharmaFly (owner 2026-11-21): month and year -> 'YYYY-MM' (null when it is not one).
+  // «03/2028», «3/28», «03-2028», «0328», «032028», «328», Arabic digits too; the year within 5 years back and 15 ahead
+  function parseExp(raw, now) {
+    const s = String(raw || '').replace(/[٠-٩]/g, (c) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).trim();
+    let mo, y, m = /^(\d{1,2})\s*[/\-. ]\s*(\d{2}|\d{4})$/.exec(s);
+    if (m) { mo = +m[1]; y = +m[2]; } else {
+      const g = s.replace(/\D/g, '');
+      if (s !== g || !(g.length === 3 || g.length === 4 || g.length === 6)) return null;
+      mo = g.length === 3 ? +g[0] : +g.slice(0, 2); y = +g.slice(g.length === 3 ? 1 : 2);
+    }
+    if (y < 100) y += 2000;
+    const n = now || new Date();
+    if (!(mo >= 1 && mo <= 12) || y < n.getFullYear() - 5 || y > n.getFullYear() + 15) return null;
+    return `${y}-${String(mo).padStart(2, '0')}`;
+  }
   // the customer's balance after this sale (paid part taken off) above the limit on his card
   function overLimit(cust, amount, paid) {
     if (!cust) return null;
@@ -185,7 +200,7 @@
     if (!bills.length) bills.push(blankBill());
     return { cur: Math.min(Math.max(0, Math.floor(Number(raw && raw.cur)) || 0), bills.length - 1), bills };
   }
-  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
+  const api = { stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -207,6 +222,8 @@
   let bills = [blankBill()], cur = 0;
   // the expiry batches of every item with stock (the count's file from the laptop): Map code -> {p: parts, b: [{x, k, u}]}
   let batches = null, batchAt = 0, batchData = '', batchP = null, expFor = null;
+  // the items SOLD in the last 12 months that have no stock (z of the same file; owner 2026-11-21): rows [code, name, price, parts, has an expiry, Arabic name]
+  let zRows = [], zItems = [], zById = new Map();
   let stopped = new Set(); // customers whose credit the owner stopped
   // «الفكة»: the amount off (−) or added (+) on this bill; any change in the lines clears it
   let adj = 0, adjOpen = false, adjSign = -1;
@@ -261,6 +278,7 @@
   // an item with no stock (not in the stock list) is looked up by its code on the server
   async function itemByCode(code) {
     if (byId.has(code)) return byId.get(code);
+    if (zById.has(code)) return zById.get(code);   // sold in the last year, no stock: PharmaFly's current price and parts
     if (!db()) return null;
     try {
       const { data } = await db().from('ar_store_items').select('id,name,arabic_name,price').eq('id', code).limit(1);
@@ -276,6 +294,28 @@
     batches = new Map(rows.map((r) => [Number(r[0]), { p: Number(r[1]) > 1 ? Number(r[1]) : 1, b: (r[2] || []).map((a) => ({ x: a[0] || null, k: Number(a[1]) || 0, u: Number(a[2]) || 0 })) }]));
     batchData = String(at || '');
   }
+  // the sold-without-stock items as the sale's items: «مفيش رصيد» tagged, sold with no stock as PharmaFly does
+  function useZ(rows) {
+    zRows = rows;
+    zItems = rows.map((r) => ({ item_id: Number(r[0]), name: String(r[1] || ''), arabic_name: String(r[5] || ''), price: Number(r[2]) || 0, parts: Number(r[3]) > 1 ? Number(r[3]) : 1, packs: 0, units: 0, nostock: true, sold0: true, hasExp: !!r[4] }));
+    zById = new Map(zItems.map((x) => [x.item_id, x]));
+  }
+  // their Arabic names (the search is often typed in Arabic): asked once from the items table, then kept with the rest
+  async function loadZNames() {
+    try {
+      const need = zRows.filter((r) => r[5] === undefined).map((r) => r[0]);
+      for (let i = 0; i < need.length; i += 200) {
+        const chunk = need.slice(i, i + 200);
+        const { data, error } = await db().from('ar_store_items').select('id,arabic_name').in('id', chunk);
+        if (error) return;
+        const m = new Map((data || []).map((x) => [Number(x.id), String(x.arabic_name || '').trim()]));
+        for (const r of zRows) if (r[5] === undefined && chunk.includes(r[0])) r[5] = m.get(Number(r[0])) || '';
+      }
+      useZ(zRows);
+      const c = load(XKEY, null);
+      if (c) keep(XKEY, { ...c, z: zRows });
+    } catch (e) { /* the names are a help only */ }
+  }
   function loadBatches() {
     if (batchP) return batchP;
     if (batches && Date.now() - batchAt < 3 * 60 * 1000) return Promise.resolve();
@@ -286,11 +326,15 @@
         if (error || !blob) throw error || new Error('no file');
         const d = JSON.parse(await blob.text());
         const rows = (d.items || []).map((it) => [it.i, it.p, (it.b || []).map((b) => [b.x || null, b.k, b.u])]);
-        useBatches(rows, d.data_at); batchAt = Date.now(); batchFail = 0;
-        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows });
+        // keep the Arabic names already found for the same items
+        const had = new Map(zRows.filter((r) => r[5] !== undefined).map((r) => [r[0], r[5]]));
+        const z = (d.z || []).map((it) => { const r = [Number(it.i), it.n, it.sp, it.p, it.e ? 1 : 0]; if (had.has(r[0])) r.push(had.get(r[0])); return r; });
+        useBatches(rows, d.data_at); useZ(z); batchAt = Date.now(); batchFail = 0;
+        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows, z });
+        loadZNames();
       } catch (e) {
         batchFail = Date.now();
-        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); batchAt = c.at; } }
+        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); useZ(Array.isArray(c.z) ? c.z : []); batchAt = c.at; } }
       }
       batchP = null;
     })();
@@ -308,17 +352,28 @@
   }
 
   // ---------- adding items ----------
-  function add(it, x, bs) {
+  function add(it, x, bs, extra) {
     const line = addItem(cart, it, x);
     if (x) { line.x = x; line.bs = bs || null; line.xmiss = false; }
+    if (extra) Object.assign(line, extra);
     clearAdj();
     drawCart();
     return line;
+  }
+  // an item that was sold in the last year but has NO stock (owner 2026-11-21): it goes in like any item, with no stock, as PharmaFly sells it;
+  // the expiry is typed by him as PharmaFly asks for it (there is no batch to choose from). Not asked: the sticker's own expiry, or an item
+  // PharmaFly says has no expiry
+  function pickZero(it, sr) {
+    if (sr && sr.exp) return add(it, sr.exp, { k: 0, u: 0 }, { sold0: true });
+    if (!it.hasExp) return add(it, null, null, { sold0: true });
+    openType(it, null);
+    return null;
   }
   // An item goes in with an expiry the owner CHOSE (owner 2026-11-21: «ما ينزلش اي صلاحية»): the system asks which batch is sold and never
   // takes one for him. Not asked: the sticker's own barcode (its month and year ARE the batch in his hand), an item with no expiry in
   // PharmaFly, or one with nothing in stock to choose from. Returns the line, or null while the question is open.
   async function pick(it, sr) {
+    if (it.sold0) return pickZero(it, sr);
     const wait = (p) => Promise.race([p, new Promise((r) => setTimeout(r, 4000))]);
     if (batchP) await wait(batchP);
     else if (!batches) await wait(loadBatches());
@@ -341,9 +396,10 @@
       el.id = 'tsExp'; el.className = 'ts-expsheet hidden';
       el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
       el.addEventListener('click', (e) => {
-        const t = e.target.closest('[data-ts-xpick],[data-ts-xclose]');
+        const t = e.target.closest('[data-ts-xpick],[data-ts-xclose],[data-ts-xok]');
         if (!t) return;
         if (t.hasAttribute('data-ts-xclose')) { expFor = null; drawExp(); return; }
+        if (t.hasAttribute('data-ts-xok')) { submitType(); return; }
         chooseExp(t.dataset.tsXpick);
       });
       document.body.appendChild(el);
@@ -353,6 +409,7 @@
   function drawExp() {
     const el = expSheet(), f = expFor;
     if (!f) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    if (f.type) return drawType(el, f);
     const was = f.line ? f.line.x : null;
     const qt = (b) => (root.AskerStockLib ? root.AskerStockLib.qtyText(b.k, b.u, f.info.p) : String(b.k));
     const rows = f.info.list.map((b) => {
@@ -368,6 +425,51 @@
     if (first) first.focus();
   }
   function openExp(it, info, line) { expFor = { it, info, line }; drawExp(); }
+  // ---------- an item with no stock: the expiry is TYPED, as PharmaFly asks for it (owner 2026-11-21: «اكتبه لها زي فارما فلاي») ----------
+  function openType(it, line) { expFor = { it, line, type: true }; drawExp(); }
+  function drawType(el, f) {
+    const was = f.line && f.line.x ? `${f.line.x.slice(5, 7)}/${f.line.x.slice(0, 4)}` : '';
+    el.innerHTML = `<div class="ts-exp-back" data-ts-xclose></div><div class="ts-exp-card"><strong class="notr">${esc(nameOf(f.it))}</strong>` +
+      '<p class="hint"><span>مفيش رصيد على الصنف ده. اكتب الصلاحية زي ما بتكتبها في فارمافلاي (شهر وسنة):</span></p>' +
+      `<input id="tsExpIn" class="ts-exp-in" type="text" inputmode="numeric" autocomplete="off" dir="ltr" maxlength="7" placeholder="03/2028" aria-label="الصلاحية" value="${esc(was)}" />` +
+      '<p id="tsExpMsg" class="hint ts-exp-msg"></p>' +
+      '<div class="ts-exp-acts"><button type="button" class="ts-exp-ok" data-ts-xok>ضيف</button><button type="button" class="secondary" data-ts-xclose>إلغاء</button></div></div>';
+    el.classList.remove('hidden');
+    const inp = $('tsExpIn');
+    inp.addEventListener('input', typeMsg);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitType(); } });
+    typeMsg();
+    inp.focus(); inp.select();
+  }
+  // under the box: the date as it is read («صلاحية 03/2028»), or what is wrong with it
+  function typeMsg(bad) {
+    const inp = $('tsExpIn'), msg = $('tsExpMsg');
+    if (!inp || !msg) return;
+    const x = parseExp(inp.value), e = x ? expInfo(x) : null;
+    msg.className = 'hint ts-exp-msg';
+    if (bad === 'gone') { msg.className += ' bad'; msg.innerHTML = '<span>الصلاحية دي خلصت: الصنف منتهي</span>'; return; }
+    if (!inp.value.trim()) { msg.innerHTML = ''; return; }
+    if (!x) { msg.className += ' bad'; msg.innerHTML = '<span>اكتب الشهر والسنة، زي 03/2028</span>'; return; }
+    msg.innerHTML = `<span>${esc(e.text)}</span> ✓`;
+  }
+  function submitType() {
+    const f = expFor;
+    if (!f || !f.type) return;
+    const x = parseExp($('tsExpIn') ? $('tsExpIn').value : '');
+    if (!x) return typeMsg();
+    if (kind !== 'return' && expInfo(x).gone) return typeMsg('gone');   // a sale never takes an expired batch
+    expFor = null; drawExp();
+    if (f.line) {
+      const l = f.line;
+      if ((l.x || null) === x) return;
+      const other = cart.find((o) => o !== l && o.c === l.c && (o.x || null) === x);
+      if (other) { other.q += l.q; other.w += l.w; cart.splice(cart.indexOf(l), 1); } else { l.x = x; l.bs = { k: 0, u: 0 }; l.xmiss = false; }
+      clearAdj(); drawCart();
+      return;
+    }
+    add(f.it, x, { k: 0, u: 0 }, { sold0: true });
+    say('tsFind', 'اتضاف: ' + nameOf(f.it), 'ok');
+  }
   function chooseExp(x) {
     const f = expFor;
     if (!f) return;
@@ -389,7 +491,7 @@
     const price = Number(it.price) ? ' · ' + money(it.price) : '';
     // the photo BESIDE the button (a button inside a button is not valid): the name adds the item, the photo opens «تعديل الصنف»
     return photoRow(it.item_id, it.name, nameOf(it), `<button type="button" class="ts-hit" data-ts-add="${esc(it.item_id)}">
-      <strong class="notr">${esc(nameOf(it))}</strong>
+      <strong class="notr">${esc(nameOf(it))}</strong>${it.sold0 ? ' <span class="ts-tag">مفيش رصيد</span>' : ''}
       <small>كود ${esc(it.item_id)}${esc(price)} · رصيد ${esc(it.nostock ? 'مفيش' : stock)}</small></button>`);
   }
   async function find() {
@@ -406,8 +508,10 @@
     }
     if (q.length < 2) { $('tsHits').innerHTML = ''; return say('tsFind', items.length ? '' : 'بيحمّل الأصناف…'); }
     const hits = root.AskerStockLib ? root.AskerStockLib.search(q, items, 8) : [];
-    $('tsHits').innerHTML = hits.map(hitCard).join('');
-    say('tsFind', hits.length ? '' : 'مفيش صنف عليه رصيد بالاسم ده');
+    // then the ones SOLD in the last 12 months that have no stock now (owner 2026-11-21): tagged «مفيش رصيد», sold with no stock as PharmaFly does
+    const zh = root.AskerStockLib && zItems.length ? root.AskerStockLib.search(q, zItems.filter((z) => !byId.has(z.item_id)), 6) : [];
+    $('tsHits').innerHTML = hits.map(hitCard).join('') + (zh.length ? `<div class="ts-sep">اتباعوا قبل كده ومفيش رصيد دلوقتي</div>${zh.map(hitCard).join('')}` : '');
+    say('tsFind', hits.length || zh.length ? '' : zItems.length ? 'مفيش صنف بالاسم ده: لا عليه رصيد ولا اتباع في آخر سنة' : 'مفيش صنف عليه رصيد بالاسم ده');
   }
   // a picked item closes the list at once, in sale and return, by name as by code (owner 2026-11-15: the list stayed open
   // under the search after picking Augmentin); the box empties for the next item and keeps its focus
@@ -599,13 +703,15 @@
   function lineInfo(l) {
     const stock = l.nostock ? 'مفيش' : root.AskerStockLib ? (l.bs ? root.AskerStockLib.qtyText(l.bs.k, l.bs.u, l.k) : root.AskerStockLib.qtyText(l.sp, l.su, l.k)) : '';
     const short = kind !== 'return' && (overStock(l) || l.nostock);
-    return `<div class="ts-info"><span>${l.bs ? 'رصيد التشغيلة' : 'رصيد'} ${esc(stock)}</span>${short ? '<div class="ts-warn">⚠️ الكمية أكتر من الرصيد</div>' : ''}</div>`;
+    // sold in the last year with no stock: sold with no stock, as PharmaFly does: a quiet note, not the red warning (owner 2026-11-21)
+    const warn = l.sold0 ? (kind !== 'return' ? '<div class="ts-note">مفيش رصيد: هتتباع من غير رصيد (زي فارمافلاي)</div>' : '') : short ? '<div class="ts-warn">⚠️ الكمية أكتر من الرصيد</div>' : '';
+    return `<div class="ts-info"><span>${l.bs && !l.sold0 ? 'رصيد التشغيلة' : 'رصيد'} ${esc(stock)}</span>${warn}</div>`;
   }
   // the expiry the owner chose for this line (✓ + «تغيير»); «مش متاحة» when the batches file could not be read
   function expRow(l) {
     if (l.x) {
       const e = expInfo(l.x), more = e.gone ? ' · <span>منتهية</span>' : e.soon ? ' · <span>قربت</span>' : '';
-      return `<div class="ts-exp${e.soon ? ' soon' : ''}"><span>${esc(e.text)} ✓${more}</span>${batchInfo(l.c).state === 'list' ? '<button type="button" class="linklike" data-ts-xchg>تغيير</button>' : ''}</div>`;
+      return `<div class="ts-exp${e.soon ? ' soon' : ''}"><span>${esc(e.text)} ✓${more}</span>${l.sold0 || batchInfo(l.c).state === 'list' ? '<button type="button" class="linklike" data-ts-xchg>تغيير</button>' : ''}</div>`;
     }
     return l.xmiss ? '<div class="ts-exp none"><span>الصلاحية مش متاحة دلوقتي</span></div>' : '';
   }
@@ -878,6 +984,7 @@
         clearAdj(); return drawCart();
       }
       if (l && t.hasAttribute('data-ts-xchg')) {
+        if (l.sold0) { openType({ item_id: l.c, name: l.n, arabic_name: l.ar }, l); return; }
         const info = batchInfo(l.c);
         if (info.state === 'list') openExp({ item_id: l.c, name: l.n, arabic_name: l.ar }, info, l);
         return;
