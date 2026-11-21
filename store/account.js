@@ -141,6 +141,8 @@
     installWhy: 'عشان تفتح حسابك وتطلب مننا بدوسة واحدة من الشاشة الرئيسية',
     // after the hand-off to Chrome: the browser only installs on a tap, so one more (big) tap
     installAgain: '📲 دوسة كمان ويتثبت',
+    // the hand-off to Chrome did not move the page (this browser ignores the link, or Chrome is not on the phone): the way from this browser's own menu
+    installStay: 'ماقدرتش أفتحه في كروم لوحدي. من قايمة المتصفح (⋮ أو ≡) اختار «فتح في كروم» لو موجودة، أو «إضافة إلى الشاشة الرئيسية».',
     installWait: 'استنى ثانية…',
     // iPhone: no browser there installs by itself; a big guide pointing at the Share button
     guideTitle: 'التثبيت على الآيفون في 3 دوسات:',
@@ -572,6 +574,18 @@
   // one tap does it (owner 2026-11-13): Chrome (or any browser that offers it) installs at once; another Android browser
   // opens his account in Chrome straight away (one more tap there installs); an iPhone gets the big guide; a browser with
   // neither (no Chrome on the phone) shows its own steps
+  // The hand-off to Chrome can fail without a word: the link comes from WhatsApp and opens in whatever browser the phone has (Samsung Internet, Firefox, Opera, Mi Browser, an in-app browser …) and
+  // some of them ignore an intent: link (owner 2026-11-21: «مش كل الناس مثبته كروم عاملاها الاساسي»). If Chrome took the page it goes to the background at once; if the page is still on the screen
+  // after a moment the tap must not stay mute: the words say what to do from this browser's own menu.
+  let handoffTimer = 0;
+  function watchHandoff() {
+    clearTimeout(handoffTimer);
+    handoffTimer = setTimeout(() => {
+      if (document.visibilityState !== 'visible' || document.hidden) return;   // Chrome has it
+      installNote = TEXTS.installStay; installReady = false;
+      draw();
+    }, 2200);
+  }
   async function install() {
     if (installBusy) return;
     const ua = navigator.userAgent, ios = isIos(ua, navigator.platform, navigator.maxTouchPoints);
@@ -588,7 +602,12 @@
       draw();
       return;
     }
-    if (plan === 'chrome') { const to = chromeIntent(location.href, token); if (root.__askerGoIntent) root.__askerGoIntent(to); else location.href = to; return; }   // (the test hook only exists in tests, like store/alarm.js)
+    if (plan === 'chrome') {
+      const to = chromeIntent(location.href, token);
+      if (root.__askerGoIntent) root.__askerGoIntent(to); else location.href = to;   // (the test hook only exists in tests, like store/alarm.js)
+      watchHandoff();
+      return;
+    }
     if (ios) {
       // (a visitor with no link has nothing to keep in the address)
       if (token) { try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ } }

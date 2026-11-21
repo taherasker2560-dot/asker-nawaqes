@@ -350,6 +350,7 @@ window.AskerEN = {
   "📲 ثبّت التطبيق الآن": "📲 Install the app now",
   "🏪 الموقع": "🏪 The site",
   "📲 دوسة كمان ويتثبت": "📲 One more tap to install",
+  "ماقدرتش أفتحه في كروم لوحدي. من قايمة المتصفح (⋮ أو ≡) اختار «فتح في كروم» لو موجودة، أو «إضافة إلى الشاشة الرئيسية».": "I could not open it in Chrome by myself. From the browser menu (⋮ or ≡) choose “Open in Chrome” if it is there, or “Add to Home screen”.",
   "استنى ثانية…": "One second…",
   "التثبيت على الآيفون في 3 دوسات:": "Install on iPhone in 3 taps:",
   "دوس زرار المشاركة ⬆️ اللي تحت": "Tap the Share button ⬆️ below",
