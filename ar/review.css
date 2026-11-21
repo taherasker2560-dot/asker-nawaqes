@@ -63,3 +63,4 @@
 .rv-pl { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); }
 .rv-pl input { width: 96px; padding: 6px 8px; border: 1.5px solid var(--crimson); border-radius: 10px; background: var(--card); color: var(--ink); text-align: left; font: inherit; }
 .rv-disc { color: var(--crimson-ink); font-size: 14px; }
+.rv-chg { color: var(--crimson-ink); font-size: 13px; font-weight: 600; }

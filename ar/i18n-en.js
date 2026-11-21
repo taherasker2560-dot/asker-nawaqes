@@ -2328,10 +2328,11 @@ window.AskerEN = {
   "{0} فاتورة متجهزة مستنية موافقتك قبل ما تتدخل": "{0} prepared invoice(s) waiting for your approval before entry",
   "فاتورة متجهزة مستنية موافقتك": "prepared invoices waiting for your approval",
   "اكتبه هنا": "Type it here",
-  "خد سعر الكارت ({0})": "Use the card's price ({0})",
   "الخصم {0}% · التكلفة {1}": "Discount {0}% · cost {1}",
   "سعر الجمهور لازم يكون {0} أو أكتر (سعر الورقة)": "The public price must be {0} or more (the paper's price)",
-  "كمّل {0} حاجة الأول وبعدين الزرار يشتغل": "Finish {0} item(s) first, then the button works"
+  "كمّل {0} حاجة الأول وبعدين الزرار يشتغل": "Finish {0} item(s) first, then the button works",
+  "خد سعر الورقة ({0})": "Use the paper's price ({0})",
+  "هيتغيّر في الكارت: {0} ← {1}": "The card will change: {0} ← {1}"
  },
  "phrases": {
   "آخر خصم": "last discount",
