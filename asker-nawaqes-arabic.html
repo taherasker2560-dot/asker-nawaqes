@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="ar/airy.css?v=bars-20261121d" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=bars-20261121d"></script>
+    <script src="ar/i18n-en.js?v=bars-20261121e"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -82,6 +82,9 @@
         <label class="check night-row"><input id="hideSpare" type="checkbox" checked /> صف الخمس خانات</label>
         <label class="check night-row"><input id="hideBottom" type="checkbox" /> الشريط اللي تحت</label>
         <p class="hint">كل واحد بمفتاحه، وبيرجعوا لما تسحب لفوق شوية.</p>
+        <!-- the phone's own strips (the status bar on top, the three Android buttons at the bottom): one color for both, the system color or plain white (ar/settings.js) -->
+        <label class="check night-row"><input id="stripsColor" type="checkbox" checked /> الشريط الرفيع وأزرار الأندرويد بلون التطبيق</label>
+        <p class="hint">الاتنين بياخدوا لون واحد (التليفون مش بيسمح بلونين).</p>
         
         <p class="hint">اللون بيتحفظ على الموبايل ده، وتقدر تغيّره في أي وقت.</p>
         <!-- notifications (owner 2026-11-12: «لما يكون قسم محتاج شغل يظهر إشعار ونخصصله صوت»), ar/notify.js -->
@@ -1021,7 +1024,7 @@
       <p class="agza-sign" dir="ltr"><i></i><span>Agza<b>tm</b></span><i></i></p>
 </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
-    <script src="ar/settings.js?v=bars-20261121a"></script>
+    <script src="ar/settings.js?v=bars-20261121e"></script>
     <script src="ar/autoupdate.js?v=upd-20261119a" defer></script>
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=scopes-20261113a"></script>

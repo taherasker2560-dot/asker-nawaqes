@@ -113,3 +113,15 @@ run('bars: three switches in the settings (the header, the five spare buttons, t
  assert.deepEqual(await page.evaluate(()=>['hideHead','hideSpare','hideBottom'].map(i=>document.getElementById(i).checked)),[false,false,false],'the old «off» is respected');
  await page.evaluate(()=>{localStorage.removeItem('asker-bars-hide')});
 },{home:true});
+
+run('bars: a switch for the phone\'s own strips (the status bar and the three Android buttons): the system color or plain white; the phone remembers',async({page})=>{
+ await ready(page);
+ const meta=()=>page.evaluate(()=>document.querySelector('meta[name="theme-color"]').content);
+ assert.equal(await page.isChecked('#stripsColor'),true,'on by default');assert.equal(await meta(),'#217bab','the strips take the system color');
+ await page.evaluate(()=>{const b=document.getElementById('stripsColor');b.checked=false;b.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(await meta(),'#ffffff','off: plain white');assert.equal(await page.evaluate(()=>localStorage.getItem('asker-strips')),'0','kept on the phone');
+ await page.reload();await ready(page);
+ await page.click('#settingsBtn');assert.equal(await page.isChecked('#stripsColor'),false,'still off after a reload (the switch shows it when the settings open)');assert.equal(await meta(),'#ffffff');
+ await page.evaluate(()=>{const b=document.getElementById('stripsColor');b.checked=true;b.dispatchEvent(new Event('change',{bubbles:true}))});
+ assert.equal(await meta(),'#217bab','on again: the color');
+},{home:true});

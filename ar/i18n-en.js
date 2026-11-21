@@ -1484,6 +1484,8 @@ window.AskerEN = {
   "صف الخمس خانات": "The row of five spare buttons",
   "الشريط اللي تحت": "The bottom bar",
   "كل واحد بمفتاحه، وبيرجعوا لما تسحب لفوق شوية.": "Each one has its own switch, and they come back when you scroll up a little.",
+  "الشريط الرفيع وأزرار الأندرويد بلون التطبيق": "The top strip and the Android buttons in the app's color",
+  "الاتنين بياخدوا لون واحد (التليفون مش بيسمح بلونين).": "Both take one color (the phone does not allow two).",
   "برتقالي هادي": "Calm orange",
   "برتقالي فاقع": "bright orange",
   "نحاسي": "copper",
