@@ -109,7 +109,9 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.match(await text(page,'.ac-install-note'),/دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق»/);
  // Chrome offers to install: one tap
  await page.evaluate(()=>{const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
- await page.click('[data-acct-install]');
+ // the offer that comes after the steps were written (2026-11-21): the steps give way to «دوسة كمان» and the button pulses (never «stable» for a normal click)
+ await page.waitForFunction(()=>document.querySelector('[data-acct-install]').classList.contains('pulse')&&!document.querySelector('.ac-install-note'));
+ await page.$eval('[data-acct-install]',b=>b.click());
  await page.waitForFunction(()=>window.__prompted===true);
  await page.waitForFunction(()=>/اتنزّل/.test(document.querySelector('.ac-install-note')?.textContent||''));
  // the order: his name from the pharmacy (no name box), his number filled, on his account by default

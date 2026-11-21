@@ -43,6 +43,37 @@ run('Install for anyone: the home box shows to a visitor on every phone and does
  await page.goto(base+'store.html?x=2');
  await page.waitForSelector('#installBox:not([hidden])');
 },{home:true});
+// owner 2026-11-21: «ايقونه التثبيت بتاعه الموقع … الناس بتدوس عليها ما بتعملش اي حاجه». Measured on the live page: where Chrome offers no install (the link opened inside another app, a Custom Tab,
+// or the app is already installed) the button waited and then wrote «دوس ⋮ في كروم» in small print, which cannot work there. Now it hands the page over to a normal Chrome tab.
+run('Install for anyone: Chrome with NO offer is sent to a normal Chrome tab (no small print); back from it the steps say «already installed? open it from the home screen»; a late offer turns them into «دوسة كمان»',async({page,base})=>{
+ await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua});window.__fakeRpcs={ar_store_pay_info:()=>null};window.__askerGoIntent=(u)=>{window.__went=u}});
+ await page.evaluate(([ua])=>sessionStorage.setItem('__ua',ua),[UAS.chrome]);
+ await page.goto(base+'store.html?x=7');
+ await page.waitForSelector('#installBox:not([hidden])');
+ await page.click('#installBtn');
+ assert.equal(await text(page,'#installBtn'),'…','it waits a moment for the offer, inside the tap');
+ await page.waitForFunction(()=>window.__went,null,{timeout:8000});
+ const went=await page.evaluate(()=>window.__went);
+ assert.ok(went.startsWith('intent://localhost:'),went);
+ assert.ok(went.includes('package=com.android.chrome')&&went.includes('install=1'),went);
+ assert.ok(!/[?&]me=/.test(went),'a visitor: no secret in it');
+ // back in Chrome from that hand-off with still no offer (the app is installed already): the button pulses, the steps say so in words
+ await page.goto(base+'store.html?install=1');
+ await page.waitForSelector('#installBox:not([hidden])');
+ assert.equal(await text(page,'#installBtn'),'📲 دوسة كمان');
+ assert.ok(await page.$('#installBtn.pulse'));
+ await page.$eval('#installBtn',b=>b.click());   // it pulses: never «stable» for a normal click
+ await page.waitForSelector('#installNote:not([hidden])',{timeout:8000});
+ assert.match(await text(page,'#installNote'),/لو «صيدلية عسكر» موجودة على شاشة موبايلك يبقى متثبتة: افتحها من هناك\. ولو لأ: دوس ⋮ فوق في كروم/);
+ assert.equal(await page.evaluate(()=>window.__went||null),null,'no second hand-off (this page is a fresh load: nothing was sent anywhere)');
+ // the offer comes late (a slow phone): the steps give way to «دوسة كمان», and the next tap installs
+ await page.evaluate(()=>{window.__prompted=false;const e=new Event('beforeinstallprompt');e.prompt=()=>{window.__prompted=true};e.userChoice=Promise.resolve({outcome:'accepted'});window.dispatchEvent(e)});
+ await page.waitForSelector('#installNote',{state:'hidden'});
+ assert.equal(await text(page,'#installBtn'),'📲 دوسة كمان');assert.ok(await page.$('#installBtn.pulse'));
+ await page.$eval('#installBtn',b=>b.click());
+ await page.waitForFunction(()=>window.__prompted===true,null,{timeout:8000});
+ await page.waitForFunction(()=>/اتنزّل/.test(document.getElementById('installNote').textContent),null,{timeout:5000});
+},{home:true});
 run('Install for anyone: Firefox gets its steps back from the hand-off, Chrome installs on its offer, a customer has his own button, a computer needs an offer',async({page,base})=>{
  await page.addInitScript(()=>{const ua=sessionStorage.getItem('__ua');if(ua)Object.defineProperty(navigator,'userAgent',{get:()=>ua});window.__fakeRpcs={ar_store_pay_info:()=>null}});
  // Firefox arriving with ?install=1 (Chrome was not on the phone): the steps show in the box

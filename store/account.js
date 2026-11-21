@@ -154,7 +154,7 @@
     feedbackHint: 'اكتبها أو سجّلها فويس',
     preview: 'ده حساب العميل زي ما هو هيشوفه. على موبايلك مش بيتحفظ ولا بيتثبت.',
     installIos: 'على الآيفون: دوس زرار المشاركة ⬆️، وبعدين «إضافة إلى الشاشة الرئيسية». لو مش لاقيها، افتح الرابط في سفاري.',
-    installAndroid: 'دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
+    installAndroid: 'لو «صيدلية عسكر» موجودة على شاشة موبايلك يبقى متثبتة: افتحها من هناك. ولو لأ: دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».',
     installFirefox: 'في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».',
     // Samsung Internet's own install is blocked by Google Play Protect: open the account in Chrome (2026-11-16)
     installSamsung: 'متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن». افتح الرابط في كروم، وبعدين دوس «ثبّت التطبيق الآن».',
@@ -207,6 +207,10 @@
     if (hasPrompt && !mintsOwnApp(ua)) return 'prompt';
     if (offerChrome(ua) && !handedOff) return 'chrome';
     if (isIos(ua, platform, touch)) return 'guide';
+    // Android and Chrome did not offer the install (owner 2026-11-21: «الناس بتدوس عليها ما بتعملش اي حاجه»: measured on the live page, the button waited, then wrote «دوس ⋮ في كروم» in small print):
+    // that is a Chrome that cannot install here: the link opened inside another app (Facebook, Telegram … or a Custom Tab, whose menu has no «تثبيت»), or the app is already installed. A normal Chrome tab gets
+    // the offer, so the page is sent there once (the same hand-off the other browsers get); back from it with still no offer, the steps (and «it may be installed already») show.
+    if (/Android/i.test(String(ua || '')) && !handedOff) return 'chrome';
     return 'steps';
   }
   // the link that opens this page in Chrome on Android (an intent: link cannot carry the #me= part, so the secret rides in
@@ -279,9 +283,10 @@
   }
   useManifest(!pharmacyPhone);
   // Chrome's «install» (store/store.js keeps it for the home's box too); null when the phone does not offer it
-  let installEvt = null, installNote = '', installBusy = false, guide = false;
+  let installEvt = null, installNote = '', installBusy = false, guide = false, installReady = false;
   const waiters = [];
-  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; waiters.splice(0).forEach((w) => w()); draw(); });
+  // the offer can come late (a slow phone checks the manifest and the icons first): if the steps were already written for want of it, they give way to «دوسة كمان» (the button pulses): the next tap installs
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; if (installNote && !standalone()) { installNote = ''; installReady = true; } waiters.splice(0).forEach((w) => w()); draw(); });
   window.addEventListener('appinstalled', () => { installEvt = null; installNote = TEXTS.installed; draw(); });
   // Chrome may offer the install a moment after the page opens: wait for it a little (still inside the tap)
   const waitOffer = (ms) => new Promise((ok) => { if (installEvt) return ok(); waiters.push(ok); setTimeout(ok, ms); });
@@ -315,7 +320,7 @@
     const show = !pharmacyPhone && !standalone() && !token && (touchy() || !!installEvt);
     box.hidden = !show;
     if (!show) return;
-    const again = handedOff && !installNote, btn = $('installBtn'), note = $('installNote');
+    const again = (handedOff || installReady) && !installNote, btn = $('installBtn'), note = $('installNote');
     if (btn) {
       btn.disabled = installBusy;
       btn.textContent = installBusy ? TEXTS.homeBusy : again ? TEXTS.homeAgain : TEXTS.homeInstall;
@@ -444,7 +449,7 @@
       html += `<a class="ac-btn ac-back" href="asker-nawaqes-arabic.html">${esc(TEXTS.backBot)}</a><p class="hint-sm center ac-install-why">${esc(TEXTS.preview)}</p>`;
     } else if (!standalone()) {
       // one button, one tap (owner: «يا اما تثبت التطبيق يا اما تاخده للسكة اللي هيثبت بها التطبيق مباشر … فلاحين»)
-      const again = handedOff && !installNote;
+      const again = (handedOff || installReady) && !installNote;
       installHtml = `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
     }
@@ -578,12 +583,12 @@
     const plan = installPlan(ua, navigator.platform, navigator.maxTouchPoints, !!installEvt, handedOff);
     if (plan === 'prompt') {
       const e = installEvt;
-      installEvt = null;
+      installEvt = null; installReady = false;
       try { e.prompt(); const c = await e.userChoice; if (c && c.outcome === 'accepted') installNote = TEXTS.installed; } catch (err) { installNote = installSteps(ua, navigator.platform, navigator.maxTouchPoints); }
       draw();
       return;
     }
-    if (plan === 'chrome') { location.href = chromeIntent(location.href, token); return; }
+    if (plan === 'chrome') { const to = chromeIntent(location.href, token); if (root.__askerGoIntent) root.__askerGoIntent(to); else location.href = to; return; }   // (the test hook only exists in tests, like store/alarm.js)
     if (ios) {
       // (a visitor with no link has nothing to keep in the address)
       if (token) { try { history.replaceState(null, '', location.pathname + location.search + '#me=' + token); } catch (err) { /* the manifest still has it */ } }

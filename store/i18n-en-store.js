@@ -363,7 +363,7 @@ window.AskerEN = {
   "في فايرفوكس: دوس ⋮، وبعدين «تثبيت» أو «إضافة إلى الشاشة الرئيسية».": "In Firefox: tap ⋮, then “Install” or “Add to Home screen”.",
   "متصفح سامسونج تثبيته بيطلّع رسالة «تطبيق غير آمن». افتح الرابط في كروم، وبعدين دوس «ثبّت التطبيق الآن».": "Installing from Samsung Internet shows an “unsafe app” message. Open the link in Chrome, then tap “Install the app now”.",
   "افتح قايمة المتصفح (⋮ أو ≡)، واختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».": "Open the browser's menu (⋮ or ≡) and choose “Install” or “Add to Home screen”.",
-  "دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».": "Tap ⋮ at the top in Chrome, then “Install app” or “Add to Home screen”.",
+  "لو «صيدلية عسكر» موجودة على شاشة موبايلك يبقى متثبتة: افتحها من هناك. ولو لأ: دوس ⋮ فوق في كروم، وبعدين «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».": "If “Asker Pharmacy” is already on your phone's home screen, it is installed: open it from there. If not, tap ⋮ at the top in Chrome, then “Install app” or “Add to Home screen”.",
   "اتنزّل: هتلاقي «صيدلية عسكر» على الشاشة الرئيسية، وبتفتح على حسابك على طول.": "Installed: you'll find “Asker Pharmacy” on your home screen, and it opens on your account.",
   "📲 ثبّته": "📲 Install",
   "📲 دوسة كمان": "📲 One more tap",

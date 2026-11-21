@@ -126,6 +126,17 @@ assert.equal(plan(UA.firefox, false, false), 'chrome');
 assert.equal(plan(UA.firefox, false, true), 'steps');
 assert.equal(plan(UA.iosChrome, false, false), 'guide');
 assert.equal(plan('', false, false), 'steps');
+// owner 2026-11-21 («الناس بتدوس عليها ما بتعملش اي حاجه»): Android Chrome that offers NO install (a Custom Tab, an in-app browser such as Facebook\'s, or the app installed already) used to get
+// small written steps that cannot work there; now the page goes to a normal Chrome tab once, and only back from it (still no offer) the steps show
+assert.equal(plan(UA.chrome, false, false), 'chrome', 'Chrome with no offer: a normal Chrome tab is the place that installs');
+assert.equal(plan(UA.chrome, false, true), 'steps', 'back from that hand-off with still no offer: the steps (no second hand-off)');
+const FB = 'Mozilla/5.0 (Linux; Android 14; Pixel 8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 [FB_IAB/FB4A;FBAV/450.0.0.0;]';
+assert.equal(plan(FB, false, false), 'chrome', 'an in-app browser on Android (Chrome engine, no install offer): to Chrome');
+assert.equal(plan(FB, false, true), 'steps');
+assert.equal(plan('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', false, false), 'steps', 'a computer is not sent anywhere');
+assert.equal(plan(UA.chrome, true, false), 'prompt', 'with the offer nothing changes');
+assert.match(A.TEXTS.installAndroid, /متثبتة: افتحها من هناك/, 'the steps also say: already on the home screen = installed, open it from there');
+assert.match(A.TEXTS.installAndroid, /«تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية»/);
 assert.match(A.TEXTS.installSamsung, /كروم/, 'the Samsung steps say: open it in Chrome');
 assert.doesNotMatch(A.TEXTS.installSamsung, /إضافة صفحة إلى/, 'and no longer send him to Samsung\'s own add-to-home-screen');const intent = A.chromeIntent('https://taherasker2560-dot.github.io/asker-nawaqes/store.html#account', tok);
 assert.equal(intent, 'intent://taherasker2560-dot.github.io/asker-nawaqes/store.html?me=' + tok + '&install=1' +

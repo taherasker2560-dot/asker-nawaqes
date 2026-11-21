@@ -323,13 +323,7 @@
     if (!form) return '<button type="button" class="py-new" data-wl-new>📝 طلب مش موجود</button>' + (isStaff() ? '' : '<button type="button" class="secondary py-bk-open" data-wl-bk>📒 دفتر الأرقام</button>');
     const f = form, v = isStaff() ? null : vendorOf(f.vendor), staff = isStaff();
     const picked = f.item ? `<div class="py-field"><span dir="ltr"><bdi class="notr">${esc(f.item.name)}</bdi></span><button type="button" class="secondary small" data-wl-unpick>✕</button></div>`
-      : `<input id="wlItem" type="search" dir="ltr" placeholder="اسم الدوا (إنجليزي أو عربي)" aria-label="اسم الدوا" value="${esc(f.q)}" autocomplete="off" />` +
-        (f.q.trim().length >= 2 ? `<div class="py-picks">${f.results.map((r) => {
-          const pick = `<button type="button" class="py-pick" data-wl-pick="${esc(r.id)}"><b dir="ltr"><bdi class="notr">${esc(r.name)}</bdi></b>${r.arabic_name ? `<small>${esc(r.arabic_name)}</small>` : ''}</button>`;
-          // the photo BESIDE the button (a button inside a button does not work): a tap on the photo opens «تعديل الصنف», a tap on the name picks the item
-          return root.AskerItemMedia ? root.AskerItemMedia.row(r.id, r.name, r.arabic_name || r.name, pick) : pick;
-        }).join('')}` +
-          `<button type="button" class="py-pick" data-wl-typed><b>اكتبه زي ما هو</b><small dir="ltr"><bdi class="notr">${esc(f.q.trim())}</bdi></small></button></div>` : '');
+      : `<input id="wlItem" type="search" dir="ltr" placeholder="اسم الدوا (إنجليزي أو عربي)" aria-label="اسم الدوا" value="${esc(f.q)}" autocomplete="off" /><div id="wlResults">${resultsHtml()}</div>`;
     return `<div class="py-card py-confirm"><span class="py-lab">الدوا</span>${picked}` +
       `<span class="py-lab">العميل</span><div class="py-seg" style="grid-template-columns:2fr 1fr"><input id="wlPhone" type="tel" dir="ltr" placeholder="01xxxxxxxxx" aria-label="رقم العميل" value="${esc(f.phone)}" />` +
       `<input id="wlQty" type="text" inputmode="numeric" placeholder="الكمية 1" aria-label="الكمية" value="${esc(f.qty)}" /></div>` +
@@ -342,6 +336,19 @@
       (f.msg ? `<p class="status bad" id="wlMsg">${esc(f.msg)}</p>` : '') +
       `<div class="py-acts" id="wlActs">${actsHtml()}</div></div>`;
   }
+  // the items that fit what he types in the drug box (under the box, in their own place: a search that comes back redraws ONLY this, never the box he is typing in —
+  // owner 2026-11-21: «بكتب كل شويه الاقي الزراير تطلع وتنزل مني وتبوظ لي الكتابه من اول وجديد»: every answer used to rebuild the whole form, the box included, so the phone's keyboard
+  // closed and opened again and the word he was writing was cut)
+  function resultsHtml() {
+    const f = form;
+    if (!f || f.item || f.q.trim().length < 2) return '';
+    return `<div class="py-picks">${f.results.map((r) => {
+      const pick = `<button type="button" class="py-pick" data-wl-pick="${esc(r.id)}"><b dir="ltr"><bdi class="notr">${esc(r.name)}</bdi></b>${r.arabic_name ? `<small>${esc(r.arabic_name)}</small>` : ''}</button>`;
+      // the photo BESIDE the button (a button inside a button does not work): a tap on the photo opens «تعديل الصنف», a tap on the name picks the item
+      return root.AskerItemMedia ? root.AskerItemMedia.row(r.id, r.name, r.arabic_name || r.name, pick) : pick;
+    }).join('')}<button type="button" class="py-pick" data-wl-typed><b>اكتبه زي ما هو</b><small dir="ltr"><bdi class="notr">${esc(f.q.trim())}</bdi></small></button></div>`;
+  }
+  const paintResults = () => { const el = $('wlResults'); if (el && form && !form.item) el.innerHTML = resultsHtml(); };
   // the save buttons: with a telesales number for the chosen supplier the first one opens WhatsApp on him (he presses send); staff just save
   function teleOf(f) { return f && !isStaff() && f.vendor ? vnums.get(String(f.vendor)) || null : null; }
   function actsHtml() {
@@ -599,16 +606,13 @@
     if (!form || form.item) return;
     const mine = ++searchSeq;
     const q = form.q.trim().replace(/[^0-9A-Za-zء-ي ]+/g, ' ').trim();
-    if (q.length < 2 || !db()) { form.results = []; return draw(); }
+    if (q.length < 2 || !db()) { form.results = []; return paintResults(); }
     let req = db().from('ar_store_items').select('id,name,arabic_name,status,price');
     for (const w of q.split(/\s+/).filter((x) => x.length >= 2).slice(0, 5)) req = req.or(`name.ilike.*${w}*,arabic_name.ilike.*${w}*`);
     const { data: rows, error } = await req.order('name').limit(8);
     if (mine !== searchSeq || !form) return;
     form.results = error ? [] : rows || [];
-    const keep = $('wlItem'), pos = keep ? keep.selectionStart : 0;
-    draw();
-    const again = $('wlItem');
-    if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (e) { /* not supported */ } }
+    paintResults();   // only the list under the box: the box keeps its focus, its keyboard and the word being written
   }
   async function save(mode) {
     if (!form || busy) return;
@@ -658,6 +662,7 @@
     $('wlRefresh')?.addEventListener('click', () => { note = ''; load(); });
     panel.addEventListener('input', (e) => {
       if (e.target.id === 'wlItem' && form) { form.q = e.target.value; clearTimeout(searchTimer); searchTimer = setTimeout(search, 250); }
+      else if (e.target.id === 'wlQty' && form) form.qty = e.target.value;
       else if (e.target.id === 'wlPhone' && form) { form.phone = e.target.value; onPhone(); }
       else if (e.target.id === 'wlName' && form) { form.name = e.target.value; form.nameAuto = false; onName(); }
       else if (e.target.id === 'wlBkQ' && mgr) { mgr.q = e.target.value; mgr.shown = MGR_STEP; mgr.sure = false; paintBook(); }
