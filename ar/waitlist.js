@@ -261,25 +261,28 @@
   // ---- «📱 تطبيق الموبايل» (owner 2026-11-20, option «أ»; migration 202611201900, contacts-android/): the phone app that writes the numbers saved here into his phone's contacts (and so Google's)
   // and sends the phone's contacts here every 10 days (the laptop merges them: new ones come CLOSED to the staff) ----
   const APP_URL = 'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/contacts-build/asker-contacts.apk';
-  // null = not asked yet; {data} = the status; {error} = it could not be read now (a slow net, the phone app just took the screen). The block STAYS (owner 2026-11-21: «مش مفروض بعد ما اربطه يختفي»):
-  // it says so and keeps its two buttons, and the status is asked again
-  let phoneApp = null, phoneTries = 0;
+  // null = not asked yet; {data} = the status; {error} = it could not be read now (a slow net, the phone app just took the screen): the block says so, keeps its two buttons and the status is asked again.
+  // Once a phone IS linked the big block goes away (owner 2026-11-21: «مش مفروض بعد ما اربطه يختفي؟» was a QUESTION; his second message: «نزلته وربطته بس مختفاش ليه من الصفحة»):
+  // one thin line says «مربوط ✓ · آخر اتصال»; «تفاصيل» opens the whole block again (download, link another phone, the numbers waiting)
+  let phoneApp = null, phoneTries = 0, phoneOpen = false;
   const go = (u) => { root.open(u, '_self'); };   // a custom-scheme link (the phone app's own): the same tab; e2e replaces window.open
   const dayTime = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   function phoneAppHtml() {
     const p = phoneApp && phoneApp.data, lines = [];
+    const linked = !!(p && (p.phones || []).length), last = linked ? (p.phones || []).map((x) => x.last_used_at).filter(Boolean).sort().pop() : null;
+    const lastB = `<b dir="ltr">${last ? esc(dayTime(last)) : '<span>لسه</span>'}</b>`;
+    if (linked && !phoneOpen) return `<div class="py-l2"><b>📱 تطبيق الموبايل</b> ✓ <span>موبايل مربوط، آخر اتصال:</span> ${lastB} <button type="button" class="secondary small" data-wl-appmore>تفاصيل</button></div>`;
     if (phoneApp && phoneApp.error) lines.push('<span>مقدرتش أجيب حالة التطبيق دلوقتي، وبحاول تاني. الزرارين شغالين.</span>');
     else if (!p) lines.push('<span>بحمّل…</span>');
     else {
-      const last = (p.phones || []).map((x) => x.last_used_at).filter(Boolean).sort().pop();
-      lines.push((p.phones || []).length ? `<span>موبايل مربوط، آخر اتصال:</span> <b dir="ltr">${last ? esc(dayTime(last)) : '<span>لسه</span>'}</b>` : '<span>لسه مفيش موبايل مربوط.</span>');
+      lines.push(linked ? `<span>موبايل مربوط، آخر اتصال:</span> ${lastB}` : '<span>لسه مفيش موبايل مربوط.</span>');
       if (p.last_sync) lines.push(`<span>آخر إرسال لجهات الاتصال:</span> <b>${esc(p.last_sync.n)}</b> <span>جهة اتصال</span>${p.last_sync.merged_at ? ' ✓' : ' <span>(لسه ما اتدمجتش على اللاب)</span>'}`);
       if (Number(p.pending) > 0) lines.push(`<span>أرقام مستنية تنزل على الموبايل:</span> <b>${esc(p.pending)}</b>`);
     }
     return '<div class="py-l1"><b>📱 تطبيق الموبايل</b></div>' +
       '<p class="hint">بيحفظ الأرقام الجديدة في جهات اتصال موبايلك وجوجل لوحده، وكل 10 أيام بيبعت جهات اتصالك هنا (وبتيجي مقفولة على الموظفين).</p>' +
       lines.map((l) => `<div class="py-l2">${l}</div>`).join('') +
-      `<div class="py-acts"><a class="py-a" href="${esc(APP_URL)}" target="_blank" rel="noopener">نزّل التطبيق</a><button type="button" class="py-p small" data-wl-applink>اربط التطبيق</button></div>`;
+      `<div class="py-acts"><a class="py-a" href="${esc(APP_URL)}" target="_blank" rel="noopener">نزّل التطبيق</a><button type="button" class="py-p small" data-wl-applink>اربط التطبيق</button>${linked ? '<button type="button" class="secondary small" data-wl-appmore>إخفاء</button>' : ''}</div>`;
   }
   const paintPhoneApp = () => { const el = $('wlPhoneApp'); if (el && mgr) el.innerHTML = phoneAppHtml(); };
   async function loadPhoneApp() {
@@ -302,6 +305,7 @@
       go(/Android/i.test(root.navigator.userAgent) ? `intent://link?k=${k}#Intent;scheme=askercontacts;package=com.askerpharmacy.contacts;S.browser_fallback_url=${encodeURIComponent(APP_URL)};end` : `askercontacts://link?k=${k}`);
       note = '';
       phoneTries = 0;
+      phoneOpen = false;   // linked: the big block goes back to its thin line once the status shows the phone
       setTimeout(loadPhoneApp, 4000);
     } catch (e) { note = 'ماتغيّرش: ' + (e && e.message ? e.message : ''); }
     busy = false;
@@ -597,12 +601,13 @@
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-appmore],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock]');
       if (!t) return;
       const d = t.dataset;
       // the number book screen and the «🔒 خاص» marks (owner only)
       if ('wlBk' in d) { if (!isStaff()) { form = null; note = ''; mgr = { filter: 'other', q: '', shown: MGR_STEP, sure: false }; loadBook(); draw(); loadPhoneApp(); } return; }
       if ('wlApplink' in d) { linkApp(); return; }
+      if ('wlAppmore' in d) { phoneOpen = !phoneOpen; paintPhoneApp(); return; }
       if ('wlTele' in d) { const r = data.waiting.find((x) => String(x.id) === d.wlTele); if (r) sendTele(r.vendor_id, [r]); return; }
       if ('wlTelegroup' in d) { sendTele(d.wlTelegroup, data.waiting.filter((x) => String(x.vendor_id) === d.wlTelegroup)); return; }
       if ('wlBkclose' in d) { mgr = null; draw(); return; }

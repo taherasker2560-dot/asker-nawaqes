@@ -350,6 +350,11 @@ run('Waiting list: «📱 تطبيق الموبايل» inside the number book: 
  });
  await open(page);
  await page.click('[data-wl-bk]');
+ // a phone is linked: the big block is NOT there, one thin line says so (owner 2026-11-21: «نزلته وربطته بس مختفاش ليه من الصفحة»); «تفاصيل» opens it
+ await page.waitForSelector('#wlPhoneApp [data-wl-appmore]');
+ assert.match(await txt(page,'#wlPhoneApp'),/📱 تطبيق الموبايل ✓ موبايل مربوط، آخر اتصال: 2026-11-20 \d\d:05/);
+ assert.equal(await page.$('#wlPhoneApp [data-wl-applink]'),null,'no link button once linked');assert.equal(await page.$('#wlPhoneApp a'),null,'no download link once linked');
+ await page.click('[data-wl-appmore]');
  await page.waitForSelector('#wlPhoneApp .py-acts');
  const t=await txt(page,'#wlPhoneApp');
  assert.match(t,/📱 تطبيق الموبايل/);assert.match(t,/موبايل مربوط، آخر اتصال: 2026-11-20 \d\d:05/);
@@ -367,6 +372,10 @@ run('Waiting list: «📱 تطبيق الموبايل» inside the number book: 
  await page.waitForFunction(()=>window.__opened.length===2,null,{timeout:5000});
  assert.equal(await page.evaluate(()=>window.__opened[1]),'intent://link?k='+'ab'.repeat(32)+'#Intent;scheme=askercontacts;package=com.askerpharmacy.contacts;S.browser_fallback_url='+encodeURIComponent('https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/contacts-build/asker-contacts.apk')+';end');
  assert.equal(await page.evaluate(()=>window.__linkCalls),2,'a new key each time');
+ // after «اربط التطبيق» the block goes back to its thin line; «إخفاء» does the same by hand
+ await page.waitForFunction(()=>!!document.querySelector('#wlPhoneApp [data-wl-appmore]')&&!document.querySelector('#wlPhoneApp [data-wl-applink]'),null,{timeout:8000});
+ await page.click('[data-wl-appmore]');await page.waitForSelector('#wlPhoneApp [data-wl-applink]');
+ await page.click('[data-wl-appmore]');await page.waitForFunction(()=>!document.querySelector('#wlPhoneApp [data-wl-applink]'));
  // a staff member never sees it (the book screen is the owner's)
  await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;return window.AskerWait.open()});
  assert.equal(await page.$('[data-wl-bk]'),null);
@@ -435,10 +444,11 @@ run('Waiting list: the phone app block STAYS when its status cannot be read (own
  // the server answers later (a linked phone that has not talked yet): the same block now shows it, and a status that was read is NOT wiped by a failed read after it
  await page.evaluate(()=>{window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_phone_status:()=>({pending:0,last_sync:null,phones:[{label:'phone 2026-11-21',created_at:'2026-11-21T08:11:33Z',last_used_at:null}]})});document.dispatchEvent(new Event('visibilitychange'))});
  await page.waitForFunction(()=>/موبايل مربوط، آخر اتصال: لسه/.test(document.getElementById('wlPhoneApp').textContent),null,{timeout:5000});
+ assert.equal(await page.$('#wlPhoneApp [data-wl-applink]'),null,'linked (a key exists, the app has not talked yet): the thin line, not the big block');
  await page.evaluate(()=>{window.__fakeRpcs.ar_phone_status=()=>{throw new Error('offline')};document.dispatchEvent(new Event('visibilitychange'))});
  await page.waitForTimeout(600);
  assert.match(await txt(page,'#wlPhoneApp'),/موبايل مربوط، آخر اتصال: لسه/,'the status already on screen stays');
- assert.ok(await page.$('#wlPhoneApp [data-wl-applink]'));
+ assert.ok(await page.$('#wlPhoneApp [data-wl-appmore]'));
 });
 
 run('Waiting list in English: no Arabic left on the screen except names, and the words read right',async({page})=>{
