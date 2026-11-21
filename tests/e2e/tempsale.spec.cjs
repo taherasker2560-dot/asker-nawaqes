@@ -19,10 +19,10 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.click('.subbar [data-tab="tempsale"]');
  assert.match(await text(page,'#tsCart'),/لسه مفيش أصناف/);
  // the top is one thin bar (owner 2026-11-13 «في 2 سنتي»): بيع/مرتجع, 📷 🔎 #, «البيعات», then the search; no data-age
- // line here, so the bill starts high on the screen
+ // line here, so the bill starts high on the screen (352: the header's wave, the owner's 2026-11-21 look, makes the header 16 px taller than the flat one the old 340 was written for)
  const top=await page.evaluate(()=>({bar:document.querySelector('.ts-bar').getBoundingClientRect().height,
   cart:document.getElementById('tsCart').getBoundingClientRect().top,age:getComputedStyle(document.getElementById('dataAge')).display}));
- assert.ok(top.bar<=52,'one row: '+top.bar);assert.ok(top.cart<340,'the bill starts at '+top.cart);assert.equal(top.age,'none');
+ assert.ok(top.bar<=52,'one row: '+top.bar);assert.ok(top.cart<352,'the bill starts at '+top.cart);assert.equal(top.age,'none');
  await page.click('.subbar [data-tab="storeorders"]');
  assert.equal(await page.evaluate(()=>document.body.classList.contains('ts-page')),false,'the data-age line is back elsewhere');
  await page.click('.subbar [data-tab="tempsale"]');
