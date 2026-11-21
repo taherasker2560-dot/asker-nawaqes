@@ -75,7 +75,7 @@
       if (r.kind !== 'sale') continue;
       for (const l of r.lines || []) {
         const key = String(l.i);
-        const x = by.get(key) || { name: l.n || l.a || '#' + l.i, packs: 0, units: 0, n: 0 };
+        const x = by.get(key) || { id: l.i, name: l.n || l.a || '#' + l.i, packs: 0, units: 0, n: 0 };
         x.packs += num(l.p); x.units += num(l.u); x.n += 1;
         by.set(key, x);
       }
@@ -91,6 +91,10 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
+  // the item's small photo (a tap opens «تعديل الصنف»; owner 2026-11-21, group 4): every place here carries the item's number, so no guessing by name
+  const IM = () => root.AskerItemMedia;
+  const photo = (id, en, title) => (IM() && id != null && id !== '' ? IM().thumb(id, en, title) : '');
+  const photoRow = (id, en, title, inner) => (IM() ? IM().row(id, en, title, inner) : inner);
   const PAGE = 50, FRESH_MS = 2 * 60 * 1000;
   const st = { period: 'today', custom: null, kind: null, item: null, customer: null };
   let sum = null, rows = [], done = false, loadedAt = 0, seq = 0, busy = false, failText = '', lastAt = null;
@@ -180,14 +184,14 @@
     let html = '';
     if (st.item && sum.item) {
       const it = sum.item;
-      html += `<div class="sa-item"><div class="sa-item-n"><span class="notr" dir="ltr">${esc(st.item.name)}</span>${st.item.arabic_name ? `<small class="notr">${esc(st.item.arabic_name)}</small>` : ''}</div>` +
+      html += `<div class="sa-item">${photoRow(st.item.id, st.item.name, st.item.arabic_name || st.item.name, `<div class="sa-item-n"><span class="notr" dir="ltr">${esc(st.item.name)}</span>${st.item.arabic_name ? `<small class="notr">${esc(st.item.arabic_name)}</small>` : ''}</div>`)}` +
         `<p><span>اتباع منه</span> <b>${esc(qtyText(it.packs, it.units))}</b> <span>في</span> <b>${esc(sum.sales_n)}</b> <span>فاتورة</span> · <span>بقيمة</span> <b dir="ltr">${esc(money(it.value))}</b> <span>ج</span></p>` +
         `<p class="hint"><span>نقدي</span> ${esc(sum.cash_n)} · <span>آجل</span> ${esc(sum.credit_n)}${num(sum.returns_n) ? ` · <span>مرتجع</span> ${esc(sum.returns_n)}` : ''}</p></div>`;
     } else if (st.customer) {
       const n = num(sum.sales_n), avg = n ? num(sum.sales) / n : 0;
       html += `<div class="sa-sum">${card(sum.sales, 'اشترى بـ', n, 'credit')}<div class="sa-s"><b dir="ltr">${esc(money(Math.round(avg)))}</b><span>متوسط الفاتورة</span></div></div>`;
       const top = topItems(rows, 3);
-      if (top.length) html += `<p class="hint sa-top3"><span>أكتر أصناف بياخدها:</span> ${top.map((x) => `<span class="notr" dir="ltr">${esc(x.name)}</span> (${esc(x.n)})`).join(' · ')}</p>`;
+      if (top.length) html += `<p class="hint sa-top3"><span>أكتر أصناف بياخدها:</span> ${top.map((x) => `<span class="sa-t3">${photo(x.id, x.name, x.name)}<span><span class="notr" dir="ltr">${esc(x.name)}</span> (${esc(x.n)})</span></span>`).join(' ')}</p>`;
       if (num(sum.returns_n)) html += `<p class="hint"><span>مرتجع</span> ${esc(sum.returns_n)} · <span dir="ltr">${esc(money(sum.returns))}</span> <span>ج</span></p>`;
     } else {
       html += '<div class="sa-sum">' + card(sum.sales, 'إجمالي البيع', num(sum.sales_n), '') + card(sum.cash, 'نقدي', num(sum.cash_n), 'cash') +
@@ -215,7 +219,7 @@
       `<div class="sa-inv-s"><span>${esc(whenText(r.at))}</span> · <span>${esc(n)} ${n === 1 ? 'صنف' : 'أصناف'}</span></div>`;
     if (isOpen) {
       html += '<table class="sa-lines">' + (r.lines || []).map((l) =>
-        `<tr><td><span class="notr" dir="ltr">${esc(l.n || '#' + l.i)}</span>${l.a ? `<small class="notr">${esc(l.a)}</small>` : ''}</td><td>${esc(qtyText(l.p, l.u))}</td><td class="n" dir="ltr">${esc(money(lineValue(l)))}</td></tr>`).join('') + '</table>';
+        `<tr><td class="ph">${photo(l.i, l.n || l.a, l.a || l.n)}</td><td><span class="notr" dir="ltr">${esc(l.n || '#' + l.i)}</span>${l.a ? `<small class="notr">${esc(l.a)}</small>` : ''}</td><td>${esc(qtyText(l.p, l.u))}</td><td class="n" dir="ltr">${esc(money(lineValue(l)))}</td></tr>`).join('') + '</table>';
     }
     return html + '</div>';
   }
@@ -239,8 +243,9 @@
     if (!q) { el.innerHTML = ''; return; }
     if (list === null) { el.innerHTML = '<p class="status">بيدوّر…</p>'; return; }
     if (!list.length) { el.innerHTML = '<p class="status">مفيش صنف بالاسم ده.</p>'; return; }
-    el.innerHTML = '<div class="sa-hits">' + list.map((x) =>
-      `<button type="button" class="sa-hit" data-sa-item="${esc(x.id)}"><span class="notr" dir="ltr">${esc(x.name)}</span>${x.arabic_name ? `<small class="notr">${esc(x.arabic_name)}</small>` : ''}<em>${esc(num(x.invoices))} <span>فاتورة في السنة</span></em></button>`).join('') + '</div>';
+    // the photo BESIDE the button (a button inside a button is not valid): the name picks the item, the photo opens «تعديل الصنف»
+    el.innerHTML = '<div class="sa-hits">' + list.map((x) => photoRow(x.id, x.name, x.arabic_name || x.name,
+      `<button type="button" class="sa-hit" data-sa-item="${esc(x.id)}"><span class="notr" dir="ltr">${esc(x.name)}</span>${x.arabic_name ? `<small class="notr">${esc(x.arabic_name)}</small>` : ''}<em>${esc(num(x.invoices))} <span>فاتورة في السنة</span></em></button>`)).join('') + '</div>';
     el._hits = list;
   }
   function find(q) {

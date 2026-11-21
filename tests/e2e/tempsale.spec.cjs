@@ -35,6 +35,11 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.fill('#tsQ','كريم');
  await page.waitForSelector('#tsHits [data-ts-add="4875"]');
  assert.match(await text(page,'#tsHits [data-ts-add="4875"] small'),/كود 4875 · 20 ج · رصيد 3 علب/);
+ // group 4: the photo sits BESIDE the button; a tap on it opens «تعديل الصنف» and adds nothing, the list stays
+ assert.equal(await page.$$eval('#tsHits .im-lrow > button.im-th[data-im="4875"]',x=>x.length),1);
+ await page.click('#tsHits .im-th[data-im="4875"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.match(await text(page,'#tsCart'),/لسه مفيش أصناف/,'the photo adds nothing to the bill');
+ assert.equal((await page.$$('#tsHits [data-ts-add="4875"]')).length,1,'the list stays');
  await page.click('#tsHits [data-ts-add="4875"]');
  await closed('sale, tap');
  assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'1');
@@ -47,6 +52,11 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  // the line shows the stock and the nearest expiry, as in PharmaFly; more than the stock = red
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/رصيد 3 علب · صلاحية 07\/2028/);
  assert.equal(await page.$('#tsCart .ts-line[data-i="0"] .ts-warn'),null);
+ // group 4: the bill's line carries the item's photo; a tap on it opens the sheet over the bill and touches nothing in it
+ assert.equal(await page.$eval('#tsCart .ts-line[data-i="0"] > .im-lrow > .im-th',b=>b.dataset.im),'4875');
+ await page.click('#tsCart .ts-line[data-i="0"] .im-th');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'2','the quantity did not move');
+ assert.equal((await page.$$('#tsCart .ts-line')).length,1,'the line is still there');
  await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus]');
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-warn'),/الكمية أكتر من الرصيد/);
  await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');
@@ -130,6 +140,11 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  assert.match(await text(page,'#tsRows .ts-sale'),/عميل تجربة \(آجل\)/);
  await page.click('#tsRows [data-ts-open]');
  assert.match(await text(page,'#tsRows .ts-items'),/2 علبة[\s\S]*2 وحدة/);
+ // group 4: each item of a waiting sale has its photo (by the code); a tap opens the sheet and the sale stays open and waiting
+ assert.deepEqual(await page.$$eval('#tsRows .ts-items .ts-li > .im-th',b=>b.map(x=>x.dataset.im)),['4875','1060']);
+ await page.click('#tsRows .ts-items .im-th[data-im="1060"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
+ assert.equal((await page.$$('#tsRows .ts-sale.open [data-ts-done]')).length,1,'the sale is still open and waiting');
+ assert.equal((await table('ar_temp_sales'))[0].status,'pending','the photo did not mark it');
  await page.click('#tsRows [data-ts-done]');
  assert.equal((await table('ar_temp_sales'))[0].status,'entered');
  assert.match(await text(page,'#tsChips'),/مستنية 0[\s\S]*اتدخلت 1/);

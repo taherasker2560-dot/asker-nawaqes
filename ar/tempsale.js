@@ -153,6 +153,10 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
+  // the item's small photo (a tap opens «تعديل الصنف» over the bill and touches nothing in it; owner 2026-11-21, group 4). Every place carries the item's code
+  const IM = () => root.AskerItemMedia;
+  const photo = (id, en, title) => (IM() && id != null && id !== '' && Number.isFinite(Number(id)) ? IM().thumb(id, en, title) : '');
+  const photoRow = (id, en, title, inner) => (IM() && id != null && id !== '' && Number.isFinite(Number(id)) ? IM().row(id, en, title, inner) : inner);
   const QKEY = 'asker-ts-queue', IKEY = 'asker-ts-items', CKEY = 'asker-ts-cust';
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v ?? d; } catch (e) { return d; } };
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -230,9 +234,10 @@
   function hitCard(it) {
     const stock = root.AskerStockLib ? root.AskerStockLib.qtyText(it.packs, it.units, it.parts) : '';
     const price = Number(it.price) ? ' · ' + money(it.price) : '';
-    return `<button type="button" class="ts-hit" data-ts-add="${esc(it.item_id)}">
+    // the photo BESIDE the button (a button inside a button is not valid): the name adds the item, the photo opens «تعديل الصنف»
+    return photoRow(it.item_id, it.name, nameOf(it), `<button type="button" class="ts-hit" data-ts-add="${esc(it.item_id)}">
       <strong class="notr">${esc(nameOf(it))}</strong>
-      <small>كود ${esc(it.item_id)}${esc(price)} · رصيد ${esc(it.nostock ? 'مفيش' : stock)}</small></button>`;
+      <small>كود ${esc(it.item_id)}${esc(price)} · رصيد ${esc(it.nostock ? 'مفيش' : stock)}</small></button>`);
   }
   async function find() {
     const q = $('tsQ').value.trim();
@@ -453,8 +458,8 @@
       box.innerHTML = '<p class="hint">لسه مفيش أصناف. دوّر على صنف ودوس عليه.</p>';
     } else {
       box.innerHTML = cart.map((l, i) => `<div class="ts-line" data-i="${i}">
-        <div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>
-        ${lineInfo(l)}
+        ${photoRow(l.c, l.n, nameOf(l), `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>
+        ${lineInfo(l)}`)}
         <div class="ts-l2">
           <span class="ts-code">كود ${esc(l.c)}</span>
           <span class="ts-qty"><button type="button" data-ts-minus aria-label="أقل">−</button><b>${esc(l.q)}</b><button type="button" data-ts-plus aria-label="أكتر">+</button></span>
@@ -584,7 +589,7 @@
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
       <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· باعها <span class="notr">${esc(seller)}</span></span>` : ''}</span>${tag}</button>
       <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
-      ${open ? `<ul class="ts-items">${its.map((x) => `<li><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
+      ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small></span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
         ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}` : ''}
     </div>`;
