@@ -1991,22 +1991,22 @@ ul.so-lines li.so-nophoto { padding-inline-start: 44px; }
 .ts-qn::-webkit-outer-spin-button, .ts-qn::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .ts-qoff { display: block; text-align: center; margin-top: 10px; color: var(--muted); font-size: 12.5px; }
 .ts-calc { margin-top: 6px; color: var(--muted); font-size: 12.5px; }
-.ts-exp { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 4px 10px; border-radius: 10px; background: #e6f4ed; color: #1f8a5b; font-size: 12.5px; font-weight: 700; }
-.ts-exp.soon { background: #fbefdc; color: #b7791f; }
+.ts-exp { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 4px 10px; border-radius: 10px; background: var(--rose); color: var(--crimson-ink); font-size: 12.5px; font-weight: 700; }
+.ts-exp.soon { box-shadow: inset 0 0 0 1px var(--crimson); }   /* one brand color: «close» is the same tint with a line, not another hue */
 .ts-exp.none { background: var(--tint); color: var(--muted); font-weight: 400; }
 html body .ts-exp button.linklike { min-height: 0; margin: 0; padding: 0 4px; background: transparent; color: var(--crimson-ink); border: 0; border-radius: 0; box-shadow: none; font-size: 12.5px; font-weight: 700; text-decoration: underline; }
 .ts-line .ts-l2 { justify-content: space-between; }
 .ts-expsheet { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-end; justify-content: center; }
 .ts-expsheet.hidden { display: none; }
 .ts-exp-back { position: absolute; inset: 0; background: rgba(20, 30, 40, .45); }
-.ts-exp-card { position: relative; width: min(100%, 480px); max-height: 85vh; overflow: auto; padding: 16px 14px 20px; border-radius: 22px 22px 0 0; background: var(--card); box-shadow: 0 -8px 28px rgba(33, 123, 171, .18); }
+.ts-exp-card { position: relative; width: min(100%, 480px); max-height: 85vh; overflow: auto; padding: 16px 14px 20px; border-radius: 22px 22px 0 0; background: var(--card); box-shadow: 0 -8px 28px rgba(15, 23, 42, .18); }
 .ts-exp-card > strong { display: block; font-size: 16px; text-align: start; }
 .ts-exp-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .ts-exp-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 56px; margin: 0; padding: 10px 14px; text-align: start; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: none; }
-.ts-exp-row.soon { background: #fffaf0; border-color: #e8cf9f; }
+.ts-exp-row.soon { background: var(--rose); border-color: var(--crimson); }
 .ts-exp-row.on { border-color: var(--crimson); background: var(--tint); }
 .ts-exp-d { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.ts-exp-row small { color: #b7791f; font-weight: 700; }
+.ts-exp-row small { color: var(--crimson-ink); font-weight: 700; }
 .ts-exp-row b { margin-inline-start: auto; font-weight: 700; }
 /* «📷 صوّر المادة الفعالة» (owner 2026-11-21): the reading's state under the button: waiting (a small spinner), read (soft green: the fields below are filled, he checks them), could not read (soft red) */
 .im-read { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); font-size: 13.5px; }
