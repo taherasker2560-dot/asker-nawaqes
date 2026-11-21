@@ -74,6 +74,8 @@ run('shortage list rows',async({page})=>{
  // 6) the list is looked at only: nothing written; fits the phone; letters stick under the app bar
  assert.deepEqual(await page.evaluate(()=>window.__fakeWrites),[],'no writes');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the screen');
+ // (the header slides away while you scroll down a list, so the sticky letters go up with it: look at the page's top, where the bars are always there)
+ await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);
  assert.ok(parseInt(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--sticky-top')))>=40);
  // other tabs: names changed there show when coming back
  await page.click('[data-tab="translate"]');await page.click('[data-tab="short"]');
