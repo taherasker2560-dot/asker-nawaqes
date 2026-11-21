@@ -86,5 +86,5 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  await page.waitForFunction(()=>/لسه مش متاحة/.test(document.getElementById('saStatus').textContent));
  assert.equal(await page.$$eval('#saList [data-sa-inv]',x=>x.length),0);
  // nothing was written by all those photo taps (the sheet only asks «who may edit»)
- assert.deepEqual((await page.evaluate(()=>window.__fakeWrites)).filter(w=>!/^(ar_staff_can|ar_people_list|ar_sales_(summary|list|find_items))$/.test(w.rpc||'')).map(w=>w.rpc||JSON.stringify(w).slice(0,80)),[]);
+ assert.deepEqual((await page.evaluate(()=>window.__fakeWrites)).filter(w=>!/^(ar_is_staff|ar_people_list|ar_sales_(summary|list|find_items))$/.test(w.rpc||'')).map(w=>w.rpc||JSON.stringify(w).slice(0,80)),[]);
 });

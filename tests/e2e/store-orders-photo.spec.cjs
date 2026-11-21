@@ -16,5 +16,5 @@ run('Store orders: the photo of each site item, none for a typed line, a tap ope
  await page.click('#soOpen [data-order="7"] .so-lines .im-th[data-im="101"]');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
  assert.equal((await table('ar_store_orders'))[0].status,'new','the photo did not touch the order');
  assert.equal(await page.$eval('#soOpen [data-order="7"] .so-wa',a=>a.href),wa,'the WhatsApp message is the same');
- assert.deepEqual((await page.evaluate(()=>window.__fakeWrites)).filter(w=>!/^(ar_staff_can|ar_people_list)$/.test(w.rpc||'')).map(w=>w.rpc||JSON.stringify(w).slice(0,80)),[],'nothing was written');
+ assert.deepEqual((await page.evaluate(()=>window.__fakeWrites)).filter(w=>!/^(ar_is_staff|ar_people_list)$/.test(w.rpc||'')).map(w=>w.rpc||JSON.stringify(w).slice(0,80)),[],'nothing was written');
 });

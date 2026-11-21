@@ -1,4 +1,4 @@
-// Function asker-store-img: the owner (or «storeorders») keeps a chosen photo on our storage; anyone else is refused; only
+// Function asker-store-img: the owner (or any active staff member) keeps a chosen photo on our storage; anyone else is refused; only
 // real pictures from public https addresses. Fake Supabase and fake websites; nothing real is called.
 const assert = require('node:assert/strict'), path = require('node:path'), { pathToFileURL } = require('node:url');
 (async () => {
@@ -13,7 +13,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
       calls.push({ url, o }); const u = new URL(url);
       if (u.hostname === 'p.supabase.co') {
         if (u.pathname === '/auth/v1/user') return new Response(JSON.stringify(me ? { id: me } : {}), { status: me ? 200 : 401 });
-        if (u.pathname === '/rest/v1/rpc/ar_staff_can') return new Response(JSON.stringify(staffOk));
+        if (u.pathname === '/rest/v1/rpc/ar_is_staff') return new Response(JSON.stringify(staffOk));
         if (u.pathname.startsWith('/storage/v1/object/ar-store-img/')) { assert.equal(o.headers.apikey, 'service'); return new Response('{}'); }
         if (u.pathname === '/rest/v1/ar_store_edits') { saved.push(JSON.parse(o.body)); return new Response(null, { status: 201 }); }
         throw Error('unexpected ' + url);
@@ -31,7 +31,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   // a photo from his phone (base64)
   f = fake(); r = await F.handle(req({ id: 9, data: 'data:image/jpeg;base64,' + Buffer.from(JPG).toString('base64') }), env, f);
   assert.equal(r.status, 200); assert.match((await r.json()).img, /^e\/9-/);
-  // a staff member with «storeorders» may; one without may not; no sign-in: refused
+  // an active staff member may (owner 2026-11-21: any of them, not only «storeorders»); a stranger (not staff) may not; no sign-in: refused
   assert.equal((await F.handle(req({ id: 9, url: 'https://a.com/x.jpg' }), env, fake({ me: STAFF, staffOk: true }))).status, 200);
   f = fake({ me: STAFF, staffOk: false }); r = await F.handle(req({ id: 9, url: 'https://a.com/x.jpg' }), env, f);
   assert.equal(r.status, 403); assert.equal(f.saved.length, 0);

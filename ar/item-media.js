@@ -99,7 +99,8 @@
     const u = data && data.session && data.session.user;
     if (!u) return (canEdit = false);
     if (u.id === OWNER) return (canEdit = true);
-    const r = await c.rpc('ar_staff_can', { ps: ['storeorders'] });
+    // any ACTIVE staff member the owner made may edit an item from its sheet (owner 2026-11-21: «افتح لهم عادي»; migration 202611211500)
+    const r = await c.rpc('ar_is_staff');
     return (canEdit = !r.error && r.data === true);
   }
 
