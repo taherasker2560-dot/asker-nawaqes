@@ -61,3 +61,19 @@ run('bars: the customers\' site has the same bars: the header with the wave, the
  assert.equal(x.sig,'Agzatm','«Agza» and tm at the end of the page');assert.ok(x.sigBeforeBar,'right above the bottom bar');
  assert.equal(await page.$$eval('#spareBar',n=>n.length),0,'the spare buttons are for the system only');
 },{home:true});
+
+run('bars: the two rows at the top slide away when you scroll down and come back when you scroll up a little, at the top and when you tap the bar',async({page})=>{
+ await ready(page);
+ await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px'});
+ const state=()=>page.evaluate(()=>({away:document.documentElement.classList.contains('bars-away'),tf:getComputedStyle(document.querySelector('.appbar')).transform,st:getComputedStyle(document.documentElement).getPropertyValue('--sticky-top').trim()}));
+ let s=await state();assert.equal(s.away,false,'the rows are there at the top');assert.equal(s.tf,'none');
+ await page.evaluate(()=>window.scrollTo(0,700));await page.waitForTimeout(450);
+ s=await state();assert.equal(s.away,true,'scrolling down hides the two rows');assert.match(s.tf,/^matrix\(1, 0, 0, 1, 0, -\d+/,'they slid up: '+s.tf);assert.equal(s.st,'0px','the sticky tabs go up under the screen\'s edge');
+ await page.evaluate(()=>window.scrollTo(0,650));await page.waitForTimeout(450);
+ s=await state();assert.equal(s.away,false,'scrolling up a little brings them back');assert.equal(s.tf,'none');
+ await page.evaluate(()=>window.scrollTo(0,1400));await page.waitForTimeout(450);assert.equal((await state()).away,true);
+ await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(450);assert.equal((await state()).away,false,'at the top they are always there');
+ await page.evaluate(()=>window.scrollTo(0,1400));await page.waitForTimeout(450);assert.equal((await state()).away,true);
+ await page.evaluate(()=>document.querySelector('.bottomnav [data-group="accounts"]').click());await page.waitForTimeout(300);
+ assert.equal((await state()).away,false,'a tap on the bottom bar brings them back');
+},{home:true});
