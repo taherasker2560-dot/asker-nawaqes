@@ -78,18 +78,38 @@ run('bars: the two rows at the top slide away when you scroll down and come back
  assert.equal((await state()).away,false,'a tap on the bottom bar brings them back');
 },{home:true});
 
-run('bars: a switch in the settings turns the hiding off and on, and the phone remembers',async({page})=>{
+run('bars: three switches in the settings (the header, the five spare buttons, the bottom bar), each decides what hides while you scroll down; the phone remembers',async({page})=>{
  await ready(page);
  await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px'});
- const away=()=>page.evaluate(()=>document.documentElement.classList.contains('bars-away'));
- assert.equal(await page.isChecked('#barHide'),true,'on by default');
- await page.evaluate(()=>window.scrollTo(0,800));await page.waitForTimeout(450);assert.equal(await away(),true);
- // off: they come back at once and stay while scrolling
- await page.evaluate(()=>{const b=document.getElementById('barHide');b.checked=false;b.dispatchEvent(new Event('change',{bubbles:true}))});
- assert.equal(await away(),false,'turning it off brings the rows back');assert.equal(await page.evaluate(()=>localStorage.getItem('asker-bars-hide')),'0','kept on the phone');
- await page.evaluate(()=>window.scrollTo(0,1600));await page.waitForTimeout(450);assert.equal(await away(),false,'off: scrolling down does not hide them');
- // after a reload the switch shows what was chosen
- await page.reload();await ready(page);assert.equal(await page.isChecked('#barHide'),false,'still off after a reload');
- await page.evaluate(()=>{const b=document.getElementById('barHide');b.checked=true;b.dispatchEvent(new Event('change',{bubbles:true}))});
- await page.evaluate(()=>{document.querySelector('main').style.paddingBottom='3000px';window.scrollTo(0,900)});await page.waitForTimeout(450);assert.equal(await away(),true,'on again: they hide');
+ const cls=()=>page.evaluate(()=>['hd-away','sp-away','bt-away'].filter(c=>document.documentElement.classList.contains(c)));
+ const ty=(sel)=>page.evaluate((s)=>{const m=/matrix\(1, 0, 0, 1, 0, (-?[\d.]+)\)/.exec(getComputedStyle(document.querySelector(s)).transform);return m?parseFloat(m[1]):0},sel);
+ const sw=(id,on)=>page.evaluate(([id,on])=>{const b=document.getElementById(id);b.checked=on;b.dispatchEvent(new Event('change',{bubbles:true}))},[id,on]);
+ const st=()=>page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--sticky-top').trim());
+ assert.deepEqual(await page.evaluate(()=>['hideHead','hideSpare','hideBottom'].map(i=>document.getElementById(i).checked)),[true,true,false],'the header and the spare row hide by default, the bottom bar stays');
+ const H=await page.evaluate(()=>document.querySelector('.appbar').offsetHeight);
+ await page.evaluate(()=>window.scrollTo(0,800));await page.waitForTimeout(450);
+ assert.deepEqual(await cls(),['hd-away','sp-away'],'by default the header and the spare row go');assert.equal(await ty('.bottomnav'),0,'the bottom bar stays');
+ // the bottom bar's own switch: it goes down and out at once
+ await sw('hideBottom',true);await page.waitForTimeout(350);
+ assert.deepEqual(await cls(),['hd-away','sp-away','bt-away']);assert.ok((await ty('.bottomnav'))>60,'the bottom bar slid down');
+ await sw('hideBottom',false);await page.waitForTimeout(350);assert.equal(await ty('.bottomnav'),0,'and comes back when its switch is off');
+ // the header off, the spare row on: only the spare row slides (up by its own height)
+ await sw('hideHead',false);await page.waitForTimeout(350);
+ assert.deepEqual(await cls(),['sp-away']);assert.equal(Math.round(await ty('.appbar')),0,'the header stays where it is');assert.match(await page.evaluate(()=>getComputedStyle(document.querySelector('.appbar')).clipPath),/inset\(0px 0px 56px/,'the spare row\'s strip is cut off at the bottom');assert.equal(await st(),'calc('+H+'px - 56px)','the sticky tabs sit under the header only (the header\'s height minus the spare row\'s)');
+ // the header on, the spare row off: the header slides up and the spare row stays at the top
+ await sw('hideHead',true);await sw('hideSpare',false);await page.waitForTimeout(350);
+ assert.deepEqual(await cls(),['hd-away']);assert.equal(Math.round(await ty('.appbar')),-(H-56),'the header slides out, the spare row stays');assert.equal(await st(),'56px','the sticky tabs sit under the spare row');
+ // everything off: nothing hides
+ await sw('hideHead',false);await page.waitForTimeout(350);
+ assert.deepEqual(await cls(),[]);assert.equal(await ty('.appbar'),0);
+ await page.evaluate(()=>window.scrollTo(0,1600));await page.waitForTimeout(450);assert.deepEqual(await cls(),[],'all off: scrolling down hides nothing');
+ // the choices are kept on the phone
+ assert.deepEqual(await page.evaluate(()=>['asker-hide-head','asker-hide-spare','asker-hide-bottom'].map(k=>localStorage.getItem(k))),['0','0','0']);
+ await page.reload();await ready(page);
+ assert.deepEqual(await page.evaluate(()=>['hideHead','hideSpare','hideBottom'].map(i=>document.getElementById(i).checked)),[false,false,false],'after a reload the switches show what he chose');
+ // the first version's single switch still counts for the header and the spare row until the new ones are touched
+ await page.evaluate(()=>{['asker-hide-head','asker-hide-spare','asker-hide-bottom'].forEach(k=>localStorage.removeItem(k));localStorage.setItem('asker-bars-hide','0')});
+ await page.reload();await ready(page);
+ assert.deepEqual(await page.evaluate(()=>['hideHead','hideSpare','hideBottom'].map(i=>document.getElementById(i).checked)),[false,false,false],'the old «off» is respected');
+ await page.evaluate(()=>{localStorage.removeItem('asker-bars-hide')});
 },{home:true});

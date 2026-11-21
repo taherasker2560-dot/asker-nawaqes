@@ -103,8 +103,16 @@ html body .pgroups button { min-height: 40px; background: var(--card); border: 1
 html body .pgroups button.on { background: var(--rose); border-color: var(--crimson); color: var(--crimson-ink); font-weight: 700; box-shadow: none; }
 html body #niAdd, html body .dc-pick, html body .py-new, html body .ct-scan, html body .ts-save, html body button.cu-send { background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); box-shadow: none; font-weight: 800; }
 
-/* 7) the two rows at the top slide away when you scroll down a list and come back when you scroll up a little (ar/barhide.js adds «bars-away» to <html>): more room to read. The bottom bar stays. */
-html body .appbar { transition: transform 0.22s ease; will-change: transform; }
-html.bars-away body .appbar { transform: translateY(-100%); }
-html.bars-away { --sticky-top: 0px !important; }
-@media (prefers-reduced-motion: reduce) { html body .appbar { transition: none; } }
+/* 7) the bars slide away when you scroll down a list and come back when you scroll up a little (ar/barhide.js adds hd-away / sp-away / bt-away to <html>, one switch each in the settings):
+      more room to read. The header and the spare row are one box (.appbar): both away = up and out; only the header away = up until the spare row is what is left at the top; only the spare
+      row away = its strip is cut off at the bottom (the header with its wave stays; the wave takes the page's white). The sticky tabs of a section follow what is still showing (--sticky-top). */
+html body .appbar { transition: transform 0.22s ease, clip-path 0.22s ease; will-change: transform; clip-path: inset(0 0 0 0); }
+html body .bottomnav { transition: transform 0.22s ease; }
+html.hd-away.sp-away body .appbar { transform: translateY(-100%); }
+html.hd-away:not(.sp-away) body .appbar { transform: translateY(calc(var(--spare-h) - 100%)); }
+html.sp-away:not(.hd-away) body .appbar { clip-path: inset(0 0 var(--spare-h) 0); --wave-fill: var(--card); }
+html.hd-away.sp-away { --sticky-top: 0px !important; }
+html.hd-away:not(.sp-away) { --sticky-top: var(--spare-h) !important; }
+html.sp-away:not(.hd-away) { --sticky-top: calc(var(--appbar-h, 130px) - var(--spare-h)) !important; }
+html.bt-away body .bottomnav { transform: translateY(calc(100% + 32px)); }
+@media (prefers-reduced-motion: reduce) { html body .appbar, html body .bottomnav { transition: none; } }
