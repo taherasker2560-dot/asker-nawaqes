@@ -2,7 +2,7 @@
 // lines is kept but not spoken. Same fakes as tests/inbox.cjs; nothing real is called.
 const assert=require('node:assert/strict'),path=require('node:path'),crypto=require('node:crypto');
 (async()=>{
-const F=await import(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts'));
+const F=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','arabic-shortages','index.ts')).href);
 const env={GEMINI_API_KEY:'k',ALLOWED_EMAILS:'owner@example.com',SUPABASE_URL:'https://p.supabase.co',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service',INBOX_CLAIM_WAIT_MS:'1'};
 const KEY='a'.repeat(64),HASH=crypto.createHash('sha256').update(KEY).digest('hex');
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];

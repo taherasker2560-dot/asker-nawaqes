@@ -8,12 +8,14 @@ const TYPES={'.html':'text/html; charset=utf-8','.js':'application/javascript','
 function serve(){return new Promise(ok=>{const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x');const f=path.join(repo,decodeURIComponent(u.pathname));
   if(q.method==='GET'&&f.startsWith(repo)&&fs.existsSync(f)&&fs.statSync(f).isFile()){r.writeHead(200,{'content-type':TYPES[path.extname(f)]||'application/octet-stream'});return r.end(fs.readFileSync(f))}
   r.writeHead(404);r.end()});srv.listen(0,'127.0.0.1',()=>ok(srv))})}
+// Playwright's own Chromium when it is installed (CI); otherwise the Chrome installed on the machine (the owner's laptop has no Playwright Chromium, 2026-11-21)
+function launchOpts(){try{if(fs.existsSync(chromium.executablePath()))return {}}catch(e){}return {channel:'chrome'}}
 // runs one after the other; any failure sets a failing exit code
 let queue=Promise.resolve();
 function run(name,fn,opts){queue=queue.then(()=>runOne(name,fn,opts)).catch(e=>{console.error('FAIL: '+name+'\n',e);process.exitCode=1});return queue}
 // the page opens on «الرئيسية» (2026-11-12); most tests start in «المشتريات» ← «النواقص» like before (home:true keeps the first screen)
 async function runOne(name,fn,{permissions=[],home=false}={}){const srv=await serve(),base=`http://localhost:${srv.address().port}/`;
- const browser=await chromium.launch();const errs=[];
+ const browser=await chromium.launch(launchOpts());const errs=[];
  try{const ctx=await browser.newContext({viewport:{width:412,height:915},permissions});
   await ctx.route(/^https?:\/\//,route=>{const u=new URL(route.request().url());
    if(u.hostname==='cdn.jsdelivr.net'&&u.pathname.includes('supabase'))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(FAKE)});
