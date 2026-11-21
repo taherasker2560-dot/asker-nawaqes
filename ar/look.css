@@ -2482,6 +2482,18 @@ html.night .py-bkf button.on { color: var(--ink); }
 .vn-pk { margin: 0; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--muted); font-size: 12.5px; font-weight: 600; box-shadow: none; }
 .vn-pk.guess { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 800; }
 .vn-pk.on { border-color: var(--crimson); background: var(--crimson); color: #fff; }
+/* a number he types (owner 2026-11-21): number + optional name, then the job; and the line in «طلب مش موجود» that adds the supplier's telesales number from the form itself */
+.vn-typed { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin: 6px 0; }
+.vn-typed input { width: 100%; margin: 0; }
+.vn-sg .hint { flex: 1 0 auto; margin: 0; }
+.py-tele { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 13px; }
+.py-tele.set { border: 1px solid transparent; background: var(--rose); color: var(--ink); }
+.py-tele > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.py-tele button { margin: 0; flex: none; }
+.py-confirm .vn-pick { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 14px; }
+html body .py-tele .linklike, html body .py-confirm .vn-pick .linklike { min-height: 0; margin: 0; padding: 6px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--crimson-ink); box-shadow: none; font-size: 13px; font-weight: 700; }
+html.night body .py-tele .linklike, html.night body .py-confirm .vn-pick .linklike { color: var(--ink); }
+html.night .py-tele.set { background: var(--tint-2, var(--rose)); }
 html.night .vn-slot.set { background: var(--tint-2, var(--rose)); }
 html.night .vn-pk.guess { color: var(--ink); }
 .py-bx.on { border-color: var(--crimson); background: var(--rose); color: var(--ink); }
