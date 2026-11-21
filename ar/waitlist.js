@@ -198,8 +198,11 @@
     return `<div class="py-card">${withPhoto(r.item_id, r.item, `<div class="py-l1"><span class="py-name" dir="ltr"><bdi class="notr">${esc(r.item)}</bdi></span>${vchip(r)}</div>`)}` +
       `<div class="py-l2">${person(r)} · ${qtySpan(r)} · <span>${esc(ago('اتطلب', r.days))}</span>` + (r.item_id == null ? ` · <span>${esc('صنف مش معروف للسيستم: دوس «وصل» بإيدك')}</span>` : '') + '</div>' +
       (r.vendor_id == null && !isStaff() ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
-      `<div class="py-acts">${isStaff() ? '' : act(r.id, 'arrived', 'وصل', 'py-p')}${teleBtn(r)}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
+      `<div class="py-acts">${isStaff() ? '' : act(r.id, 'arrived', 'وصل', 'py-p')}${callBtn(r)}${teleBtn(r)}${act(r.id, 'cancelled', 'إلغاء')}</div></div>`;
   }
+  // «اتصل» on every card that shows a customer (owner 2026-11-22, after the same button came to the customers' list: «انت عملت الاوبشن ده لقائمة الانتظار؟»): the dialer opens on the number of the request;
+  // unlike the one on «كلّم دول» it does not mark him as called (nothing is written)
+  const callBtn = (r) => (r.phone ? `<a class="py-a" href="${esc(telLink(r.phone))}">اتصل</a>` : '');
   // «📲 ابعت للتليسيلز»: the supplier of this request has a telesales number saved (ar/vendors.js): WhatsApp opens on it with the request ready (owner only)
   const teleOf1 = (r) => (isStaff() || r.vendor_id == null ? null : vnums.get(String(r.vendor_id)) || null);
   const teleBtn = (r) => (teleOf1(r) ? `<button type="button" class="secondary small" data-wl-tele="${esc(r.id)}">📲 ابعت للتليسيلز</button>` : '');
@@ -218,7 +221,7 @@
       `<div class="py-l2"><span>${esc(ago('وصل', r.days_here))}</span> · <b>${esc(leftText(left))}</b></div>` +
       `<div class="py-l2">${nums.map((n) => `<span>${esc(n)}</span>`).join(' · ')}${r.exp_short ? ' ' + tag('صلاحيته أقل من سنة ونص') : ''}</div>` +
       (r.vendor_id == null ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
-      `<div class="py-acts">${act(r.id, 'returned', 'رجّعته للمورد', 'py-p')}${act(r.id, 'kept', 'هسيبه')}${act(r.id, 'delivered', 'اتسلّم')}${act(r.id, 'reopen', 'مش وصل لسه')}</div></div>`;
+      `<div class="py-acts">${act(r.id, 'returned', 'رجّعته للمورد', 'py-p')}${callBtn(r)}${act(r.id, 'kept', 'هسيبه')}${act(r.id, 'delivered', 'اتسلّم')}${act(r.id, 'reopen', 'مش وصل لسه')}</div></div>`;
   }
   const head = (title, n) => `<h3 class="py-h">${esc(title)} <span class="py-num">${esc(n)}</span></h3>`;
 

@@ -64,8 +64,8 @@ run('Waiting list: call these (call / WhatsApp / handed over), the waiting ones,
  assert.deepEqual((await texts(page,'#wlMain .py-h'))[0],'مستنيين الدوا 2','no «call these» heading when there is nobody to call');
  // the waiting ones: how long ago, the supplier's kind, one the system does not know (by hand), a supplier chosen later
  const waiting=await texts(page,'#wlMain .py-h + .py-card, #wlMain .py-card:not(.py-wait):not(.py-look)');
- assert.match(waiting[0],/CATAFLAM 50MG 20 TAB المتحدة للأدوية · مخزن عميل مثال · 01055556666 · علبة · اتطلب من يومين وصل إلغاء/);
- assert.match(waiting[1],/PHARMABILAST ORAL .*علبتين · اتطلب النهارده · صنف مش معروف للسيستم: دوس «وصل» بإيدك .*وصل إلغاء/);
+ assert.match(waiting[0],/CATAFLAM 50MG 20 TAB المتحدة للأدوية · مخزن عميل مثال · 01055556666 · علبة · اتطلب من يومين وصل اتصل إلغاء/);
+ assert.match(waiting[1],/PHARMABILAST ORAL .*علبتين · اتطلب النهارده · صنف مش معروف للسيستم: دوس «وصل» بإيدك .*وصل اتصل إلغاء/);
  await page.selectOption('select[data-wl-vendor="2"]','12');
  await page.waitForFunction(()=>window.__wl.calls.some(c=>c[2]==='vendor'),null,{timeout:5000});
  assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).slice(-1),[['set',2,'vendor',12]]);
@@ -83,7 +83,7 @@ run('Waiting list: call these (call / WhatsApp / handed over), the waiting ones,
  const left=await texts(page,'#wlMain .py-card:has([data-wl-act="returned"])');
  assert.equal(left.length,3,'the two leftovers and the customer he called: still here until he decides');
  assert.match(left[0],/XYZ CREAM 30G مورد جديد .* اتكلم وصل من 22 يوم · حدد نوع المورد عشان يظهر ميعاد الرجوع اتباع آخر سنة: 3.5 علبة · السعر 62 ج · أقرب صلاحية في المخزن 2026-06 صلاحيته أقل من سنة ونص/);
- assert.match(left[1],/CATAFLAM 50MG 20 TAB مركز توزيع النور · مركز توزيع عميل مثال تاني · 01077778888 · علبة وصل من 6 أيام · فاضل يوم على الرجوع اتباع آخر سنة: 0 علبة · السعر 85 ج · أقرب صلاحية في المخزن 2030-01 رجّعته للمورد هسيبه اتسلّم مش وصل لسه/);
+ assert.match(left[1],/CATAFLAM 50MG 20 TAB مركز توزيع النور · مركز توزيع عميل مثال تاني · 01077778888 · علبة وصل من 6 أيام · فاضل يوم على الرجوع اتباع آخر سنة: 0 علبة · السعر 85 ج · أقرب صلاحية في المخزن 2030-01 رجّعته للمورد اتصل هسيبه اتسلّم مش وصل لسه/);
  assert.equal(await page.$$eval('#wlMain .py-card.py-look',c=>c.length),1,'only the one with a day left is in red');
  assert.equal(await page.$$eval('#wlMain .py-card.py-look',c=>c[0].textContent.includes('CATAFLAM')),true);
  // decisions: returned / kept are a second tap
@@ -159,6 +159,25 @@ run('Waiting list: a new request: search, the supplier\'s kind asked once, the n
  await page.click('[data-wl-close]');
  assert.ok(await page.isVisible('[data-wl-new]'));
 },{permissions:['clipboard-read','clipboard-write']});
+
+// owner 2026-11-22 («انت عملت الاوبشن ده لقائمة الانتظار؟»): «اتصل» was only on «كلّم دول»; now also on «مستنيين الدوا» and «قرار الرجوع»: the dialer on the request's number, nothing written
+run('Waiting list: «اتصل» on the waiting cards and the return-decision cards too (the request\'s number, nobody is marked as called, nothing is written)',async({page})=>{
+ await seed(page);
+ await open(page);
+ await page.evaluate(()=>{window.__tel=[];document.addEventListener('click',(e)=>{const a=e.target.closest('a[href^="tel:"]');if(a){e.preventDefault();window.__tel.push(a.getAttribute('href'))}},true)});
+ const pairs=(sel,key)=>page.$$eval(sel,(cards,k)=>cards.map(c=>[c.querySelector(`[data-wl-act="${k}"]`).dataset.id,[...c.querySelectorAll('a.py-a[href^="tel:"]')].map(a=>a.getAttribute('href')).join('|')||null]),key);
+ assert.deepEqual(await pairs('#wlMain .py-card:has([data-wl-act="arrived"])','arrived'),[['1','tel:01055556666'],['2','tel:01099998888']],'«مستنيين الدوا»: each card calls its own number');
+ assert.deepEqual(await pairs('#wlMain .py-card:has([data-wl-act="returned"])','returned'),[['5','tel:01022223333'],['6','tel:01077778888']],'«قرار الرجوع»: the same');
+ assert.equal(await page.$$eval('#wlMain .py-card:not(.py-wait) a[data-wl-called]',a=>a.length),0,'only the «كلّم دول» links mark a customer as called');
+ assert.equal(await page.$$eval('#wlMain .py-card.py-wait a[data-wl-called][href^="tel:"]',a=>a.length),2,'«كلّم دول» is as it was');
+ assert.equal(await page.$eval('#wlMain .py-card:has([data-wl-act="arrived"][data-id="2"]) a.py-a[href^="tel:"]',a=>a.textContent.trim()),'اتصل');
+ // a tap dials and changes nothing: the card stays, nothing is sent to the server
+ await page.click('#wlMain .py-card:has([data-wl-act="arrived"][data-id="2"]) a.py-a[href^="tel:"]');
+ await page.click('#wlMain .py-card:has([data-wl-act="returned"][data-id="6"]) a.py-a[href^="tel:"]');
+ assert.deepEqual(await page.evaluate(()=>window.__tel),['tel:01099998888','tel:01077778888']);
+ assert.equal(await page.$$eval('#wlMain .py-card:has([data-wl-act="arrived"])',c=>c.length),2);
+ assert.deepEqual(await page.evaluate(()=>window.__wl.calls),[],'nothing was written or marked');
+});
 
 // owner 2026-11-21: «انا فاتح الانتظار وبكتب كل شويه الاقي الزراير تطلع وتنزل مني كده وتبوظ لي الكتابه من اول وجديد»: every answer of the drug search rebuilt the WHOLE form (the box he was typing in
 // included): the phone's keyboard closed and opened again and the word was cut. Now only the list under the box is drawn again.
