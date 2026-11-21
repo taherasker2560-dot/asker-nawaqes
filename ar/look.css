@@ -1970,6 +1970,44 @@ ul.so-lines li:first-child { border-top: 0; }
 ul.so-lines li .so-m { flex: 1; min-width: 0; }
 ul.so-lines li b { flex: none; }
 ul.so-lines li.so-nophoto { padding-inline-start: 44px; }
+/* temp sale (owner 2026-11-21): up to 3 bills in tabs, two quantity boxes (boxes / units), the expiry chosen on the line and the question that asks for it */
+.ts-bills { display: flex; gap: 6px; margin: 4px 0; }
+.ts-bill { flex: 1 1 0; min-width: 0; min-height: 34px; margin: 0; padding: 1px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--muted); font-weight: 700; font-size: 14px; line-height: 1.25; box-shadow: none; }
+.ts-bill b { color: var(--ink); }
+.ts-bill small { display: block; font-size: 11.5px; font-weight: 700; color: var(--crimson-ink); font-variant-numeric: tabular-nums; }
+.ts-bill.on { border-color: var(--crimson); background: var(--tint); color: var(--crimson-ink); }
+.ts-bill.on b { color: var(--crimson-ink); }
+.ts-bill.ret { border-color: #e7a9a3; }
+.ts-bill.ret.on { background: #fdecea; color: #b42318; border-color: #c62828; }
+.ts-bill.ret.on b, .ts-bill.ret small { color: #b42318; }
+.ts-bill.add { flex: 0 0 44px; border-style: dashed; color: var(--crimson-ink); font-size: 18px; }
+.ts-qrow { display: flex; gap: 8px; margin-top: 10px; }
+.ts-qbox { flex: 1 1 0; min-width: 0; padding: 6px 8px 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.ts-qbox.off { background: var(--tint); opacity: .8; }
+.ts-ql { display: block; text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+.ts-qctl { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-top: 4px; }
+.ts-qctl button { width: 36px; min-width: 36px; min-height: 36px; margin: 0; padding: 0; border-radius: 10px; background: var(--card); color: var(--ink); border: 1px solid var(--line); font-weight: 700; font-size: 18px; box-shadow: none; }
+.ts-qctl input.ts-qn { flex: 1 1 0; width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 2px 0; text-align: center; font-size: 20px; font-weight: 800; border: 0; border-bottom: 2px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; color: var(--ink); font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+.ts-qn::-webkit-outer-spin-button, .ts-qn::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ts-qoff { display: block; text-align: center; margin-top: 10px; color: var(--muted); font-size: 12.5px; }
+.ts-calc { margin-top: 6px; color: var(--muted); font-size: 12.5px; }
+.ts-exp { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 4px 10px; border-radius: 10px; background: #e6f4ed; color: #1f8a5b; font-size: 12.5px; font-weight: 700; }
+.ts-exp.soon { background: #fbefdc; color: #b7791f; }
+.ts-exp.none { background: var(--tint); color: var(--muted); font-weight: 400; }
+html body .ts-exp button.linklike { min-height: 0; margin: 0; padding: 0 4px; background: transparent; color: var(--crimson-ink); border: 0; border-radius: 0; box-shadow: none; font-size: 12.5px; font-weight: 700; text-decoration: underline; }
+.ts-line .ts-l2 { justify-content: space-between; }
+.ts-expsheet { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-end; justify-content: center; }
+.ts-expsheet.hidden { display: none; }
+.ts-exp-back { position: absolute; inset: 0; background: rgba(20, 30, 40, .45); }
+.ts-exp-card { position: relative; width: min(100%, 480px); max-height: 85vh; overflow: auto; padding: 16px 14px 20px; border-radius: 22px 22px 0 0; background: var(--card); box-shadow: 0 -8px 28px rgba(33, 123, 171, .18); }
+.ts-exp-card > strong { display: block; font-size: 16px; text-align: start; }
+.ts-exp-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.ts-exp-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 56px; margin: 0; padding: 10px 14px; text-align: start; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: none; }
+.ts-exp-row.soon { background: #fffaf0; border-color: #e8cf9f; }
+.ts-exp-row.on { border-color: var(--crimson); background: var(--tint); }
+.ts-exp-d { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ts-exp-row small { color: #b7791f; font-weight: 700; }
+.ts-exp-row b { margin-inline-start: auto; font-weight: 700; }
 /* «📷 صوّر المادة الفعالة» (owner 2026-11-21): the reading's state under the button: waiting (a small spinner), read (soft green: the fields below are filled, he checks them), could not read (soft red) */
 .im-read { display: flex; gap: 10px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); font-size: 13.5px; }
 .im-read b { display: block; font-size: 14px; }

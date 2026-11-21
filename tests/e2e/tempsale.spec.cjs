@@ -2,6 +2,8 @@
 // customer over his limit, kept on the phone with no internet and sent later, then marked «اتدخلت». Made-up items and
 // customers only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');
+// a line's two boxes: boxes (q) and units (w) are inputs now (owner 2026-11-21)
+const qv=(page,i,w='q')=>page.inputValue(`#tsCart .ts-line[data-i="${i}"] [data-ts-n="${w}"]`);
 const STOCK=[
  {item_id:1060,name:'ITEM ONE 14TAB',arabic_name:'صنف تجربة',price:210,packs:5,units:0,parts:2,exp_near:'2028-03-28',other:[],data_at:'2026-11-12 22:00:00'},
  {item_id:4875,name:'CREAM SMALL',arabic_name:'كريم صغير',price:20,packs:3,units:0,parts:1,exp_near:'2028-07-28',other:[],data_at:'2026-11-12 22:00:00'},
@@ -19,10 +21,11 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.click('.subbar [data-tab="tempsale"]');
  assert.match(await text(page,'#tsCart'),/لسه مفيش أصناف/);
  // the top is one thin bar (owner 2026-11-13 «في 2 سنتي»): بيع/مرتجع, 📷 🔎 #, «البيعات», then the search; no data-age
- // line here, so the bill starts high on the screen (352: the header's wave, the owner's 2026-11-21 look, makes the header 16 px taller than the flat one the old 340 was written for)
+ // line here, so the bill starts high on the screen (360: the header's wave, the owner's 2026-11-21 look, makes the header 16 px taller than the flat one the old 340 was written for,
+ // and the row of the 3 bills' tabs, which took the place of the «الفاتورة» heading, is 6 px taller than that heading was)
  const top=await page.evaluate(()=>({bar:document.querySelector('.ts-bar').getBoundingClientRect().height,
   cart:document.getElementById('tsCart').getBoundingClientRect().top,age:getComputedStyle(document.getElementById('dataAge')).display}));
- assert.ok(top.bar<=52,'one row: '+top.bar);assert.ok(top.cart<352,'the bill starts at '+top.cart);assert.equal(top.age,'none');
+ assert.ok(top.bar<=52,'one row: '+top.bar);assert.ok(top.cart<360,'the bill starts at '+top.cart);assert.equal(top.age,'none');
  await page.click('.subbar [data-tab="storeorders"]');
  assert.equal(await page.evaluate(()=>document.body.classList.contains('ts-page')),false,'the data-age line is back elsewhere');
  await page.click('.subbar [data-tab="tempsale"]');
@@ -42,24 +45,25 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  assert.equal((await page.$$('#tsHits [data-ts-add="4875"]')).length,1,'the list stays');
  await page.click('#tsHits [data-ts-add="4875"]');
  await closed('sale, tap');
- assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'1');
+ await page.waitForSelector('#tsCart .ts-line[data-i="0"]');
+ assert.equal(await qv(page,0),'1');
  await page.fill('#tsQ','كريم');
  await page.waitForSelector('#tsHits [data-ts-add="4875"]');
  await page.press('#tsQ','Enter');
  await closed('sale, Enter');
  assert.equal(await page.evaluate(()=>document.activeElement.id),'tsQ','Enter keeps the cursor in the search box');
- await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] .ts-qty b')?.textContent==='2');
+ await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] [data-ts-n="q"]')?.value==='2');
  // the line shows the stock and the nearest expiry, as in PharmaFly; more than the stock = red
- assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/رصيد 3 علب · صلاحية 07\/2028/);
+ assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/رصيد 3 علب/);
  assert.equal(await page.$('#tsCart .ts-line[data-i="0"] .ts-warn'),null);
  // group 4: the bill's line carries the item's photo; a tap on it opens the sheet over the bill and touches nothing in it
  assert.equal(await page.$eval('#tsCart .ts-line[data-i="0"] > .im-lrow > .im-th',b=>b.dataset.im),'4875');
  await page.click('#tsCart .ts-line[data-i="0"] .im-th');await page.waitForSelector('#imSheet:not([hidden])');await page.click('#imSheet .im-x');
- assert.equal(await text(page,'#tsCart .ts-line[data-i="0"] .ts-qty b'),'2','the quantity did not move');
+ assert.equal(await qv(page,0),'2','the quantity did not move');
  assert.equal((await page.$$('#tsCart .ts-line')).length,1,'the line is still there');
- await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus]');
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus="q"]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus="q"]');
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-warn'),/الكمية أكتر من الرصيد/);
- await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus="q"]');await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus="q"]');
  // by code: the sticker's number works too (101060 = code 1060)
  await page.click('[data-ts-way="code"]');
  assert.equal(await page.getAttribute('#tsQ','inputmode'),'numeric');
@@ -70,28 +74,30 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  // the camera's reading (the sticker barcode) counts only when the same number comes twice in a row
  await page.evaluate(()=>window.AskerTempSale.scanned('169423'));
  await page.evaluate(()=>window.AskerTempSale.scanned('101060'));
- assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b'),'1','one reading alone adds nothing');
+ assert.equal(await qv(page,1),'1','one reading alone adds nothing');
  await page.evaluate(()=>window.AskerTempSale.scanned('101060'));
- assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b'),'2');
+ assert.equal(await qv(page,1),'2');
  assert.match(await text(page,'#tsFind'),/اتضاف: صنف تجربة \(الباركود 101060\)/,'the number read is shown');
- // the sticker's barcode itself (ITF, 10 digits): 1 + code + the batch's month and year; the line shows that batch's expiry
+ // the sticker's barcode itself (ITF, 10 digits): 1 + code + the batch's month and year; it is the batch in his hand, so the line
+ // takes that expiry with no question, and it is a line of its own (another batch of the same item), not a box added to line 0
  await page.evaluate(()=>window.AskerTempSale.scanned('1048750729',true,'itf'));
- assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-info'),/صلاحية 07\/2029/);
- await page.click('#tsCart .ts-line[data-i="0"] [data-ts-minus]');
+ assert.match(await text(page,'#tsCart .ts-line[data-i="2"] .ts-exp'),/صلاحية 07\/2029/);
+ assert.equal(await qv(page,0),'2','the line with no expiry did not move');
+ await page.click('#tsCart .ts-line[data-i="2"] [data-ts-del]');
  // from the camera (owner: «بعض مرة بيقرا كده»): an ITF value counts after 3 reads in a row; a misread is ignored quietly;
  // the same sticker kept in front of the camera adds one box only
  const before=await text(page,'#tsFind');
  for(let i=0;i<3;i++)await page.evaluate(()=>window.AskerTempSale.scanned('1634036085',false,'itf'));
  assert.equal(await text(page,'#tsFind'),before,'a misread says nothing');
- const q1=()=>text(page,'#tsCart .ts-line[data-i="1"] .ts-qty b');
- const was=Number(await q1());
+ // (the sticker's batch, 03/2028, is a line of its own: index 2)
  await page.evaluate(()=>{window.AskerTempSale.scanned('1010600328',false,'itf');window.AskerTempSale.scanned('1010600328',false,'itf')});
- assert.equal(Number(await q1()),was,'two ITF reads are not enough');
+ assert.equal(await page.$('#tsCart .ts-line[data-i="2"]'),null,'two ITF reads are not enough');
  await page.evaluate(()=>window.AskerTempSale.scanned('1010600328',false,'itf'));
- assert.equal(Number(await q1()),was+1,'the third adds one box');
+ assert.equal(await qv(page,2),'1','the third adds the batch\'s line, one box');
+ assert.match(await text(page,'#tsCart .ts-line[data-i="2"] .ts-exp'),/صلاحية 03\/2028/);
  for(let i=0;i<6;i++)await page.evaluate(()=>window.AskerTempSale.scanned('1010600328',false,'itf'));
- assert.equal(Number(await q1()),was+1,'still in view: no more boxes');
- await page.click('#tsCart .ts-line[data-i="1"] [data-ts-minus]');
+ assert.equal(await qv(page,2),'1','still in view: no more boxes');
+ await page.click('#tsCart .ts-line[data-i="2"] [data-ts-del]');
  // a short or long reading is never taken as a code; the number read is shown
  await page.evaluate(()=>window.AskerTempSale.scanned('9493',true,'itf'));
  assert.match(await text(page,'#tsFind'),/الكاميرا قرت 9493 \(itf\): ده مش رقم ملصق فارمافلاي/,'the number and its barcode kind are shown');
@@ -102,8 +108,18 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.evaluate(()=>window.AskerTempSale.scanned('6221234567890',true));
  assert.match(await text(page,'#tsFind'),/مش رقم ملصق فارمافلاي/);
  assert.equal((await page.$$('#tsCart .ts-line')).length,2);
- // a box that splits: one unit = half the price
- await page.click('#tsCart .ts-line[data-i="1"] [data-ts-u="unit"]');
+ // a box that splits: two boxes, «علب» and «وحدات», typed (a unit = half the price here); a box that does not split has no units box
+ assert.ok(await page.$('#tsCart .ts-line[data-i="0"] .ts-qbox.off'),'cream does not split: its units box is shut');
+ const typed=async(i,w,v)=>{const s=`#tsCart .ts-line[data-i="${i}"] [data-ts-n="${w}"]`;await page.fill(s,String(v));await page.press(s,'Tab')};
+ await typed(1,'w',2);
+ assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-amt'),'630 ج','2 boxes at 210 + 2 units at 105');
+ assert.match(await text(page,'#tsCart .ts-line[data-i="1"] .ts-calc'),/2 × 210 ج \+ 2 × 105 ج/);
+ await typed(1,'q',0);
+ assert.equal(await qv(page,1,'w'),'2');
+ await page.click('#tsCart .ts-line[data-i="1"] [data-ts-minus="w"]');await page.click('#tsCart .ts-line[data-i="1"] [data-ts-plus="w"]');
+ assert.equal(await qv(page,1,'w'),'2','minus then plus: back to 2');
+ await typed(1,'w',0);
+ assert.equal(await qv(page,1,'w'),'2','never both boxes at 0');
  assert.equal(await text(page,'#tsCart .ts-line[data-i="1"] .ts-amt'),'210 ج');
  assert.equal(await text(page,'#tsCart .ts-total b'),'250 ج');
  // a credit customer: over his limit after this sale -> the red warning; paying enough takes it away
