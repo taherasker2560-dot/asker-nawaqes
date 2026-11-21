@@ -16,15 +16,26 @@ assert.equal(T.stickerRead('1634760799'),null,'year 2099: a misread');assert.equ
 assert.equal(T.stickerCode('1634760729'),63476,'typed too');assert.equal(T.stickerCode('A101060',true),null);assert.equal(T.stickerCode(' 163070 ',true),63070);
 // price of one box, or one unit when the box splits
 assert.equal(T.priceOf(66.7,1,'unit'),66.7,'a box that does not split');assert.equal(T.priceOf(108,2,'unit'),54);assert.equal(T.priceOf(100,3,'unit'),33.33);assert.equal(T.priceOf(100,3,'pack'),100);
-// the bill: a tap adds one box, the same item again = one more; a unit changes the price
+// the bill: a tap adds one box, the same item again = one more; two boxes per line: boxes (q) and units (w)
 const lines=[];
 T.addItem(lines,{item_id:1060,name:'ITEM ONE 14TAB',arabic_name:'صنف واحد',price:210,parts:2});
 T.addItem(lines,{item_id:1060,name:'ITEM ONE 14TAB',price:210,parts:2});
 T.addItem(lines,{item_id:4875,name:'CREAM SMALL',price:20,parts:1});
-assert.deepEqual(lines.map(l=>[l.c,l.q,l.u,l.p]),[[1060,2,'pack',210],[4875,1,'pack',20]]);
+assert.deepEqual(lines.map(l=>[l.c,l.q,l.w,l.p,l.pu]),[[1060,2,0,210,105],[4875,1,0,20,20]]);
 assert.equal(T.total(lines),440);
-T.setUnit(lines[0],'unit');assert.equal(lines[0].p,105);assert.equal(T.total(lines),230);
-T.setUnit(lines[1],'unit');assert.equal(lines[1].u,'pack','a box that does not split stays a box');
+T.setQty(lines[0],'w',1);assert.equal(T.total(lines),545,'2 boxes + 1 unit');
+T.setQty(lines[0],'q',0);assert.equal(T.total(lines),125,'units only');
+T.setQty(lines[0],'w',0);assert.equal(lines[0].w,1,'never both boxes: a line that sells nothing');
+T.setQty(lines[0],'w',2);assert.equal(T.total(lines),230,'2 units = one box\'s price');
+T.setQty(lines[1],'w',3);assert.equal(lines[1].w,0,'a box that does not split has no units');
+T.setQty(lines[1],'q',0);assert.equal(lines[1].q,1,'never both 0');
+T.setQty(lines[1],'q','abc');assert.equal(lines[1].q,1,'a typed non-number changes nothing');
+T.setQty(lines[1],'q',2.9);assert.equal(lines[1].q,2,'whole boxes only');T.setQty(lines[1],'q',1);
+// the same item with ANOTHER expiry is another line (each batch its own quantity); the same expiry again = one more box
+const xs=[];
+T.addItem(xs,{item_id:7,name:'X',price:100,parts:3},'2028-03');T.addItem(xs,{item_id:7,name:'X',price:100,parts:3},'2029-01');T.addItem(xs,{item_id:7,name:'X',price:100,parts:3},'2028-03');
+assert.deepEqual(xs.map(l=>[l.c,l.x,l.q]),[[7,'2028-03',2],[7,'2029-01',1]]);
+assert.deepEqual(T.sellable([{x:'2028-03',k:2,u:0},{x:'2027-01',k:0,u:2},{x:'2029-01',k:-1,u:0},{x:null,k:5,u:0},{x:'2030-01',k:0,u:0}],3).map(b=>b.x),['2027-01','2028-03'],'only batches with stock, oldest first; a negative one, an empty one and a dateless one are not offered');
 // the customer's limit: balance + this sale − what he paid, above the limit on his card
 const c={id:101,name:'عميل تجربة',credit_limit:5000,balance:4900};
 assert.deepEqual(T.overLimit(c,230,0),{bal:4900,lim:5000,after:5130});
@@ -65,13 +76,27 @@ assert.deepEqual(T.stripBox(1080,1920,3.5),{sx:0,sy:806,sw:1080,sh:309});
 assert.deepEqual(T.stripBox(1920,1080,3.5),{sx:0,sy:266,sw:1920,sh:549});
 assert.deepEqual(T.stripBox(4000,500,3.5),{sx:1125,sy:0,sw:1750,sh:500});
 assert.equal(T.stripBox(0,0,3.5),null);
-// the line's stock and expiry, as in PharmaFly's sale
-const L=[];T.addItem(L,{item_id:7,name:'X',price:100,parts:3,packs:2,units:1,exp_near:'2028-03-28'});
-assert.deepEqual([L[0].sp,L[0].su,L[0].exp],[2,1,'2028-03-28']);
+// the line's stock, as in PharmaFly's sale: the whole item's, or the chosen expiry's batch
+const L=[];T.addItem(L,{item_id:7,name:'X',price:100,parts:3,packs:2,units:1});
+assert.deepEqual([L[0].sp,L[0].su,L[0].x],[2,1,null],'no expiry is taken for him');
 assert.equal(T.overStock(L[0]),false);L[0].q=3;assert.equal(T.overStock(L[0]),true,'3 boxes > 2 boxes + 1 unit');
-T.setUnit(L[0],'unit');L[0].q=7;assert.equal(T.overStock(L[0]),false,'7 units = 2×3 + 1');L[0].q=8;assert.equal(T.overStock(L[0]),true);
+L[0].q=2;L[0].w=1;assert.equal(T.overStock(L[0]),false,'2 boxes + 1 unit = all of it');L[0].w=2;assert.equal(T.overStock(L[0]),true);
+L[0].q=0;L[0].w=7;assert.equal(T.overStock(L[0]),false,'7 units = 2×3 + 1');L[0].w=8;assert.equal(T.overStock(L[0]),true);
+L[0].bs={k:1,u:0};L[0].q=1;L[0].w=0;assert.equal(T.overStock(L[0]),false,'the chosen batch has 1 box');L[0].w=1;assert.equal(T.overStock(L[0]),true,'more than that batch holds, though the item has more in other batches');
 const now=new Date(2026,10,13);
 assert.deepEqual(T.expInfo('2028-03-28',now),{text:'صلاحية 03/2028',soon:false,gone:false});
 assert.equal(T.expInfo('2027-01-28',now).soon,true,'within 3 months');assert.equal(T.expInfo('2026-11-28',now).gone,true);
 assert.equal(T.expInfo(null,now),null,'no expiry in PharmaFly: nothing shown');
-console.log('PASS: temp sale: sticker = 100000 + code, box/unit prices, the bill, the limit, the row, the list');
+// a line with boxes AND units goes to the server as two entries (everything that reads {c,n,q,u,p} keeps working); the chosen expiry rides on both
+const both=[];T.addItem(both,{item_id:7,name:'X',price:100,parts:3},'2028-03');T.setQty(both[0],'w',2);
+T.addItem(both,{item_id:8,name:'Y',price:20,parts:1});
+assert.equal(T.total(both),100+66.66+20);
+assert.deepEqual(T.record({id:'b',soldAt:'t',lines:both,customer:null,paid:'',note:''}).items,[{c:7,n:'X',q:1,u:'pack',p:100,x:'2028-03'},{c:7,n:'X',q:2,u:'unit',p:33.33,x:'2028-03'},{c:8,n:'Y',q:1,u:'pack',p:20}]);
+// up to 3 bills kept on the phone, made safe when read back
+const cb=T.cleanBills({cur:5,bills:[{kind:'return',cart:[{c:1,n:'A',q:2,p:10,k:2,base:10},{c:'bad'}],cust:{id:3,name:'م'},paid:5,note:'n',adj:-2},{cart:'x'},null]});
+assert.equal(cb.bills.length,1);assert.equal(cb.cur,0,'the open bill is brought into range');assert.equal(cb.bills[0].kind,'return');
+assert.deepEqual(cb.bills[0].cart.map(l=>[l.c,l.q,l.w,l.p,l.pu,l.x]),[[1,2,0,10,5,null]],'a broken line is dropped, the unit price is made');assert.equal(cb.bills[0].cust.id,3);assert.equal(cb.bills[0].paid,'5');assert.equal(cb.bills[0].adj,-2);
+assert.deepEqual(T.cleanBills(null),{cur:0,bills:[T.blankBill()]},'nothing kept: one empty bill');
+const four=T.cleanBills({cur:2,bills:[1,2,3,4].map(()=>({cart:[]}))});assert.equal(four.bills.length,T.MAX_BILLS);assert.equal(T.MAX_BILLS,3);assert.equal(four.cur,2);
+assert.equal(T.cleanBills({bills:[{cart:[{c:1,q:0,w:0,p:5}]}]}).bills[0].cart.length,0,'a line that sells nothing is dropped');
+console.log('PASS: temp sale: sticker = 100000 + code, boxes + units, expiry lines, the bill, the limit, the row, the bills, the list');

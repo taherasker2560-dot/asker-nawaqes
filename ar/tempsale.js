@@ -40,32 +40,46 @@
     const k = Number(parts) > 1 ? Number(parts) : 1;
     return unit === 'unit' && k > 1 ? r2(base / k) : r2(base);
   }
-  const lineTotal = (l) => r2(l.q * l.p);
+  // a line has TWO boxes (owner 2026-11-21: «مكان للوحدات ومكان للعبوات»): q = boxes (packs), w = units; the price is
+  // q × the box's price + w × the unit's price (an item that does not split has no units)
+  const lineTotal = (l) => r2(l.q * l.p + l.w * l.pu);
   const total = (lines) => r2((lines || []).reduce((s, l) => s + lineTotal(l), 0));
-  // a tap on an item adds one box; the same item again = one more
-  function addItem(lines, it) {
-    const c = Number(it.item_id ?? it.id);
-    const same = lines.find((l) => l.c === c);
+  // a tap on an item adds one box; the same item AND the same expiry again = one more box. x = the expiry the owner chose
+  // ('YYYY-MM'; null when the item has none or it is not known): the same item with another expiry is another line
+  function addItem(lines, it, x) {
+    const c = Number(it.item_id ?? it.id), key = x || null;
+    const same = lines.find((l) => l.c === c && (l.x || null) === key);
     if (same) { same.q += 1; return same; }
     const base = Number(it.price) || 0, k = Number(it.parts) > 1 ? Number(it.parts) : 1;
-    const line = { c, n: String(it.name || ''), ar: String(it.arabic_name || ''), q: 1, u: 'pack', k, base, p: priceOf(base, k, 'pack'),
-      // the stock and the nearest expiry, shown on the line as in PharmaFly's sale (never sent to the server)
-      sp: Number(it.packs) || 0, su: Number(it.units) || 0, exp: it.exp_near || null, nostock: !!it.nostock };
+    const line = { c, n: String(it.name || ''), ar: String(it.arabic_name || ''), q: 1, w: 0, k, base, p: priceOf(base, k, 'pack'), pu: priceOf(base, k, 'unit'), x: key,
+      // the stock shown on the line as in PharmaFly's sale (never sent to the server): the whole item's, or the chosen expiry's (bs)
+      sp: Number(it.packs) || 0, su: Number(it.units) || 0, bs: null, nostock: !!it.nostock };
     lines.push(line);
     return line;
   }
-  // the line's quantity in units against the stock in units (a box = parts units)
-  const overStock = (l) => !l.nostock && (l.u === 'unit' ? l.q : l.q * l.k) > (l.sp * l.k + l.su) + 1e-9;
+  // the box «علب» (which = 'q') or «وحدات» ('w') set to n (typed or +/−): never below 0, never both 0 (the line would sell
+  // nothing), units only on an item that splits
+  function setQty(line, which, n) {
+    const v = Math.min(9999, Math.max(0, Math.floor(Number(n) || 0)));
+    if (which === 'w') { if (!(line.k > 1)) return line; if (line.q + v > 0) line.w = v; return line; }
+    if (v + line.w > 0) line.q = v;
+    return line;
+  }
+  // the line's quantity in units against the stock in units (a box = parts units); the chosen expiry's stock when it has one
+  const unitsOf = (l) => l.q * l.k + l.w;
+  const stockUnits = (l) => (l.bs ? l.bs.k * l.k + l.bs.u : l.sp * l.k + l.su);
+  const overStock = (l) => !l.nostock && unitsOf(l) > stockUnits(l) + 1e-9;
+  // an item's batches that have stock: [{x:'YYYY-MM', k: boxes, u: units}] oldest expiry first (a negative or empty batch cannot be sold from)
+  function sellable(batches, parts) {
+    const p = Number(parts) > 1 ? Number(parts) : 1;
+    return (batches || []).filter((b) => b && b.x && b.k * p + b.u > 0).sort((a, b) => String(a.x).localeCompare(String(b.x)));
+  }
   // «صلاحية 03/2028» (nothing for an item with no expiry in PharmaFly); soon = within 3 months from now
   function expInfo(exp, now) {
     const m = String(exp || '').match(/^(\d{4})-(\d{2})/);
     if (!m) return null;
     const n = now || new Date(), months = (+m[1] - n.getFullYear()) * 12 + (+m[2] - 1 - n.getMonth());
     return { text: `صلاحية ${m[2]}/${m[1]}`, soon: months <= 3, gone: months <= 0 };
-  }
-  function setUnit(line, unit) {
-    line.u = unit === 'unit' && line.k > 1 ? 'unit' : 'pack';
-    line.p = priceOf(line.base, line.k, line.u);
   }
   // the customer's balance after this sale (paid part taken off) above the limit on his card
   function overLimit(cust, amount, paid) {
@@ -100,7 +114,14 @@
       id, sold_at: soldAt, kind: kind === 'return' ? 'return' : 'sale',
       customer_id: customer ? Number(customer.id) : null,
       customer_name: customer ? String(customer.name || '').slice(0, 120) : null,
-      items: lines.map((l) => ({ c: l.c, n: l.n, q: l.q, u: l.u, p: l.p })),
+      // a line with boxes AND units goes as two entries, so everything that reads items ({c,n,q,u,p}) works as before;
+      // x = the expiry chosen for it (only when there is one)
+      items: lines.flatMap((l) => {
+        const x = l.x ? { x: l.x } : {}, out = [];
+        if (l.q > 0) out.push({ c: l.c, n: l.n, q: l.q, u: 'pack', p: l.p, ...x });
+        if (l.w > 0) out.push({ c: l.c, n: l.n, q: l.w, u: 'unit', p: l.pu, ...x });
+        return out;
+      }),
       total: due(lines, adj),
       adjust: adj || null,
       paid: (customer || kind === 'return') && Number(paid) > 0 ? r2(paid) : null,
@@ -144,7 +165,27 @@
   }
   // a balance in words: «250 ج», or «له 50 ج» when the pharmacy owes him
   const balText = (x) => (r2(x) < 0 ? 'له ' + money(-x) : money(x));
-  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setUnit, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
+  // up to 3 bills open together (owner 2026-11-21): each is a whole bill of its own; all kept on the phone
+  const MAX_BILLS = 3;
+  const blankBill = () => ({ kind: 'sale', cart: [], cust: null, custOpen: false, paid: '', note: '', adj: 0, adjOpen: false, adjSign: -1 });
+  const okLine = (l) => l && Number.isFinite(Number(l.c)) && Number.isFinite(Number(l.q)) && Number.isFinite(Number(l.p));
+  // what was kept on the phone, made safe: 1..3 bills, every line complete, the open one in range
+  function cleanBills(raw) {
+    const list = raw && Array.isArray(raw.bills) ? raw.bills.slice(0, MAX_BILLS) : [];
+    const bills = list.filter((b) => b && Array.isArray(b.cart)).map((b) => {
+      const cart = b.cart.filter(okLine).map((l) => {
+        const k = Number(l.k) > 1 ? Number(l.k) : 1, base = Number(l.base) || Number(l.p) || 0;
+        return { ...l, c: Number(l.c), q: Math.max(0, Math.floor(Number(l.q)) || 0), w: k > 1 ? Math.max(0, Math.floor(Number(l.w)) || 0) : 0, k, base,
+          p: Number(l.p), pu: Number.isFinite(Number(l.pu)) ? Number(l.pu) : priceOf(base, k, 'unit'), x: l.x || null, bs: l.bs && Number.isFinite(Number(l.bs.k)) ? { k: Number(l.bs.k), u: Number(l.bs.u) || 0 } : null };
+      }).filter((l) => l.q + l.w > 0);
+      const cu = b.cust && b.cust.id != null ? { id: b.cust.id, name: String(b.cust.name || ''), credit_limit: b.cust.credit_limit, balance: b.cust.balance } : null;
+      return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: String(b.paid || ''), note: String(b.note || '').slice(0, 300),
+        adj: r2(b.adj), adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
+    });
+    if (!bills.length) bills.push(blankBill());
+    return { cur: Math.min(Math.max(0, Math.floor(Number(raw && raw.cur)) || 0), bills.length - 1), bills };
+  }
+  const api = { stickerRead, overStock, expInfo, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -157,11 +198,15 @@
   const IM = () => root.AskerItemMedia;
   const photo = (id, en, title) => (IM() && id != null && id !== '' && Number.isFinite(Number(id)) ? IM().thumb(id, en, title) : '');
   const photoRow = (id, en, title, inner) => (IM() && id != null && id !== '' && Number.isFinite(Number(id)) ? IM().row(id, en, title, inner) : inner);
-  const QKEY = 'asker-ts-queue', IKEY = 'asker-ts-items', CKEY = 'asker-ts-cust';
+  const QKEY = 'asker-ts-queue', IKEY = 'asker-ts-items', CKEY = 'asker-ts-cust', BKEY = 'asker-ts-bills', XKEY = 'asker-ts-batches';
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v ?? d; } catch (e) { return d; } };
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name', kind = 'sale';
+  // the bills open together (up to 3): `cart` / `cust` / `kind` / the fields are the CURRENT one's; bills[cur] is refreshed from them (snap)
+  let bills = [blankBill()], cur = 0;
+  // the expiry batches of every item with stock (the count's file from the laptop): Map code -> {p: parts, b: [{x, k, u}]}
+  let batches = null, batchAt = 0, batchData = '', batchP = null, expFor = null;
   let stopped = new Set(); // customers whose credit the owner stopped
   // «الفكة»: the amount off (−) or added (+) on this bill; any change in the lines clears it
   let adj = 0, adjOpen = false, adjSign = -1;
@@ -224,12 +269,120 @@
     } catch (e) { return null; }
   }
 
+  // ---------- the expiry batches (the count's file from the laptop, every update; kept on the phone) ----------
+  // Readable for the owner and for a staff member with «جرد المخزون»; with no file the sale still works, a line just says its expiry is not known
+  let batchFail = 0;
+  function useBatches(rows, at) {
+    batches = new Map(rows.map((r) => [Number(r[0]), { p: Number(r[1]) > 1 ? Number(r[1]) : 1, b: (r[2] || []).map((a) => ({ x: a[0] || null, k: Number(a[1]) || 0, u: Number(a[2]) || 0 })) }]));
+    batchData = String(at || '');
+  }
+  function loadBatches() {
+    if (batchP) return batchP;
+    if (batches && Date.now() - batchAt < 3 * 60 * 1000) return Promise.resolve();
+    if (Date.now() - batchFail < 60 * 1000) return Promise.resolve();
+    batchP = (async () => {
+      try {
+        const { data: blob, error } = await db().storage.from('asker-private').download('count/stock.json');
+        if (error || !blob) throw error || new Error('no file');
+        const d = JSON.parse(await blob.text());
+        const rows = (d.items || []).map((it) => [it.i, it.p, (it.b || []).map((b) => [b.x || null, b.k, b.u])]);
+        useBatches(rows, d.data_at); batchAt = Date.now(); batchFail = 0;
+        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows });
+      } catch (e) {
+        batchFail = Date.now();
+        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); batchAt = c.at; } }
+      }
+      batchP = null;
+    })();
+    return batchP;
+  }
+  // what the batches say about an item: unknown (no file), nostock (not in the file), noexp (PharmaFly says «له تاريخ: لأ»),
+  // empty (dated batches but none with stock), or list (batches to choose from)
+  function batchInfo(code) {
+    if (!batches) return { state: 'unknown' };
+    const e = batches.get(Number(code));
+    if (!e) return { state: 'nostock' };
+    if (!e.b.some((b) => b.x)) return { state: 'noexp' };
+    const list = sellable(e.b, e.p);
+    return list.length ? { state: 'list', list, p: e.p } : { state: 'empty' };
+  }
+
   // ---------- adding items ----------
-  function add(it) {
-    const line = addItem(cart, it);
+  function add(it, x, bs) {
+    const line = addItem(cart, it, x);
+    if (x) { line.x = x; line.bs = bs || null; line.xmiss = false; }
     clearAdj();
     drawCart();
     return line;
+  }
+  // An item goes in with an expiry the owner CHOSE (owner 2026-11-21: «ما ينزلش اي صلاحية»): the system asks which batch is sold and never
+  // takes one for him. Not asked: the sticker's own barcode (its month and year ARE the batch in his hand), an item with no expiry in
+  // PharmaFly, or one with nothing in stock to choose from. Returns the line, or null while the question is open.
+  async function pick(it, sr) {
+    const wait = (p) => Promise.race([p, new Promise((r) => setTimeout(r, 4000))]);
+    if (batchP) await wait(batchP);
+    else if (!batches) await wait(loadBatches());
+    else if (Date.now() - batchAt > 3 * 60 * 1000) loadBatches();   // refreshed behind the sale, never waited for
+    const info = batchInfo(it.item_id), sx = sr && sr.exp;
+    if (sx) {
+      const b = info.list ? info.list.find((r) => r.x === sx) : null;
+      return add(it, sx, info.state === 'unknown' ? null : b ? { k: b.k, u: b.u } : { k: 0, u: 0 });
+    }
+    if (info.state === 'unknown') { const line = add(it, null); line.xmiss = true; drawCart(); return line; }
+    if (info.state !== 'list') return add(it, null);
+    openExp(it, info, null);
+    return null;
+  }
+  // ---------- the question «أنهي صلاحية؟» ----------
+  function expSheet() {
+    let el = $('tsExp');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'tsExp'; el.className = 'ts-expsheet hidden';
+      el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+      el.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-ts-xpick],[data-ts-xclose]');
+        if (!t) return;
+        if (t.hasAttribute('data-ts-xclose')) { expFor = null; drawExp(); return; }
+        chooseExp(t.dataset.tsXpick);
+      });
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function drawExp() {
+    const el = expSheet(), f = expFor;
+    if (!f) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    const was = f.line ? f.line.x : null;
+    const qt = (b) => (root.AskerStockLib ? root.AskerStockLib.qtyText(b.k, b.u, f.info.p) : String(b.k));
+    const rows = f.info.list.map((b) => {
+      const e = expInfo(b.x);
+      return `<button type="button" class="ts-exp-row${e.soon ? ' soon' : ''}${b.x === was ? ' on' : ''}" data-ts-xpick="${esc(b.x)}"><span class="ts-exp-d" dir="ltr">${esc(b.x.slice(5, 7))}/${esc(b.x.slice(0, 4))}</span>${e.gone ? '<small>منتهية</small>' : e.soon ? '<small>قربت</small>' : ''}<b>${esc(qt(b))}</b></button>`;
+    }).join('');
+    el.innerHTML = `<div class="ts-exp-back" data-ts-xclose></div><div class="ts-exp-card"><strong class="notr">${esc(nameOf(f.it))}</strong>` +
+      `<p class="hint"><span>اختار الصلاحية اللي هتتباع</span>${f.line ? '' : ' <span>(الصنف مش هيتضاف قبل ما تختار)</span>'}</p><div class="ts-exp-list">${rows}</div>` +
+      (batchData ? `<p class="hint"><span>الرصيد حسب داتا</span> <span dir="ltr">${esc(batchData.replace('T', ' ').slice(0, 16))}</span></p>` : '') +
+      '<button type="button" class="secondary" data-ts-xclose>إلغاء</button></div>';
+    el.classList.remove('hidden');
+    const first = el.querySelector('.ts-exp-row.on') || el.querySelector('.ts-exp-row');
+    if (first) first.focus();
+  }
+  function openExp(it, info, line) { expFor = { it, info, line }; drawExp(); }
+  function chooseExp(x) {
+    const f = expFor;
+    if (!f) return;
+    const b = f.info.list.find((r) => r.x === x), bs = b ? { k: b.k, u: b.u } : null;
+    expFor = null; drawExp();
+    if (f.line) {
+      const l = f.line;
+      if ((l.x || null) === x) return;
+      const other = cart.find((o) => o !== l && o.c === l.c && (o.x || null) === x);
+      if (other) { other.q += l.q; other.w += l.w; other.bs = bs; cart.splice(cart.indexOf(l), 1); } else { l.x = x; l.bs = bs; l.xmiss = false; }
+      clearAdj(); drawCart();
+      return;
+    }
+    add(f.it, x, bs);
+    say('tsFind', 'اتضاف: ' + nameOf(f.it), 'ok');
   }
   function hitCard(it) {
     const stock = root.AskerStockLib ? root.AskerStockLib.qtyText(it.packs, it.units, it.parts) : '';
@@ -402,7 +555,7 @@
   async function scanned(raw, sure, format) {
     raw = String(raw || '').trim();
     const now = Date.now();
-    if (!raw) return;
+    if (!raw || expFor) return;   // while «أنهي صلاحية؟» is open the camera waits
     if (raw === lastRaw && now - lastAt < GONE_MS) { lastAt = now; return; }
     if (!sure) {
       if (raw === seenRaw && now - seenAt < 1200) streak++; else { seenRaw = raw; streak = 1; }
@@ -422,15 +575,15 @@
     }
     lastRaw = raw; lastAt = now;
     beep(true);
-    const line = add(it);
-    // the sticker carries its own batch's expiry: the line shows that one (as PharmaFly does when it sells that batch)
-    if (sr.exp && line) { line.exp = sr.exp; drawCart(); }
+    // the sticker carries its own batch's expiry: the line takes that one with no question (it is the batch in his hand, as
+    // PharmaFly does when it sells that batch); a sticker with the 6 digits only asks for the expiry like any other way in
+    const added = await pick(it, sr);
     // this camera reads the stickers: kept on this phone, the switch hides
     if (stream && camNow()) keep(CAMKEY, camNow());
     lastGood = Date.now();
     showSwitch(false);
     if (navigator.vibrate) navigator.vibrate(60);
-    say('tsFind', `اتضاف: ${nameOf(it)} (الباركود ${raw})`, 'ok');
+    say('tsFind', added ? `اتضاف: ${nameOf(it)} (الباركود ${raw})` : '', added ? 'ok' : '');
   }
   function stopScan() {
     clearInterval(timer); timer = null;
@@ -442,14 +595,26 @@
   }
 
   // ---------- the bill ----------
-  // under the item's name, as in PharmaFly's sale: its stock and nearest expiry; red when the bill asks more than the stock
+  // under the item's name, as in PharmaFly's sale: its stock (the chosen expiry's when there is one); red when the bill asks more than the stock
   function lineInfo(l) {
-    const stock = l.nostock ? 'مفيش' : root.AskerStockLib ? root.AskerStockLib.qtyText(l.sp, l.su, l.k) : '';
-    const e = expInfo(l.exp);
-    const bits = [`<span>رصيد ${esc(stock)}</span>`];
-    if (e) bits.push(`<span class="${e.soon ? 'ts-soon' : ''}">${esc(e.text)}</span>`);
+    const stock = l.nostock ? 'مفيش' : root.AskerStockLib ? (l.bs ? root.AskerStockLib.qtyText(l.bs.k, l.bs.u, l.k) : root.AskerStockLib.qtyText(l.sp, l.su, l.k)) : '';
     const short = kind !== 'return' && (overStock(l) || l.nostock);
-    return `<div class="ts-info">${bits.join(' · ')}${short ? '<div class="ts-warn">⚠️ الكمية أكتر من الرصيد</div>' : ''}</div>`;
+    return `<div class="ts-info"><span>${l.bs ? 'رصيد التشغيلة' : 'رصيد'} ${esc(stock)}</span>${short ? '<div class="ts-warn">⚠️ الكمية أكتر من الرصيد</div>' : ''}</div>`;
+  }
+  // the expiry the owner chose for this line (✓ + «تغيير»); «مش متاحة» when the batches file could not be read
+  function expRow(l) {
+    if (l.x) {
+      const e = expInfo(l.x), more = e.gone ? ' · <span>منتهية</span>' : e.soon ? ' · <span>قربت</span>' : '';
+      return `<div class="ts-exp${e.soon ? ' soon' : ''}"><span>${esc(e.text)} ✓${more}</span>${batchInfo(l.c).state === 'list' ? '<button type="button" class="linklike" data-ts-xchg>تغيير</button>' : ''}</div>`;
+    }
+    return l.xmiss ? '<div class="ts-exp none"><span>الصلاحية مش متاحة دلوقتي</span></div>' : '';
+  }
+  // «علب» / «وحدات»: a box each (owner 2026-11-21), − and + and typed; an item that does not split has no units
+  function qbox(l, which) {
+    const label = which === 'q' ? 'علب' : 'وحدات';
+    if (which === 'w' && !(l.k > 1)) return `<div class="ts-qbox off"><span class="ts-ql">${label}</span><span class="ts-qoff">ما بتتقسمش</span></div>`;
+    const v = which === 'q' ? l.q : l.w;
+    return `<div class="ts-qbox"><span class="ts-ql">${label}</span><span class="ts-qctl"><button type="button" data-ts-minus="${which}" aria-label="أقل">−</button><input class="ts-qn" data-ts-n="${which}" type="number" inputmode="numeric" min="0" step="1" value="${esc(v)}" aria-label="${label}" /><button type="button" data-ts-plus="${which}" aria-label="أكتر">+</button></span></div>`;
   }
   function drawCart() {
     const box = $('tsCart');
@@ -457,18 +622,51 @@
     if (!cart.length) {
       box.innerHTML = '<p class="hint">لسه مفيش أصناف. دوّر على صنف ودوس عليه.</p>';
     } else {
-      box.innerHTML = cart.map((l, i) => `<div class="ts-line" data-i="${i}">
-        ${photoRow(l.c, l.n, nameOf(l), `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>
-        ${lineInfo(l)}`)}
-        <div class="ts-l2">
-          <span class="ts-code">كود ${esc(l.c)}</span>
-          <span class="ts-qty"><button type="button" data-ts-minus aria-label="أقل">−</button><b>${esc(l.q)}</b><button type="button" data-ts-plus aria-label="أكتر">+</button></span>
-          ${l.k > 1 ? `<span class="ts-units"><button type="button" class="chip${l.u === 'pack' ? ' on' : ''}" data-ts-u="pack">علبة</button><button type="button" class="chip${l.u === 'unit' ? ' on' : ''}" data-ts-u="unit">وحدة</button></span>` : `<span class="ts-units">علبة</span>`}
-          <button type="button" class="ts-del" data-ts-del aria-label="شيل الصنف">✕</button>
-        </div></div>`).join('') +
+      box.innerHTML = cart.map((l, i) => {
+        const head = `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>${lineInfo(l)}${expRow(l)}`;
+        const calc = l.q > 0 && l.w > 0 ? `<div class="ts-calc"><span>${esc(l.q)}</span> × <span>${esc(money(l.p))}</span> + <span>${esc(l.w)}</span> × <span>${esc(money(l.pu))}</span></div>` : '';
+        return `<div class="ts-line" data-i="${i}">${photoRow(l.c, l.n, nameOf(l), head)}
+        <div class="ts-qrow">${qbox(l, 'q')}${qbox(l, 'w')}</div>${calc}
+        <div class="ts-l2"><span class="ts-code">كود ${esc(l.c)}</span><button type="button" class="ts-del" data-ts-del aria-label="شيل الصنف">✕</button></div></div>`;
+      }).join('') +
         `<div class="ts-total"><span>الإجمالي (تقريبي)</span><b>${esc(money(total(cart)))}</b></div>` + adjHtml();
     }
     drawCust();
+    drawBills();
+  }
+  // ---------- the bills open together (up to 3; owner 2026-11-21) ----------
+  // the current bill's state, as a bill (what bills[cur] keeps, and what is kept on the phone)
+  function snap() {
+    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign };
+  }
+  function persist() { bills[cur] = snap(); keep(BKEY, { cur, bills }); }
+  function applyBill(b) {
+    kind = b.kind; cart = b.cart; cust = b.cust; custOpen = b.custOpen; adj = b.adj; adjOpen = b.adjOpen; adjSign = b.adjSign;
+    $('tsPaid').value = b.paid || ''; $('tsNote').value = b.note || '';
+    $('tsQ').value = ''; $('tsHits').innerHTML = ''; $('tsClear').classList.add('hidden');
+  }
+  function drawBills() {
+    const el = $('tsBills');
+    if (!el) return;
+    el.innerHTML = bills.map((b0, i) => {
+      const b = i === cur ? { kind, cart, adj } : b0, ret = b.kind === 'return';
+      return `<button type="button" class="ts-bill${i === cur ? ' on' : ''}${ret ? ' ret' : ''}" data-ts-bill="${i}"><span>${ret ? 'مرتجع' : 'بيعة'}</span> <b>${i + 1}</b>${b.cart.length ? ` <small>${esc(money(due(b.cart, b.adj)))}</small>` : ''}</button>`;
+    }).join('') + (bills.length < MAX_BILLS ? '<button type="button" class="ts-bill add" data-ts-billadd aria-label="بيعة جديدة">＋</button>' : '');
+  }
+  function switchBill(i) {
+    if (i === cur || !bills[i]) return;
+    bills[cur] = snap();
+    cur = i;
+    applyBill(bills[cur]);
+    setKind(kind);
+  }
+  function newBill() {
+    if (bills.length >= MAX_BILLS) return;
+    bills[cur] = snap();
+    bills.push(blankBill());
+    cur = bills.length - 1;
+    applyBill(bills[cur]);
+    setKind('sale');
   }
   // «الفكة»: round down / up to 5 pounds in one tap, or any amount off or added; then «المطلوب»
   function adjHtml() {
@@ -508,6 +706,7 @@
     $('tsPaidRow').classList.toggle('hidden', !cust && !ret);
     $('tsPaidLbl').textContent = ret ? 'رجّعتله كام فلوس؟' : 'دفع كام؟';
     if ($('tsCQ')) { $('tsCQ').value = q; drawCustHits(); }
+    persist();   // every change of the bill (lines, kind, customer, what he paid) passes here: the bills stay on the phone
   }
   function drawCustHits() {
     const q = $('tsCQ').value.trim(), F = root.AskerFuzzy;
@@ -523,11 +722,13 @@
   async function save() {
     if (!cart.length) return say('tsStatus', 'ضيف صنف الأول', 'bad');
     const rec = record({ id: uuid(), soldAt: new Date().toISOString(), lines: cart, customer: cust, paid: $('tsPaid').value, note: $('tsNote').value, kind, adjust: adj });
+    if (rec.items.length > 60) return say('tsStatus', 'البيعة كبيرة: احفظ جزء منها وافتح بيعة تانية للباقي', 'bad');   // the server keeps 60 entries a bill (a line with boxes and units is two)
     queue.push(rec);
     keep(QKEY, queue);
-    cart = []; cust = null; custOpen = false; clearAdj(); setKind('sale');
-    $('tsPaid').value = ''; $('tsNote').value = ''; $('tsQ').value = ''; $('tsHits').innerHTML = '';
-    drawCart();
+    // only THIS bill is saved and emptied; the other open bills stay as they are
+    bills[cur] = blankBill();
+    applyBill(bills[cur]);
+    setKind('sale');
     drawBadge();
     say('tsStatus', 'اتحفظت على الموبايل…', 'ok');
     const left = await flush();
@@ -589,7 +790,7 @@
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
       <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· باعها <span class="notr">${esc(seller)}</span></span>` : ''}</span>${tag}</button>
       <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
-      ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small></span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
+      ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small>${x.x && expInfo(x.x) ? ` <small>${esc(expInfo(x.x).text)}</small>` : ''}</span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
         ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}` : ''}
     </div>`;
@@ -644,6 +845,16 @@
         drawCust();
       }
     });
+    // a box typed by hand (when he leaves it): «علب» or «وحدات»
+    panel.addEventListener('change', (e) => {
+      const inp = e.target.closest && e.target.closest('.ts-qn');
+      if (!inp) return;
+      const line = inp.closest('.ts-line'), l = line ? cart[Number(line.dataset.i)] : null;
+      if (!l) return;
+      setQty(l, inp.dataset.tsN === 'w' ? 'w' : 'q', inp.value);
+      clearAdj(); drawCart();
+    });
+    $('tsNote').addEventListener('input', persist);
     panel.addEventListener('click', async (e) => {
       const t = e.target.closest('button');
       if (!t || !panel.contains(t)) return;
@@ -651,16 +862,26 @@
       if (t.dataset.tsWay) return setWay(t.dataset.tsWay);
       if (t.dataset.tsType) return setKind(t.dataset.tsType);
       if (t.id === 'tsCam') return nextCam();
+      if (t.dataset.tsBill != null) return switchBill(Number(t.dataset.tsBill));
+      if (t.hasAttribute('data-ts-billadd')) return newBill();
       if (t.dataset.tsAdd) {
         closeHits();
         const it = await itemByCode(Number(t.dataset.tsAdd));
-        if (it) { add(it); say('tsFind', 'اتضاف: ' + nameOf(it), 'ok'); }
+        if (it && (await pick(it))) say('tsFind', 'اتضاف: ' + nameOf(it), 'ok');
         return;
       }
       const line = t.closest('.ts-line'), l = line ? cart[Number(line.dataset.i)] : null;
-      if (l && t.hasAttribute('data-ts-plus')) { l.q += 1; clearAdj(); return drawCart(); }
-      if (l && t.hasAttribute('data-ts-minus')) { if (l.q > 1) l.q -= 1; clearAdj(); return drawCart(); }
-      if (l && t.dataset.tsU) { setUnit(l, t.dataset.tsU); clearAdj(); return drawCart(); }
+      // the two boxes: «علب» (q) and «وحدات» (w)
+      if (l && (t.dataset.tsPlus || t.dataset.tsMinus)) {
+        const w = (t.dataset.tsPlus || t.dataset.tsMinus) === 'w' ? 'w' : 'q';
+        setQty(l, w, (w === 'w' ? l.w : l.q) + (t.dataset.tsPlus ? 1 : -1));
+        clearAdj(); return drawCart();
+      }
+      if (l && t.hasAttribute('data-ts-xchg')) {
+        const info = batchInfo(l.c);
+        if (info.state === 'list') openExp({ item_id: l.c, name: l.n, arabic_name: l.ar }, info, l);
+        return;
+      }
       if (l && t.hasAttribute('data-ts-del')) { cart.splice(Number(line.dataset.i), 1); clearAdj(); return drawCart(); }
       // «الفكة»
       if (t.dataset.tsAdj != null) { adj = Number(t.dataset.tsAdj) || 0; adjOpen = false; return drawCart(); }
@@ -680,9 +901,14 @@
   }
   async function open() {
     bind();
+    loadBatches();   // the expiry batches: fresh each time the screen opens, never waited for here
     if (!ready) {
       ready = true;
-      drawCart();
+      // the bills kept on the phone (up to 3) come back as they were, even after the page was closed
+      const saved = cleanBills(load(BKEY, null));
+      bills = saved.bills; cur = saved.cur;
+      applyBill(bills[cur]);
+      setKind(kind);
       say('tsFind', 'بيحمّل الأصناف…');
       await Promise.all([loadItems(), db() && can('credit') ? loadCustomers() : Promise.resolve()]);
       if (!$('tsQ').value) say('tsFind', items.length ? '' : 'الأصناف لسه ما اتحمّلتش. جرّب تاني لما النت يرجع.', items.length ? '' : 'bad');
