@@ -34,7 +34,12 @@
     })).catch(() => null);
     // a write may take its time in the background; a read is what the search waits for
     if (mode !== 'readonly') return work;
-    return Promise.race([work, new Promise((ok) => setTimeout(() => { broken = true; ok(null); }, WAIT_MS))]);
+    // the storage is «broken» only when THIS read did not answer in time. The timer is stopped as soon as the read answers
+    // (2026-11-21: it used to fire 2.5 s after every read, even a quick one, so every write after that, like the fresh copy
+    // saved once a slow server read ended, was skipped and the phone kept an old copy)
+    let timer = null;
+    const late = new Promise((ok) => { timer = setTimeout(() => { broken = true; ok(null); }, WAIT_MS); });
+    return Promise.race([work.then((v) => { clearTimeout(timer); return v; }), late]);
   }
   const get = (k) => req('readonly', (s) => s.get(k));
   const set = (k, v) => req('readwrite', (s) => { s.put(v, k); });
