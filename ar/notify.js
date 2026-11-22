@@ -173,7 +173,7 @@
     if (root.AskerReturns) { try { await root.AskerReturns.load(false); out.returnsN = root.AskerReturns.count().n; out.returnsAmt = Math.round(root.AskerReturns.count().amount); } catch (e) { /* no returns file yet */ } }
     // «💊 مزمن» (owner 2026-11-16): the customers whose regular medicine is late (the list is in «العملاء»)
     if (root.AskerChronic) { try { await root.AskerChronic.load(false); out.chronicN = root.AskerChronic.count(); } catch (e) { /* no chronic file yet */ } }
-    if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers.over.length; }
+    if (a) { out.expiry = today(a.mix) + today(a.negative) + today(a.expiredSold); out.customers = a.customers && a.customers.over ? a.customers.over.length : 0; }   // an alerts object with no customers part (an old file, or a test's partial one) must not stop the home
     // the other bags: only the late items count here (the home card shows every bag's shortages anyway)
     if (a && a.bags) out.bags = root.AskerAlertsLib ? root.AskerAlertsLib.lateBags(a) : 0;
     return out;

@@ -49,7 +49,7 @@ run('Waiting list: call these (call / WhatsApp / handed over), the waiting ones,
  // call these: one card for the medicine, two customers; a card's name loses the number glued to it; the link, the WhatsApp message
  const call=await texts(page,'#wlMain .py-card.py-wait');
  assert.equal(call.length,1);
- assert.match(call[0],/AUGMENTIN 1GM 14 TAB 📦 حطه في مكان الانتظار، مش مع الرف العادي فلان · 01012345678 · علبة اتصل واتساب اتسلّم مش وصل لسه 01111111111 · علبتين اتصل واتساب اتسلّم مش وصل لسه$/);
+ assert.match(call[0],/AUGMENTIN 1GM 14 TAB 📦 حطه في مكان الانتظار، مش مع الرف العادي فلان · 01012345678 · علبة اتصل واتساب 🧾 بيعها اتسلّم مش وصل لسه 01111111111 · علبتين اتصل واتساب 🧾 بيعها اتسلّم مش وصل لسه$/);
  assert.equal(await page.getAttribute('a[data-wl-called="3"][href^="tel:"]','href'),'tel:01012345678');
  const wa=await page.getAttribute('a[data-wl-called="3"][target="_blank"]','href');
  assert.equal(wa,'https://wa.me/201012345678?text='+encodeURIComponent('أهلًا بحضرتك، الدوا اللي سألت عليه (AUGMENTIN 1GM 14 TAB) وصل في الصيدلية. تقدر تعدّي تاخده. شكرًا.'));
@@ -83,7 +83,7 @@ run('Waiting list: call these (call / WhatsApp / handed over), the waiting ones,
  const left=await texts(page,'#wlMain .py-card:has([data-wl-act="returned"])');
  assert.equal(left.length,3,'the two leftovers and the customer he called: still here until he decides');
  assert.match(left[0],/XYZ CREAM 30G مورد جديد .* اتكلم وصل من 22 يوم · حدد نوع المورد عشان يظهر ميعاد الرجوع اتباع آخر سنة: 3.5 علبة · السعر 62 ج · أقرب صلاحية في المخزن 2026-06 صلاحيته أقل من سنة ونص/);
- assert.match(left[1],/CATAFLAM 50MG 20 TAB مركز توزيع النور · مركز توزيع عميل مثال تاني · 01077778888 · علبة وصل من 6 أيام · فاضل يوم على الرجوع اتباع آخر سنة: 0 علبة · السعر 85 ج · أقرب صلاحية في المخزن 2030-01 رجّعته للمورد اتصل هسيبه اتسلّم مش وصل لسه/);
+ assert.match(left[1],/CATAFLAM 50MG 20 TAB مركز توزيع النور · مركز توزيع عميل مثال تاني · 01077778888 · علبة وصل من 6 أيام · فاضل يوم على الرجوع اتباع آخر سنة: 0 علبة · السعر 85 ج · أقرب صلاحية في المخزن 2030-01 رجّعته للمورد اتصل 🧾 بيعها هسيبه اتسلّم مش وصل لسه/);
  assert.equal(await page.$$eval('#wlMain .py-card.py-look',c=>c.length),1,'only the one with a day left is in red');
  assert.equal(await page.$$eval('#wlMain .py-card.py-look',c=>c[0].textContent.includes('CATAFLAM')),true);
  // decisions: returned / kept are a second tap
