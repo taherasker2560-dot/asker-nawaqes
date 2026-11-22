@@ -1541,6 +1541,16 @@ button.linklike.cu-add {
 .ts-items small { color: var(--muted); }
 .ts-acts { display: flex; gap: 8px; margin-top: 8px; }
 .ts-acts button { flex: 1; margin: 0; }
+/* «🤖 ادخلها دلوقتي» (owner 2026-11-22): soft (tint + a line in the color); the robot's state on the bill: asked / typing (dashed line) or stopped (red, like a return's tag) */
+.ts-acts { flex-wrap: wrap; }
+.ts-acts .ts-robot { flex: 1 1 100%; background: var(--tint); color: var(--crimson); border: 1px solid var(--crimson); box-shadow: none; font-weight: 700; }
+.ts-acts .ts-robot:disabled { opacity: .55; }
+.ts-robot-all { display: flex; justify-content: center; align-items: center; gap: 6px; width: 100%; margin: 2px 0 10px; background: var(--tint); color: var(--crimson); border: 1px solid var(--crimson); box-shadow: none; font-weight: 700; }
+.ts-robot-all b { padding: 0 7px; border-radius: 999px; background: var(--card); font-size: 12px; }
+.ts-st.go { background: var(--tint); color: var(--crimson); border: 1px dashed var(--crimson); }
+.ts-st.bad { background: #fdecee; color: #c62828; }
+html.night .ts-st.bad { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
+.ts-sale > small.ts-rn { color: var(--crimson-ink); }
 html.night .ts-warn { background: rgba(229, 36, 59, 0.15); color: #ff8a95; }
 html.night .ts-st.w { background: rgba(var(--glow), 0.15); color: var(--crimson-ink); }
 html.night .ts-st.d { background: rgba(255, 255, 255, 0.08); color: var(--muted); }.ts-types { margin: 10px 0 0; }

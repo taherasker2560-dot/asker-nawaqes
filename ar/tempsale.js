@@ -924,15 +924,47 @@
       try {
         const since = new Date(Date.now() - 7 * 864e5).toISOString();
         const cols = 'id,no,sold_at,kind,customer_id,customer_name,items,total,paid,note,status,entered_ticket,created_by';
-        // limit_ok_by: the owner's approval of a bill over the limit (migration 202611220100); before it is on the server the list loads without it
-        let { data, error } = await db().from('ar_temp_sales').select(cols + ',limit_ok_by').gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299);
-        if (error && /limit_ok/i.test(String(error.message))) ({ data, error } = await db().from('ar_temp_sales').select(cols).gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299));
+        // limit_ok_by: the owner's approval of a bill over the limit (migration 202611220100); robot_*: his «ادخلها دلوقتي» and what the robot is doing
+        // (migration 202611221500); before they are on the server the list loads without them
+        let data = null, error = null;
+        for (const extra of [',limit_ok_by,robot_ask_at,robot_state,robot_state_at', ',limit_ok_by', '']) {
+          ({ data, error } = await db().from('ar_temp_sales').select(cols + extra).gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299));
+          if (!error || !/limit_ok|robot_/i.test(String(error.message))) break;
+        }
         if (!error) server = data || [];
       } catch (e) {}
     }
     drawList();
   }
   const isPending = (s) => s.queued || s.status === 'pending';
+  // «🤖 ادخلها دلوقتي» (owner 2026-11-22: «لما ادوس عليه المدخل ينفذ الامر»): the owner's button on a waiting bill that is already on the server. The ask is
+  // signed as his by the server; the robot on the laptop takes the bill within a minute (even if somebody is on the laptop) and its state shows on the bill.
+  const fresh = (t, min) => !!t && Date.now() - new Date(t).getTime() < min * 60000;
+  const canRobot = (s) => !s.queued && s.status === 'pending' && !staffNow();
+  function robotState(s) {
+    if (s.queued || s.status !== 'pending') return '';
+    if (s.robot_state === 'typing' && fresh(s.robot_state_at, 10)) return 'typing';
+    if (s.robot_state === 'stopped') return 'stopped';
+    return s.robot_ask_at ? 'asked' : '';
+  }
+  const ROBOT_TAG = { asked: '<span class="ts-st go">🤖 <span>طلبك وصل</span></span> ', typing: '<span class="ts-st go">🤖 <span>بيكتبها دلوقتي</span></span> ', stopped: '<span class="ts-st bad">🤖 <span>وقف</span></span> ' };
+  const ROBOT_NOTE = { asked: 'الروبوت هياخدها في أقل من دقيقة · لو الهَب شغال يستنى يخلص', typing: 'فارمافلاي قدام الروبوت على اللاب', stopped: 'الروبوت وقف · سؤاله في «الروبوت محتاج رأيك»' };
+  async function robotAsk(ids) {
+    if (!db() || !ids.length) return;
+    const patch = { robot_ask_at: new Date().toISOString(), robot_state: null, robot_state_at: null };
+    const { error } = await db().from('ar_temp_sales').update(patch).in('id', ids);
+    if (error) return say('tsListStatus', /robot_/i.test(String(error.message)) ? 'الزرار لسه مش جاهز على السيستم' : 'ماتبعتش: ' + error.message, 'bad');
+    for (const s of server) if (ids.includes(s.id)) Object.assign(s, patch);
+    say('tsListStatus', ids.length > 1 ? 'طلبك وصل للروبوت: هياخدهم في أقل من دقيقة' : 'طلبك وصل للروبوت: هياخدها في أقل من دقيقة', 'ok');
+    drawList();
+  }
+  // while a bill is asked or being typed, the list looks again every few seconds to show where the robot got to (and stops when nothing is waiting on it)
+  let robotT = null;
+  function robotWatch() {
+    clearTimeout(robotT); robotT = null;
+    if (view !== 'list' || !merged(server, queue).some((s) => !s.queued && s.status === 'pending' && (s.robot_ask_at || s.robot_state === 'typing'))) return;
+    robotT = setTimeout(() => { robotT = null; loadList(); }, 5000);
+  }
   function drawBadge() {
     const n = merged(server, queue).filter(isPending).length, b = $('tsPendN');
     if (!b) return;
@@ -942,7 +974,8 @@
   function saleRow(s) {
     const its = Array.isArray(s.items) ? s.items : [];
     const who = s.customer_id ? `<span class="notr">${esc(s.customer_name || '')}</span> (آجل)` : 'نقدي';
-    const tag = (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
+    const rs = robotState(s);
+    const tag = (rs ? ROBOT_TAG[rs] : '') + (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
       (s.limit_ok_by || s.limit_ok_at ? '<span class="ts-st ok">✓ موافق على التجاوز</span> ' : '') +
       (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? `<span class="ts-st d"><span>اتدخلت</span>${s.entered_ticket ? ` <span dir="ltr">#${esc(s.entered_ticket)}</span>` : ''}</span>` : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
@@ -952,9 +985,10 @@
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
       <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· <span>باعها</span> ${seller}</span>` : ''}</span>${tag}</button>
       <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
+      ${rs ? `<small class="ts-rn">${esc(ROBOT_NOTE[rs])}</small>` : ''}
       ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small>${x.x && expInfo(x.x) ? ` <small>${esc(expInfo(x.x).text)}</small>` : ''}</span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
-        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}
+        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" class="ts-robot" data-ts-robot${rs === 'asked' || rs === 'typing' ? ' disabled' : ''}>🤖 <span>ادخلها دلوقتي</span></button><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}
         ${canDelete(s) ? `<div class="ts-acts"><button type="button" class="secondary ts-delsale${delSure === s.id ? ' sure' : ''}" data-ts-delsale>${delSure === s.id ? 'متأكد؟ دوس تاني تتمسح خالص' : '🗑 امسح'}</button></div>` : ''}` : ''}
     </div>`;
   }
@@ -981,8 +1015,12 @@
     const pend = all.filter(isPending), done = all.filter((s) => !isPending(s));
     $('tsChips').innerHTML = `<button type="button" class="chip${listKind === 'pending' ? ' on' : ''}" data-ts-kind="pending">مستنية ${pend.length}</button><button type="button" class="chip${listKind === 'entered' ? ' on' : ''}" data-ts-kind="entered">اتدخلت ${done.length}</button>`;
     const rows = listKind === 'pending' ? pend : done;
-    $('tsRows').innerHTML = rows.map(saleRow).join('') || `<p class="hint">${listKind === 'pending' ? 'مفيش بيعات مستنية' : 'مفيش بيعات اتدخلت آخر 7 أيام'}</p>`;
+    // the owner's «ادخّل كل المستني دلوقتي»: every waiting bill already on the server that the robot is not already on
+    const robotIds = listKind === 'pending' ? pend.filter((s) => canRobot(s) && !['asked', 'typing'].includes(robotState(s))).map((s) => s.id) : [];
+    const topBtn = robotIds.length ? `<button type="button" class="ts-robot-all" data-ts-robot-all>🤖 <span>ادخّل كل المستني دلوقتي</span> <b>${esc(robotIds.length)}</b></button>` : '';
+    $('tsRows').innerHTML = topBtn + (rows.map(saleRow).join('') || `<p class="hint">${listKind === 'pending' ? 'مفيش بيعات مستنية' : 'مفيش بيعات اتدخلت آخر 7 أيام'}</p>`);
     drawBadge();
+    robotWatch();
   }
   async function mark(id, status) {
     if (!db()) return;
@@ -1085,6 +1123,11 @@
       if (t.dataset.tsKind) { listKind = t.dataset.tsKind; return drawList(); }
       const row = t.closest('[data-ts-row]');
       if (row && t.hasAttribute('data-ts-open')) { openRow = openRow === row.dataset.tsRow ? '' : row.dataset.tsRow; return drawList(); }
+      if (t.hasAttribute('data-ts-robot-all')) {
+        const ids = merged(server, queue).filter((s) => isPending(s) && canRobot(s) && !['asked', 'typing'].includes(robotState(s))).map((s) => s.id);
+        return robotAsk(ids);
+      }
+      if (row && t.hasAttribute('data-ts-robot')) return robotAsk([row.dataset.tsRow]);
       if (row && t.hasAttribute('data-ts-done')) return mark(row.dataset.tsRow, 'entered');
       if (row && t.hasAttribute('data-ts-cancel')) { if (root.confirm('تلغي البيعة دي؟ مش هتتدخل في فارمافلاي.')) mark(row.dataset.tsRow, 'cancelled'); }
       if (row && t.hasAttribute('data-ts-delsale')) { delSale(row.dataset.tsRow); return; }
