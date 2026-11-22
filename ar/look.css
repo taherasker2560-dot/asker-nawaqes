@@ -2661,3 +2661,8 @@ html.night .cu-lim-wait { background: var(--tint-2, var(--rose)); }
 .search .vo-search { position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%); width: 36px; min-width: 36px; height: 36px; min-height: 36px; margin: 0; font-size: 16px; }
 .search:has(.vo-search) input[type='search'] { padding-inline-end: 86px; }
 .search:has(.vo-search) .search-clear { inset-inline-end: 46px; }
+/* the round 📞 beside a row (PR #425) took the name's width on a phone: names broke letter under letter (owner 2026-11-22: «بوظ تنسيق أسامي العملاء … بقى الاسم مكتوب بالطول»).
+   With the 📞 beside it, the row drops its letter circle (the 📞 is its round mark), the amount pill is a little tighter, and a name wraps by whole words, never inside a word */
+.cu-rowc .cu-row::before { display: none; }
+.cu-rowc .cu-amt { padding-inline: 10px; }
+.cu-main strong { overflow-wrap: break-word; word-break: normal; }
