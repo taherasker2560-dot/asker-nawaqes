@@ -190,7 +190,7 @@
   const balText = (x) => (r2(x) < 0 ? 'له ' + money(-x) : money(x));
   // up to 3 bills open together (owner 2026-11-21): each is a whole bill of its own; all kept on the phone
   const MAX_BILLS = 3;
-  const blankBill = () => ({ kind: 'sale', cart: [], cust: null, custOpen: false, paid: '', note: '', adj: 0, adjOpen: false, adjSign: -1 });
+  const blankBill = () => ({ kind: 'sale', cart: [], cust: null, custOpen: false, paid: '', note: '', adj: 0, adjOpen: false, adjSign: -1, wait: null });
   const okLine = (l) => l && Number.isFinite(Number(l.c)) && Number.isFinite(Number(l.q)) && Number.isFinite(Number(l.p));
   // what was kept on the phone, made safe: 1..3 bills, every line complete, the open one in range
   function cleanBills(raw) {
@@ -203,7 +203,7 @@
       }).filter((l) => l.q + l.w > 0);
       const cu = b.cust && b.cust.id != null ? { id: b.cust.id, name: String(b.cust.name || ''), credit_limit: b.cust.credit_limit, balance: b.cust.balance } : null;
       return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: String(b.paid || ''), note: String(b.note || '').slice(0, 300),
-        adj: r2(b.adj), adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
+        adj: r2(b.adj), wait: b.wait != null && b.wait !== '' ? String(b.wait).slice(0, 20) : null, adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
     });
     if (!bills.length) bills.push(blankBill());
     return { cur: Math.min(Math.max(0, Math.floor(Number(raw && raw.cur)) || 0), bills.length - 1), bills };
@@ -226,6 +226,8 @@
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name', kind = 'sale';
+  // the waiting-list request this bill came from (owner 2026-11-22, «🧾 بيعها»): saved = handed over; askQty = the quantity of that request for the line about to be added
+  let waitId = null, askQty = null;
   // the bills open together (up to 3): `cart` / `cust` / `kind` / the fields are the CURRENT one's; bills[cur] is refreshed from them (snap)
   let bills = [blankBill()], cur = 0;
   // the expiry batches of every item with stock (the count's file from the laptop): Map code -> {p: parts, b: [{x, k, u}]}
@@ -368,6 +370,7 @@
   function add(it, x, bs, extra) {
     const line = addItem(cart, it, x);
     if (!line.vp && isVp(line.c)) line.vp = true;
+    if (askQty && askQty.c === line.c) { if (line.q === 1 && !line.w) setQty(line, 'q', askQty.q); askQty = null; }
     if (x) { line.x = x; line.bs = bs || null; line.xmiss = false; }
     if (extra) Object.assign(line, extra);
     clearAdj();
@@ -771,11 +774,11 @@
   // ---------- the bills open together (up to 3; owner 2026-11-21) ----------
   // the current bill's state, as a bill (what bills[cur] keeps, and what is kept on the phone)
   function snap() {
-    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign };
+    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign, wait: waitId };
   }
   function persist() { bills[cur] = snap(); keep(BKEY, { cur, bills }); }
   function applyBill(b) {
-    kind = b.kind; cart = b.cart; cust = b.cust; custOpen = b.custOpen; adj = b.adj; adjOpen = b.adjOpen; adjSign = b.adjSign;
+    kind = b.kind; cart = b.cart; cust = b.cust; custOpen = b.custOpen; adj = b.adj; adjOpen = b.adjOpen; adjSign = b.adjSign; waitId = b.wait || null;
     $('tsPaid').value = b.paid || ''; $('tsNote').value = b.note || '';
     $('tsQ').value = ''; $('tsHits').innerHTML = ''; $('tsClear').classList.add('hidden');
   }
@@ -883,13 +886,38 @@
     queue.push(rec);
     keep(QKEY, queue);
     // only THIS bill is saved and emptied; the other open bills stay as they are
+    const forWait = kind === 'sale' ? waitId : null;
     bills[cur] = blankBill();
     applyBill(bills[cur]);
     setKind('sale');
     drawBadge();
     say('tsStatus', 'اتحفظت على الموبايل…', 'ok');
+    if (forWait) markWait(forWait);
     const left = await flush();
     say('tsStatus', left ? 'اتحفظت على الموبايل، وهتتبعت أول ما النت يرجع' : 'اتحفظت ✓', 'ok');
+  }
+  // the waiting-list request this bill came from (owner 2026-11-22): a saved bill = the medicine was handed over, «اتسلّم»; best effort (the waiting list has the same button by hand)
+  async function markWait(id) { try { if (db()) await db().rpc('ar_waitlist_set', { p_id: Number(id), p_action: 'delivered' }); } catch (e) {} }
+  // «🧾 بيعها» on the waiting list (owner 2026-11-22: «ادوس عليه يعمل لي الصنف بيعة ويدخله هنا في الفواتير»): the request's item goes into a NEW bill (the open one when it is still empty),
+  // the usual way (the batch is chosen, a variable-price box shows), with the customer in the note; saving that bill marks the request «اتسلّم»
+  async function startFor(o) {
+    bind();
+    if (!ready) await open();
+    for (let i = 0; i < 40 && !items.length; i++) await new Promise((r) => setTimeout(r, 150));   // the screen's items are still loading (opened a moment ago): wait for them, up to 6 s
+    showView('new');
+    if (cart.length) {
+      if (bills.length >= MAX_BILLS) { say('tsFind', 'فيه 3 بيعات مفتوحة. احفظ واحدة الأول وجرّب تاني', 'bad'); return false; }
+      newBill();
+    }
+    setKind('sale');
+    waitId = String(o.wait_id);
+    $('tsNote').value = ('طلب انتظار: ' + (o.who ? o.who + ' · ' : '') + (o.phone || '')).slice(0, 300);
+    askQty = { c: Number(o.item_id), q: Math.max(1, Math.floor(Number(o.qty)) || 1) };
+    const it = await itemByCode(Number(o.item_id));
+    if (!it) { askQty = null; say('tsFind', 'الصنف ده مش لاقيه في أصناف البيع', 'bad'); return false; }
+    await pick(it);
+    persist();
+    return true;
   }
   // «بيع» or «مرتجع» for the whole bill
   function setKind(k) {
@@ -924,15 +952,47 @@
       try {
         const since = new Date(Date.now() - 7 * 864e5).toISOString();
         const cols = 'id,no,sold_at,kind,customer_id,customer_name,items,total,paid,note,status,entered_ticket,created_by';
-        // limit_ok_by: the owner's approval of a bill over the limit (migration 202611220100); before it is on the server the list loads without it
-        let { data, error } = await db().from('ar_temp_sales').select(cols + ',limit_ok_by').gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299);
-        if (error && /limit_ok/i.test(String(error.message))) ({ data, error } = await db().from('ar_temp_sales').select(cols).gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299));
+        // limit_ok_by: the owner's approval of a bill over the limit (migration 202611220100); robot_*: his «ادخلها دلوقتي» and what the robot is doing
+        // (migration 202611221500); before they are on the server the list loads without them
+        let data = null, error = null;
+        for (const extra of [',limit_ok_by,robot_ask_at,robot_state,robot_state_at', ',limit_ok_by', '']) {
+          ({ data, error } = await db().from('ar_temp_sales').select(cols + extra).gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299));
+          if (!error || !/limit_ok|robot_/i.test(String(error.message))) break;
+        }
         if (!error) server = data || [];
       } catch (e) {}
     }
     drawList();
   }
   const isPending = (s) => s.queued || s.status === 'pending';
+  // «🤖 ادخلها دلوقتي» (owner 2026-11-22: «لما ادوس عليه المدخل ينفذ الامر»): the owner's button on a waiting bill that is already on the server. The ask is
+  // signed as his by the server; the robot on the laptop takes the bill within a minute (even if somebody is on the laptop) and its state shows on the bill.
+  const fresh = (t, min) => !!t && Date.now() - new Date(t).getTime() < min * 60000;
+  const canRobot = (s) => !s.queued && s.status === 'pending' && !staffNow();
+  function robotState(s) {
+    if (s.queued || s.status !== 'pending') return '';
+    if (s.robot_state === 'typing' && fresh(s.robot_state_at, 10)) return 'typing';
+    if (s.robot_state === 'stopped') return 'stopped';
+    return s.robot_ask_at ? 'asked' : '';
+  }
+  const ROBOT_TAG = { asked: '<span class="ts-st go">🤖 <span>طلبك وصل</span></span> ', typing: '<span class="ts-st go">🤖 <span>بيكتبها دلوقتي</span></span> ', stopped: '<span class="ts-st bad">🤖 <span>وقف</span></span> ' };
+  const ROBOT_NOTE = { asked: 'الروبوت هياخدها في أقل من دقيقة · لو الهَب شغال يستنى يخلص', typing: 'فارمافلاي قدام الروبوت على اللاب', stopped: 'الروبوت وقف · سؤاله في «الروبوت محتاج رأيك»' };
+  async function robotAsk(ids) {
+    if (!db() || !ids.length) return;
+    const patch = { robot_ask_at: new Date().toISOString(), robot_state: null, robot_state_at: null };
+    const { error } = await db().from('ar_temp_sales').update(patch).in('id', ids);
+    if (error) return say('tsListStatus', /robot_/i.test(String(error.message)) ? 'الزرار لسه مش جاهز على السيستم' : 'ماتبعتش: ' + error.message, 'bad');
+    for (const s of server) if (ids.includes(s.id)) Object.assign(s, patch);
+    say('tsListStatus', ids.length > 1 ? 'طلبك وصل للروبوت: هياخدهم في أقل من دقيقة' : 'طلبك وصل للروبوت: هياخدها في أقل من دقيقة', 'ok');
+    drawList();
+  }
+  // while a bill is asked or being typed, the list looks again every few seconds to show where the robot got to (and stops when nothing is waiting on it)
+  let robotT = null;
+  function robotWatch() {
+    clearTimeout(robotT); robotT = null;
+    if (view !== 'list' || !merged(server, queue).some((s) => !s.queued && s.status === 'pending' && (s.robot_ask_at || s.robot_state === 'typing'))) return;
+    robotT = setTimeout(() => { robotT = null; loadList(); }, 5000);
+  }
   function drawBadge() {
     const n = merged(server, queue).filter(isPending).length, b = $('tsPendN');
     if (!b) return;
@@ -942,7 +1002,8 @@
   function saleRow(s) {
     const its = Array.isArray(s.items) ? s.items : [];
     const who = s.customer_id ? `<span class="notr">${esc(s.customer_name || '')}</span> (آجل)` : 'نقدي';
-    const tag = (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
+    const rs = robotState(s);
+    const tag = (rs ? ROBOT_TAG[rs] : '') + (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
       (s.limit_ok_by || s.limit_ok_at ? '<span class="ts-st ok">✓ موافق على التجاوز</span> ' : '') +
       (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? `<span class="ts-st d"><span>اتدخلت</span>${s.entered_ticket ? ` <span dir="ltr">#${esc(s.entered_ticket)}</span>` : ''}</span>` : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
@@ -952,9 +1013,10 @@
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
       <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· <span>باعها</span> ${seller}</span>` : ''}</span>${tag}</button>
       <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
+      ${rs ? `<small class="ts-rn">${esc(ROBOT_NOTE[rs])}</small>` : ''}
       ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small>${x.x && expInfo(x.x) ? ` <small>${esc(expInfo(x.x).text)}</small>` : ''}</span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
-        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}
+        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" class="ts-robot" data-ts-robot${rs === 'asked' || rs === 'typing' ? ' disabled' : ''}>🤖 <span>ادخلها دلوقتي</span></button><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}
         ${canDelete(s) ? `<div class="ts-acts"><button type="button" class="secondary ts-delsale${delSure === s.id ? ' sure' : ''}" data-ts-delsale>${delSure === s.id ? 'متأكد؟ دوس تاني تتمسح خالص' : '🗑 امسح'}</button></div>` : ''}` : ''}
     </div>`;
   }
@@ -981,8 +1043,12 @@
     const pend = all.filter(isPending), done = all.filter((s) => !isPending(s));
     $('tsChips').innerHTML = `<button type="button" class="chip${listKind === 'pending' ? ' on' : ''}" data-ts-kind="pending">مستنية ${pend.length}</button><button type="button" class="chip${listKind === 'entered' ? ' on' : ''}" data-ts-kind="entered">اتدخلت ${done.length}</button>`;
     const rows = listKind === 'pending' ? pend : done;
-    $('tsRows').innerHTML = rows.map(saleRow).join('') || `<p class="hint">${listKind === 'pending' ? 'مفيش بيعات مستنية' : 'مفيش بيعات اتدخلت آخر 7 أيام'}</p>`;
+    // the owner's «ادخّل كل المستني دلوقتي»: every waiting bill already on the server that the robot is not already on
+    const robotIds = listKind === 'pending' ? pend.filter((s) => canRobot(s) && !['asked', 'typing'].includes(robotState(s))).map((s) => s.id) : [];
+    const topBtn = robotIds.length ? `<button type="button" class="ts-robot-all" data-ts-robot-all>🤖 <span>ادخّل كل المستني دلوقتي</span> <b>${esc(robotIds.length)}</b></button>` : '';
+    $('tsRows').innerHTML = topBtn + (rows.map(saleRow).join('') || `<p class="hint">${listKind === 'pending' ? 'مفيش بيعات مستنية' : 'مفيش بيعات اتدخلت آخر 7 أيام'}</p>`);
     drawBadge();
+    robotWatch();
   }
   async function mark(id, status) {
     if (!db()) return;
@@ -1085,6 +1151,11 @@
       if (t.dataset.tsKind) { listKind = t.dataset.tsKind; return drawList(); }
       const row = t.closest('[data-ts-row]');
       if (row && t.hasAttribute('data-ts-open')) { openRow = openRow === row.dataset.tsRow ? '' : row.dataset.tsRow; return drawList(); }
+      if (t.hasAttribute('data-ts-robot-all')) {
+        const ids = merged(server, queue).filter((s) => isPending(s) && canRobot(s) && !['asked', 'typing'].includes(robotState(s))).map((s) => s.id);
+        return robotAsk(ids);
+      }
+      if (row && t.hasAttribute('data-ts-robot')) return robotAsk([row.dataset.tsRow]);
       if (row && t.hasAttribute('data-ts-done')) return mark(row.dataset.tsRow, 'entered');
       if (row && t.hasAttribute('data-ts-cancel')) { if (root.confirm('تلغي البيعة دي؟ مش هتتدخل في فارمافلاي.')) mark(row.dataset.tsRow, 'cancelled'); }
       if (row && t.hasAttribute('data-ts-delsale')) { delSale(row.dataset.tsRow); return; }
@@ -1114,5 +1185,5 @@
   }
   // leaving the screen turns the camera off
   function close() { stopScan(); if (way === 'scan') setWay('name'); }
-  root.AskerTempSale = { open, close, flush, scanned };
+  root.AskerTempSale = { open, close, flush, scanned, startFor };
 })(typeof window === 'undefined' ? globalThis : window);
