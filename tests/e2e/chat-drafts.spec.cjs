@@ -35,7 +35,7 @@ run('Suggested answers: «🤖 الرد جاهز», ابعت / عدّل / سيب
  await page.click('[data-chat-acctlink]');
  await page.waitForFunction(()=>window.__opened.length===1);
  const wa=await page.evaluate(()=>window.__opened[0]);
- assert.match(wa,/^https:\/\/wa\.me\/201011112222\?text=/);assert.match(decodeURIComponent(wa),/store\.html#me=[0-9a-f]{64}/);
+ assert.match(wa,/^https:\/\/wa\.me\/201011112222\?text=/);assert.match(decodeURIComponent(wa),/store\.html\?me=[0-9a-f]{64}/);
  assert.match(await text(page,'.ch-draft'),/الرد المقترح.*متوفر؟ بكام؟.*أيوه متوفر بـ 59 ج، تحب نجهزهولك؟.*PANADOL COLD & FLU \(بانادول كولد\): متوفر · 59 ج · 12 علبة/);
  await page.click('[data-draft-send]');
  await page.waitForFunction(()=>/اتبعت/.test(document.getElementById('chatPanel').textContent));

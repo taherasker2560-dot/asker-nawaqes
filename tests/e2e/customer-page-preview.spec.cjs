@@ -18,9 +18,9 @@ run('Customer statement: «👁 شوف صفحته» opens his page in a new tab,
  assert.equal(await text(page,'#cuSt [data-cu-link-view]'),'👁 شوف صفحته');
  const base=await page.evaluate(()=>new URL('store.html',location.href.replace(/#.*$/,'')).href);
  await page.click('#cuSt [data-cu-link-view]');
- await page.waitForFunction(()=>window.__opened.some(u=>/store\.html#me=/.test(u)));
+ await page.waitForFunction(()=>window.__opened.some(u=>/store\.html\?me=/.test(u)));
  let opened=await page.evaluate(()=>window.__opened);
- assert.ok(opened.includes(base+'#me='+TOK),'his own page: '+JSON.stringify(opened));
+ assert.ok(opened.includes(base+'?me='+TOK),'his own page: '+JSON.stringify(opened));
  assert.ok(!opened.some(u=>/wa\.me|whatsapp/i.test(u)),'nothing goes to WhatsApp');
  assert.equal((await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_customer_link').length)),0,'no new link was made for him');
  assert.equal((await table('ar_customer_links')).length,1);
@@ -30,20 +30,20 @@ run('Customer statement: «👁 شوف صفحته» opens his page in a new tab,
  await page.click('#cuRows [data-cu="102"]');await page.waitForSelector('#cuSt:not(.hidden) [data-cu-link-view]');
  assert.match(await text(page,'#cuSt .cu-link-seen span'),/لسه ما اتبعتلوش رابط/);
  await page.click('#cuSt [data-cu-link-view]');
- await page.waitForFunction(()=>window.__opened.some(u=>/store\.html#me=[0-9a-f]{64}$/.test(u)));
+ await page.waitForFunction(()=>window.__opened.some(u=>/store\.html\?me=[0-9a-f]{64}$/.test(u)));
  const links=await table('ar_customer_links');
  assert.equal(links.length,2);
  const made=links.find(l=>l.customer_id===102);assert.match(made.token,/^[0-9a-f]{64}$/);
  opened=await page.evaluate(()=>window.__opened);
- assert.ok(opened.includes(base+'#me='+made.token));
+ assert.ok(opened.includes(base+'?me='+made.token));
  assert.ok(!opened.some(u=>/wa\.me|whatsapp/i.test(u)),'a link was made, not sent');
  // the same button again: the same link, no second one
  await page.evaluate(()=>{window.__opened.length=0;window.__fakeWrites.length=0});
  await page.click('#cuSt [data-cu-link-view]');
- await page.waitForFunction(()=>window.__opened.some(u=>/store\.html#me=/.test(u)));
+ await page.waitForFunction(()=>window.__opened.some(u=>/store\.html\?me=/.test(u)));
  assert.equal((await table('ar_customer_links')).length,2);
  assert.equal(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_customer_link').length),0);
- assert.ok((await page.evaluate(()=>window.__opened)).includes(base+'#me='+made.token));
+ assert.ok((await page.evaluate(()=>window.__opened)).includes(base+'?me='+made.token));
  // the status line is only the customer's own opening: a look did not change it
  assert.match(await text(page,'#cuSt .cu-link-seen span'),/لسه ما فتحش رابطه/);
 },{home:true});
