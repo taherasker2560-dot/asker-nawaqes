@@ -281,6 +281,7 @@
       (st.error ? `<p class="status bad">${esc(st.error)}</p>` : '') +
       draftHtml() +
       `<div class="ch-reply"><textarea id="chatReply" rows="2" maxlength="2000" placeholder="اكتب الرد…"></textarea>` +
+      (root.AskerVoice ? root.AskerVoice.button('#chatReply', 'قول الرد') : '') + // «🎤» (owner 2026-11-22, ar/voice.js)
       `<button type="button" data-chat-send${st.busy ? ' disabled' : ''}>${st.busy ? 'بيبعت…' : 'ابعت'}</button></div>` +
       (st.note ? `<p class="status ${st.noteBad ? 'bad' : 'good'}">${esc(st.note)}</p>` : '') +
       supHtml() +
