@@ -108,6 +108,8 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  await page.evaluate(()=>window.AskerTempSale.scanned('6221234567890',true));
  assert.match(await text(page,'#tsFind'),/مش رقم ملصق فارمافلاي/);
  assert.equal((await page.$$('#tsCart .ts-line')).length,2);
+ // the newest line is drawn on top, the oldest at the bottom (owner 2026-11-22); the bill itself keeps its order (data-i)
+ assert.deepEqual(await page.$$eval('#tsCart .ts-line',x=>x.map(e=>e.dataset.i)),['1','0'],'newest on top');
  // a box that splits: two boxes, «علب» and «وحدات», typed (a unit = half the price here); a box that does not split has no units box
  assert.ok(await page.$('#tsCart .ts-line[data-i="0"] .ts-qbox.off'),'cream does not split: its units box is shut');
  const typed=async(i,w,v)=>{const s=`#tsCart .ts-line[data-i="${i}"] [data-ts-n="${w}"]`;await page.fill(s,String(v));await page.press(s,'Tab')};
