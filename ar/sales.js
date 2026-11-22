@@ -207,7 +207,8 @@
       : '';
   }
   function tag(r) {
-    if (r.kind === 'return') return '<span class="sa-tag ret">مرتجع</span>';
+    // a return says which kind it was (owner 2026-11-22: «المرتجع النقدي يبقى مكتوب عليه مرتجع نقدي، والمرتجع الاجل يبقى مكتوب عليه مرتجع اجل»); a cash one has no customer
+    if (r.kind === 'return') return r.customer_id == null ? '<span class="sa-tag ret">مرتجع نقدي</span>' : `<span class="sa-tag ret"><span>مرتجع آجل</span>${r.customer ? ` · <span class="notr">${esc(r.customer)}</span>` : ''}</span>`;
     if (r.customer_id == null) return '<span class="sa-tag cash">نقدي</span>';
     return `<span class="sa-tag credit"><span>آجل</span>${r.customer ? ` · <span class="notr">${esc(r.customer)}</span>` : ''}</span>`;
   }

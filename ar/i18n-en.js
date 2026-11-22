@@ -831,6 +831,8 @@ window.AskerEN = {
   "بيعها": "Sell it",
   "فيه 3 بيعات مفتوحة. احفظ واحدة الأول وجرّب تاني": "3 bills are open. Save one first and try again",
   "الصنف ده مش لاقيه في أصناف البيع": "Cannot find this item in the sale items",
+  "مرتجع نقدي": "Cash return",
+  "مرتجع آجل": "Credit return",
   "مفيش رصيد على الصنف ده. اكتب الصلاحية زي ما بتكتبها في فارمافلاي (شهر وسنة):": "There is no stock of this item. Type the expiry as you write it in PharmaFly (month and year):",
   "اكتب الشهر والسنة، زي 03/2028": "Type the month and the year, like 03/2028",
   "الصلاحية دي خلصت: الصنف منتهي": "This expiry has passed: the item is expired",
