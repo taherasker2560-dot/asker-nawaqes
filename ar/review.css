@@ -103,3 +103,21 @@
 .rv-lines small.rv-info, .rv-lines small.rv-ex { display: block; color: var(--muted); font-size: 12.5px; }
 .rv-nm small.rv-sug { color: var(--crimson-ink); }
 .rv-sug b { font-weight: 700; }
+/* a NEW item's box photo (owner 2026-11-22, mockup mockups/new_item_photo_2026-11-22.jpg): «📷 صوّر العلبة» under the line, «بيقرا العلبة…» while the laptop reads it, then the reading */
+.rv-nirow td { border-top: 0; padding-top: 0; }
+.rv-ni { grid-column: 1 / -1; margin-top: 6px; }
+.rv-ni-cam { display: flex; justify-content: center; align-items: center; gap: 6px; width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 14px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.rv-ni-b .rv-ni-cam { width: auto; padding: 6px 12px; font-size: 13px; font-weight: 400; border-color: var(--line); background: var(--card); color: var(--ink); }
+.rv-ni-wait { padding: 8px 10px; border-radius: 12px; border: 1.5px dashed var(--crimson); color: var(--crimson-ink); font-size: 13px; }
+.rv-ni-wait.bad { border-color: var(--bad); color: var(--bad); margin-bottom: 6px; }
+.rv-ni-read { display: flex; gap: 9px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.rv-ni-ph { flex: none; width: 52px; height: 52px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); background: var(--rose); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.rv-ni-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rv-ni-m b { font-size: 13px; text-align: left; overflow-wrap: anywhere; }
+.rv-ni-m small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.rv-ni-m small.rv-ni-note { color: var(--crimson-ink); }
+.rv-ni-m small.rv-ni-done { color: var(--crimson-ink); font-weight: 600; }
+.rv-ni-b { margin-top: 4px; flex-wrap: wrap; }
+.rv-ni-edit { display: flex; gap: 6px; margin-top: 4px; }
+.rv-ni-edit input { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; border-radius: 10px; }
+.rv-ni-edit button { flex: none; width: auto; min-height: 0; padding: 6px 12px; border-radius: 12px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font: inherit; font-size: 13px; font-weight: 700; box-shadow: none; }
