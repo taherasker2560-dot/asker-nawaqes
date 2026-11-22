@@ -820,6 +820,8 @@
     $('tsPaidRow').classList.toggle('hidden', !cust && !ret);
     $('tsPaidLbl').textContent = ret ? 'رجّعتله كام فلوس؟' : 'دفع كام؟';
     if ($('tsCQ')) { $('tsCQ').value = q; drawCustHits(); }
+    // the bill changed after the «over the limit» question: the question starts again
+    if (overSure && overSure !== overKey()) { overSure = ''; saveLabel(); }
     persist();   // every change of the bill (lines, kind, customer, what he paid) passes here: the bills stay on the phone
   }
   function drawCustHits() {
@@ -833,9 +835,30 @@
 
   // ---------- saving: on the phone first, then to the server ----------
   const uuid = () => (root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => ((Math.random() * 16) | 0).toString(16)));
+  // a credit bill over the customer's limit (owner 2026-11-22: «لازم يبان لي على السيستم إنه متجاوز، وانا اقرر ساعتها … لكن انا لو وافقت خلاص»): the owner's first tap only
+  // says so; a second tap saves it WITH his approval (when, by how much; the server signs who), and the robot then passes PharmaFly's «متجاوز» without asking.
+  // A staff member's bill over the limit carries no approval: the robot stops on it and asks the owner.
+  let overSure = '';
+  const overKey = () => (cust ? `${cust.id}|${due(cart, adj)}|${Number($('tsPaid') && $('tsPaid').value) || 0}` : '');
+  const overNow = () => (kind !== 'return' && cust ? overLimit(cust, due(cart, adj), Number($('tsPaid') && $('tsPaid').value) || 0) : null);
+  function saveLabel() {
+    const b = $('tsSave');
+    if (b) b.textContent = kind === 'return' ? 'احفظ المرتجع' : overSure ? 'موافق: احفظها متجاوزة الحد' : 'احفظ البيعة';
+  }
   async function save() {
     if (!cart.length) return say('tsStatus', 'ضيف صنف الأول', 'bad');
+    const over = overNow();
+    let ok = null;
+    if (over && !staffNow()) {
+      if (overSure !== overKey()) {
+        overSure = overKey(); saveLabel();
+        return say('tsStatus', `العميل هيعدّي الحد: هيبقى عليه ${money(over.after)} والحد ${money(over.lim)}. لو موافق دوس «احفظ» تاني.`, 'bad');
+      }
+      ok = { at: new Date().toISOString(), over: r2(over.after - over.lim) };
+    }
+    overSure = '';
     const rec = record({ id: uuid(), soldAt: new Date().toISOString(), lines: cart, customer: cust, paid: $('tsPaid').value, note: $('tsNote').value, kind, adjust: adj });
+    if (ok) { rec.limit_ok_at = ok.at; rec.limit_over = ok.over; }
     if (rec.items.length > 60) return say('tsStatus', 'البيعة كبيرة: احفظ جزء منها وافتح بيعة تانية للباقي', 'bad');   // the server keeps 60 entries a bill (a line with boxes and units is two)
     queue.push(rec);
     keep(QKEY, queue);
@@ -853,7 +876,8 @@
     kind = k === 'return' ? 'return' : 'sale';
     document.querySelectorAll('[data-ts-type]').forEach((b) => b.classList.toggle('on', b.dataset.tsType === kind));
     $('tsNew').classList.toggle('ts-return', kind === 'return');
-    $('tsSave').textContent = kind === 'return' ? 'احفظ المرتجع' : 'احفظ البيعة';
+    overSure = '';
+    saveLabel();
     drawCart();
   }
   // sends what is kept on the phone; returns how many are still waiting
@@ -879,8 +903,10 @@
     if (db()) {
       try {
         const since = new Date(Date.now() - 7 * 864e5).toISOString();
-        const { data, error } = await db().from('ar_temp_sales').select('id,no,sold_at,kind,customer_id,customer_name,items,total,paid,note,status,entered_ticket,created_by')
-          .gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299);
+        const cols = 'id,no,sold_at,kind,customer_id,customer_name,items,total,paid,note,status,entered_ticket,created_by';
+        // limit_ok_by: the owner's approval of a bill over the limit (migration 202611220100); before it is on the server the list loads without it
+        let { data, error } = await db().from('ar_temp_sales').select(cols + ',limit_ok_by').gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299);
+        if (error && /limit_ok/i.test(String(error.message))) ({ data, error } = await db().from('ar_temp_sales').select(cols).gte('sold_at', since).order('sold_at', { ascending: false }).range(0, 299));
         if (!error) server = data || [];
       } catch (e) {}
     }
@@ -897,6 +923,7 @@
     const its = Array.isArray(s.items) ? s.items : [];
     const who = s.customer_id ? `<span class="notr">${esc(s.customer_name || '')}</span> (آجل)` : 'نقدي';
     const tag = (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
+      (s.limit_ok_by || s.limit_ok_at ? '<span class="ts-st ok">✓ موافق على التجاوز</span> ' : '') +
       (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? `<span class="ts-st d"><span>اتدخلت</span>${s.entered_ticket ? ` <span dir="ltr">#${esc(s.entered_ticket)}</span>` : ''}</span>` : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
     // the owner sees who sold it, always (owner 2026-11-22: «يبقى مكتوب مين اللي باعها كمان، ده شيء اساسي»): a staff member's name, «إنت» for his own

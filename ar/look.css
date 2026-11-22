@@ -2595,3 +2595,35 @@ a.cu-callnum small { display: block; color: var(--muted); font-size: 12px; }
 a.cu-callnum > span:last-child { display: flex; align-items: center; justify-content: center; width: 40px; height: 36px; border-radius: 12px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); }
 a.so-call { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 700; text-decoration: none; }
 html.night a.cu-call, html.night a.cu-callbtn, html.night button.cu-callbtn, html.night a.so-call, html.night a.cu-callnum > span:last-child { color: var(--ink); }
+
+/* «🤖 الروبوت محتاج رأيك» at the top of «البيع المؤقت» (ar/robot.js, owner 2026-11-22) */
+.rb-box { margin: 0 0 12px; padding: 10px 12px; border: 1.5px solid var(--crimson); border-radius: 14px; background: var(--card); color: var(--ink); }
+.rb-h { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15.5px; }
+.rb-n { min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--crimson); color: #fff; font-size: 12px; text-align: center; }
+.rb-card { padding: 9px 0; border-top: 1px solid var(--line); }
+.rb-card:first-of-type { border-top: 0; }
+.rb-title { font-weight: 800; overflow-wrap: anywhere; }
+.rb-details { margin-top: 3px; color: var(--ink); font-size: 13.5px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
+.rb-when { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.rb-opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.rb-opts button { margin: 0; min-height: 40px; border-radius: 14px; }
+.rb-opts .rb-main { background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); font-weight: 800; box-shadow: none; }
+.rb-own { display: flex; gap: 8px; margin-top: 8px; }
+.rb-own input { flex: 1; min-width: 0; margin: 0; }
+.rb-own button { margin: 0; flex: none; }
+.rb-msg { margin: 8px 0 0; }
+html.night .rb-opts .rb-main { color: var(--ink); }
+/* «✏️ تعديل الحد» on the customer's statement (ar/customers.js, owner 2026-11-22): the new limit waits for the robot in PharmaFly */
+.cu-lim-btn { margin: 8px 0 0; }
+.cu-lim { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.cu-lim input { flex: 1 1 140px; min-width: 0; margin: 0; }
+.cu-lim .hint { flex: 1 0 100%; margin: 0; }
+.cu-lim-wait { justify-content: space-between; background: var(--rose); border-color: transparent; }
+.cu-lim-tag { display: inline-block; margin-inline-start: 4px; padding: 1px 9px; border-radius: 999px; background: var(--card); color: var(--crimson-ink); font-size: 11.5px; font-weight: 700; }
+.cu-lim-acts { display: flex; gap: 8px; }
+.cu-lim-acts button { margin: 0; }
+.cu-lim-acts .cu-lim-ok { background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); font-weight: 800; box-shadow: none; }
+.cu-lim .linklike { min-height: 0; padding: 0 4px; background: none; color: var(--crimson-ink); font-size: 13px; font-weight: 700; text-decoration: underline; box-shadow: none; }
+html.night .cu-lim-wait { background: var(--tint-2, var(--rose)); }
+/* a credit bill over the limit that the owner approved (ar/tempsale.js) */
+.ts-st.ok { background: var(--rose); color: var(--crimson-ink); }

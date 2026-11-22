@@ -10,7 +10,7 @@ window.__tables=tables;window.__fakeWrites=[];window.__reads=[];let seq=1;
 {const j=localStorage.getItem('__fakeArNames');if(j)tables.ar_names=JSON.parse(j);const q=localStorage.getItem('__fakeQty');if(q){const m=JSON.parse(q);tables.ar_shortages.forEach(r=>Object.assign(r,m[r.id]||{}))}}
 function builder(table){let filters=[],op='select',payload=null,opts={},range=null,single=false,ret=false,lim=null;
  const run=()=>{const t=tables[table]||(tables[table]=[]);const match=r=>filters.every(f=>f(r));
-  if(op==='insert'){const rows=(Array.isArray(payload)?payload:[payload]).map(x=>({id:'id'+(seq++),created_at:new Date().toISOString(),...(table==='ar_item_reads'?{status:'pending',result:null,error:null}:{}),...x}));
+  if(op==='insert'){const rows=(Array.isArray(payload)?payload:[payload]).map(x=>({id:'id'+(seq++),created_at:new Date().toISOString(),...(table==='ar_item_reads'?{status:'pending',result:null,error:null}:{}),...(table==='ar_limit_requests'?{status:'pending'}:{}),...x}));
    if(table==='ar_answers'&&rows.some(r=>t.some(o=>o.alias_key===r.alias_key&&o.name_key===r.name_key)))return {data:null,error:{message:'dup'}};if(table==='name_aliases'&&rows.some(r=>t.some(o=>o.alias_key===r.alias_key&&o.target_name===r.target_name)))return {data:null,error:{message:'duplicate key value violates unique constraint'}};
    // the real table has «ar_po_items_one_open»: one open line per item (a second one is refused, and a batch fails as a whole)
    if(table==='ar_po_items'&&rows.some((r,i)=>r.status==='open'&&(t.some(o=>o.item_id===r.item_id&&o.status==='open')||rows.some((q,j)=>j<i&&q.status==='open'&&q.item_id===r.item_id))))return {data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "ar_po_items_one_open"'}};
