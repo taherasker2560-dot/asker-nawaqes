@@ -2657,3 +2657,7 @@ html.night .cu-lim-wait { background: var(--tint-2, var(--rose)); }
 .ch-reply .vo-mic { align-self: flex-end; }
 .vo-toast { position: fixed; left: 50%; bottom: calc(var(--nav-h, 66px) + 18px); transform: translate(-50%, 20px); max-width: min(92vw, 420px); padding: 10px 16px; border-radius: 14px; background: var(--card); color: var(--ink); border: 1px solid var(--crimson); box-shadow: var(--sh-2); font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 9999; }
 .vo-toast.on { opacity: 1; transform: translate(-50%, 0); }
+/* «🎤» inside a SEARCH box (the quick sale's item and customer search, owner 2026-11-22 «عايز الصنف كونجستال بدل ما اكتبه اقوله»): at the box's end, the ✕ moves beside it */
+.search .vo-search { position: absolute; inset-inline-end: 6px; top: 50%; transform: translateY(-50%); width: 36px; min-width: 36px; height: 36px; min-height: 36px; margin: 0; font-size: 16px; }
+.search:has(.vo-search) input[type='search'] { padding-inline-end: 86px; }
+.search:has(.vo-search) .search-clear { inset-inline-end: 46px; }

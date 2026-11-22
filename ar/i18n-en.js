@@ -2403,6 +2403,8 @@ window.AskerEN = {
   "تمام ✓": "OK ✓",
   "الصنف ده جديد: اكتب سعره": "This item is new: type its price",
   "اتكلم بدل ما تكتب": "Speak instead of typing",
+  "قول اسم الصنف": "Say the item's name",
+  "قول اسم العميل": "Say the customer's name",
   "قول للروبوت يعمل إيه": "Tell the robot what to do",
   "قول اللي عايزه": "Say what you want",
   "قول ملاحظتك": "Say your note",
