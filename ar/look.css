@@ -2666,3 +2666,13 @@ html.night .cu-lim-wait { background: var(--tint-2, var(--rose)); }
 .cu-rowc .cu-row::before { display: none; }
 .cu-rowc .cu-amt { padding-inline: 10px; }
 .cu-main strong { overflow-wrap: break-word; word-break: normal; }
+/* «💵 دفعة» in a customer's statement (owner 2026-11-23, mockup customer_payment_2026-11-22): a soft button; the box with the amount, the balance after, who took it */
+button.cu-paybtn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin: 12px 0 0; border-radius: 14px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 700; font-size: 15px; box-shadow: none; }
+.cu-paybox { margin-top: 12px; padding: 12px; border: 1px solid var(--crimson); border-radius: 16px; background: var(--card); display: flex; flex-direction: column; gap: 8px; }
+.cu-paylbl { color: var(--muted); font-size: 13px; }
+#cuPayAmt { font-size: 22px; font-weight: 700; text-align: left; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
+.cu-payafter { font-size: 13px; line-height: 1.8; background: var(--rose); border-radius: 12px; padding: 8px 10px; }
+.cu-payafter b { color: var(--crimson-ink); }
+button.cu-paygo { min-height: 46px; border-radius: 14px; border: 1px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 700; font-size: 15px; box-shadow: none; }
+button.cu-paygo:disabled { opacity: 0.5; }
+.ts-st.p { background: var(--rose); color: var(--crimson-ink); }

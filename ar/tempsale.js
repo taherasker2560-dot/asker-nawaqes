@@ -1005,7 +1005,8 @@
     const its = Array.isArray(s.items) ? s.items : [];
     const who = s.customer_id ? `<span class="notr">${esc(s.customer_name || '')}</span> (آجل)` : 'نقدي';
     const rs = robotState(s);
-    const tag = (rs ? ROBOT_TAG[rs] : '') + (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
+    const pay = s.kind === 'payment';   // a customer's payment (owner 2026-11-23, «💵 دفعة» in his statement): no items, the amount is «paid»
+    const tag = (rs ? ROBOT_TAG[rs] : '') + (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : pay ? '<span class="ts-st p">💵 دفعة</span> ' : '') +
       (s.limit_ok_by || s.limit_ok_at ? '<span class="ts-st ok">✓ موافق على التجاوز</span> ' : '') +
       (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? `<span class="ts-st d"><span>اتدخلت</span>${s.entered_ticket ? ` <span dir="ltr">#${esc(s.entered_ticket)}</span>` : ''}</span>` : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
@@ -1014,9 +1015,9 @@
     const seller = staffNow() ? '' : sname ? `<span class="notr">${esc(sname)}</span>` : '<span>إنت</span>';
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
       <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· <span>باعها</span> ${seller}</span>` : ''}</span>${tag}</button>
-      <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
+      <small>${pay ? `${esc(clock(s.sold_at))} · <span>دفع</span> ${esc(money(s.paid))}` : `${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}`}</small>
       ${rs ? `<small class="ts-rn">${esc(ROBOT_NOTE[rs])}</small>` : ''}
-      ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small>${x.x && expInfo(x.x) ? ` <small>${esc(expInfo(x.x).text)}</small>` : ''}</span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
+      ${open ? `<ul class="ts-items">${pay ? '' : its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small>${x.x && expInfo(x.x) ? ` <small>${esc(expInfo(x.x).text)}</small>` : ''}</span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
         ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" class="ts-robot" data-ts-robot${rs === 'asked' || rs === 'typing' ? ' disabled' : ''}>🤖 <span>ادخلها دلوقتي</span></button><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}
         ${canDelete(s) ? `<div class="ts-acts"><button type="button" class="secondary ts-delsale${delSure === s.id ? ' sure' : ''}" data-ts-delsale>${delSure === s.id ? 'متأكد؟ دوس تاني تتمسح خالص' : '🗑 امسح'}</button></div>` : ''}` : ''}
@@ -1187,5 +1188,19 @@
   }
   // leaving the screen turns the camera off
   function close() { stopScan(); if (way === 'scan') setWay('name'); }
-  root.AskerTempSale = { open, close, flush, scanned, startFor };
+  // «💵 دفعة» (owner 2026-11-22/23: «ا، الدفعات», mockup customer_payment_2026-11-22): a customer's payment, recorded from his statement, waits here like a bill
+  // (kept on the phone first, then sent) and the robot enters it in PharmaFly his way: one «أصناف متنوعة» line at 0, the customer, the amount in «المدفوع».
+  function queuePayment({ customer, amount, note }) {
+    const amt = r2(Number(amount) || 0);
+    if (!customer || !(Number(customer.id) > 0) || !(amt > 0)) return null;
+    const rec = {
+      id: uuid(), sold_at: new Date().toISOString(), kind: 'payment',
+      customer_id: Number(customer.id), customer_name: String(customer.name || '').slice(0, 120),
+      items: [{ c: 1, n: 'أصناف متنوعة', q: 1, u: 'pack', p: 0 }], total: 0, paid: amt, adjust: null,
+      note: note ? String(note).trim().slice(0, 300) || null : null, status: 'pending',
+    };
+    queue.push(rec); keep(QKEY, queue); drawBadge();
+    return flush().then(() => rec);
+  }
+  root.AskerTempSale = { open, close, flush, scanned, startFor, queuePayment };
 })(typeof window === 'undefined' ? globalThis : window);
