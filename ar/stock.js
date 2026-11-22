@@ -42,10 +42,14 @@
     const diff = Math.round((day(n) - day(d)) / 864e5);
     return 'آخر رصيد: ' + (diff === 0 ? 'النهارده ' : diff === 1 ? 'امبارح ' : `${m[3]}/${m[2]} `) + t;
   }
+  // an Arabic query (typed or SAID, owner 2026-11-22 «عايز الصنف كونجستال بدل ما اكتبه اقوله») also meets the English name written in Arabic letters (AskerFuzzy.arabize)
+  const arOf = new WeakMap();
   function search(q, rows, limit) {
     const F = root.AskerFuzzy;
     if (!F) return [];
-    return F.rank(q, rows, (it) => [F.fold(it.arabic_name), F.fold(it.name)], limit || 30);
+    const ar = /[؀-ۿ]/.test(String(q || '')) && F.arabize;
+    const sounds = (it) => { if (!it || typeof it !== 'object') return ''; let v = arOf.get(it); if (v == null) { v = F.fold(F.arabize(it.name)); arOf.set(it, v); } return v; };
+    return F.rank(q, rows, (it) => (ar ? [F.fold(it.arabic_name), F.fold(it.name), sounds(it)] : [F.fold(it.arabic_name), F.fold(it.name)]), limit || 30);
   }
   const api = { qtyText, expText, otherText, ageText, search };
   root.AskerStockLib = api;

@@ -837,7 +837,7 @@
         ${over ? `<div class="ts-warn">⚠️ هيبقى عليه ${esc(money(over.after))} والحد ${esc(money(over.lim))}: هيعدّي الحد بالبيعة دي</div>` : ''}
         <button type="button" class="linklike" data-ts-change>غيّر العميل</button></div>`;
     } else if (custOpen) {
-      html += `<div class="search"><input id="tsCQ" type="search" autocomplete="off" aria-label="العميل" placeholder="اسم العميل أو الكود…" /></div><div id="tsCHits"></div>`;
+      html += `<div class="search"><input id="tsCQ" type="search" autocomplete="off" aria-label="العميل" placeholder="اسم العميل أو الكود…" />${root.AskerVoice ? root.AskerVoice.button('#tsCQ', 'قول اسم العميل', 'replace') : ''}</div><div id="tsCHits"></div>`;
     }
     const q = $('tsCQ') ? $('tsCQ').value : '';
     box.innerHTML = html;

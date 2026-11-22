@@ -16,7 +16,9 @@
   if (typeof document === 'undefined') return;
 
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  let rec = null, sel = '', base = '', fin = '', interim = '', toastTimer = 0;
+  // mode 'replace' (a SEARCH box, owner 2026-11-22: «انت ليه ما عملتش مكان البيع؟ … عايز الصنف كونجستال بدل ما اكتبه اقوله»): what he says REPLACES the box and
+  // the search runs while he speaks (an «input» event on every word heard)
+  let rec = null, sel = '', base = '', fin = '', interim = '', mode = '', toastTimer = 0;
   const box = () => { try { return sel ? document.querySelector(sel) : null; } catch (e) { return null; } };
   function toast(text) {
     let t = document.getElementById('voToast');
@@ -50,13 +52,15 @@
     if (rec) { const same = button.dataset.voice === sel; stop(); if (same) return; }
     let t = null; try { t = document.querySelector(button.dataset.voice); } catch (e) { t = null; }
     if (!t) return;
-    sel = button.dataset.voice; base = clean(t.value); fin = ''; interim = '';
+    sel = button.dataset.voice; mode = button.dataset.voiceMode || ''; base = mode === 'replace' ? '' : clean(t.value); fin = ''; interim = '';
+    if (mode === 'replace') { t.value = ''; t.dispatchEvent(new Event('input', { bubbles: true })); }
     const r = new R();
     r.lang = 'ar-EG'; r.continuous = false; r.interimResults = true; r.maxAlternatives = 1;
     r.onresult = (ev) => {
       let f = '', i = '';
       for (let k = 0; k < ev.results.length; k++) { const x = ev.results[k], s = clean(x && x[0] && x[0].transcript); if (!s) continue; if (x.isFinal) f = clean(f + ' ' + s); else i = clean(i + ' ' + s); }
       fin = f; interim = i; write();
+      if (mode === 'replace') { const t2 = box(); if (t2) t2.dispatchEvent(new Event('input', { bubbles: true })); }
     };
     r.onerror = (ev) => {
       const e = ev && ev.error;
@@ -82,7 +86,7 @@
   new MutationObserver(() => { if (rec) mark(); }).observe(document.documentElement, { childList: true, subtree: true });
   root.AskerVoice = {
     // the button's html for a box (its css selector); screens put it right after the box
-    button(selector, label) { return `<button type="button" class="vo-mic" data-voice="${esc(selector)}" aria-label="${esc(label || 'اتكلم بدل ما تكتب')}" title="${esc(label || 'اتكلم بدل ما تكتب')}">🎤</button>`; },
+    button(selector, label, how) { return `<button type="button" class="vo-mic${how === 'replace' ? ' vo-search' : ''}" data-voice="${esc(selector)}"${how === 'replace' ? ' data-voice-mode="replace"' : ''} aria-label="${esc(label || 'اتكلم بدل ما تكتب')}" title="${esc(label || 'اتكلم بدل ما تكتب')}">🎤</button>`; },
     stop,
     listening: () => !!rec,
   };

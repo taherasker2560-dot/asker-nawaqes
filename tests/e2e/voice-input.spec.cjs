@@ -42,6 +42,30 @@ run('Voice: the robot\'s answer box, the bill note and an invoice note take spok
  await page.waitForFunction(()=>/الميكروفون مش متاح/.test(document.getElementById('voToast')?.textContent||''));
 });
 
+run('Voice: the quick sale\'s search, said in Arabic, finds an item that has only its English name',async({page})=>{
+ // owner 2026-11-22: «انت ليه ما عملتش مكان البيع؟ هقول البيع بالمايك، يعني عايز الصنف كونجستال بدل ما اكتبه اقوله كده. ده اصلا كان الهدف»
+ await page.evaluate(()=>{
+  window.__tables.ar_stock=[
+   {item_id:66906,name:'CONGESTAL 20T',arabic_name:'',price:50,packs:9,units:0,parts:2,exp_near:null,other:[],data_at:'2026-11-22 12:00:00'},
+   {item_id:24281,name:'FEVER SYRUP 120ML',arabic_name:'',price:33,packs:5,units:0,parts:1,exp_near:null,other:[],data_at:'2026-11-22 12:00:00'}];
+  window.__tables.ar_customers=[];window.__tables.ar_temp_sales=[];window.__tables.ar_store_items=[];
+  window.__storage['count/stock.json']=JSON.stringify({generated_at:new Date().toISOString(),data_at:'2026-11-22T12:00:00',store:1,sections:[],z:[],items:[{i:66906,n:'CONGESTAL 20T',s:0,p:2,v:1,b:[{x:null,k:9,u:0}]},{i:24281,n:'FEVER SYRUP 120ML',s:0,p:1,v:2,b:[{x:null,k:5,u:0}]}]});
+ });
+ await fakeMic(page);
+ await page.click('[data-group="sales"]');await page.click('.subbar [data-tab="tempsale"]');await page.waitForSelector('#tempSalePanel:not(.hidden)');
+ await page.waitForFunction(()=>!/بيحمّل الأصناف/.test(document.getElementById('tsFind').textContent));
+ // the search box has its microphone; what he says REPLACES the box and the search runs
+ await page.fill('#tsQ','قديم');
+ await page.evaluate(()=>{window.__say='كونجستال'});
+ await page.click('#tsSearch .vo-mic');
+ await page.waitForSelector('#tsHits [data-ts-add="66906"]');
+ assert.equal(await page.inputValue('#tsQ'),'كونجستال','the spoken name replaced what was in the box');
+ assert.equal(await page.$('#tsHits [data-ts-add="24281"]'),null,'only the item that sounds like it');
+ await page.click('#tsHits [data-ts-add="66906"]');
+ await page.waitForSelector('#tsCart .ts-line[data-i="0"]');
+ assert.match(await page.$eval('#tsCart .ts-line[data-i="0"]',(x)=>x.textContent),/CONGESTAL 20T/);
+});
+
 run('Voice: an invoice note\'s own words, said, are saved like typed ones',async({page})=>{
  await page.evaluate(()=>{
   window.__tables.ar_invoice_reviews=[{id:31,batch:'2026-11-22',ord:1,supplier:'مورد مثال',doc_no:'888001',paper_date:'2026-11-22',total:100,photos:[],

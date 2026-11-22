@@ -116,7 +116,18 @@
     if (opts && opts.rel && hits.length && hits[0][0] > 0) { const cut = opts.rel * hits[0][0]; hits = hits.filter((x) => x[0] >= cut); }
     return hits.slice(0, limit || hits.length).map((x) => x[2]);
   }
-  const api = { fold, words, score, rank };
+  // an English item name written in Arabic letters the way it sounds (owner 2026-11-22: «عايز الصنف كونجستال بدل ما اكتبه اقوله»): the phone hears Arabic,
+  // most items carry only their English name, so «كونجستال» must find «CONGESTAL 20T». Rough on purpose: the search skips letters and merges sound-alikes,
+  // so CONGESTAL → كونجيستال still holds كونجستال. Digits and the rest stay as they are.
+  const AR = { a: 'ا', b: 'ب', c: 'ك', d: 'د', e: 'ي', f: 'ف', g: 'ج', h: 'ه', i: 'ي', j: 'ج', k: 'ك', l: 'ل', m: 'م', n: 'ن', o: 'و', p: 'ب', q: 'ك', r: 'ر', s: 'س', t: 'ت', u: 'و', v: 'ف', w: 'و', x: 'كس', y: 'ي', z: 'ز' };
+  function arabize(s) {
+    return String(s ?? '').toLowerCase()
+      .replace(/ph/g, 'ف').replace(/sh|ch/g, 'ش').replace(/kh/g, 'خ').replace(/th/g, 'ث').replace(/gh/g, 'غ')
+      .replace(/ce|ci/g, (m) => 'س' + AR[m[1]]).replace(/oo|ou/g, 'و').replace(/ee/g, 'ي')
+      .replace(/[a-z]/g, (c) => AR[c] || c)
+      .replace(/(.)\1+/g, '$1'); // CETAL → سيتال, double letters once
+  }
+  const api = { fold, words, score, rank, arabize };
   if (typeof module !== 'undefined') module.exports = api;
   root.AskerFuzzy = api;
 })(typeof window === 'undefined' ? globalThis : window);
