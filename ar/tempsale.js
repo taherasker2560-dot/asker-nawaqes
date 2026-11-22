@@ -384,6 +384,8 @@
       return add(it, sx, info.state === 'unknown' ? null : b ? { k: b.k, u: b.u } : { k: 0, u: 0 });
     }
     if (info.state === 'unknown') { const line = add(it, null); line.xmiss = true; drawCart(); return line; }
+    // a RETURN of an item with nothing in stock to choose from: PharmaFly asks for the expiry printed on the box (owner 2026-11-22), so the system asks the same
+    if (kind === 'return' && (info.state === 'nostock' || info.state === 'empty') && it.hasExp !== false) { openType(it, null, 'return'); return null; }
     if (info.state !== 'list') return add(it, null);
     openExp(it, info, null);
     return null;
@@ -396,10 +398,11 @@
       el.id = 'tsExp'; el.className = 'ts-expsheet hidden';
       el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
       el.addEventListener('click', (e) => {
-        const t = e.target.closest('[data-ts-xpick],[data-ts-xclose],[data-ts-xok]');
+        const t = e.target.closest('[data-ts-xpick],[data-ts-xclose],[data-ts-xok],[data-ts-xtype]');
         if (!t) return;
         if (t.hasAttribute('data-ts-xclose')) { expFor = null; drawExp(); return; }
         if (t.hasAttribute('data-ts-xok')) { submitType(); return; }
+        if (t.hasAttribute('data-ts-xtype')) { const f = expFor; if (f) openType(f.it, f.line, 'return'); return; }
         chooseExp(t.dataset.tsXpick);
       });
       document.body.appendChild(el);
@@ -417,7 +420,9 @@
       return `<button type="button" class="ts-exp-row${e.soon ? ' soon' : ''}${b.x === was ? ' on' : ''}" data-ts-xpick="${esc(b.x)}"><span class="ts-exp-d" dir="ltr">${esc(b.x.slice(5, 7))}/${esc(b.x.slice(0, 4))}</span>${e.gone ? '<small>منتهية</small>' : e.soon ? '<small>قربت</small>' : ''}<b>${esc(qt(b))}</b></button>`;
     }).join('');
     el.innerHTML = `<div class="ts-exp-back" data-ts-xclose></div><div class="ts-exp-card"><strong class="notr">${esc(nameOf(f.it))}</strong>` +
-      `<p class="hint"><span>اختار الصلاحية اللي هتتباع</span>${f.line ? '' : ' <span>(الصنف مش هيتضاف قبل ما تختار)</span>'}</p><div class="ts-exp-list">${rows}</div>` +
+      `<p class="hint"><span>${kind === 'return' ? 'اختار صلاحية العلبة اللي رجعت' : 'اختار الصلاحية اللي هتتباع'}</span>${f.line ? '' : ' <span>(الصنف مش هيتضاف قبل ما تختار)</span>'}</p><div class="ts-exp-list">${rows}</div>` +
+      // a return whose box carries an expiry that is not in stock any more (owner 2026-11-22: «لو مش موجودة اكنسلها … ويعمل لي مكان اكتب فيه الصلاحية الفعلية»): type it, as in PharmaFly
+      (kind === 'return' ? '<button type="button" class="secondary ts-exp-other" data-ts-xtype>الصلاحية مش هنا؟ اكتبها</button>' : '') +
       (batchData ? `<p class="hint"><span>الرصيد حسب داتا</span> <span dir="ltr">${esc(batchData.replace('T', ' ').slice(0, 16))}</span></p>` : '') +
       '<button type="button" class="secondary" data-ts-xclose>إلغاء</button></div>';
     el.classList.remove('hidden');
@@ -426,11 +431,14 @@
   }
   function openExp(it, info, line) { expFor = { it, info, line }; drawExp(); }
   // ---------- an item with no stock: the expiry is TYPED, as PharmaFly asks for it (owner 2026-11-21: «اكتبه لها زي فارما فلاي») ----------
-  function openType(it, line) { expFor = { it, line, type: true }; drawExp(); }
+  // why: 'return' = a returned box whose expiry is typed from the box itself; otherwise an item with no stock
+  function openType(it, line, why) { expFor = { it, line, type: true, why: why || '' }; drawExp(); }
   function drawType(el, f) {
     const was = f.line && f.line.x ? `${f.line.x.slice(5, 7)}/${f.line.x.slice(0, 4)}` : '';
     el.innerHTML = `<div class="ts-exp-back" data-ts-xclose></div><div class="ts-exp-card"><strong class="notr">${esc(nameOf(f.it))}</strong>` +
-      '<p class="hint"><span>مفيش رصيد على الصنف ده. اكتب الصلاحية زي ما بتكتبها في فارمافلاي (شهر وسنة):</span></p>' +
+      (f.why === 'return'
+        ? '<p class="hint"><span>اكتب الصلاحية اللي على العلبة اللي رجعت، زي ما بتكتبها في فارمافلاي (شهر وسنة):</span></p>'
+        : '<p class="hint"><span>مفيش رصيد على الصنف ده. اكتب الصلاحية زي ما بتكتبها في فارمافلاي (شهر وسنة):</span></p>') +
       `<input id="tsExpIn" class="ts-exp-in" type="text" inputmode="numeric" autocomplete="off" dir="ltr" maxlength="7" placeholder="03/2028" aria-label="الصلاحية" value="${esc(was)}" />` +
       '<p id="tsExpMsg" class="hint ts-exp-msg"></p>' +
       '<div class="ts-exp-acts"><button type="button" class="ts-exp-ok" data-ts-xok>ضيف</button><button type="button" class="secondary" data-ts-xclose>إلغاء</button></div></div>';
@@ -889,17 +897,37 @@
     const its = Array.isArray(s.items) ? s.items : [];
     const who = s.customer_id ? `<span class="notr">${esc(s.customer_name || '')}</span> (آجل)` : 'نقدي';
     const tag = (s.kind === 'return' ? '<span class="ts-st r">مرتجع</span> ' : '') +
-      (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? '<span class="ts-st d">اتدخلت</span>' : '<span class="ts-st w">مستنية</span>');
+      (s.queued ? '<span class="ts-st q">لسه ما اتبعتتش</span>' : s.status === 'entered' ? `<span class="ts-st d"><span>اتدخلت</span>${s.entered_ticket ? ` <span dir="ltr">#${esc(s.entered_ticket)}</span>` : ''}</span>` : '<span class="ts-st w">مستنية</span>');
     const open = openRow === s.id;
-    // the owner sees who recorded it (a staff member's name; nothing for his own)
-    const seller = !staffNow() && s.created_by && root.AskerStaff ? root.AskerStaff.nameOf(s.created_by) : '';
+    // the owner sees who sold it, always (owner 2026-11-22: «يبقى مكتوب مين اللي باعها كمان، ده شيء اساسي»): a staff member's name, «إنت» for his own
+    const sname = !staffNow() && s.created_by && root.AskerStaff ? root.AskerStaff.nameOf(s.created_by) : '';
+    const seller = staffNow() ? '' : sname ? `<span class="notr">${esc(sname)}</span>` : '<span>إنت</span>';
     return `<div class="ts-sale${open ? ' open' : ''}" data-ts-row="${esc(s.id)}">
-      <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· باعها <span class="notr">${esc(seller)}</span></span>` : ''}</span>${tag}</button>
+      <button type="button" class="ts-sale-h" data-ts-open><span>${s.no ? '#' + esc(s.no) + ' · ' : ''}${who}${seller ? ` <span class="ts-seller">· <span>باعها</span> ${seller}</span>` : ''}</span>${tag}</button>
       <small>${esc(clock(s.sold_at))} · ${esc(countText(its.length))} · ${esc(money(s.total))}${s.paid ? (s.kind === 'return' ? ' · رجعله ' : ' · دفع ') + esc(money(s.paid)) : ''}</small>
       ${open ? `<ul class="ts-items">${its.map((x) => `<li class="ts-li">${photo(x.c, x.n, x.n)}<span class="ts-li-m"><span class="notr">${esc(x.n)}</span> <small>كود ${esc(x.c)}</small>${x.x && expInfo(x.x) ? ` <small>${esc(expInfo(x.x).text)}</small>` : ''}</span><b>${esc(qtyText(x.q, x.u))}</b></li>`).join('')}</ul>
         ${s.note ? `<p class="hint notr">${esc(s.note)}</p>` : ''}
-        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}` : ''}
+        ${!s.queued && s.status === 'pending' && !staffNow() ? `<div class="ts-acts"><button type="button" data-ts-done>اتدخلت في فارمافلاي</button><button type="button" class="secondary" data-ts-cancel>الغيها</button></div>` : ''}
+        ${canDelete(s) ? `<div class="ts-acts"><button type="button" class="secondary ts-delsale${delSure === s.id ? ' sure' : ''}" data-ts-delsale>${delSure === s.id ? 'متأكد؟ دوس تاني تتمسح خالص' : '🗑 امسح'}</button></div>` : ''}` : ''}
     </div>`;
+  }
+  // «🗑 امسح» (owner 2026-11-22: «المسح ده للفواتير اللي هي ما هياش فعليه … لكن الفواتير اللي بعد كده لازم تفضل مستنيه»): the owner only, a second tap, and only for a bill that never went
+  // into PharmaFly with a ticket number (a trial, or one marked «اتدخلت» by hand). One with a PharmaFly ticket stays: it is undone by a return there.
+  const canDelete = (s) => !staffNow() && !s.entered_ticket;
+  let delSure = '';
+  async function delSale(id) {
+    const s = merged(server, queue).find((x) => x.id === id);
+    if (!s || !canDelete(s)) return;
+    if (delSure !== id) { delSure = id; return drawList(); }
+    delSure = '';
+    if (s.queued) { queue = queue.filter((x) => x.id !== id); keep(QKEY, queue); return drawList(); }
+    if (!db()) return;
+    const { error } = await db().from('ar_temp_sales').delete().eq('id', id);
+    if (error) return say('tsListStatus', 'ماتمسحتش: ' + error.message, 'bad');
+    server = server.filter((x) => x.id !== id);
+    openRow = '';
+    say('tsListStatus', 'اتمسحت', 'ok');
+    drawList();
   }
   function drawList() {
     const all = merged(server, queue).filter((s) => s.status !== 'cancelled');
@@ -984,7 +1012,7 @@
         clearAdj(); return drawCart();
       }
       if (l && t.hasAttribute('data-ts-xchg')) {
-        if (l.sold0) { openType({ item_id: l.c, name: l.n, arabic_name: l.ar }, l); return; }
+        if (l.sold0) { openType({ item_id: l.c, name: l.n, arabic_name: l.ar }, l, kind === 'return' ? 'return' : ''); return; }
         const info = batchInfo(l.c);
         if (info.state === 'list') openExp({ item_id: l.c, name: l.n, arabic_name: l.ar }, info, l);
         return;
@@ -1003,6 +1031,7 @@
       if (row && t.hasAttribute('data-ts-open')) { openRow = openRow === row.dataset.tsRow ? '' : row.dataset.tsRow; return drawList(); }
       if (row && t.hasAttribute('data-ts-done')) return mark(row.dataset.tsRow, 'entered');
       if (row && t.hasAttribute('data-ts-cancel')) { if (root.confirm('تلغي البيعة دي؟ مش هتتدخل في فارمافلاي.')) mark(row.dataset.tsRow, 'cancelled'); }
+      if (row && t.hasAttribute('data-ts-delsale')) { delSale(row.dataset.tsRow); return; }
     });
     root.addEventListener('online', flush);
   }
