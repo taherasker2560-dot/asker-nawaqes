@@ -260,6 +260,8 @@
     $('tempSalePanel')?.classList.toggle('hidden', tab !== 'tempsale');
     // «البيع المؤقت» (ar/tempsale.js, owner 2026-11-12); leaving it turns the camera off
     if (tab === 'tempsale') window.AskerTempSale?.open(); else window.AskerTempSale?.close();
+    // «🤖 الروبوت محتاج رأيك» (ar/robot.js, owner 2026-11-22): the robot's open questions at the top of «البيع المؤقت»
+    if (tab === 'tempsale') window.AskerRobot?.open();
     // the sale (and later the stock count) takes the whole page: no search on top (owner 2026-11-13)
     $('app')?.classList.toggle('focus', tab === 'tempsale' || tab === 'count');
     // and the sale's bill gets the most room: no data-age line there either (owner 2026-11-13 «في 2 سنتي»)

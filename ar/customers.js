@@ -932,7 +932,7 @@
     box.innerHTML =
       `<button type="button" class="secondary small cu-back" data-cu-back>→ رجوع للعملاء</button>` +
       `<div class="cu-head"><div class="cu-name"><strong class="notr">${esc(c.name)}</strong> <span class="hint">كود ${esc(c.id)}</span></div>` +
-      `<div class="cu-bal ${b.cls}">${esc(b.text)}</div><div class="hint">${esc(limLine)}</div>` +
+      `<div class="cu-bal ${b.cls}">${esc(b.text)}</div><div class="hint">${esc(limLine)}</div>` + limHtml() +
       (st.monthDone ? `<div class="cu-sum"><div>اشترى الشهر ده<b>${esc(money(sums.bought))} ج</b></div><div>دفع الشهر ده<b class="paid">${esc(money(sums.paid))} ج</b></div></div>` : '') +
       phoneHtml() + linkHtml() +
       '</div>' +
@@ -953,6 +953,64 @@
     window.scrollTo?.(0, 0);
     loadMoves();
     if (ownerHere() && stops) loadLink(st);
+    if (ownerHere()) loadLimit(st);
+  }
+  // ---------- «✏️ تعديل الحد» (owner 2026-11-22: «اعمل لي اوبشن ان انا اعدل الحدود دي في السيستم من العملاء … وانا هعلمك تعديل الحد … عشان لو انا عدلت الحد اديلك الامر ان انت تخش تعدله»;
+  // migration 202611220100). The new limit WAITS («مستني يتنفذ في فارمافلاي») until the robot changes it in PharmaFly on his order; when PharmaFly's card says it (the
+  // customers' sync), the server closes it by itself. One waiting request per customer; the owner only. ----------
+  async function loadLimit(me) {
+    try {
+      const { data, error } = await db().from('ar_limit_requests').select('id,new_limit,requested_at').eq('customer_id', me.c.id).eq('status', 'pending').limit(1);
+      if (error) throw error;
+      me.limReq = (data || [])[0] || null; me.limOff = false;
+    } catch (e) { me.limReq = null; me.limOff = true; }   // the table is not on the server yet: nothing shows
+    if (st === me) drawStatement();
+  }
+  function limHtml() {
+    if (!st || !ownerHere() || st.limOff || st.limReq === undefined) return '';
+    const msg = st.limMsg ? `<p class="status cu-note ${st.limBad ? 'bad' : 'good'}">${esc(st.limMsg)}</p>` : '';
+    if (st.limEdit) {
+      const v = st.limReq ? st.limReq.new_limit : limitOf(st.c) || '';
+      return `<div class="cu-lim"><label class="hint" for="cuLimIn">الحد الجديد</label><input id="cuLimIn" type="number" inputmode="decimal" min="0" step="100" dir="ltr" value="${esc(v)}" />` +
+        `<div class="cu-lim-acts"><button type="button" class="cu-lim-ok" data-cu-lim-save${st.limBusy ? ' disabled' : ''}>احفظ</button><button type="button" class="secondary" data-cu-lim-cancel>إلغاء</button></div></div>` + msg;
+    }
+    if (st.limReq) {
+      return `<div class="cu-lim cu-lim-wait"><span><b>الحد الجديد ${esc(money(st.limReq.new_limit))} ج</b> <span class="cu-lim-tag">مستني يتنفذ في فارمافلاي</span></span>` +
+        `<span class="cu-lim-acts"><button type="button" class="linklike" data-cu-lim-edit>غيّره</button><button type="button" class="linklike" data-cu-lim-drop>الغيه</button></span></div>` + msg;
+    }
+    return `<button type="button" class="secondary small cu-lim-btn" data-cu-lim-edit>✏️ تعديل الحد</button>` + msg;
+  }
+  async function saveLimit() {
+    const me = st, inp = $('cuLimIn');
+    if (!me || me.limBusy || !inp) return;
+    const raw = String(inp.value).trim(), v = Math.round(Number(raw) * 100) / 100;
+    const bad = (m) => { me.limMsg = m; me.limBad = true; drawStatement(); };
+    if (raw === '' || !Number.isFinite(v) || v < 0 || v > 100000000) return bad('اكتب الحد بالأرقام، صفر أو أكتر.');
+    if (!me.limReq && v === (Number(limitOf(me.c)) || 0)) return bad('ده نفس الحد اللي في كارته دلوقتي.');
+    me.limBusy = true; me.limMsg = '';
+    try {
+      const q = me.limReq
+        ? db().from('ar_limit_requests').update({ new_limit: v }).eq('id', me.limReq.id).eq('status', 'pending')
+        : db().from('ar_limit_requests').insert({ customer_id: Number(me.c.id), old_limit: limitOf(me.c) || null, new_limit: v });
+      const { error } = await q;
+      if (error) throw error;
+      me.limEdit = false; me.limMsg = 'اتسجّل: الحد الجديد مستني يتنفذ في فارمافلاي.'; me.limBad = false;
+    } catch (e) { me.limMsg = 'ماتحفظش: ' + errText(e); me.limBad = true; }
+    me.limBusy = false;
+    await loadLimit(me);
+  }
+  async function dropLimit() {
+    const me = st;
+    if (!me || !me.limReq || me.limBusy) return;
+    if (!root.confirm(tr('تلغي طلب الحد الجديد؟'))) return;
+    me.limBusy = true;
+    try {
+      const { error } = await db().from('ar_limit_requests').update({ status: 'cancelled' }).eq('id', me.limReq.id).eq('status', 'pending');
+      if (error) throw error;
+      me.limMsg = 'اتلغى.'; me.limBad = false;
+    } catch (e) { me.limMsg = 'ماتلغاش: ' + errText(e); me.limBad = true; }
+    me.limBusy = false;
+    await loadLimit(me);
   }
   function closeStatement() {
     st = null;
@@ -1006,6 +1064,10 @@
       // the customer's WhatsApp number
       if (!st) return;
       if (e.target.closest('[data-cu-call]')) { st.callOpen = !st.callOpen; drawStatement(); return; }
+      if (e.target.closest('[data-cu-lim-edit]')) { st.limEdit = true; st.limMsg = ''; drawStatement(); const i = $('cuLimIn'); if (i) { i.focus(); i.select(); } return; }
+      if (e.target.closest('[data-cu-lim-cancel]')) { st.limEdit = false; st.limMsg = ''; drawStatement(); return; }
+      if (e.target.closest('[data-cu-lim-save]')) { saveLimit(); return; }
+      if (e.target.closest('[data-cu-lim-drop]')) { dropLimit(); return; }
       const keepDraft = () => { const i = $('cuPhoneIn'); if (i) st.phoneDraft = i.value; };
       if (e.target.closest('[data-cu-phone-edit]')) { Object.assign(st, { phoneEdit: true, phoneMsg: '', tels: null }); drawStatement(); return; }
       if (e.target.closest('[data-cu-phone-cancel]')) { Object.assign(st, { phoneEdit: false, phoneMsg: '', tels: null, phoneDraft: '' }); drawStatement(); return; }
