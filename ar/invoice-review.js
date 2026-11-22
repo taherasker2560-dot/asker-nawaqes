@@ -107,7 +107,9 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
-  const COLS = 'id,batch,ord,supplier,doc_no,paper_date,total,photos,lines,notes,answers,owner_note,status,result,created_at,done_at';
+  // «🎤» beside the boxes where he writes his own words (owner 2026-11-22, ar/voice.js): said instead of typed, saved the same way when the box changes
+  const voice = (selector, label) => (root.AskerVoice ? root.AskerVoice.button(selector, label) : '');
+  const COLS ='id,batch,ord,supplier,doc_no,paper_date,total,photos,lines,notes,answers,owner_note,status,result,created_at,done_at';
   let rows = [], urls = {}, openState = {}, showAllLines = {}, rot = {}, timer = null, loading = false, sig = '', busy = false;
 
   function say(text, kind) {
@@ -332,7 +334,7 @@
     return `<div class="rv-note${a ? ' done' : ''}" data-note="${esc(n.id)}"><div class="rv-nl"><p><b>${n.line != null ? 'سطر ' + esc(n.line) + ': ' : ''}</b><span class="notr">${esc(n.text)}</span>` +
       (n.mine ? `<small class="rv-mine">هعمل: <span class="notr">${esc(n.mine)}</span></small>` : '') + '</p>' +
       (locked ? '' : `<div class="rv-nb"><button type="button" class="rv-yes${a && a.v === 'ok' ? ' on' : ''}" data-rv-ok="${esc(r.id)}|${esc(n.id)}">تمام</button><button type="button" data-rv-chg="${esc(r.id)}|${esc(n.id)}">غيّر</button></div>`) + '</div>' +
-      (locked ? '' : `<div class="rv-alt${a && a.v !== 'ok' ? ' on' : ''}" data-rv-box="${esc(r.id)}|${esc(n.id)}">${alts}<input type="text" maxlength="200" placeholder="أو اكتب اللي عايزه…" value="${a && a.v === 'text' ? esc(a.t) : ''}" data-rv-text="${esc(r.id)}|${esc(n.id)}"></div>`) +
+      (locked ? '' : `<div class="rv-alt${a && a.v !== 'ok' ? ' on' : ''}" data-rv-box="${esc(r.id)}|${esc(n.id)}">${alts}<div class="vo-row"><input type="text" maxlength="200" placeholder="أو اكتب اللي عايزه…" value="${a && a.v === 'text' ? esc(a.t) : ''}" data-rv-text="${esc(r.id)}|${esc(n.id)}">${voice(`[data-rv-text="${r.id}|${n.id}"]`, 'قول اللي عايزه')}</div></div>`) +
       (a ? `<div class="rv-chosen notr">${esc(answerText(n, a))}</div>` : '') + '</div>';
   }
   function photosHtml(r) {
@@ -347,7 +349,7 @@
     if (WAITING.includes(r.status)) {
       const open = needs(r), ok = canApprove(r);
       return `<label class="rv-lbl" for="rvNote${esc(r.id)}">ملاحظتك على الفاتورة دي (اختياري)</label>` +
-        `<textarea id="rvNote${esc(r.id)}" maxlength="1000" placeholder="اكتب أي حاجة عايزني أعملها فيها…" data-rv-own="${esc(r.id)}">${esc(r.owner_note || '')}</textarea>` +
+        `<div class="vo-row"><textarea id="rvNote${esc(r.id)}" maxlength="1000" placeholder="اكتب أي حاجة عايزني أعملها فيها…" data-rv-own="${esc(r.id)}">${esc(r.owner_note || '')}</textarea>${voice(`#rvNote${r.id}`, 'قول ملاحظتك')}</div>` +
         `<button type="button" class="rv-go" data-rv-approve="${esc(r.id)}"${ok ? '' : ' disabled'}>✅ وافق ودخّلها</button>` +
         `<div class="hint rv-h">${ok ? 'اضغط الزرار أو Enter' : `كمّل ${open} حاجة الأول وبعدين الزرار يشتغل`}</div>` +
         (r.status === 'held' ? '<div class="hint rv-h">موقوفة: هتتدخل لما توافق.</div>' : `<button type="button" class="rv-link" data-rv-hold="${esc(r.id)}">استنى عليها</button>`);
@@ -405,7 +407,8 @@
       await loadNi(next);
       const before = sig; rows = next; sig = signature();
       // never redraw under his fingers (typing a note, choosing an answer)
-      const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+      const typing = (document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
+        !!(root.AskerVoice && root.AskerVoice.listening()); // nor while he is speaking into a box
       if (force || (sig !== before && !typing)) draw();
       say('');
     } catch (e) {

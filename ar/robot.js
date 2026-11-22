@@ -38,9 +38,14 @@
     }
     return el;
   }
+  // «🎤» beside his own words (owner 2026-11-22, ar/voice.js): he says what the robot should do instead of typing it
+  const mic = (id) => (root.AskerVoice ? root.AskerVoice.button(`[data-rb="${id}"] [data-rb-text]`, 'قول للروبوت يعمل إيه') : '');
   function draw() {
     const el = box();
     if (!el) return;
+    // words he typed or said in a card stay when the box is drawn again
+    const kept = {};
+    el.querySelectorAll('[data-rb]').forEach((c) => { const i = c.querySelector('[data-rb-text]'); if (i && i.value) kept[c.dataset.rb] = i.value; });
     el.classList.toggle('hidden', !reports.length && !msg);
     el.innerHTML = (reports.length ? `<h3 class="rb-h"><span>🤖 الروبوت محتاج رأيك</span> <span class="rb-n">${reports.length}</span></h3>` : '') +
       reports.map((r) => `<div class="rb-card" data-rb="${esc(r.id)}">
@@ -48,9 +53,10 @@
         ${r.details ? `<div class="rb-details notr">${esc(r.details)}</div>` : ''}
         <div class="rb-when">${esc(clock(r.created_at))}</div>
         ${options(r).length ? `<div class="rb-opts">${options(r).map((o, i) => `<button type="button" class="${i === 0 ? 'rb-main' : 'secondary'}" data-rb-key="${esc(o.key)}"${busy ? ' disabled' : ''}><span class="notr">${esc(o.label)}</span></button>`).join('')}</div>` : ''}
-        <div class="rb-own"><input type="text" maxlength="1000" autocomplete="off" placeholder="أو اكتب له تعمل إيه…" aria-label="اكتب للروبوت" data-rb-text /><button type="button" class="secondary" data-rb-send${busy ? ' disabled' : ''}>ابعت</button></div>
+        <div class="rb-own"><input type="text" maxlength="1000" autocomplete="off" placeholder="أو اكتب له تعمل إيه…" aria-label="اكتب للروبوت" data-rb-text />${mic(esc(r.id))}<button type="button" class="secondary" data-rb-send${busy ? ' disabled' : ''}>ابعت</button></div>
       </div>`).join('') +
       (msg ? `<p class="status rb-msg">${esc(msg)}</p>` : '');
+    el.querySelectorAll('[data-rb]').forEach((c) => { const i = c.querySelector('[data-rb-text]'); if (i && kept[c.dataset.rb]) i.value = kept[c.dataset.rb]; });
   }
   async function load() {
     if (!db() || isStaff()) { reports = []; return draw(); }
