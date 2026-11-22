@@ -29,7 +29,7 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  assert.match(await text(page,'#saAge'),/^آخر فاتورة: النهارده 1:18 م$/);
  assert.deepEqual(await ids(page),[5004,5003,5002,5001],'newest first');
  assert.match(await text(page,'[data-sa-inv="5002"]'),/فاتورة رقم 5,002 آجل · عميل تجربة واحد ?281/);
- assert.match(await text(page,'[data-sa-inv="5003"]'),/مرتجع ?-116/);
+ assert.match(await text(page,'[data-sa-inv="5003"]'),/مرتجع نقدي ?-116/,'a cash return says so');
  // a tap opens the items with their names, quantities and values
  await page.click('[data-sa-inv="5004"]');
  assert.deepEqual(await page.$$eval('[data-sa-inv="5004"] .sa-lines tr',x=>x.map(e=>[...e.cells].slice(1).map(c=>c.innerText.replace(/\s+/g,' ').trim()).join('|'))),
@@ -87,4 +87,14 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
  assert.equal(await page.$$eval('#saList [data-sa-inv]',x=>x.length),0);
  // nothing was written by all those photo taps (the sheet only asks «who may edit»)
  assert.deepEqual((await page.evaluate(()=>window.__fakeWrites)).filter(w=>!/^(ar_is_staff|ar_people_list|ar_sales_(summary|list|find_items))$/.test(w.rpc||'')).map(w=>w.rpc||JSON.stringify(w).slice(0,80)),[]);
+});
+
+// returns say which kind they are (owner 2026-11-22): a cash one «مرتجع نقدي», a credit one «مرتجع آجل» with the customer
+run('Sales activity: a cash return says cash return, a credit return says credit return and the customer',async({page})=>{
+ const R=[{id:6002,at:at(0,14,5),customer_id:7,kind:'return',total:-165,lines:[{i:102,p:1,u:0,k:3,s:165,d:0}]},{id:6001,at:at(0,13,40),customer_id:null,kind:'return',total:-116,lines:[{i:101,p:1,u:0,k:2,s:116,d:0}]}];
+ await page.evaluate(([s,i])=>{window.__tables.ar_sales=s;window.__tables.ar_store_items=i;window.__tables.ar_customers=[{id:7,name:'عميل تجربة واحد'}]},[R,ITEMS]);
+ await page.click('[data-group="sales"]');await page.click('.subbar[data-for="sales"] [data-tab="sales"]');await page.waitForSelector('#saList [data-sa-inv]');
+ assert.match(await text(page,'[data-sa-inv="6002"]'),/فاتورة رقم 6,002 مرتجع آجل · عميل تجربة واحد ?-165/);
+ assert.match(await text(page,'[data-sa-inv="6001"]'),/فاتورة رقم 6,001 مرتجع نقدي ?-116/);
+ assert.equal(await page.$$eval('#saList .sa-tag.ret',x=>x.length),2);
 });
