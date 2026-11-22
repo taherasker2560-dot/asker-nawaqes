@@ -681,6 +681,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <input id="cuQ" type="search" autocomplete="off" aria-label="دوّر في العملاء" placeholder="دوّر باسم العميل أو الكود…" />
                 <button id="cuClear" type="button" class="search-clear hidden" aria-label="امسح البحث">✕</button>
+                <button type="button" class="vo-mic vo-search" data-voice="#cuQ" data-voice-mode="replace" aria-label="قول اسم العميل" title="قول اسم العميل">🎤</button>
               </div>
               <div id="cuChips" class="chips" role="group" aria-label="العملاء"></div>
               <p id="cuCount" class="sr-count"></p>
@@ -711,6 +712,7 @@
               ><button type="button" class="chip on" data-ve-view="year">اتعاملنا معاهم السنة دي</button
               ><button type="button" class="chip" data-ve-view="all">الكل</button>
             </div>
+            <div class="search ve-nameq"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="veNameQ" type="search" autocomplete="off" aria-label="دوّر على مورد" placeholder="دوّر على مورد بالاسم…" /><button type="button" class="vo-mic vo-search" data-voice="#veNameQ" data-voice-mode="replace" aria-label="قول اسم المورد" title="قول اسم المورد">🎤</button></div>
             <p id="veStatus" class="status"></p>
             <div id="veRows"></div>
             <p class="hint">الرصيد = الفواتير − المرتجعات − الدفعات اللي متسجلة في فارمافلاي (اتطابق مع شاشة فارمافلاي). بيتحدّث مع باقي السيستم.</p>
@@ -737,6 +739,7 @@
               <div class="search">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <input id="veQ" type="search" autocomplete="off" aria-label="دوّر على صنف" placeholder="دوّر على صنف…" />
+                <button type="button" class="vo-mic vo-search" data-voice="#veQ" data-voice-mode="replace" aria-label="قول اسم الصنف" title="قول اسم الصنف">🎤</button>
               </div>
               <div id="veFind"></div>
             </div>
@@ -810,7 +813,7 @@
           <div id="saCustPick" class="sa-custpick hidden">
             <div class="search">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              <input id="saCustQ" type="search" autocomplete="off" aria-label="دوّر في العملاء" placeholder="دوّر باسم العميل أو الكود…" />
+              <input id="saCustQ" type="search" autocomplete="off" aria-label="دوّر في العملاء" placeholder="دوّر باسم العميل أو الكود…" /><button type="button" class="vo-mic vo-search" data-voice="#saCustQ" data-voice-mode="replace" aria-label="قول اسم العميل" title="قول اسم العميل">🎤</button>
             </div>
             <div id="saCustList" class="sa-custlist"></div>
             <button id="saCustClose" type="button" class="secondary small">لغي</button>
@@ -1070,7 +1073,7 @@
     <script src="ar/store-link.js?v=airy-20261119a"></script>
     <script src="ar/customers.js?v=linkq-20261122a"></script>
 <script src="ar/sales.js?v=retlabel-20261122a"></script>
-<script src="ar/vendors.js?v=supnum-20261121a"></script>
+<script src="ar/vendors.js?v=voicepeople-20261123a"></script>
 <script src="ar/ops.js?v=ops-20261120a"></script>
 <script src="ar/cash.js?v=op50-20261119a"></script>
 <script src="ar/pay.js?v=apps-20261119a"></script>

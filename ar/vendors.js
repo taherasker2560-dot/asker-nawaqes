@@ -240,7 +240,10 @@
     const t = totals(list);
     $('veTotal').innerHTML = `<div class="ve-total"><span>علينا للموردين كلهم:</span> <b dir="ltr">${esc(money(t.owed))}</b> <span>ج</span><small><span>${esc(t.year)}</span> <span>مورد اتعاملنا معاهم السنة دي</span></small></div>`;
     document.querySelectorAll('[data-ve-view]').forEach((b) => b.classList.toggle('on', b.dataset.veView === view));
-    const rows = pickVendors(list, view);
+    // «🎤 دوّر على مورد» (owner 2026-11-23: «وعاوز مايك للعملا و مايك للموردين»): a name typed or said looks in ALL the suppliers, the closest first
+    const qBox = $('veNameQ'), q = qBox ? qBox.value.trim() : '', F = root.AskerFuzzy;
+    const rows = q.length >= 2 && F ? F.rank(q, pickVendors(list, 'all'), (v) => [F.fold(v.name), F.fold(v.short || ''), F.arabize ? F.fold(F.arabize(v.name)) : ''], 60) : pickVendors(list, view);
+    if (q.length >= 2 && !rows.length) { el.innerHTML = '<p class="status">مفيش مورد بالاسم ده.</p>'; return; }
     el.innerHTML = rows.length ? rows.map((v) => {
       const b = balanceText(v.balance);
       const pay = v.last_payment_at ? `<span>آخر دفعة</span> <span>${esc(dayText(v.last_payment_at))}</span>${num(v.last_payment) ? ` (<span dir="ltr">${esc(money(v.last_payment))}</span>)` : ''}` : '<span>مفيش دفعات</span>';
@@ -624,6 +627,8 @@
     const panel = $('vendorsPanel');
     if (!panel || bound) return;
     bound = true;
+    // the supplier name box (typed or said): the list follows
+    panel.addEventListener('input', (e) => { if (e.target && e.target.id === 'veNameQ') drawList(); });
     panel.addEventListener('click', (e) => {
       const vv = e.target.closest('[data-ve-view]');
       if (vv) { view = vv.dataset.veView; drawList(); return; }
