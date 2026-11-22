@@ -190,7 +190,7 @@
   const balText = (x) => (r2(x) < 0 ? 'له ' + money(-x) : money(x));
   // up to 3 bills open together (owner 2026-11-21): each is a whole bill of its own; all kept on the phone
   const MAX_BILLS = 3;
-  const blankBill = () => ({ kind: 'sale', cart: [], cust: null, custOpen: false, paid: '', note: '', adj: 0, adjOpen: false, adjSign: -1 });
+  const blankBill = () => ({ kind: 'sale', cart: [], cust: null, custOpen: false, paid: '', note: '', adj: 0, adjOpen: false, adjSign: -1, wait: null });
   const okLine = (l) => l && Number.isFinite(Number(l.c)) && Number.isFinite(Number(l.q)) && Number.isFinite(Number(l.p));
   // what was kept on the phone, made safe: 1..3 bills, every line complete, the open one in range
   function cleanBills(raw) {
@@ -203,7 +203,7 @@
       }).filter((l) => l.q + l.w > 0);
       const cu = b.cust && b.cust.id != null ? { id: b.cust.id, name: String(b.cust.name || ''), credit_limit: b.cust.credit_limit, balance: b.cust.balance } : null;
       return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: String(b.paid || ''), note: String(b.note || '').slice(0, 300),
-        adj: r2(b.adj), adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
+        adj: r2(b.adj), wait: b.wait != null && b.wait !== '' ? String(b.wait).slice(0, 20) : null, adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
     });
     if (!bills.length) bills.push(blankBill());
     return { cur: Math.min(Math.max(0, Math.floor(Number(raw && raw.cur)) || 0), bills.length - 1), bills };
@@ -226,6 +226,8 @@
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
   let items = [], byId = new Map(), customers = [], cart = [], cust = null, custOpen = false, way = 'name', kind = 'sale';
+  // the waiting-list request this bill came from (owner 2026-11-22, «🧾 بيعها»): saved = handed over; askQty = the quantity of that request for the line about to be added
+  let waitId = null, askQty = null;
   // the bills open together (up to 3): `cart` / `cust` / `kind` / the fields are the CURRENT one's; bills[cur] is refreshed from them (snap)
   let bills = [blankBill()], cur = 0;
   // the expiry batches of every item with stock (the count's file from the laptop): Map code -> {p: parts, b: [{x, k, u}]}
@@ -368,6 +370,7 @@
   function add(it, x, bs, extra) {
     const line = addItem(cart, it, x);
     if (!line.vp && isVp(line.c)) line.vp = true;
+    if (askQty && askQty.c === line.c) { if (line.q === 1 && !line.w) setQty(line, 'q', askQty.q); askQty = null; }
     if (x) { line.x = x; line.bs = bs || null; line.xmiss = false; }
     if (extra) Object.assign(line, extra);
     clearAdj();
@@ -771,11 +774,11 @@
   // ---------- the bills open together (up to 3; owner 2026-11-21) ----------
   // the current bill's state, as a bill (what bills[cur] keeps, and what is kept on the phone)
   function snap() {
-    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign };
+    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign, wait: waitId };
   }
   function persist() { bills[cur] = snap(); keep(BKEY, { cur, bills }); }
   function applyBill(b) {
-    kind = b.kind; cart = b.cart; cust = b.cust; custOpen = b.custOpen; adj = b.adj; adjOpen = b.adjOpen; adjSign = b.adjSign;
+    kind = b.kind; cart = b.cart; cust = b.cust; custOpen = b.custOpen; adj = b.adj; adjOpen = b.adjOpen; adjSign = b.adjSign; waitId = b.wait || null;
     $('tsPaid').value = b.paid || ''; $('tsNote').value = b.note || '';
     $('tsQ').value = ''; $('tsHits').innerHTML = ''; $('tsClear').classList.add('hidden');
   }
@@ -883,13 +886,38 @@
     queue.push(rec);
     keep(QKEY, queue);
     // only THIS bill is saved and emptied; the other open bills stay as they are
+    const forWait = kind === 'sale' ? waitId : null;
     bills[cur] = blankBill();
     applyBill(bills[cur]);
     setKind('sale');
     drawBadge();
     say('tsStatus', 'اتحفظت على الموبايل…', 'ok');
+    if (forWait) markWait(forWait);
     const left = await flush();
     say('tsStatus', left ? 'اتحفظت على الموبايل، وهتتبعت أول ما النت يرجع' : 'اتحفظت ✓', 'ok');
+  }
+  // the waiting-list request this bill came from (owner 2026-11-22): a saved bill = the medicine was handed over, «اتسلّم»; best effort (the waiting list has the same button by hand)
+  async function markWait(id) { try { if (db()) await db().rpc('ar_waitlist_set', { p_id: Number(id), p_action: 'delivered' }); } catch (e) {} }
+  // «🧾 بيعها» on the waiting list (owner 2026-11-22: «ادوس عليه يعمل لي الصنف بيعة ويدخله هنا في الفواتير»): the request's item goes into a NEW bill (the open one when it is still empty),
+  // the usual way (the batch is chosen, a variable-price box shows), with the customer in the note; saving that bill marks the request «اتسلّم»
+  async function startFor(o) {
+    bind();
+    if (!ready) await open();
+    for (let i = 0; i < 40 && !items.length; i++) await new Promise((r) => setTimeout(r, 150));   // the screen's items are still loading (opened a moment ago): wait for them, up to 6 s
+    showView('new');
+    if (cart.length) {
+      if (bills.length >= MAX_BILLS) { say('tsFind', 'فيه 3 بيعات مفتوحة. احفظ واحدة الأول وجرّب تاني', 'bad'); return false; }
+      newBill();
+    }
+    setKind('sale');
+    waitId = String(o.wait_id);
+    $('tsNote').value = ('طلب انتظار: ' + (o.who ? o.who + ' · ' : '') + (o.phone || '')).slice(0, 300);
+    askQty = { c: Number(o.item_id), q: Math.max(1, Math.floor(Number(o.qty)) || 1) };
+    const it = await itemByCode(Number(o.item_id));
+    if (!it) { askQty = null; say('tsFind', 'الصنف ده مش لاقيه في أصناف البيع', 'bad'); return false; }
+    await pick(it);
+    persist();
+    return true;
   }
   // «بيع» or «مرتجع» for the whole bill
   function setKind(k) {
@@ -1157,5 +1185,5 @@
   }
   // leaving the screen turns the camera off
   function close() { stopScan(); if (way === 'scan') setWay('name'); }
-  root.AskerTempSale = { open, close, flush, scanned };
+  root.AskerTempSale = { open, close, flush, scanned, startFor };
 })(typeof window === 'undefined' ? globalThis : window);

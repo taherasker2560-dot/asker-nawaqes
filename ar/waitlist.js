@@ -163,6 +163,16 @@
   let vnums = new Map(), vnumsState = 'none';
   // a staff member (or the owner looking as one): no suppliers, no returns, no book screen; the server holds the line, this hides the buttons
   const isStaff = () => !!(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
+  // «🧾 بيعها» (owner 2026-11-22: «ادوس عليه يعمل لي الصنف بيعة ويدخله هنا في الفواتير»): an arrived request whose item the system knows becomes a bill in «البيع المؤقت»;
+  // saving that bill marks the request «اتسلّم». For the owner, and for a staff member who has the quick sale.
+  const canSell = () => !!(root.AskerTempSale && root.AskerTempSale.startFor && root.AskerApp && root.AskerApp.showTab) && (!isStaff() || !!(root.AskerStaff.can && root.AskerStaff.can('tempsale')));
+  const sellBtn = (r) => (r.item_id != null && canSell() ? `<button type="button" class="secondary small" data-wl-sell="${esc(r.id)}">🧾 <span>بيعها</span></button>` : '');
+  function sellFrom(id) {
+    const r = [...(data.call || []), ...(data.leftover || [])].find((x) => String(x.id) === String(id));
+    if (!r || r.item_id == null || !canSell()) return;
+    root.AskerApp.showTab('tempsale');
+    root.AskerTempSale.startFor({ wait_id: r.id, item_id: r.item_id, name: r.item, qty: num(r.qty) || 1, who: who(r), phone: r.phone });
+  }
 
   const vendorOf = (id) => data.vendors.find((v) => String(v.id) === String(id));
   const who = (r) => (r.who ? cleanName(r.who) : '');
@@ -190,7 +200,7 @@
       html += `<div class="py-l2">${person(r)} · ${qtySpan(r)}</div><div class="py-acts">` +
         `<a class="py-a on" href="${esc(telLink(r.phone))}" data-wl-called="${esc(r.id)}">اتصل</a>` +
         `<a class="py-a" href="${esc(wa)}" target="_blank" rel="noopener" data-wl-called="${esc(r.id)}">واتساب</a>` +
-        act(r.id, 'delivered', 'اتسلّم', 'py-p') + (isStaff() ? '' : act(r.id, 'reopen', 'مش وصل لسه')) + '</div>';
+        sellBtn(r) + act(r.id, 'delivered', 'اتسلّم', 'py-p') + (isStaff() ? '' : act(r.id, 'reopen', 'مش وصل لسه')) + '</div>';
     }
     return html + '</div>';
   }
@@ -221,7 +231,7 @@
       `<div class="py-l2"><span>${esc(ago('وصل', r.days_here))}</span> · <b>${esc(leftText(left))}</b></div>` +
       `<div class="py-l2">${nums.map((n) => `<span>${esc(n)}</span>`).join(' · ')}${r.exp_short ? ' ' + tag('صلاحيته أقل من سنة ونص') : ''}</div>` +
       (r.vendor_id == null ? `<div class="py-l2">${vendorSelect(`data-wl-vendor="${esc(r.id)}"`, '')}</div>` : '') +
-      `<div class="py-acts">${act(r.id, 'returned', 'رجّعته للمورد', 'py-p')}${callBtn(r)}${act(r.id, 'kept', 'هسيبه')}${act(r.id, 'delivered', 'اتسلّم')}${act(r.id, 'reopen', 'مش وصل لسه')}</div></div>`;
+      `<div class="py-acts">${act(r.id, 'returned', 'رجّعته للمورد', 'py-p')}${callBtn(r)}${sellBtn(r)}${act(r.id, 'kept', 'هسيبه')}${act(r.id, 'delivered', 'اتسلّم')}${act(r.id, 'reopen', 'مش وصل لسه')}</div></div>`;
   }
   const head = (title, n) => `<h3 class="py-h">${esc(title)} <span class="py-num">${esc(n)}</span></h3>`;
 
@@ -680,7 +690,7 @@
       else if (t.dataset && t.dataset.wlVendor) setVendor(t.dataset.wlVendor, t.value);
     });
     panel.addEventListener('click', (e) => {
-      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-appmore],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock],[data-wl-numopen],[data-wl-numclose],[data-wl-numset],[data-wl-numtyped]');
+      const t = e.target.closest('[data-wl-new],[data-wl-close],[data-wl-pick],[data-wl-typed],[data-wl-unpick],[data-wl-kind],[data-wl-save],[data-wl-act],[data-wl-sell],[data-wl-called],[data-wl-contact],[data-wl-tele],[data-wl-telegroup],[data-wl-bk],[data-wl-applink],[data-wl-appmore],[data-wl-bkclose],[data-wl-bkf],[data-wl-bkmore],[data-wl-bkbulk],[data-wl-lock],[data-wl-numopen],[data-wl-numclose],[data-wl-numset],[data-wl-numtyped]');
       if (!t) return;
       const d = t.dataset;
       // the number book screen and the «🔒 خاص» marks (owner only)
@@ -702,6 +712,7 @@
       if ('wlNew' in d) { note = ''; lastMsg = ''; form = { item: null, q: '', results: [], phone: '', name: '', qty: '', vendor: '', kind: '', msg: '', known: null, hist: [], picks: [], nameAuto: false }; draw(); $('wlItem')?.focus(); loadBook(); vnumsState = 'none'; loadVNums(); return; }
       if ('wlClose' in d) { form = null; draw(); return; }
       if ('wlCalled' in d) { rpc('ar_waitlist_set', { p_id: Number(d.wlCalled), p_action: 'called' }).then(() => setTimeout(load, 800), () => {}); return; }
+      if ('wlSell' in d) { sellFrom(d.wlSell); return; }
       if ('wlAct' in d) {
         const key = d.id + ':' + d.wlAct;
         // closing one is a second tap; «وصل» and the others go through
