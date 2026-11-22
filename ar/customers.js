@@ -912,6 +912,38 @@
       (st.linkMsg ? `<p class="status cu-note ${st.linkBad ? 'bad' : 'good'}">${esc(st.linkMsg)}</p>` : '') +
       '</div>';
   }
+  // «💵 دفعة» (owner 2026-11-22/23: «ا، الدفعات» then «بعد 12.3»; mockup customer_payment_2026-11-22): the amount (the number ready, a tap replaces it), his balance
+  // before and after, who took it (the one signed in), an optional note; «سجّل الدفعة» puts it in «البيع المؤقت» as a waiting payment (AskerTempSale.queuePayment)
+  // and the robot enters it in PharmaFly his way. The owner, and staff who may use «البيع المؤقت» (the same table and rule as a bill).
+  const payAllowed = () => !!(root.AskerTempSale && root.AskerTempSale.queuePayment) && (ownerHere() || !!(root.AskerStaff && root.AskerStaff.can && root.AskerStaff.can('tempsale')));
+  function payHtml() {
+    if (!st || !payAllowed()) return '';
+    const p = st.pay || {};
+    if (!p.open) return `<button type="button" class="cu-paybtn" data-cu-pay>💵 دفعة</button>` + (p.msg ? `<p class="status ${p.bad ? 'bad' : 'good'}">${esc(p.msg)}</p>` : '');
+    const amt = parseFloat(String(p.amount || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[٫,]/g, '.')) || 0;
+    const now = num(st.c.balance), after = Math.round((now - amt) * 100) / 100;
+    const who = ownerHere() ? 'الباشمهندس' : (root.AskerStaff && root.AskerStaff.myId && root.AskerStaff.nameOf ? root.AskerStaff.nameOf(root.AskerStaff.myId()) : '') || 'انت';
+    return `<div class="cu-paybox"><label class="cu-paylbl" for="cuPayAmt">دفع كام؟</label>` +
+      `<input id="cuPayAmt" type="number" inputmode="decimal" min="0" step="0.5" dir="ltr" value="${esc(p.amount || '')}" placeholder="0" aria-label="المبلغ" />` +
+      `<div class="cu-payafter" id="cuPayAfter"><span>رصيده دلوقتي</span> <b>${esc(balanceText(now).text)}</b>${amt > 0 ? ` <span>← بعد الدفعة</span> <b>${esc(balanceText(after).text)}</b>` : ''}<br><span>استلمها:</span> <b class="notr">${esc(who)}</b></div>` +
+      `<div class="vo-row"><input id="cuPayNote" type="text" maxlength="300" placeholder="ملاحظة (اختياري)" value="${esc(p.note || '')}" aria-label="ملاحظة" />${root.AskerVoice ? root.AskerVoice.button('#cuPayNote', 'قول الملاحظة') : ''}</div>` +
+      `<button type="button" class="cu-paygo" data-cu-paygo${amt > 0 && !p.busy ? '' : ' disabled'}>💵 سجّل الدفعة</button>` +
+      `<button type="button" class="secondary small" data-cu-paycancel>إلغاء</button>` +
+      (p.msg ? `<p class="status ${p.bad ? 'bad' : 'good'}">${esc(p.msg)}</p>` : '') + '</div>';
+  }
+  async function payGo() {
+    const me = st;
+    if (!me || !me.pay || me.pay.busy) return;
+    const amt = parseFloat(String(me.pay.amount || '').replace(/[٫,]/g, '.')) || 0;
+    if (!(amt > 0)) return;
+    me.pay.busy = true; drawStatement();
+    try {
+      const rec = await root.AskerTempSale.queuePayment({ customer: me.c, amount: amt, note: me.pay.note || '' });
+      if (!rec) throw new Error('bad');
+      me.pay = { open: false, msg: `اتسجّلت دفعة ${money(amt)} ج: مستنية تدخل فارمافلاي (في «البيع المؤقت»).`, bad: false };
+    } catch (e) { me.pay.busy = false; me.pay.msg = 'ما اتسجّلتش، جرّب تاني.'; me.pay.bad = true; }
+    if (st === me) drawStatement();
+  }
   function drawStatement() {
     const box = $('cuSt');
     if (!box) return;
@@ -937,7 +969,7 @@
       `<div class="cu-head"><div class="cu-name"><strong class="notr">${esc(c.name)}</strong> <span class="hint">كود ${esc(c.id)}</span></div>` +
       `<div class="cu-bal ${b.cls}">${esc(b.text)}</div><div class="hint">${esc(limLine)}</div>` + limHtml() +
       (st.monthDone ? `<div class="cu-sum"><div>اشترى الشهر ده<b>${esc(money(sums.bought))} ج</b></div><div>دفع الشهر ده<b class="paid">${esc(money(sums.paid))} ج</b></div></div>` : '') +
-      phoneHtml() + linkHtml() +
+      payHtml() + phoneHtml() + linkHtml() +
       '</div>' +
       sendHtml() +
       `<div class="chips cu-filter" role="group" aria-label="نوع الحركة">${chip('all', 'الكل')}${chip('sales', 'المبيعات')}${chip('payments', 'المدفوعات')}</div>` +
@@ -1103,12 +1135,26 @@
       // his personal link and «وقّف الآجل»
       if (e.target.closest('[data-cu-link-send]')) { sendLink(false); return; }
       if (e.target.closest('[data-cu-link-view]')) { viewPage(); return; }
+      if (e.target.closest('[data-cu-pay]')) { st.pay = { open: true }; drawStatement(); const a = $('cuPayAmt'); if (a) a.focus(); return; }
+      if (e.target.closest('[data-cu-paycancel]')) { st.pay = { open: false }; drawStatement(); return; }
+      if (e.target.closest('[data-cu-paygo]')) { payGo(); return; }
       if (e.target.closest('[data-cu-link-new]')) { sendLink(true); return; }
       if (e.target.closest('[data-cu-stop]')) { setStop(true); return; }
       if (e.target.closest('[data-cu-unstop]')) { setStop(false); return; }
     });
     // the message can be changed before sending; a redraw keeps the change
-    panel.addEventListener('input', (e) => { if (e.target.id === 'cuMsg' && st && st.send) st.send.msg = e.target.value; });
+    panel.addEventListener('input', (e) => {
+      if (e.target.id === 'cuMsg' && st && st.send) st.send.msg = e.target.value;
+      // the payment's amount: only its own line and button follow (the box he types in is never drawn again under his fingers)
+      if (e.target.id === 'cuPayAmt' && st && st.pay) {
+        st.pay.amount = e.target.value;
+        const amt = parseFloat(String(e.target.value || '').replace(/[٫,]/g, '.')) || 0, now = num(st.c.balance), after = Math.round((now - amt) * 100) / 100;
+        const box = $('cuPayAfter'), go = document.querySelector('[data-cu-paygo]');
+        if (box) { const who = box.querySelector('b.notr'); box.innerHTML = `<span>رصيده دلوقتي</span> <b>${esc(balanceText(now).text)}</b>${amt > 0 ? ` <span>← بعد الدفعة</span> <b>${esc(balanceText(after).text)}</b>` : ''}<br><span>استلمها:</span> ${who ? who.outerHTML : ''}`; }
+        if (go) go.disabled = !(amt > 0) || !!st.pay.busy;
+      }
+      if (e.target.id === 'cuPayNote' && st && st.pay) st.pay.note = e.target.value;
+    });
     $('cuQ')?.addEventListener('input', (e) => { query = e.target.value; shown = SHOW; drawList(); });
     $('cuClear')?.addEventListener('click', () => { query = ''; $('cuQ').value = ''; drawList(); $('cuQ').focus(); });
     // the phone's back button closes the statement
