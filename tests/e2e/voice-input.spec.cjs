@@ -81,6 +81,36 @@ run('Voice: the home search («الكل»), said in Arabic, finds an item that h
  assert.ok(!/FEVER SYRUP/.test(await page.$eval('#hsItems',(x)=>x.textContent)),'only the item that sounds like it');
 });
 
+run('Voice: the customers\' search and the suppliers\' new name search take a spoken name',async({page})=>{
+ // owner 2026-11-23: «وعاوز مايك للعملا و مايك للموردين»
+ await page.evaluate(()=>{
+  window.__tables.ar_customers=[{id:101,name:'أحمد محمود',credit_limit:5000,balance:1250,last_at:'2026-11-20T11:00:00',last_kind:'sale',moves:2},{id:102,name:'سامي حسن',credit_limit:5000,balance:480,last_at:'2026-11-19T11:00:00',last_kind:'sale',moves:1}];
+  window.__tables.ar_customer_moves=[];window.__tables.ar_customer_phones=[];
+  window.__tables.ar_vendors=[{id:2374,name:'A M group',short:'AMG',active:true,balance:3120,invoices:3,last_invoice_at:'2026-11-21T12:00:00',last_payment_at:null,last_payment:null},
+   {id:2278,name:'رضا عطية',short:'SKY',active:true,balance:900,invoices:1,last_invoice_at:'2026-11-10T12:00:00',last_payment_at:null,last_payment:null},
+   {id:188,name:'ابن سينا',short:'IBN',active:true,balance:-500,invoices:1,last_invoice_at:'2026-11-01T12:00:00',last_payment_at:null,last_payment:null}];
+  window.__tables.ar_vendor_moves=[];
+ });
+ await fakeMic(page);
+ // customers: «🎤» in the search, the spoken name filters the list
+ await page.click('[data-group="accounts"]');await page.waitForSelector('#cuBox:not(.hidden)');await page.click('#cuChips [data-cu-view="all"]');await page.waitForSelector('#cuRows [data-cu="102"]');
+ await page.evaluate(()=>{window.__say='سامي'});
+ await page.click('#cuQ ~ .vo-mic');
+ await page.waitForFunction(()=>!document.querySelector('#cuRows [data-cu="101"]')&&document.querySelector('#cuRows [data-cu="102"]'));
+ assert.equal(await page.inputValue('#cuQ'),'سامي');
+ // suppliers: a new name box with «🎤»; the spoken name looks in all the suppliers
+ await page.waitForFunction(()=>!document.querySelector('.vo-mic.rec'));
+ await page.click('.subbar[data-for="accounts"] [data-tab="vendors"]');await page.waitForSelector('#veRows .ve-row');
+ await page.evaluate(()=>{window.__say='رضا'});
+ await page.click('.ve-nameq .vo-mic');
+ await page.waitForFunction(()=>{const b=[...document.querySelectorAll('#veRows [data-ve-open]')].map(x=>x.dataset.veOpen);return b.length===1&&b[0]==='2278'});
+ // the English name of a supplier said in Arabic letters too
+ await page.waitForFunction(()=>!document.querySelector('.vo-mic.rec'));
+ await page.evaluate(()=>{window.__say='جروب'});
+ await page.click('.ve-nameq .vo-mic');
+ await page.waitForFunction(()=>[...document.querySelectorAll('#veRows [data-ve-open]')].map(x=>x.dataset.veOpen).includes('2374'));
+});
+
 run('Voice: an invoice note\'s own words, said, are saved like typed ones',async({page})=>{
  await page.evaluate(()=>{
   window.__tables.ar_invoice_reviews=[{id:31,batch:'2026-11-22',ord:1,supplier:'مورد مثال',doc_no:'888001',paper_date:'2026-11-22',total:100,photos:[],
