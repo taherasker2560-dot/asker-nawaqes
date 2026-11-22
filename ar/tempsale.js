@@ -759,13 +759,15 @@
     if (!cart.length) {
       box.innerHTML = '<p class="hint">لسه مفيش أصناف. دوّر على صنف ودوس عليه.</p>';
     } else {
+      // the newest line on top, the oldest at the bottom (owner 2026-11-22: «الاصناف الاقدم تحت والاحدث فوق … بضطر افر الفاتورة كلها»);
+      // only the drawing is turned: the bill keeps its order (data-i = the line's place in the bill), so the saved sale and PharmaFly's typing stay oldest first
       box.innerHTML = cart.map((l, i) => {
         const head = `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>${lineInfo(l)}${expRow(l)}${vpRow(l)}`;
         const calc = l.q > 0 && l.w > 0 ? `<div class="ts-calc"><span>${esc(l.q)}</span> × <span>${esc(money(l.p))}</span> + <span>${esc(l.w)}</span> × <span>${esc(money(l.pu))}</span></div>` : '';
         return `<div class="ts-line" data-i="${i}">${photoRow(l.c, l.n, nameOf(l), head)}
         <div class="ts-qrow">${qbox(l, 'q')}${qbox(l, 'w')}</div>${calc}
         <div class="ts-l2"><span class="ts-code">كود ${esc(l.c)}</span><button type="button" class="ts-del" data-ts-del aria-label="شيل الصنف">✕</button></div></div>`;
-      }).join('') +
+      }).reverse().join('') +
         `<div class="ts-total"><span>الإجمالي (تقريبي)</span><b>${esc(money(total(cart)))}</b></div>` + adjHtml();
     }
     drawCust();
