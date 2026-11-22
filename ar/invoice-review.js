@@ -136,9 +136,147 @@
   function lineRow(r, l) {
     const flag = flagged(r, l), d = discOf(r, l), rej = rejected(r, l);
     const price = (d ? `${esc(String(d))}% · ` : '') + (l.exp ? esc(expiryText(l.exp)) : 'من غير صلاحية');
+    const ni = niHtml(r, l);
     return `<tr class="${flag ? 'rv-flag' : ''}${rej ? ' rv-rejd' : ''}"><td class="rv-ln">${esc(l.n)}</td><td>${esc(l.paper)}<small class="notr" dir="ltr">${esc(l.name || '')}${l.id ? ' · ' + esc(l.id) : ' · جديد'}</small>` +
       (l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : '') + (l.exp ? `<small class="rv-ex">${expHtml(r, l)}</small>` : '') + '</td>' +
-      `<td class="rv-num" dir="ltr">${esc(l.qty)} × ${price}<br><b>${esc(money(l.total))}</b></td></tr>`;
+      `<td class="rv-num" dir="ltr">${esc(l.qty)} × ${price}<br><b>${esc(money(l.total))}</b></td></tr>` +
+      (ni ? `<tr class="rv-nirow"><td></td><td colspan="2">${ni}</td></tr>` : '');
+  }
+  // ---------- a NEW item's box photo (owner 2026-11-22: «اوبشن صوره ادخله بيها، يقوم جاي عامل الصنف منها» → «مراجعه الفواتير بس»; mockup mockups/new_item_photo_2026-11-22.jpg) ----------
+  // A line that is not in PharmaFly yet gets «📷 صوّر العلبة». The photo goes to ar_item_reads (kind 'new_item', migration 202611221800); the laptop's Claude reads the box (name the pharmacy's way,
+  // form, count, company, printed price, active ingredient) and the reading shows under the line. He keeps it («تمام») or types his own name (answers['N<line>'] = {v:'item', read, t}); approving
+  // the invoice keeps the reading's name when he said nothing. The invoices conversation makes the PharmaFly card from it and marks the review with result.new_items [{n, code}]; the page then
+  // sets the box photo as the new item's photo (AskerItemMedia.upload, his own session) and marks the reading «applied».
+  let ni = {}, niPics = {}, niEdit = null, niTimer = null;
+  const niKey = (r, l) => r.id + '|' + l.n;
+  const niName = (r, l, s) => { const a = answersOf(r)['N' + l.n]; return (a && a.v === 'item' && a.t) || (s && s.result && s.result.name_en) || ''; };
+  const niCodeOf = (r, l) => { const x = ((r.result && r.result.new_items) || []).find((y) => String(y.n) === String(l.n)); return x && Number(x.code) > 0 ? Number(x.code) : null; };
+  function niHtml(r, l) {
+    if (!l || l.id) return '';
+    const s = ni[niKey(r, l)], wait = WAITING.includes(r.status), k = niKey(r, l);
+    const cam = (label) => wait ? `<label class="rv-ni-cam">${label}<input type="file" accept="image/*" capture="environment" hidden data-rv-cam="${esc(k)}"></label>` : '';
+    if (!s) return wait ? `<div class="rv-ni">${cam('📷 صوّر العلبة')}</div>` : '';
+    if (s.status === 'sending' || s.status === 'pending' || s.status === 'reading') {
+      return `<div class="rv-ni"><div class="rv-ni-wait">📷 ${s.status === 'sending' ? 'ببعت الصورة…' : 'الصورة وصلت… بيقرا العلبة'}${s.late ? ' (لو طوّل: اللاب ممكن يكون مقفول)' : ''}</div></div>`;
+    }
+    const res = s.result || {};
+    if (s.status === 'failed' || !res.found) {
+      return `<div class="rv-ni"><div class="rv-ni-wait bad">ما عرفتش أقرا العلبة${res.note ? ': <span class="notr">' + esc(res.note) + '</span>' : ''}</div>${cam('📷 صوّرها تاني')}</div>`;
+    }
+    const name = niName(r, l, s), mine = !!answersOf(r)['N' + l.n], pic = niPics[s.id];
+    const meta = [res.form, Number(res.count) > 0 ? `العلبة فيها ${res.count}` : '', res.company, Number(res.price) > 0 ? `السعر على العلبة ${money(res.price)}` : 'السعر مش على العلبة']
+      .filter(Boolean).map((x) => `<span class="notr">${esc(x)}</span>`).join(' · ');
+    const code = niCodeOf(r, l);
+    const edit = niEdit === k && wait
+      ? `<div class="rv-ni-edit"><input type="text" dir="ltr" maxlength="120" autocapitalize="characters" value="${esc(name)}" data-rv-niname="${esc(k)}" aria-label="اسم الصنف"><button type="button" class="rv-yes on" data-rv-nisave="${esc(k)}">احفظ</button></div>`
+      : '';
+    const btns = wait && niEdit !== k
+      ? `<div class="rv-nb rv-ni-b"><button type="button" class="rv-yes${mine ? ' on' : ''}" data-rv-niok="${esc(k)}">تمام</button><button type="button" data-rv-niedit="${esc(k)}">غيّر الاسم</button>${cam('📷 تاني')}</div>`
+      : '';
+    return `<div class="rv-ni"><div class="rv-ni-read">${pic ? `<img class="rv-ni-ph" alt="" src="${esc(pic)}">` : '<span class="rv-ni-ph">📷</span>'}<div class="rv-ni-m">` +
+      `<b class="notr" dir="ltr">${esc(name)}</b><small>${meta}</small>` +
+      (res.active ? `<small class="notr">💊 ${esc(res.active)}</small>` : '') + (res.note ? `<small class="rv-ni-note notr">${esc(res.note)}</small>` : '') +
+      (code ? `<small class="rv-ni-done">اتعمل كارت <b dir="ltr">${esc(code)}</b> من الصورة${s.status === 'applied' ? ' · والصورة بقت صورة الصنف ✓' : ''}</small>` : '') +
+      edit + btns + '</div></div></div>';
+  }
+  // the readings of the invoices shown (the newest per line; a photo taken again cancels the older one)
+  async function loadNi(list) {
+    const ids = list.filter((r) => linesOf(r).some((l) => l && !l.id)).map((r) => r.id);
+    if (!ids.length) { ni = {}; return; }
+    try {
+      const { data, error } = await db().from('ar_item_reads').select('id,review_id,line_n,status,result,error,created_at').in('review_id', ids).eq('kind', 'new_item').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(200);
+      if (error) return; // before the migration: no readings, the button still shows
+      const next = {};
+      const newest = (data || []).slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      for (const x of newest) { const k = x.review_id + '|' + x.line_n; if (!next[k]) next[k] = x; }
+      for (const k in ni) if (ni[k] && ni[k].status === 'sending' && !next[k]) next[k] = ni[k];
+      for (const k in next) { const o = ni[k]; if (o && o.id === next[k].id && o.late) next[k].late = true; }
+      ni = next;
+      // the photos of the readings shown (once each)
+      const need = Object.values(ni).filter((x) => x.id && !niPics[x.id] && (x.status === 'done' || x.status === 'applied')).map((x) => x.id).slice(0, 12);
+      if (need.length) {
+        const q = await db().from('ar_item_reads').select('id,img_b64').in('id', need);
+        for (const x of (q && q.data) || []) if (x.img_b64) niPics[x.id] = 'data:image/jpeg;base64,' + x.img_b64;
+      }
+      await niApply(list);
+    } catch (e) { /* the readings are a help: the invoice is shown without them */ }
+  }
+  // after the invoice is entered: the box photo becomes the new card's photo (once)
+  async function niApply(list) {
+    const M = root.AskerItemMedia;
+    if (!M || !M.upload) return;
+    for (const r of list) {
+      if (r.status !== 'entered') continue;
+      for (const l of linesOf(r)) {
+        const code = l && !l.id && niCodeOf(r, l), s = code && ni[niKey(r, l)];
+        if (!s || s.status !== 'done' || !niPics[s.id] || s.uploading) continue;
+        s.uploading = true;
+        try {
+          await M.upload(code, await niSmall(niPics[s.id], 800));
+          await db().from('ar_item_reads').update({ status: 'applied' }).eq('id', s.id);
+          s.status = 'applied';
+        } catch (e) { s.uploading = false; }
+      }
+    }
+  }
+  const niFit = (w, h, max) => { const k = Math.min(1, max / Math.max(w, h)); return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) }; };
+  function niDraw(img, max, q) {
+    const { w, h } = niFit(img.naturalWidth, img.naturalHeight, max);
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+    return cv.toDataURL('image/jpeg', q);
+  }
+  const niLoad = (src) => new Promise((ok, bad) => { const img = new Image(); img.onload = () => ok(img); img.onerror = () => bad(new Error('الملف ده مش صورة.')); img.src = src; });
+  const niSmall = async (src, max) => niDraw(await niLoad(src), max, 0.85);
+  // a reading still on its way: the screen asks again every few seconds (the laptop reads once a minute)
+  function niWatch() {
+    clearTimeout(niTimer);
+    const busyOnes = Object.values(ni).filter((x) => x.status === 'sending' || x.status === 'pending' || x.status === 'reading');
+    if (!busyOnes.length || !panelOn()) return;
+    for (const x of busyOnes) if (x.created_at && Date.now() - Date.parse(x.created_at) > 120000) x.late = true;
+    niTimer = setTimeout(() => load(false).then(niWatch), 4000);
+  }
+  async function niPhoto(input) {
+    const [rid, n] = split(input.dataset.rvCam), file = input.files && input.files[0];
+    input.value = '';
+    const r = find(rid), l = r && linesOf(r).find((x) => String(x.n) === String(n));
+    if (!file || !l) return;
+    const k = niKey(r, l), prev = ni[k];
+    ni[k] = { id: null, status: 'sending' }; openState[r.id] = true; niEdit = null; sig = signature(); draw();
+    const url = URL.createObjectURL(file);
+    try {
+      const b64 = niDraw(await niLoad(url), 1300, 0.82).split(',')[1];
+      const { data, error } = await db().from('ar_item_reads').insert({ kind: 'new_item', review_id: r.id, line_n: String(l.n), item_name: String(l.paper || l.name || '').slice(0, 250) || null, img_b64: b64 }).select('id');
+      if (error) throw error;
+      const id = data && data[0] && data[0].id;
+      niPics[id] = 'data:image/jpeg;base64,' + b64;
+      ni[k] = { id, status: 'pending', created_at: new Date().toISOString() };
+      if (prev && prev.id) { try { await db().from('ar_item_reads').update({ status: 'cancelled' }).eq('id', prev.id); } catch (e) { /* the newest reading wins anyway */ } }
+      if (answersOf(r)['N' + l.n]) await answer(r.id, 'N' + l.n, null); // a new photo: the name kept for the old one goes
+      sig = signature(); draw(); niWatch();
+    } catch (e) {
+      ni[k] = prev; say('الصورة ما اتبعتتش: ' + (e.message || e), 'bad'); sig = signature(); draw();
+    } finally { URL.revokeObjectURL(url); }
+  }
+  // his name for the new item (typed), or the reading's kept with «تمام»
+  function niKeep(k, typed) {
+    const [rid, n] = split(k), r = find(rid), l = r && linesOf(r).find((x) => String(x.n) === String(n)), s = r && l && ni[niKey(r, l)];
+    if (!s || !s.id) return;
+    const t = String(typed == null ? niName(r, l, s) : typed).replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 120);
+    if (!t) { say('اكتب اسم الصنف', 'bad'); return; }
+    niEdit = null;
+    return answer(r.id, 'N' + l.n, { v: 'item', read: s.id, t });
+  }
+  // approving keeps the reading's name for every new line he did not answer (so the laptop sees it written)
+  function niFill(r) {
+    let next = null;
+    for (const l of linesOf(r)) {
+      const s = l && !l.id && ni[niKey(r, l)];
+      if (!s || s.status !== 'done' || !s.result || !s.result.found || answersOf(r)['N' + l.n]) continue;
+      next = next || { ...answersOf(r) };
+      next['N' + l.n] = { v: 'item', read: s.id, t: String(s.result.name_en || '').toUpperCase().slice(0, 120) };
+    }
+    return next;
   }
   // the small line under an item: its last cost and how much it moved (or «new»), the quantity
   function moveHtml(l) {
@@ -164,7 +302,7 @@
             `<small>${moveHtml(l)} · ${expHtml(r, l)}</small>${sug && sug !== card && !p ? `<small class="rv-sug">المقترح <b dir="ltr">${esc(sug)}</b>${card ? ` (الكارت <span dir="ltr">${esc(card)}</span>)` : ''}</small>` : ''}${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
             `<div class="rv-cost" dir="ltr">${esc(money(l.net))}</div>` +
             `<input class="rv-box${p ? ' done' : ''}" type="text" inputmode="decimal" dir="ltr" maxlength="12" enterkeyhint="next" data-rv-price="${esc(r.id)}|${esc(l.n)}" value="${p ? esc(String(p)) : ''}" placeholder="${hint ? esc(String(hint)) : 'سعره'}" aria-label="سعر الجمهور"${locked || rej ? ' disabled' : ''}>` +
-            (ch && !rej ? `<div class="rv-chg">${card ? `الكارت هيتغير: <span dir="ltr">${esc(card)} ← ${esc(ch)}</span>` : `سعره: <span dir="ltr">${esc(ch)}</span>`}</div>` : '') + '</div>';
+            (ch && !rej ? `<div class="rv-chg">${card ? `الكارت هيتغير: <span dir="ltr">${esc(card)} ← ${esc(ch)}</span>` : `سعره: <span dir="ltr">${esc(ch)}</span>`}</div>` : '') + niHtml(r, l) + '</div>';
         }).join('');
     }
     if (rest.length) {
@@ -177,7 +315,7 @@
   }
   function linesHtml(r) {
     const ls = linesOf(r), cap = 20, all = showAllLines[r.id] || ls.length <= cap + 1;
-    const show = all ? ls : ls.filter((l, i) => i < 3 || flagged(r, l) || l.ask === 'price');
+    const show = all ? ls : ls.filter((l, i) => i < 3 || flagged(r, l) || l.ask === 'price' || !l.id); // a new item is never folded away (its box photo)
     const hidden = ls.length - show.length;
     return `<table class="rv-lines">${show.map((l) => lineRow(r, l)).join('')}` +
       (hidden > 0 ? `<tr class="rv-more"><td colspan="3"><button type="button" class="rv-link" data-rv-all="${esc(r.id)}">… و${hidden} سطر تانيين مطابقين (دوس تشوفهم)</button></td></tr>` : '') + '</table>';
@@ -247,7 +385,8 @@
     }
     box.innerHTML = html;
   }
-  const signature = () => JSON.stringify(rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]));
+  const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]),
+    Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late])]);
   async function load(force) {
     if (!db() || loading) return;
     loading = true;
@@ -263,6 +402,7 @@
           for (const x of signed || []) if (x && x.path && x.signedUrl) urls[x.path] = x.signedUrl;
         } catch (e) { /* a photo that cannot be shown is not a reason to hide the invoice */ }
       }
+      await loadNi(next);
       const before = sig; rows = next; sig = signature();
       // never redraw under his fingers (typing a note, choosing an answer)
       const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
@@ -330,7 +470,8 @@
       for (const id of ids) {
         const r = find(id);
         if (!r || !(WAITING.includes(r.status))) continue;
-        await patch(id, { status: 'approved' });
+        const fill = niFill(r);
+        await patch(id, fill ? { answers: fill, status: 'approved' } : { status: 'approved' });
       }
       say(ids.length > 1 ? `وافقت على ${ids.length} فواتير: اللاب هيبدأ يدخّلهم بالترتيب` : 'وافقت: اللاب هيبدأ يدخّلها دلوقتي', 'good');
       sig = signature(); draw();
@@ -372,10 +513,14 @@
     if ((el = g('data-rv-rej'))) { const [r, n] = split(el.dataset.rvRej), row = find(r), l = row && linesOf(row).find((x) => String(x.n) === n); return l ? answer(r, 'R' + n, rejected(row, l) ? null : { v: 'reject' }) : undefined; }
     if ((el = g('data-rv-all'))) { showAllLines[el.dataset.rvAll] = true; return draw(); }
     if ((el = g('data-rv-shot'))) { const [r, i] = split(el.dataset.rvShot); return viewer(r, Number(i)); }
+    if ((el = g('data-rv-niok'))) return niKeep(el.dataset.rvNiok);
+    if ((el = g('data-rv-niedit'))) { niEdit = el.dataset.rvNiedit; sig = signature(); draw(); const i = document.querySelector(`[data-rv-niname="${CSS.escape(niEdit)}"]`); if (i) { i.focus(); i.select(); } return; }
+    if ((el = g('data-rv-nisave'))) { const i = document.querySelector(`[data-rv-niname="${CSS.escape(el.dataset.rvNisave)}"]`); return niKeep(el.dataset.rvNisave, i ? i.value : ''); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
   }
   function onChange(e) {
     const t = e.target;
+    if (t.matches('[data-rv-cam]')) return niPhoto(t);
     if (t.matches('[data-rv-alt]')) { const [r, n, k] = split(t.dataset.rvAlt); const row = find(r), note = row && notesOf(row).find((x) => x.id === n); const alt = note && (note.alts || []).find((x) => x.k === k); return answer(r, n, { v: 'alt', k, t: alt ? alt.t : '' }); }
     if (t.matches('[data-rv-price]')) { const [r, n] = split(t.dataset.rvPrice); const v = parseNum(t.value); return v > 0 ? setPrice(r, n, v) : undefined; }
     if (t.matches('[data-rv-text]')) { const [r, n] = split(t.dataset.rvText); const v = t.value.trim().slice(0, 200); return v ? answer(r, n, { v: 'text', t: v }) : undefined; }
@@ -397,13 +542,13 @@
   }
   function open() {
     if (!db()) return;
-    load(true).then(focusFirst);
+    load(true).then(() => { focusFirst(); niWatch(); });
     clearInterval(timer);
     timer = setInterval(() => { if (panelOn() && !document.hidden) load(false); }, 20000);
   }
-  function close() { clearInterval(timer); timer = null; shot && shot.remove(); shot = null; }
+  function close() { clearInterval(timer); timer = null; clearTimeout(niTimer); niTimer = null; shot && shot.remove(); shot = null; }
   const main = $('rvMain');
-  if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
+  if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-niname]')) { e.preventDefault(); niKeep(e.target.dataset.rvNiname, e.target.value); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
   document.addEventListener('keydown', onKey);
   $('rvRefresh')?.addEventListener('click', () => load(true));
   // the badge / home row: how many invoices wait for his yes (asked by ar/notify.js with the other counts)

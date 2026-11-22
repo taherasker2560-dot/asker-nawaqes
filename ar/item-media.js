@@ -349,6 +349,18 @@
 
   root.AskerItemMedia = {
     load, open,
+    // set an item's photo from a picture the page already has (a data: URL), through the same function as the sheet's phone photo (owner / staff session).
+    // Used by «مراجعة الفواتير»: a new item's box photo becomes its photo once its PharmaFly card exists (owner 2026-11-22). Throws with the function's message on a refusal.
+    async upload(id, data) {
+      const c = app(), { data: s } = await c.auth.getSession();
+      const tok = s && s.session && s.session.access_token;
+      const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: KEY }, body: JSON.stringify({ id: Number(id), data }) });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok || !b.img) throw new Error(b.message || 'الصورة ما اتحفظتش');
+      edits[id] = Object.assign({ item_id: Number(id), descr: null, desc_off: false }, edits[id] || {}, { img: b.img, img_off: false });
+      changed();
+      return b.img;
+    },
     // a card's small photo; title / en are what the sheet shows on top
     thumb(id, en, title) {
       load();
