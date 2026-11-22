@@ -46,6 +46,8 @@
   //        shortages: [{product_name}], names: Map(name_key -> {arabic_name}), orders: [{name_key}], nk, sure, fold }
   function buildIndex(src) {
     const nk = src.nk, fold = src.fold || ((s) => String(s || '').toLowerCase());
+    // the English name in Arabic letters (AskerFuzzy.arabize): an Arabic word typed or SAID (owner 2026-11-22: «انت ليه ما عملتش بحث في الكل … بالصوت برضه») finds an English-only item
+    const sound = (s) => (src.arabize && s ? fold(src.arabize(s)) : '');
     const names = src.names || new Map();
     const arOf = (en, given) => String(given || '').trim() || String((names.get(nk(en)) || {}).arabic_name || '').trim();
     const byId = new Map(), byName = new Map(), items = [], extra = [];
@@ -86,7 +88,7 @@
     for (const it of items) {
       if (ordered.has(nk(it.en))) it.ordered = true;
       it.offers = bestOffers(it.offers);
-      it._h = [fold(it.ar), fold(it.en)];
+      it._h = [fold(it.ar), fold(it.en)]; it._s = sound(it.en);
     }
     for (const l of extra) l._h = [fold(l.supplier_name), fold(l.pharmafly_name || '')];
     // «الملغى» (owner 2026-11-21): the cancelled items (src.cancel, parseCancel) leave «الكل» and the other buttons: visible / gone
@@ -336,7 +338,7 @@
     const d = e.detail || {};
     if (d.id == null) return;
     const it = index && index.items.find((x) => String(x.id) === String(d.id));
-    if (it) { it.ar = d.ar || ''; it._h = [fz().fold(it.ar), fz().fold(it.en)]; }
+    if (it) { it.ar = d.ar || ''; it._h = [fz().fold(it.ar), fz().fold(it.en)]; it._s = fz().arabize ? fz().fold(fz().arabize(it.en)) : ''; }
     const c = catalog && catalog.find((r) => String(r.id) === String(d.id));
     if (c) { c.arabic_name = d.ar || ''; keepCatalog(); }
     if (it && it.stock) it.stock.arabic_name = d.ar || '';
@@ -368,7 +370,7 @@
     const src = [catalog, stock, lines, buys, cancelMap, L.shortages, L.knownNames, L.orders];
     if (index && built && src.every((x, i) => x === built[i])) return index;
     built = src;
-    index = buildIndex({ items: catalog || [], stock, lines: lines || [], buys: buys || [], cancel: cancelMap, shortages: L.shortages, names: L.knownNames, orders: L.orders, nk: L.nk, sure: root.AskerSuppliers && root.AskerSuppliers.sure, fold: fz().fold });
+    index = buildIndex({ items: catalog || [], stock, lines: lines || [], buys: buys || [], cancel: cancelMap, shortages: L.shortages, names: L.knownNames, orders: L.orders, nk: L.nk, sure: root.AskerSuppliers && root.AskerSuppliers.sure, fold: fz().fold, arabize: fz().arabize });
     return index;
   }
   const PEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -478,7 +480,9 @@
     // «الكل» and the other buttons leave the cancelled items out; «الملغى» (owner) holds only them
     const pool = scope === 'cancelled' ? ix.gone : scope === 'all' ? ix.visible : ix.visible.filter((it) => inScope(it, scope));
     // only the names close to the best one (owner 2026-11-13: «Abimol» filled 25 cards with ALFABRIMO, CARBIMAZOLE…)
-    const hits = fz().rank(q, pool, (it) => it._h, 25, { rel: 0.75 });
+    const hits0 = fz().rank(q, pool, (it) => it._h, 25, { rel: 0.75 });
+    // an Arabic word (typed or SAID, owner 2026-11-22) also meets English-only names written in Arabic letters: after the usual hits, and strict (inside one word, no letter forgiven)
+    const hits = /[؀-ۿ]/.test(q) && hits0.length < 25 ? hits0.concat(fz().rank(q, pool.filter((it) => it._s && !hits0.includes(it)), (it) => [it._s], 25 - hits0.length, { strict: true })) : hits0;
     // the warehouses' lines that are not surely one of our items belong to «الكل» and «القوايم»
     // strict: each word inside one word of the line, no letter forgiven, and close enough (owner 2026-11-13: «ابيمول» showed
     // «اب كير امبول»: «اصناف تانية غريبة كده ملهاش علاقة بيه»)
@@ -530,7 +534,7 @@
     }
     // this page at once: the card, the kept rows, and the search words
     it.ar = shownName;
-    it._h = [fz().fold(it.ar), fz().fold(it.en)];
+    it._h = [fz().fold(it.ar), fz().fold(it.en)]; it._s = fz().arabize ? fz().fold(fz().arabize(it.en)) : '';
     const c = catalog && catalog.find((r) => String(r.id) === String(it.id));
     if (c) { c.arabic_name = shownName; keepCatalog(); } // the kept copy shows the fixed name next time too
     if (it.stock) it.stock.arabic_name = shownName;

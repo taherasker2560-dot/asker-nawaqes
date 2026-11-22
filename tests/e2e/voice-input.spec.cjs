@@ -66,6 +66,21 @@ run('Voice: the quick sale\'s search, said in Arabic, finds an item that has onl
  assert.match(await page.$eval('#tsCart .ts-line[data-i="0"]',(x)=>x.textContent),/CONGESTAL 20T/);
 });
 
+run('Voice: the home search («الكل»), said in Arabic, finds an item that has only its English name',async({page})=>{
+ // owner 2026-11-22: «انت ليه ما عملتش بحث في الكل، اللي هو البحث عن الاصناف اللي هو في الرئيسيه بالصوت برضه»
+ await page.evaluate(()=>{localStorage.setItem('__fakeTables',JSON.stringify({
+  ar_store_items:[{id:66906,name:'CONGESTAL 20T',arabic_name:null,price:50,status:'available',is_listed:true,hidden:false},{id:24281,name:'FEVER SYRUP 120ML',arabic_name:null,price:33,status:'available',is_listed:true,hidden:false}],
+  ar_stock:[{item_id:66906,name:'CONGESTAL 20T',arabic_name:'',price:50,packs:9,units:0,parts:2,exp_near:null,other:null,data_at:'2026-11-22 12:00:00'}]}))});
+ await page.reload();await page.waitForFunction(()=>/\d/.test(document.getElementById('shStats')?.textContent||''));
+ await fakeMic(page);
+ assert.ok(await page.$('.home-q .vo-mic'),'the home search has its microphone');
+ await page.evaluate(()=>{window.__say='كونجستال'});
+ await page.click('.home-q .vo-mic');
+ await page.waitForFunction(()=>/CONGESTAL 20T/.test(document.getElementById('hsItems')?.textContent||''),null,{timeout:8000});
+ assert.equal(await page.inputValue('#hsQ'),'كونجستال');
+ assert.ok(!/FEVER SYRUP/.test(await page.$eval('#hsItems',(x)=>x.textContent)),'only the item that sounds like it');
+});
+
 run('Voice: an invoice note\'s own words, said, are saved like typed ones',async({page})=>{
  await page.evaluate(()=>{
   window.__tables.ar_invoice_reviews=[{id:31,batch:'2026-11-22',ord:1,supplier:'مورد مثال',doc_no:'888001',paper_date:'2026-11-22',total:100,photos:[],

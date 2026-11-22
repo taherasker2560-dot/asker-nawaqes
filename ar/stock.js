@@ -47,9 +47,12 @@
   function search(q, rows, limit) {
     const F = root.AskerFuzzy;
     if (!F) return [];
-    const ar = /[؀-ۿ]/.test(String(q || '')) && F.arabize;
+    const ar = /[؀-ۿ]/.test(String(q || '')) && F.arabize, max = limit || 30;
     const sounds = (it) => { if (!it || typeof it !== 'object') return ''; let v = arOf.get(it); if (v == null) { v = F.fold(F.arabize(it.name)); arOf.set(it, v); } return v; };
-    return F.rank(q, rows, (it) => (ar ? [F.fold(it.arabic_name), F.fold(it.name), sounds(it)] : [F.fold(it.arabic_name), F.fold(it.name)]), limit || 30);
+    const hits = F.rank(q, rows, (it) => [F.fold(it.arabic_name), F.fold(it.name)], max);
+    if (!ar || hits.length >= max) return hits;
+    // after the usual hits, and strict (inside one word of the sound, no letter forgiven): a short word does not catch letters spread over a long name
+    return hits.concat(F.rank(q, (rows || []).filter((it) => !hits.includes(it)), (it) => [sounds(it)], max - hits.length, { strict: true }));
   }
   const api = { qtyText, expText, otherText, ageText, search };
   root.AskerStockLib = api;
