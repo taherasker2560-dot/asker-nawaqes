@@ -240,8 +240,11 @@
     return /^[1-9]\d{7,14}$/.test(d) ? 'tel:+' + d : '';
   }
   // the customer's personal link (owner 2026-11-13, IDEAS row 1): his own account on the store site, store.html#me=<secret>
+  // 2026-11-22 (owner: «عميل بعت له رابط حسابه، لما بيدوسه بيوديه على الموقع»): the links sent that day were never opened on an account (seen 0) although the
+  // server answered them; the part after «#» can be dropped on the way (an installed pharmacy app, a browser hand-off). The secret now rides in «?me=», which
+  // store/account.js already takes and removes from the address at once (it never goes to another site: cross-site requests carry only the origin)
   function linkUrl(base, token) {
-    return new URL('store.html#me=' + token, String(base || '').replace(/#.*$/, '')).href;
+    return new URL('store.html?me=' + token, String(base || '').replace(/[?#].*$/, '')).href;
   }
   function linkMessage(name, url) {
     return [

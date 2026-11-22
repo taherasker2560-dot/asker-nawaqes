@@ -27,7 +27,7 @@ run('Customer link: the owner sends the link from the statement, a new one repla
  let opened=await page.evaluate(()=>window.__opened);
  assert.ok(opened[0].startsWith('https://wa.me/201012345678?text='));
  const msg=decodeURIComponent(opened[0].split('?text=')[1]);
- const m1=/store\.html#me=([0-9a-f]{64})\n/.exec(msg);
+ const m1=/store\.html\?me=([0-9a-f]{64})\n/.exec(msg);
  assert.ok(m1,'the link is in the message: '+msg);
  assert.match(msg,/^أهلًا بحضرتك 🌿\nده رابط حسابك في صيدلية عسكر يا أحمد محمود:\n/);
  assert.match(msg,/الرابط ده ليك انت بس، ما تبعتهوش لحد\.$/);
@@ -37,13 +37,13 @@ run('Customer link: the owner sends the link from the statement, a new one repla
  // the same link again: no new secret
  await page.click('[data-cu-link-send]');
  opened=await page.evaluate(()=>window.__opened);
- assert.equal(opened.length,2);assert.ok(decodeURIComponent(opened[1]).includes('#me='+m1[1]));
+ assert.equal(opened.length,2);assert.ok(decodeURIComponent(opened[1]).includes('?me='+m1[1]));
  // «رابط جديد»: asks first, then a new secret (the old one stops)
  page.once('dialog',d=>{assert.match(d.message(),/الرابط القديم هيبطل/);d.accept()});
  await page.click('[data-cu-link-new]');
  await page.waitForFunction(()=>window.__opened.length===3);
  const t2=(await table('ar_customer_links'))[0].token;
- assert.notEqual(t2,m1[1]);assert.ok(decodeURIComponent((await page.evaluate(()=>window.__opened))[2]).includes('#me='+t2));
+ assert.notEqual(t2,m1[1]);assert.ok(decodeURIComponent((await page.evaluate(()=>window.__opened))[2]).includes('?me='+t2));
  // «وقّف الآجل»: a row in ar_customer_stops, the statement and the list say so
  await page.click('[data-cu-stop]');
  await page.waitForSelector('[data-cu-unstop]');
@@ -76,6 +76,13 @@ run('Customer link: he opens it, sees only his account with the items, orders on
  assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_customer')),tok);
  assert.equal(await text(page,'#acctName'),'حسابك يا أحمد محمود · كود 101');
  assert.equal(await text(page,'.ac-big'),'عليك 7,174.50 ج');
+ // the link as it is sent since 2026-11-22 (store.html?me=…, the part after «#» can be lost on the way): the same account, the secret leaves the address at once
+ await page.evaluate(()=>localStorage.removeItem('asker_store_customer'));
+ await page.goto(base+'store.html?me='+tok);
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ assert.equal(await page.evaluate(()=>location.search+location.hash),'#account','no ?me= left in the address');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('asker_store_customer')),tok);
+ assert.equal(await text(page,'#acctName'),'حسابك يا أحمد محمود · كود 101');
  assert.equal(await page.$('.ac-stop'),null,'not stopped');
  assert.match(await text(page,'.ac-order'),/اطلب من الصيدلية/);
  // his movements only, newest first, the items open on a tap (they are on the «الكل» page now: the home is short)
