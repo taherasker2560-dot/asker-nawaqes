@@ -104,4 +104,8 @@ const n0=new Date(2026,10,21);
 for(const [typed,want] of [['03/2028','2028-03'],['3/28','2028-03'],['03-2028','2028-03'],['03.28','2028-03'],['0328','2028-03'],['032028','2028-03'],['328','2028-03'],['١٢/٢٠٢٧','2027-12'],[' 12 / 27 ','2027-12'],['1228','2028-12']])assert.equal(T.parseExp(typed,n0),want,typed);
 for(const bad of ['','abc','13/2028','00/2028','03/2050','03/2010','3','03/20','2028','03/2028/1','٣/٢٨ ب'])assert.equal(T.parseExp(bad,n0),null,'refused: '+bad);
 assert.equal(T.parseExp('11/2026',n0),'2026-11','this month is read (a sale refuses it later: it is «gone»)');assert.equal(T.expInfo('2026-11',n0).gone,true);
+// «سعر متغيّر» (owner 2026-11-22, for everyone who sells): the box's price typed on the line, the unit's follows (÷ parts); nothing at or below 0
+{const ls=[];const l=T.addItem(ls,{item_id:66713,name:'COLD CAPS 20',price:36,parts:2,vp:true});assert.equal(l.vp,true);assert.deepEqual([l.p,l.pu],[36,18]);
+T.setPrice(l,'40');assert.deepEqual([l.p,l.pu],[40,20]);l.w=1;assert.equal(T.lineTotal(l),60);T.setPrice(l,0);assert.equal(l.p,40,'0 is refused');T.setPrice(l,'abc');assert.equal(l.p,40);T.setPrice(l,-5);assert.equal(l.p,40);
+T.setPrice(l,'37,5');assert.deepEqual([l.p,l.pu],[37.5,18.75]);assert.equal(T.addItem([],{item_id:1,name:'X',price:5,parts:1}).vp,false,'an ordinary item has no price box');}
 console.log('PASS: temp sale: sticker = 100000 + code, boxes + units, expiry lines, the bill, the limit, the row, the bills, the typed expiry, the list');

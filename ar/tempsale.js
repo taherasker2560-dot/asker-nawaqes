@@ -51,10 +51,18 @@
     const same = lines.find((l) => l.c === c && (l.x || null) === key);
     if (same) { same.q += 1; return same; }
     const base = Number(it.price) || 0, k = Number(it.parts) > 1 ? Number(it.parts) : 1;
-    const line = { c, n: String(it.name || ''), ar: String(it.arabic_name || ''), q: 1, w: 0, k, base, p: priceOf(base, k, 'pack'), pu: priceOf(base, k, 'unit'), x: key,
+    const line = { c, n: String(it.name || ''), ar: String(it.arabic_name || ''), q: 1, w: 0, k, base, p: priceOf(base, k, 'pack'), pu: priceOf(base, k, 'unit'), x: key, vp: !!it.vp,
       // the stock shown on the line as in PharmaFly's sale (never sent to the server): the whole item's, or the chosen expiry's (bs)
       sp: Number(it.packs) || 0, su: Number(it.units) || 0, bs: null, nostock: !!it.nostock };
     lines.push(line);
+    return line;
+  }
+  // «سعر متغيّر» (PharmaFly's Items.VariableSalesPrice; owner 2026-11-22, for everyone who sells: «يظهر لي خانة اغير فيها السعر»): the box's price
+  // typed on the line, the unit's price follows (price ÷ parts); nothing at or below 0. The robot types this price in PharmaFly's «أدخل سعر البيع».
+  function setPrice(line, v) {
+    const n = r2(String(v == null ? '' : v).replace(',', '.'));
+    if (!(n > 0) || n > 100000) return line;
+    line.p = n; line.pu = priceOf(n, line.k, 'unit');
     return line;
   }
   // the box «علب» (which = 'q') or «وحدات» ('w') set to n (typed or +/−): never below 0, never both 0 (the line would sell
@@ -200,7 +208,7 @@
     if (!bills.length) bills.push(blankBill());
     return { cur: Math.min(Math.max(0, Math.floor(Number(raw && raw.cur)) || 0), bills.length - 1), bills };
   }
-  const api = { stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
+  const api = { stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, setPrice, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -291,9 +299,13 @@
   // Readable for the owner and for a staff member with «جرد المخزون»; with no file the sale still works, a line just says its expiry is not known
   let batchFail = 0;
   function useBatches(rows, at) {
-    batches = new Map(rows.map((r) => [Number(r[0]), { p: Number(r[1]) > 1 ? Number(r[1]) : 1, b: (r[2] || []).map((a) => ({ x: a[0] || null, k: Number(a[1]) || 0, u: Number(a[2]) || 0 })) }]));
+    batches = new Map(rows.map((r) => [Number(r[0]), { p: Number(r[1]) > 1 ? Number(r[1]) : 1, b: (r[2] || []).map((a) => ({ x: a[0] || null, k: Number(a[1]) || 0, u: Number(a[2]) || 0 })), vp: Number(r[3]) === 1 }]));
     batchData = String(at || '');
   }
+  // «سعر متغيّر» items with no stock (the count file's z, vp = 1)
+  let vpZ = new Set();
+  function useVz(list) { vpZ = new Set((list || []).map(Number)); }
+  const isVp = (c) => !!((batches && batches.get(Number(c)) && batches.get(Number(c)).vp) || vpZ.has(Number(c)));
   // the sold-without-stock items as the sale's items: «مفيش رصيد» tagged, sold with no stock as PharmaFly does
   function useZ(rows) {
     zRows = rows;
@@ -325,16 +337,17 @@
         const { data: blob, error } = await db().storage.from('asker-private').download('count/stock.json');
         if (error || !blob) throw error || new Error('no file');
         const d = JSON.parse(await blob.text());
-        const rows = (d.items || []).map((it) => [it.i, it.p, (it.b || []).map((b) => [b.x || null, b.k, b.u])]);
+        const rows = (d.items || []).map((it) => [it.i, it.p, (it.b || []).map((b) => [b.x || null, b.k, b.u]), it.vp ? 1 : 0]);
+        const vz = (d.z || []).filter((it) => it.vp).map((it) => Number(it.i));
         // keep the Arabic names already found for the same items
         const had = new Map(zRows.filter((r) => r[5] !== undefined).map((r) => [r[0], r[5]]));
         const z = (d.z || []).map((it) => { const r = [Number(it.i), it.n, it.sp, it.p, it.e ? 1 : 0]; if (had.has(r[0])) r.push(had.get(r[0])); return r; });
-        useBatches(rows, d.data_at); useZ(z); batchAt = Date.now(); batchFail = 0;
-        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows, z });
+        useBatches(rows, d.data_at); useZ(z); useVz(vz); batchAt = Date.now(); batchFail = 0;
+        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows, z, vz });
         loadZNames();
       } catch (e) {
         batchFail = Date.now();
-        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); useZ(Array.isArray(c.z) ? c.z : []); batchAt = c.at; } }
+        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); useZ(Array.isArray(c.z) ? c.z : []); useVz(c.vz); batchAt = c.at; } }
       }
       batchP = null;
     })();
@@ -354,6 +367,7 @@
   // ---------- adding items ----------
   function add(it, x, bs, extra) {
     const line = addItem(cart, it, x);
+    if (!line.vp && isVp(line.c)) line.vp = true;
     if (x) { line.x = x; line.bs = bs || null; line.xmiss = false; }
     if (extra) Object.assign(line, extra);
     clearAdj();
@@ -723,6 +737,12 @@
     }
     return l.xmiss ? '<div class="ts-exp none"><span>الصلاحية مش متاحة دلوقتي</span></div>' : '';
   }
+  // «سعر متغيّر»: the tag and the box's price, typed (PharmaFly's price shown beside it once it is changed)
+  function vpRow(l) {
+    if (!l.vp) return '';
+    const was = l.base && Math.abs(l.base - l.p) > 0.004 ? `<span class="ts-was">في فارمافلاي <b>${esc(money(l.base))}</b></span>` : '';
+    return `<div class="ts-vp"><span class="ts-vptag">سعر متغيّر</span><label class="ts-vpl"><span>${l.k > 1 ? 'سعر العلبة' : 'السعر'}</span><input class="ts-vpin" data-ts-vp type="number" inputmode="decimal" min="0" step="0.25" value="${esc(l.p)}" aria-label="سعر الصنف" /></label>${was}</div>`;
+  }
   // «علب» / «وحدات»: a box each (owner 2026-11-21), − and + and typed; an item that does not split has no units
   function qbox(l, which) {
     const label = which === 'q' ? 'علب' : 'وحدات';
@@ -737,7 +757,7 @@
       box.innerHTML = '<p class="hint">لسه مفيش أصناف. دوّر على صنف ودوس عليه.</p>';
     } else {
       box.innerHTML = cart.map((l, i) => {
-        const head = `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>${lineInfo(l)}${expRow(l)}`;
+        const head = `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>${lineInfo(l)}${expRow(l)}${vpRow(l)}`;
         const calc = l.q > 0 && l.w > 0 ? `<div class="ts-calc"><span>${esc(l.q)}</span> × <span>${esc(money(l.p))}</span> + <span>${esc(l.w)}</span> × <span>${esc(money(l.pu))}</span></div>` : '';
         return `<div class="ts-line" data-i="${i}">${photoRow(l.c, l.n, nameOf(l), head)}
         <div class="ts-qrow">${qbox(l, 'q')}${qbox(l, 'w')}</div>${calc}
@@ -1008,6 +1028,15 @@
     });
     // a box typed by hand (when he leaves it): «علب» or «وحدات»
     panel.addEventListener('change', (e) => {
+      const vpIn = e.target.closest && e.target.closest('.ts-vpin');
+      if (vpIn) {
+        // «سعر متغيّر»: the price typed by hand (when he leaves the box)
+        const line = vpIn.closest('.ts-line'), l = line ? cart[Number(line.dataset.i)] : null;
+        if (!l) return;
+        setPrice(l, vpIn.value);
+        clearAdj(); drawCart();
+        return;
+      }
       const inp = e.target.closest && e.target.closest('.ts-qn');
       if (!inp) return;
       const line = inp.closest('.ts-line'), l = line ? cart[Number(line.dataset.i)] : null;

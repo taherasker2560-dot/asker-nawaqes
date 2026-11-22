@@ -2012,6 +2012,12 @@ html body .ts-exp button.linklike { min-height: 0; margin: 0; padding: 0 4px; ba
 .ts-sep { margin: 12px 4px 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .ts-tag { display: inline-block; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px; background: var(--rose); color: var(--crimson-ink); font-size: 11.5px; font-weight: 700; vertical-align: middle; }
 .ts-note { margin-top: 4px; padding: 5px 9px; border-radius: 10px; background: var(--rose); color: var(--crimson-ink); font-size: 12.5px; font-weight: 700; }
+/* «سعر متغيّر» (owner 2026-11-22): the tag + the box's price typed on the line; PharmaFly's price beside it once changed */
+.ts-vp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); }
+.ts-vptag { padding: 1px 9px; border-radius: 999px; border: 1px solid var(--crimson); color: var(--crimson); font-size: 11.5px; font-weight: 700; }
+.ts-vpl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); }
+.ts-vpin { width: 92px; padding: 5px 6px; border: 1px solid var(--crimson); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 16px; font-weight: 700; text-align: center; }
+.ts-was { font-size: 12px; color: var(--muted); }
 .ts-exp-card input.ts-exp-in { display: block; width: 100%; min-height: 52px; margin: 10px 0 4px; padding: 8px 12px; text-align: center; font-size: 26px; font-weight: 800; letter-spacing: 1px; border: 1.5px solid var(--crimson); border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: none; }
 .ts-exp-msg { min-height: 20px; margin: 2px 2px 8px; font-weight: 700; color: var(--crimson-ink); }
 .ts-exp-msg.bad { color: #c62828; }
