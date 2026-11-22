@@ -22,12 +22,26 @@ run('Temp sale: «سعر متغيّر» shows its tag and a price box; the price
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-vpl'),/سعر العلبة/,'parts 2: the box\'s price');
  assert.equal(await page.inputValue('#tsCart .ts-line[data-i="0"] [data-ts-vp]'),'36','PharmaFly\'s price ready in the box');
  assert.equal(await page.$('#tsCart .ts-line[data-i="0"] .ts-was'),null,'nothing beside it while unchanged');
- // a new price (typed, then he leaves the box): the line and the bill follow, PharmaFly's price shown beside it
- await page.fill('#tsCart .ts-line[data-i="0"] [data-ts-vp]','40');await page.press('#tsCart .ts-line[data-i="0"] [data-ts-vp]','Tab');
+ // a new price (typed, then he leaves the box): the line and the bill follow, PharmaFly's price shown beside it.
+ // EVERY number box (owner 2026-11-22: «الرقم اللي هغيره بمربع ازرق … اكتب فيه على طول، ما اقعدش امسح»): a tap selects its whole number,
+ // so the keys typed REPLACE it (36 → 40, never 3640), and the box has the frame in the system color
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-vp]');
+ await page.waitForTimeout(50);
+ assert.equal(await page.$eval('#tsCart .ts-line[data-i="0"] [data-ts-vp]',(el)=>getComputedStyle(el).outlineStyle),'solid','the frame on the box under the cursor');
+ await page.keyboard.type('40');
+ assert.equal(await page.inputValue('#tsCart .ts-line[data-i="0"] [data-ts-vp]'),'40','typing replaced the number, nothing to delete first');
+ await page.press('#tsCart .ts-line[data-i="0"] [data-ts-vp]','Tab');
  await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] .ts-amt')?.textContent.trim()==='40 ج');
  assert.match(await text(page,'#tsCart .ts-line[data-i="0"] .ts-was'),/في فارمافلاي 36 ج/);
  // a unit follows the new price (40 ÷ 2)
  await page.click('#tsCart .ts-line[data-i="0"] [data-ts-plus="w"]');
+ await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] .ts-amt')?.textContent.trim()==='60 ج');
+ // the boxes count too: a tap on «علب» (1) and typing 3 = 3 boxes
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-n="q"]');await page.waitForTimeout(50);await page.keyboard.type('3');
+ assert.equal(await page.inputValue('#tsCart .ts-line[data-i="0"] [data-ts-n="q"]'),'3','the quantity box: typing replaced 1');
+ await page.press('#tsCart .ts-line[data-i="0"] [data-ts-n="q"]','Tab');
+ await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] .ts-amt')?.textContent.trim()==='140 ج');
+ await page.click('#tsCart .ts-line[data-i="0"] [data-ts-n="q"]');await page.waitForTimeout(50);await page.keyboard.type('1');await page.press('#tsCart .ts-line[data-i="0"] [data-ts-n="q"]','Tab');
  await page.waitForFunction(()=>document.querySelector('#tsCart .ts-line[data-i="0"] .ts-amt')?.textContent.trim()==='60 ج');
  // a price of 0 is refused: the box goes back to the price
  await page.fill('#tsCart .ts-line[data-i="0"] [data-ts-vp]','0');await page.press('#tsCart .ts-line[data-i="0"] [data-ts-vp]','Tab');

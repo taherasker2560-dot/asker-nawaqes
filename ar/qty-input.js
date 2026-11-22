@@ -5,10 +5,16 @@
    - the number is selected whenever a box gets the cursor (by Enter, by a tap, by Tab), never a number to delete first;
    - Enter goes to the next box (ticked rows only, the ones you can see), with that number selected too; on the last one the keyboard closes;
    - the phone's keyboard shows «التالي» (next) / «تم» (done) on its Enter key.
-   A box keeps firing its own «change» when the cursor leaves it, so what was typed is saved exactly as before. */
+   A box keeps firing its own «change» when the cursor leaves it, so what was typed is saved exactly as before.
+   2026-11-22 (owner: «عايزك تطبق [في] اي [خانة] ارقام … الرقم اللي هغيره بمربع ازرق كده اكتب فيه على طول، ما اقعدش امسح … زي ما بيحصل في
+   التعديل في المبيعات، لما باجي اعدل السعر»): the selection now holds for EVERY number box of the page (a price, a quantity, an amount, an
+   expiry typed as digits: type=number, inputmode decimal / numeric), not only the quantity lists. A phone number (type / inputmode «tel») is
+   left as it is, and a box can opt out with data-no-select. Enter-to-the-next stays for the quantity lists only (other boxes have their own Enter). */
 (function (root) {
   'use strict';
   const SEL = 'input[data-qty]';
+  const NUM = 'input[data-qty], input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"]';
+  const isNum = (t) => !!(t && t.matches && t.matches(NUM) && !t.matches('[type="tel"], [inputmode="tel"], [data-no-select]') && !t.readOnly && !t.disabled);
   const usable = (el) => el && !el.disabled && !el.readOnly && el.getClientRects().length > 0 && !el.closest('.off');
   const all = (scope) => [...(scope || document).querySelectorAll(SEL)].filter(usable);
   function pick(el) {
@@ -24,15 +30,17 @@
     if (a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
     return pick(all(scope)[0]);
   }
-  const api = { ready, all, pick };
+  const api = { ready, all, pick, isNum };
   root.AskerQty = api;
   if (typeof document === 'undefined') return;
   let fresh = null;
   document.addEventListener('focusin', (e) => {
     const t = e.target;
-    if (!t.matches || !t.matches(SEL)) return;
-    const list = all(), i = list.indexOf(t);
-    t.setAttribute('enterkeyhint', i >= 0 && i < list.length - 1 ? 'next' : 'done');
+    if (!isNum(t)) return;
+    if (t.matches(SEL)) {
+      const list = all(), i = list.indexOf(t);
+      t.setAttribute('enterkeyhint', i >= 0 && i < list.length - 1 ? 'next' : 'done');
+    }
     fresh = t;
     setTimeout(() => { try { t.select(); } catch (err) {} }, 0);
     setTimeout(() => { if (fresh === t) fresh = null; }, 400);
