@@ -129,7 +129,7 @@
   }
   const due = (lines, adj) => r2(total(lines) + (Number(adj) || 0));
   // the row kept on the phone and sent to ar_temp_sales
-  // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; paid = what was given back)
+  // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; a return has no paid part)
   // adjust: «الفكة» (− off the bill, + added); total is what is asked for, after it
   function record({ id, soldAt, lines, customer, paid, note, kind, adjust }) {
     const adj = r2(adjust);
@@ -202,7 +202,7 @@
           p: Number(l.p), pu: Number.isFinite(Number(l.pu)) ? Number(l.pu) : priceOf(base, k, 'unit'), x: l.x || null, bs: l.bs && Number.isFinite(Number(l.bs.k)) ? { k: Number(l.bs.k), u: Number(l.bs.u) || 0 } : null };
       }).filter((l) => l.q + l.w > 0);
       const cu = b.cust && b.cust.id != null ? { id: b.cust.id, name: String(b.cust.name || ''), credit_limit: b.cust.credit_limit, balance: b.cust.balance } : null;
-      return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: String(b.paid || ''), note: String(b.note || '').slice(0, 300),
+      return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: b.kind === 'return' ? '' : String(b.paid || ''), note: String(b.note || '').slice(0, 300),
         adj: r2(b.adj), wait: b.wait != null && b.wait !== '' ? String(b.wait).slice(0, 20) : null, adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
     });
     if (!bills.length) bills.push(blankBill());
@@ -779,7 +779,7 @@
   // ---------- the bills open together (up to 3; owner 2026-11-21) ----------
   // the current bill's state, as a bill (what bills[cur] keeps, and what is kept on the phone)
   function snap() {
-    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign, wait: waitId };
+    return { kind, cart, cust, custOpen, paid: kind === 'return' ? '' : $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign, wait: waitId };
   }
   function persist() { bills[cur] = snap(); keep(BKEY, { cur, bills }); }
   function applyBill(b) {
