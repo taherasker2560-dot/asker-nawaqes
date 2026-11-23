@@ -265,10 +265,8 @@
   // (no Chrome on the phone) this browser's steps show at once
   // (also from the plain site, no link: its home box sends a visitor to Chrome the same way)
   const handedOff = /[?&]install=1(?:&|$)/.test(location.search);
-  // opened from the QR on his card at the counter (owner 2026-11-23, mockup customer_qr_2026-11-23 «ا موافق»): for this visit «ثبّت التطبيق» comes FIRST,
-  // because the pharmacy installs it with him there. From the WhatsApp link the account stays first (owner 2026-11-16).
-  if (/[?&]from=qr(?:&|$)/.test(location.search)) { try { sessionStorage.setItem('asker_from_qr', '1'); } catch (e) { /* private window */ } }
-  const qrVisit = () => { try { return sessionStorage.getItem('asker_from_qr') === '1'; } catch (e) { return false; } };
+  // «from=qr» = opened from the QR on his card at the counter (owner 2026-11-23); it only leaves the address with the secret (dropMe): the install box is on top
+  // for the WhatsApp link too since the same day
   if (fromLink) {
     keep.set(fromLink);
     try { history.replaceState(null, '', location.pathname + dropMe(location.search) + '#account'); } catch (e) { location.hash = 'account'; }
@@ -453,8 +451,8 @@
     }
     const b = balanceWords(st.c.balance), now = new Date();
     const upd = updatedText(st.data_at, now);
-    // 2026-11-16 (owner: «اللي يهمني لما العميل يفتح ياخد الرابط يدوس عليه يوصل لحسابه»): the account comes FIRST; the install button (owner 2026-11-13: «زرار كبير مكتوب
-    // عليه ثبت التطبيق الان») is now a plain button after the account's own buttons, not the first thing the customer sees; not in the installed app
+    // the install button (owner 2026-11-13: «زرار كبير مكتوب عليه ثبت التطبيق الان»): 11-16 it went after the account's buttons («اللي يهمني لما العميل يفتح ياخد الرابط يدوس
+    // عليه يوصل لحسابه»); since 2026-11-23 it is a box at the top until the app is installed (his «وليه ما خليتش زرار التثبيت فى اول صفحه رابط الواتس برضه»); not in the installed app
     let html = '', installHtml = '';
     if (pharmacyPhone) {
       // the owner (or staff) looking at a customer's account: back to the bot, nothing installed or kept
@@ -464,8 +462,9 @@
       const again = (handedOff || installReady) && !installNote;
       installHtml = `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
-      // came from the QR at the counter: the same button in a box at the very top, before the balance (owner 2026-11-23)
-      if (qrVisit()) { html += `<section class="ac-qr-install"><b>${esc(TEXTS.qrInstall)}</b><small>${esc(TEXTS.qrInstallHint)}</small>${installHtml}</section>`; installHtml = ''; }
+      // the button in a box at the very top, before the balance, until the app is installed (owner 2026-11-23: first for the counter's QR, then
+      // «وليه ما خليتش زرار التثبيت فى اول صفحه رابط الواتس برضه»: the WhatsApp link too; this replaces 11-16's «the account first, the install after its buttons»)
+      html += `<section class="ac-qr-install"><b>${esc(TEXTS.qrInstall)}</b><small>${esc(TEXTS.qrInstallHint)}</small>${installHtml}</section>`; installHtml = '';
     }
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
     // a person of the house whose owner keeps the total to himself: a greeting in place of the balance (the server sent no number)

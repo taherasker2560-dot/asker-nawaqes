@@ -294,25 +294,25 @@ run('Customer link: the items\' pictures show in his account when he opens an in
  assert.match(pdf,/\/URI \(https?:\/\/[^)]*\/store\.html#item=10\)/);
 },{home:true});
 
-// the account comes FIRST (owner 2026-11-16: «اللي يهمني لما العميل يفتح ياخد الرابط يدوس عليه يوصل لحسابه، ويبقى فيه اوبشن بسيط يخش الموقع»)
-run('Customer link: he lands on his account (the balance first), the install button is a plain one after the account\'s own buttons, «الموقع» is a simple way into the site',async({page,base})=>{
+// the install box on top until the app is installed (owner 2026-11-23: «وليه ما خليتش زرار التثبيت فى اول صفحه رابط الواتس برضه»; it replaces 11-16's «the account first»), then the balance
+run('Customer link: the install box on top, then his balance, the four big buttons and «المزيد»; «الموقع» is a simple way into the site',async({page,base})=>{
  const tok='c'.repeat(64);
  await page.evaluate(([c,m,p,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:p,ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[]}))},[CUSTOMERS,MOVES,PHONES,tok]);
  await page.goto(base+'store.html#me='+tok);
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
- // the order of the page: the balance, the order button, the PDF/chat row, then the install button; nothing big about installing above the balance
+ // the order of the page: the install box, the balance, the four big buttons, «المزيد»
  const order=await page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-g4')?'four':e.matches('.ac-more')?'more':e.matches('[data-acct-install]')?'install':e.matches('.ac-install-why')?'why':e.matches('.ac-tabs')?'tabs':e.matches('.ac-qr-install')?'qr':e.className||e.tagName));
  assert.equal(order[0],'tabs','the four tabs are pinned at the top');
- assert.equal(order[1],'balance','and the account is the first thing under them');
+ assert.equal(order[1],'qr','the install box first (owner 2026-11-23)');assert.equal(order[2],'balance','then his balance');
  // owner 2026-11-23: four big buttons (order, prescription, talk to the pharmacy, alarm), the rest folded under «المزيد», then the install button
- assert.deepEqual(order.slice(2,5),['four','more','install'],order.join(','));
- assert.equal(order.indexOf('qr'),-1,'from the WhatsApp link: no install box on top');
+ assert.deepEqual(order.slice(3,5),['four','more'],order.join(','));
+ assert.equal(order.indexOf('install'),-1,'one install button, in the box on top');assert.equal(await page.$$eval('#acctBox [data-acct-install]',e=>e.length),1);
  assert.deepEqual(await page.$$eval('#acctBox .ac-g4 > *',els=>els.map(e=>e.matches('.ac-order')?'order':e.matches('.ac-rx-tile')?'rx':e.matches('.ac-talk')?'talk':e.matches('.ac-al-tile')?'alarm':e.className)),['order','rx','talk','alarm']);
  assert.equal(await page.$eval('#acctBox .ac-more',d=>d.open),false,'«المزيد» starts folded');
  await openMore(page);await page.click('[data-acct-filter="all"]');await page.click('[data-acct-filter="home"]');
  assert.equal(await page.$eval('#acctBox .ac-more',d=>d.open),true,'and stays open once he opened it');
  assert.equal(await page.$('.ac-moves'),null,'his movements are on their own pages, not under the buttons');
- // not the big button any more
+ // a plain-size button in the box
  const h=await page.$eval('[data-acct-install]',b=>b.getBoundingClientRect().height);
  assert.ok(h<=57,'a plain button, not the 64 px one (the capsule look makes it 56, with a hair of rounding): '+h);
  const lum=await page.$eval('[data-acct-install]',e=>{const l=c=>{const m=c.match(/\d+(\.\d+)?/g).map(Number);return 0.299*m[0]+0.587*m[1]+0.114*m[2]};const s=getComputedStyle(e);return Math.abs(l(s.color)-l(s.backgroundColor))});
