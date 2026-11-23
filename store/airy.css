@@ -61,7 +61,7 @@ html body #acctBox .ac-more .ac-al-wrap, html body #acctBox .ac-more .ac-reg-two
 html body #acctBox .ac-qr-install { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 14px 16px 0; padding: 12px 12px 4px; border: 2px solid var(--accent); border-radius: 16px; background: var(--accent-soft); text-align: center; }
 html body #acctBox .ac-qr-install > b { font-size: 16px; color: var(--ink); }
 html body #acctBox .ac-qr-install > small { font-size: 12.5px; color: var(--muted); }
-html body #acctBox .ac-qr-install .ac-install { width: 100%; margin: 10px 0 0; background: var(--accent); color: #fff; border: 0; }
+html body #acctBox .ac-qr-install .ac-install { width: 100%; margin: 10px 0 0; background: var(--card); color: var(--accent-text); border: 1.5px solid var(--accent); box-shadow: none; } /* a big button stays SOFT (owner 2026-11-19/21: no big solid blocks; tests/e2e/airy-no-blocks) */
 /* the alarm's home card on an iPhone (owner 2026-11-23): the iPhone's way in place of «Android only», and a button that opens the alarm, the same look as the Android one */
 html body .al-home button.al-home-btn { flex: none; min-height: 40px; padding: 0 14px; display: inline-flex; align-items: center; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; }
 html body .al-home .al-home-warn { font-weight: 600; line-height: 1.6; }
