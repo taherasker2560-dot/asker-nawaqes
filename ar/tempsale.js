@@ -147,7 +147,7 @@
       }),
       total: due(lines, adj),
       adjust: adj || null,
-      paid: (customer || kind === 'return') && Number(paid) > 0 ? r2(paid) : null,
+      paid: customer && kind !== 'return' && Number(paid) > 0 ? r2(paid) : null,
       note: String(note || '').trim().slice(0, 300) || null,
       status: 'pending',
     };
@@ -824,7 +824,7 @@
     const box = $('tsCust');
     if (!box) return;
     if (!can('credit')) { cust = null; custOpen = false; }
-    const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, due(cart, adj), paid);
+    const ret = kind === 'return', paid = ret ? 0 : Number($('tsPaid').value) || 0, over = ret ? null : overLimit(cust, due(cart, adj), paid);
     let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button>${can('credit') ? `<button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button>` : ''}</div>`;
     if (cust) {
       // his account with this bill, like a PharmaFly invoice (owner 2026-11-13): before, the bill, paid, after
@@ -844,9 +844,10 @@
     }
     const q = $('tsCQ') ? $('tsCQ').value : '';
     box.innerHTML = html;
-    // a credit customer: what he paid now; a return: what was given back to him (cash or credit)
-    $('tsPaidRow').classList.toggle('hidden', !cust && !ret);
-    $('tsPaidLbl').textContent = ret ? 'رجّعتله كام فلوس؟' : 'دفع كام؟';
+    // a credit customer: what he paid now. A return has no such box: «مفيش مرتجع ولا بيع نقدي بيندفع منه جزء» (his rule 2026-11-22), and the robot
+    // never typed it anyway (review 2026-11-23 money-12: the drawer could come up short with no trace)
+    $('tsPaidRow').classList.toggle('hidden', !cust || ret);
+    $('tsPaidLbl').textContent = 'دفع كام؟';
     if ($('tsCQ')) { $('tsCQ').value = q; drawCustHits(); }
     // the bill changed after the «over the limit» question: the question starts again
     if (overSure && overSure !== overKey()) { overSure = ''; saveLabel(); }
