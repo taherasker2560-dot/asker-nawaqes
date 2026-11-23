@@ -156,7 +156,10 @@
   function niHtml(r, l) {
     if (!l || l.id) return '';
     const s = ni[niKey(r, l)], wait = WAITING.includes(r.status), k = niKey(r, l);
-    const cam = (label) => wait ? `<label class="rv-ni-cam">${label}<input type="file" accept="image/*" capture="environment" hidden data-rv-cam="${esc(k)}"></label>` : '';
+    // the camera, and the phone's own photos next to it (owner 2026-11-23: «عايز كمان ادوس على الكاميرا ديت يفتح لي تحميل، ممكن احملها من الستور من عندي»):
+    // the same input with no «capture», so the phone offers its gallery / files
+    const pick = (label, camera) => `<label class="rv-ni-cam${camera ? '' : ' rv-ni-pick'}">${label}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ' data-rv-pick'} hidden data-rv-cam="${esc(k)}"></label>`;
+    const cam = (label) => wait ? `<span class="rv-ni-two">${pick(label, true)}${pick('🖼 من الصور', false)}</span>` : '';
     if (!s) return wait ? `<div class="rv-ni">${cam('📷 صوّر العلبة')}</div>` : '';
     if (s.status === 'sending' || s.status === 'pending' || s.status === 'reading') {
       return `<div class="rv-ni"><div class="rv-ni-wait">📷 ${s.status === 'sending' ? 'ببعت الصورة…' : 'الصورة وصلت… بيقرا العلبة'}${s.late ? ' (لو طوّل: اللاب ممكن يكون مقفول)' : ''}</div></div>`;

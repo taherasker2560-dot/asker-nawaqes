@@ -24,7 +24,10 @@ run('Invoice review: a new item\'s box photo is read, shown under its line, kept
  await page.click('#rvMain [data-rv-toggle="21"]').catch(()=>{});
  if(!(await page.isVisible('#rvMain .rv-ni-cam')))await page.click('#rvMain [data-rv-toggle="21"]');
  // only the two lines that are not in PharmaFly have the camera
- assert.deepEqual(await page.$$eval('#rvMain [data-rv-cam]',(b)=>b.map(x=>x.dataset.rvCam)),['21|2','21|3']);
+ assert.deepEqual(await page.$$eval('#rvMain [data-rv-cam]:not([data-rv-pick])',(b)=>b.map(x=>x.dataset.rvCam)),['21|2','21|3']);
+ // and the phone's own photos next to the camera (owner 2026-11-23: «ادوس على الكاميرا ديت يفتح لي تحميل … من الستور»): the same input with no capture
+ assert.deepEqual(await page.$$eval('#rvMain [data-rv-pick]',(b)=>b.map(x=>[x.dataset.rvCam,x.hasAttribute('capture'),x.accept])),[['21|2',false,'image/*'],['21|3',false,'image/*']]);
+ assert.deepEqual(await page.$$eval('#rvMain .rv-ni-pick',(b)=>b.map(x=>x.textContent.trim())),['🖼 من الصور','🖼 من الصور']);
  // the photo goes to the readings queue for that review and line, and the line says it is being read
  await page.setInputFiles('#rvMain [data-rv-cam="21|2"]',{name:'box.png',mimeType:'image/png',buffer:PNG});
  await page.waitForFunction(()=>/الصورة وصلت… بيقرا العلبة/.test(document.querySelector('#rvMain .rv-ni-wait')?.textContent||''));
@@ -45,7 +48,7 @@ run('Invoice review: a new item\'s box photo is read, shown under its line, kept
  assert.deepEqual(V.answers.N2,{v:'item',read:R[0].id,t:'EXAMPLE SHAMPOO 250ML'});
  assert.match(await page.$eval('#rvMain .rv-ni-read b',(x)=>x.textContent),/EXAMPLE SHAMPOO 250ML/,'his name is the one shown');
  // the second new line: photographed and read, not answered; approving keeps the reading's name for it
- await page.setInputFiles('#rvMain [data-rv-cam="21|3"]',{name:'box2.png',mimeType:'image/png',buffer:PNG});
+ await page.setInputFiles('#rvMain [data-rv-cam="21|3"][data-rv-pick]',{name:'box2.png',mimeType:'image/png',buffer:PNG}); // from the phone's photos this time
  await page.waitForFunction(()=>window.__tables.ar_item_reads.some(x=>x.line_n==='3'));
  await laptop(page,'3',{found:true,name_en:'EXAMPLE CREAM 50GM',form:'كريم',count:1,company:'',price:0,active:'',confidence:'high',note:''});
  await page.waitForFunction(()=>document.querySelectorAll('#rvMain .rv-ni-read').length===2,null,{timeout:12000});
