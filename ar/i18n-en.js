@@ -2116,6 +2116,7 @@ window.AskerEN = {
   "بيفعّل الإشعار…": "Turning the notification on…",
   "🔔 إشعار الرسايل شغال على الموبايل ده.": "🔔 Message notifications are on for this phone.",
   "📱 QR لحسابه: صوّره من موبايله": "📱 His account QR: scan it with his phone",
+  "🖼 من الصور": "🖼 From photos",
   "حساب": "Account of",
   "خلّيه يفتح الكاميرا ويصوّر الكود": "Have him open the camera and scan the code",
   "يفتح الكاميرا ويصوّر الكود": "He opens the camera and scans the code",

@@ -121,3 +121,7 @@
 .rv-ni-edit { display: flex; gap: 6px; margin-top: 4px; }
 .rv-ni-edit input { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; border-radius: 10px; }
 .rv-ni-edit button { flex: none; width: auto; min-height: 0; padding: 6px 12px; border-radius: 12px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font: inherit; font-size: 13px; font-weight: 700; box-shadow: none; }
+/* the camera and the phone's photos side by side (owner 2026-11-23: «ادوس على الكاميرا ديت يفتح لي تحميل … من الستور من عندي») */
+.rv-ni-two { display: flex; gap: 8px; width: 100%; }
+.rv-ni-two .rv-ni-cam { flex: 1; width: auto; }
+.rv-ni-b .rv-ni-two { width: auto; flex: none; }
