@@ -63,9 +63,9 @@ assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
 {
   const bk = W.makeBook([
     { phone: '01001234567', name: 'عميل ١٢١', kind: 'cash', last_item: 'Entresto' },
-    { phone: '01061287937', name: 'احمد الطنطاوى', kind: 'account', last_item: null },
-    { phone: '01112223334', name: 'أحمد الطنطاوي الصغير', kind: 'other', last_item: null },
-    { phone: '0471234567', name: 'احمد الطنطاوى مكتب', kind: 'other', last_item: null },   // a landline: in the book, but not offered for the form
+    { phone: '01000009007', name: 'احمد الفرماوى', kind: 'account', last_item: null },
+    { phone: '01112223334', name: 'أحمد الفرماوي الصغير', kind: 'other', last_item: null },
+    { phone: '0471234567', name: 'احمد الفرماوى مكتب', kind: 'other', last_item: null },   // a landline: in the book, but not offered for the form
     { phone: '447710173736', name: 'خارجي', kind: 'other', last_item: null },
   ]);
   assert.equal(W.bookFind(bk, '+20 100 123 4567').name, 'عميل ١٢١', 'a number as he types it (+20, spaces) finds the name');
@@ -74,7 +74,7 @@ assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
   assert.equal(W.bookFind(bk, '010'), null, 'half a number finds nothing');
   assert.deepEqual(W.bookSearch(bk, 'عميل 121').map((c) => c.phone), ['01001234567'], '«121» finds «١٢١»');
   assert.deepEqual(W.bookSearch(bk, 'entresto').map((c) => c.phone), ['01001234567'], 'the drug beside the name is searched too');
-  assert.deepEqual(W.bookSearch(bk, 'احمد الطنطاوي').map((c) => c.phone), ['01061287937', '01112223334'], 'ى/ي and أ/ا are the same; the shorter name first; a landline is not offered');
+  assert.deepEqual(W.bookSearch(bk, 'احمد الفرماوي').map((c) => c.phone), ['01000009007', '01112223334'], 'ى/ي and أ/ا are the same; the shorter name first; a landline is not offered');
   assert.deepEqual(W.bookSearch(bk, 'ا'), [], 'one letter offers nothing');
   assert.equal(W.bookSearch(bk, 'احمد').length, 2);
   assert.equal(W.bookKind('cash'), 'نقدي'); assert.equal(W.bookKind('account'), 'له حساب'); assert.equal(W.bookKind('other'), '');
@@ -87,7 +87,7 @@ assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
 {
   const bk = W.makeBook([
     { phone: '01001234567', name: 'عميل ١٢١', kind: 'cash', last_item: 'Entresto', private: false },
-    { phone: '01061287937', name: 'احمد الطنطاوى', kind: 'account', last_item: null, private: false },
+    { phone: '01000009007', name: 'احمد الفرماوى', kind: 'account', last_item: null, private: false },
     { phone: '01112223334', name: 'أحمد اخويا', kind: 'other', last_item: null, private: true },
     { phone: '01223334445', name: 'ماما', kind: 'other', last_item: null, private: true },
     { phone: '01334445556', name: 'سيد النجار', kind: 'other', last_item: null, private: false },
@@ -99,10 +99,10 @@ assert.equal(W.errText('xyz'), 'مقدرتش أكمّل. جرّب تاني.');
   assert.deepEqual(W.BOOK_FILTERS.map((f) => f[0]), ['all', 'cash', 'account', 'other', 'private']);
   const ph = (f, q) => W.bookView(bk, f, q).map((c) => c.phone);
   assert.equal(ph('all', '').length, 6, 'all of them');
-  assert.deepEqual(ph('cash', ''), ['01001234567']); assert.deepEqual(ph('account', ''), ['01061287937']);
+  assert.deepEqual(ph('cash', ''), ['01001234567']); assert.deepEqual(ph('account', ''), ['01000009007']);
   assert.deepEqual(ph('other', '').sort(), ['01112223334', '01223334445', '01334445556', '447710173736']);
   assert.deepEqual(ph('private', '').sort(), ['01112223334', '01223334445'], 'private: only the marked ones');
-  assert.deepEqual(ph('all', 'احمد').sort(), ['01061287937', '01112223334'], 'a word: أ/ا are the same');
+  assert.deepEqual(ph('all', 'احمد').sort(), ['01000009007', '01112223334'], 'a word: أ/ا are the same');
   assert.deepEqual(ph('private', 'احمد'), ['01112223334'], 'the filter and the word together');
   assert.deepEqual(ph('all', '0133'), ['01334445556'], 'digits only: part of a number');
   assert.deepEqual(ph('all', '+20 133'), [], 'a plus sign is not part of the stored number (01…): nothing, not everything');

@@ -17,8 +17,8 @@ assert.equal(S.ago(null,now),'ما فتحش','the old card\'s words are kept');
 // how many times: the Egyptian way
 assert.deepEqual([0,1,2,3,10,11,40].map(S.timesText),['','فتح مرة','فتح مرتين','فتح 3 مرات','فتح 10 مرات','فتح 11 مرة','فتح 40 مرة']);
 // the name as people read it: a PharmaFly card name carries a mobile or a note; «د/…» keeps its title
-assert.equal(S.cleanName('الحاج محمد حماد فتح الله_01060595664'),'الحاج محمد حماد فتح الله');
-assert.equal(S.cleanName('01020500876محمد البغدادى/700جنيه/موقوف لاى حد غيره'),'محمد البغدادى');
+assert.equal(S.cleanName('الحاج محمد حامد عبد الله_01000009005'),'الحاج محمد حامد عبد الله');
+assert.equal(S.cleanName('01000009004محمد الشرقاوى/500جنيه/موقوف لاى حد غيره'),'محمد الشرقاوى');
 assert.equal(S.cleanName('حماده جلاء يوسف ناجى بليح /موقوف'),'حماده جلاء يوسف ناجى بليح');
 assert.equal(S.cleanName('د/عبدالفتاح على عسكر'),'د/عبدالفتاح على عسكر');
 assert.equal(S.cleanName('Mona Asker'),'Mona Asker');
@@ -26,7 +26,7 @@ assert.equal(S.cleanName('01012345678'),'01012345678','only a number: kept as it
 // the mobile: the kept one (with or without 20), else the one in the card name
 assert.equal(S.phoneOf({phone:'201001112223'}),'01001112223');
 assert.equal(S.phoneOf({phone:'01112345678'}),'01112345678');
-assert.equal(S.phoneOf({phone:null,name:'منى_01060595664'}),'01060595664');
+assert.equal(S.phoneOf({phone:null,name:'منى_01000009005'}),'01000009005');
 assert.equal(S.phoneOf({phone:'123',name:'منى'}),'');
 // the state: ⚫ the push address died after his last open · ⚪ never opened · 🟢 7 days · 🟡 under 30 · 🔴 30 or more
 assert.equal(S.statusOf({last_seen_at:daysAgo(1)},now),'ok');

@@ -213,13 +213,13 @@ run('Waiting list: the number book (owner 2026-11-20): a number shows the name a
  await page.evaluate(()=>{
   window.__tables.ar_contacts=[
    {phone:'01001234567',name:'عميل ١٢١',kind:'cash',last_item:'Entresto'},
-   {phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null},
-   {phone:'01112223334',name:'أحمد الطنطاوي الصغير',kind:'other',last_item:null},
-   {phone:'0471234567',name:'مكتب احمد الطنطاوى',kind:'other',last_item:null}];   // a landline: in the book, never offered for this form
+   {phone:'01000009007',name:'احمد الفرماوى',kind:'account',last_item:null},
+   {phone:'01112223334',name:'أحمد الفرماوي الصغير',kind:'other',last_item:null},
+   {phone:'0471234567',name:'مكتب احمد الفرماوى',kind:'other',last_item:null}];   // a landline: in the book, never offered for this form
   window.__tables.ar_waitlist=[{id:1,status:'waiting'},
    {id:11,phone:'01001234567',item_name:'Eltroxin 100',status:'delivered',created_at:'2026-11-05T09:00:00Z'},
    {id:12,phone:'01001234567',item_name:'Whiton Cream',status:'returned',created_at:'2026-10-21T09:00:00Z'},
-   {id:13,phone:'01061287937',item_name:'AUGMENTIN 1GM 14 TAB',status:'waiting',created_at:'2026-11-18T09:00:00Z'}];
+   {id:13,phone:'01000009007',item_name:'AUGMENTIN 1GM 14 TAB',status:'waiting',created_at:'2026-11-18T09:00:00Z'}];
  });
  await open(page);
  await page.click('[data-wl-new]');
@@ -234,11 +234,11 @@ run('Waiting list: the number book (owner 2026-11-20): a number shows the name a
  await page.waitForFunction(()=>document.getElementById('wlName').value==='',null,{timeout:5000});
  assert.equal(await txt(page,'#wlKnown'),'');
  // a name (Ya / Alef spelled the other way): the numbers that fit, the shorter name first, no landline; a tap fills the number and the name
- await page.fill('#wlName','الطنطاوي');
+ await page.fill('#wlName','الفرماوي');
  await page.waitForSelector('[data-wl-contact]');
- assert.deepEqual(await page.$$eval('[data-wl-contact]',(b)=>b.map((x)=>x.dataset.wlContact)),['01061287937','01112223334']);
- await page.click('[data-wl-contact="01061287937"]');
- assert.equal(await page.inputValue('#wlPhone'),'01061287937');assert.equal(await page.inputValue('#wlName'),'احمد الطنطاوى');
+ assert.deepEqual(await page.$$eval('[data-wl-contact]',(b)=>b.map((x)=>x.dataset.wlContact)),['01000009007','01112223334']);
+ await page.click('[data-wl-contact="01000009007"]');
+ assert.equal(await page.inputValue('#wlPhone'),'01000009007');assert.equal(await page.inputValue('#wlName'),'احمد الفرماوى');
  await page.waitForFunction(()=>document.querySelectorAll('#wlKnown .py-hrow').length===1,null,{timeout:5000});
  assert.deepEqual(await texts(page,'#wlKnown .py-hrow'),['AUGMENTIN 1GM 14 TAB 11-18 مستني']);
  assert.match(await txt(page,'#wlKnown'),/له حساب/);
@@ -246,7 +246,7 @@ run('Waiting list: the number book (owner 2026-11-20): a number shows the name a
  await page.fill('#wlItem','augm');await page.waitForSelector('[data-wl-pick="5"]');await page.click('[data-wl-pick="5"]');
  await page.click('[data-wl-save="only"]');
  await page.waitForFunction(()=>window.__wl.calls.some(c=>c[0]==='add'),null,{timeout:5000});
- assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='add')[0][1],{p_item_id:5,p_item_name:'AUGMENTIN 1GM 14 TAB',p_phone:'01061287937',p_name:'احمد الطنطاوى',p_qty:1,p_vendor_id:null});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='add')[0][1],{p_item_id:5,p_item_name:'AUGMENTIN 1GM 14 TAB',p_phone:'01000009007',p_name:'احمد الفرماوى',p_qty:1,p_vendor_id:null});
  await page.waitForFunction(()=>document.getElementById('wlStatus').textContent.trim()==='اتسجّل.',null,{timeout:5000});
  assert.equal((await page.evaluate(()=>window.__fakeWrites)).filter((w)=>w.table==='ar_contacts').length,0,'a number the book already has is not written again');
  // a number the book does not know, with the name he wrote: kept (as a cash customer when it starts with «عميل»), and known the next time
@@ -269,7 +269,7 @@ run('Waiting list: «📒 دفتر الأرقام» (owner 2026-11-20): the filt
  await page.evaluate(()=>{
   window.__tables.ar_contacts=[
    {phone:'01001234567',name:'عميل ١٢١',kind:'cash',last_item:'Entresto',private:false},
-   {phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false},
+   {phone:'01000009007',name:'احمد الفرماوى',kind:'account',last_item:null,private:false},
    {phone:'01112223334',name:'اخويا',kind:'other',last_item:null,private:true},
    {phone:'01223334445',name:'ماما',kind:'other',last_item:null,private:true},
    {phone:'01334445556',name:'سيد النجار',kind:'other',last_item:null,private:false},
@@ -348,13 +348,13 @@ run('Waiting list: «📒 دفتر الأرقام» (owner 2026-11-20): the filt
  assert.ok(!(await page.$('#wlVendor')),'no supplier in the form');
  assert.ok(!(await page.$('[data-wl-save="copy"]')),'no supplier message to copy');
  await page.fill('#wlItem','augm');await page.waitForSelector('[data-wl-pick="5"]');await page.click('[data-wl-pick="5"]');
- await page.fill('#wlPhone','01061287937');
- await page.waitForFunction(()=>document.getElementById('wlName').value==='احمد الطنطاوى',null,{timeout:5000});
+ await page.fill('#wlPhone','01000009007');
+ await page.waitForFunction(()=>document.getElementById('wlName').value==='احمد الفرماوى',null,{timeout:5000});
  assert.ok(!(await page.$('#wlKnown [data-wl-lock]')),'no private mark for staff');
  assert.doesNotMatch(await txt(page,'#wlKnown'),/من دفتر أرقامك/);
  await page.click('[data-wl-save="only"]');
  await page.waitForFunction(()=>window.__wl.calls.some(c=>c[0]==='add'),null,{timeout:5000});
- assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='add')[0][1],{p_item_id:5,p_item_name:'AUGMENTIN 1GM 14 TAB',p_phone:'01061287937',p_name:'احمد الطنطاوى',p_qty:1,p_vendor_id:null});
+ assert.deepEqual((await page.evaluate(()=>window.__wl.calls)).filter(c=>c[0]==='add')[0][1],{p_item_id:5,p_item_name:'AUGMENTIN 1GM 14 TAB',p_phone:'01000009007',p_name:'احمد الفرماوى',p_qty:1,p_vendor_id:null});
 });
 
 run('Waiting list: the book shows 30 numbers at a time and «عرض أكتر» shows more; marking all that are shown sends them all',async({page})=>{
@@ -390,7 +390,7 @@ run('Waiting list: the book shows 30 numbers at a time and «عرض أكتر» s
 run('Waiting list: «📱 تطبيق الموبايل» inside the number book: the status, the download, «اربط التطبيق» makes a key and opens the phone app with it',async({page})=>{
  await seed(page);
  await page.evaluate(()=>{
-  window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false}];
+  window.__tables.ar_contacts=[{phone:'01000009007',name:'احمد الفرماوى',kind:'account',last_item:null,private:false}];
   window.__opened=[];window.open=(u)=>{window.__opened.push(u);return null};   // the phone app's own link must not leave the page in the test
   window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{
    ar_phone_status:()=>({pending:3,last_sync:{n:2602,finished_at:'2026-11-20T10:00:00Z',merged_at:null},phones:[{label:'phone 2026-11-20',created_at:'2026-11-20T09:00:00Z',last_used_at:'2026-11-20T10:05:00Z'}]}),
@@ -480,7 +480,7 @@ run('Waiting list: «📲 ابعت للتليسيلز» on a waiting item, and O
 
 run('Waiting list: the phone app block STAYS when its status cannot be read (owner 2026-11-21: it must not disappear after linking), and reads it again',async({page})=>{
  await seed(page);
- await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false}]});
+ await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01000009007',name:'احمد الفرماوى',kind:'account',last_item:null,private:false}]});
  await open(page);
  await page.click('[data-wl-bk]');
  await page.waitForSelector('#wlBkChips');
@@ -504,7 +504,7 @@ run('Waiting list in English: no Arabic left on the screen except names, and the
  await page.reload();
  await page.waitForSelector('[data-group="purchases"]');
  await seed(page);
- await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,private:false},{phone:'01112223334',name:'اخويا',kind:'other',last_item:null,private:true}]});
+ await page.evaluate(()=>{window.__tables.ar_contacts=[{phone:'01000009007',name:'احمد الفرماوى',kind:'account',last_item:null,private:false},{phone:'01112223334',name:'اخويا',kind:'other',last_item:null,private:true}]});
  await open(page);
  await page.click('[data-wl-new]');
  await page.selectOption('#wlVendor','11');

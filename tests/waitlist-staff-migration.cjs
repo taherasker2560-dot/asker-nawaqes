@@ -29,7 +29,7 @@ const OWNER='ff6c33dc-9dc5-4e2f-95bb-5d449e231f1c',WAIT='11111111-1111-1111-1111
   insert into public.ar_vendors values (10,'المتحدة للأدوية','UNIT',true,'2026-11-18 10:00');
   insert into public.ar_staff values ('${WAIT}','موظف الانتظار','{wait}',true),('${NOWAIT}','موظف تاني','{tempsale}',true),('${OFF}','موقوف','{wait}',false);
   insert into public.ar_contacts(phone,name,kind,source) values
-   ('01000000001','عميل ١٢١','cash','google'),('01000000002','احمد الطنطاوى','account','google'),('01000000003','اخويا','other','google'),('01000000004','صاحبي','other','google'),
+   ('01000000001','عميل ١٢١','cash','google'),('01000000002','احمد الفرماوى','account','google'),('01000000003','اخويا','other','google'),('01000000004','صاحبي','other','google'),
    ('01000000005','عميل كتبته','other','typed'),('447710173736','رقم برة','other','google');`);
  const sql=mig('202611201500_ar_contacts_private.sql');
  await db.exec(sql);

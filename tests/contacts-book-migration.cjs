@@ -14,11 +14,11 @@ const OWNER='ff6c33dc-9dc5-4e2f-95bb-5d449e231f1c',STAFF='11111111-1111-1111-111
  const owner=(q,p)=>as(OWNER,'authenticated',q,p);
 
  // the owner: add, read, change, remove
- await owner(`insert into public.ar_contacts(phone,name,kind,last_item) values ('01001234567','عميل ١٢١','cash','Entresto'),('01061287937','احمد الطنطاوى','account',null),('447710173736','خارجي','other',null)`);
+ await owner(`insert into public.ar_contacts(phone,name,kind,last_item) values ('01001234567','عميل ١٢١','cash','Entresto'),('01050009007','احمد الفرماوى','account',null),('447710173736','خارجي','other',null)`);
  await owner(`insert into public.ar_contacts(phone,name,source) values ('01099998888','عميل جديد','typed')`);
  assert.deepEqual((await owner(`select phone,name,kind,last_item,source from public.ar_contacts order by phone`)),[
   {phone:'01001234567',name:'عميل ١٢١',kind:'cash',last_item:'Entresto',source:'google'},
-  {phone:'01061287937',name:'احمد الطنطاوى',kind:'account',last_item:null,source:'google'},
+  {phone:'01050009007',name:'احمد الفرماوى',kind:'account',last_item:null,source:'google'},
   {phone:'01099998888',name:'عميل جديد',kind:'other',last_item:null,source:'typed'},
   {phone:'447710173736',name:'خارجي',kind:'other',last_item:null,source:'google'}],'the default kind is «other», the default source «google»');
  await owner(`update public.ar_contacts set name='عميل ١٢١ (محمد)' where phone='01001234567'`);
