@@ -604,9 +604,14 @@
         draw();
         return say('أمر الشرا فاضي: علّم الأصناف اللي عايز تشتريها في «الحقائب» ودوس «🛒 أمر شراء»، والطلبيات هتتجهز في خلال دقيقة أو اتنين.');
       }
-      [ordered, saved, pics, learned] = await Promise.all([soft(loadOrdered(), []), soft(loadSaved(), []), soft(loadPics(), {}), soft(loadLearned(), {})]);
+      // the «اتطلب» marks: a failed read keeps the marks he already had and says so (review 2026-11-23 errors-3): an empty list here put
+      // items already sent to another warehouse today back in this warehouse's draft
+      let orderedOk = true;
+      const lo = loadOrdered().catch(() => { orderedOk = false; return ordered; });
+      [ordered, saved, pics, learned] = await Promise.all([lo, soft(loadSaved(), []), soft(loadPics(), {}), soft(loadLearned(), {})]);
       const hidden = reapply();
-      say(hidden ? `${hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
+      if (!orderedOk) say('مفيش نت: مش متأكد إيه اللي اتطلب النهارده، جرّب تاني', 'bad');
+      else say(hidden ? `${hidden} صنف اتطلبوا النهارده، فمش هيظهروا تاني في طلبيات النهارده (النواقص زي ما هي).` : '');
       draw();
     } catch (e) {
       say('مقدرتش أجيب الطلبيات: ' + (e.message || e), 'bad');
@@ -655,7 +660,7 @@
     try {
       const { error } = await db().from('ar_orders').insert(rows);
       if (error) throw error;
-      ordered = await soft(loadOrdered(), ordered);
+      ordered = await soft(loadOrdered(), ordered.concat(rows));   // written: the marks hold even if the re-read fails
       // what was just marked leaves the order right away (owner: «ما يظهرش تاني لما اجي اطلب تعديل»)
       reapply();
       carry[current] = 'new';
