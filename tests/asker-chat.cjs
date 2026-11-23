@@ -222,6 +222,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
         return new Response(JSON.stringify(docs));
       }
       if (u.pathname === '/rest/v1/ar_documents' && o.method === 'PATCH') return new Response(null, { status: 204 });
+      if (u.pathname === '/rest/v1/ar_laptop_news' && o.method === 'POST') return new Response(null, { status: 201 });
       if (u.pathname === '/rest/v1/ar_chat_staff_push') {
         assert.equal(u.searchParams.get('user_id'), 'eq.' + OWNER, 'the owner\'s phones only');
         return new Response(JSON.stringify([{ endpoint: 'https://push.example/owner1' }, { endpoint: 'https://push.example/owner2' }]));
@@ -231,12 +232,24 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
     const day = Date.UTC(2026, 10, 23, 10, 0); // 12:00 Cairo
     const realNow = Date.now; Date.now = () => day;
     try {
-      let r = await F.handle(req({ action: 'docs' }, null), env, fd([{ id: D1 }, { id: D2 }])), b = await r.json();
-      assert.deepEqual(b, { ok: true, new: 2, sent: 2, gone: 0, failed: 0, codes: [201, 201] });
+      let r = await F.handle(req({ action: 'docs' }, null), env, fd([{ id: D1, supplier: 'شركة تجربة' }, { id: D2, supplier: null }])), b = await r.json();
+      assert.deepEqual(b, { ok: true, new: 2, said: true, sent: 2, gone: 0, failed: 0, codes: [201, 201] });
       const patch = calls.find((c) => c.method === 'PATCH');
       assert.equal(patch.q, `?id=in.(${D1},${D2})`); assert.ok(patch.body.announced_at, 'marked told');
       assert.ok(calls.indexOf(patch) < calls.findIndex((c) => c.path === '/rest/v1/ar_chat_staff_push'), 'marked before the push: told once');
       assert.deepEqual(pushes, ['/owner1', '/owner2']);
+      // the voice (11-23: the push reaches no phone yet; Tasker reads ar_sync_news ← ar_laptop_news): one line, said once
+      const voice = calls.filter((c) => c.path === '/rest/v1/ar_laptop_news');
+      assert.deepEqual(voice.map((c) => [c.method, c.body]), [['POST', { kind: 'invoice_photos', body: 'وصلت 2 صور فواتير من شركة تجربة' }]]);
+      assert.ok(calls.indexOf(patch) < calls.indexOf(voice[0]), 'marked before it is said');
+      assert.equal(F.docsVoice(1, [null]), 'وصلت صورة فاتورة');
+      assert.equal(F.docsVoice(5, ['أ', 'ب', 'ج', 'د', 'أ']), 'وصلت 5 صور فواتير من أ وب وج وغيرهم');
+      assert.ok(F.docsVoice(9, ['ش'.repeat(150), 'م'.repeat(150)]).length <= 200, 'the table keeps 200 letters');
+      // no push keys: the line is still said
+      calls.length = 0; pushes.length = 0;
+      const env2 = { ...env, VAPID_PRIVATE_JWK: '' };
+      b = await (await F.handle(req({ action: 'docs' }, null), env2, fd([{ id: D1 }]))).json();
+      assert.deepEqual(b, { ok: true, new: 1, said: true }); assert.equal(pushes.length, 0);
       // nothing new: no push
       calls.length = 0; pushes.length = 0;
       b = await (await F.handle(req({ action: 'docs' }, null), env, fd([]))).json();

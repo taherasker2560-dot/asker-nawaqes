@@ -48,6 +48,13 @@ function cors(origin: string | null, env: Env, requested?: string | null): Recor
 export function cairoHour(now: number): number {
   return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: 'numeric', hourCycle: 'h23' }).format(new Date(now))) % 24;
 }
+// the invoice photos in words: the phone's notification (title + body) and the spoken line (one sentence, ≤ 200 letters)
+const docsWho = (sups: (string | null | undefined)[]) => [...new Set(sups.map((s) => String(s || '').trim()).filter(Boolean))];
+export function docsTitle(n: number): string { return n === 1 ? 'وصلت صورة فاتورة' : `وصلت ${n} صور فواتير`; }
+export function docsVoice(n: number, sups: (string | null | undefined)[]): string {
+  const who = docsWho(sups);
+  return (docsTitle(n) + (who.length ? ' من ' + who.slice(0, 3).join(' و') + (who.length > 3 ? ' وغيرهم' : '') : '')).slice(0, 200);
+}
 const reply = (status: number, body: unknown, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 const serviceHeaders = (k: string): Record<string, string> => k.startsWith('sb_') ? { apikey: k } : { Authorization: 'Bearer ' + k, apikey: k };
@@ -213,17 +220,21 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   // 202611230300): the photos the system got (ar_documents 'new') that nobody was told about yet → one push to the OWNER's phones,
   // 08:00–23:59 Cairo (a night photo is told at 08:00), and they are marked told (announced_at). Anyone may call it: it only tells
   // what is really new, once. What the push says comes from «what» below.
+  // 11-23 10:1x: the push reaches no phone yet (ar_chat_staff_push is empty), but the VOICE does: Tasker reads ar_sync_news,
+  // which says each unsaid line of ar_laptop_news once (migration of «تقوية السيستم», PR #444; he heard its first line 10:10).
+  // So the photos are also put there as one line, kind 'invoice_photos'.
   if (body.action === 'docs') {
-    if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
     if (cairoHour(Date.now()) < 8) return reply(200, { ok: true, skipped: 'night' }, headers);
-    const fresh = await rows('/rest/v1/ar_documents?select=id&status=eq.new&announced_at=is.null&order=received_at&limit=200') as { id: string }[];
-    const ids = fresh.map((x) => String(x.id)).filter((x) => UUID.test(x));
-    if (!ids.length) return reply(200, { ok: true, new: 0 }, headers);
-    const marked = await call('/rest/v1/ar_documents?id=in.(' + ids.join(',') + ')', { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ announced_at: new Date().toISOString() }) });
+    const fresh = await rows('/rest/v1/ar_documents?select=id,supplier&status=eq.new&announced_at=is.null&order=received_at&limit=200') as { id: string; supplier?: string | null }[];
+    const got = fresh.filter((x) => UUID.test(String(x.id)));
+    if (!got.length) return reply(200, { ok: true, new: 0 }, headers);
+    const marked = await call('/rest/v1/ar_documents?id=in.(' + got.map((x) => x.id).join(',') + ')', { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ announced_at: new Date().toISOString() }) });
     if (!marked.ok) return reply(502, { error: 'mark' }, headers);   // not marked = not told now, told on the next round
+    const said = await call('/rest/v1/ar_laptop_news', { method: 'POST', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ kind: 'invoice_photos', body: docsVoice(got.length, got.map((x) => x.supplier)) }) }).then((x) => x.ok, () => false);
+    if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(200, { ok: true, new: got.length, said }, headers);
     const subs = await rows('/rest/v1/ar_chat_staff_push?select=endpoint&user_id=eq.' + (env.OWNER_ID || OWNER_ID)) as { endpoint: string }[];
     const r = await pushAll(subs.map((s) => s.endpoint), 'ar_chat_staff_push');
-    return reply(200, { ok: true, new: ids.length, ...r }, headers);
+    return reply(200, { ok: true, new: got.length, said, ...r }, headers);
   }
 
   // ---------- what a push was about (owner 2026-11-14 «وصلت السيستم … بس مفيش صوت اشعار»): pushes carry nothing, so the
@@ -243,8 +254,8 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     const dAt = docs.length ? String(docs[0].announced_at) : '';
     if (dAt && (!w || dAt >= String(w.last_at)) && (!c || dAt >= String(c.last_at))) {
       const batch = docs.filter((d) => String(d.announced_at) === dAt);
-      const who = [...new Set(batch.map((d) => String(d.supplier || '').trim()).filter(Boolean))];
-      return reply(200, { title: batch.length === 1 ? 'وصلت صورة فاتورة' : `وصلت ${batch.length} صور فواتير`,
+      const who = docsWho(batch.map((d) => d.supplier));
+      return reply(200, { title: docsTitle(batch.length),
         body: (who.length ? who.slice(0, 3).join('، ') + (who.length > 3 ? ' …' : '') + '. ' : '') + 'شوفها في «الفواتير»', tab: 'docs' }, headers);
     }
     if (w && (!c || String(w.last_at) >= String(c.last_at))) return reply(200, { title: 'وارد جديد من مخزن', body: `${w.supplier} بعت من الرابط، شوف «الوارد»`, tab: 'read' }, headers);
