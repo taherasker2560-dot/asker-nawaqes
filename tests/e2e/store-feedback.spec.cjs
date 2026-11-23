@@ -5,7 +5,7 @@ const {run,text,assert}=require('./harness.cjs');
 const openMore=(page)=>page.evaluate(()=>{const d=document.querySelector('#acctBox .ac-more');if(d&&!d.open)d.open=true}); // «المزيد» (owner 2026-11-23: four big buttons, the rest folded)
 const tok='c'.repeat(64);
 const tables=()=>({ar_customers:[{id:101,name:'أحمد محمود',credit_limit:5000,balance:1240,last_at:null,last_kind:null,moves:0}],ar_customer_moves:[],ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:tok}],ar_customer_stops:[],ar_store_orders:[],ar_chats:[],ar_chat_messages:[],ar_chat_push:[]});
-const open=async(page,base)=>{await page.setViewportSize({width:375,height:812});await page.evaluate((t)=>localStorage.setItem('__fakeTables',JSON.stringify(t)),tables());await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-fb-tile');};
+const open=async(page,base)=>{await page.setViewportSize({width:375,height:812});await page.evaluate((t)=>localStorage.setItem('__fakeTables',JSON.stringify(t)),tables());await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-fb-tile',{state:'attached'});};
 const sent=(page)=>page.evaluate(()=>window.__tables.ar_chat_messages.filter(m=>m.sender==='customer').map(m=>m.body));
 
 run('Complaint / suggestion: the tile opens the messages page with a banner, the first message carries the mark, the next ones are normal, «إلغاء» goes back to a plain chat',async({page,base})=>{
@@ -28,7 +28,7 @@ run('Complaint / suggestion: the tile opens the messages page with a banner, the
  await page.waitForFunction(()=>window.__tables.ar_chat_messages.filter(m=>m.sender==='customer').length===2);
  assert.deepEqual(await sent(page),['📝 شكوى/اقتراح: الخدمة ممتازة بس عاوز مواعيد أطول','وشكرًا'],'only the first one is marked');
  // «إلغاء»: the banner goes and the message is sent as it is
- await page.goto(base+'store.html#account');await page.waitForSelector('.ac-fb-tile');
+ await page.goto(base+'store.html#account');await page.waitForSelector('.ac-fb-tile',{state:'attached'});
  await openMore(page);await page.click('.ac-fb-tile');await page.waitForSelector('.ch-topic');
  await page.click('[data-ch-topic-off]');await page.waitForFunction(()=>!document.querySelector('.ch-topic'));
  await page.fill('#chatText','سؤال عادي');await page.press('#chatText','Enter');

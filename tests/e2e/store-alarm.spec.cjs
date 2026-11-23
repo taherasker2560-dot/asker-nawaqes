@@ -443,11 +443,11 @@ run('Account movement alerts (owner 2026-11-18, «🔔 تنبيه حركة ال�
  await setup(page,'default');
  await page.addInitScript(()=>{window.__fakeRpcs.ar_account_push_save=()=>({ok:true});if(localStorage.getItem('__keepsub'))window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)}});   // (on every load, so the address told again after a reload is recorded too; a real browser keeps its subscription, the fake one is told to)
  await openAccount(page,base);
- await page.waitForSelector('.ac-push-tile');
+ await page.waitForSelector('.ac-push-tile',{state:'attached'});
  assert.equal(await text(page,'.ac-push-tile b'),'🔔 تنبيه حركة الحساب');
  assert.match(await text(page,'.ac-push-tile small'),/اضغط عشان يوصلك إشعار لما يحصل حركة جديدة على حسابك/);
  await openMore(page);await page.click('.ac-push-tile');
- await page.waitForSelector('.ac-push-tile.on');
+ await page.waitForSelector('.ac-push-tile.on',{state:'attached'});
  assert.match(await text(page,'.ac-push-tile small'),/✓ شغّال: هيجيلك إشعار/);
  assert.deepEqual(await page.evaluate(()=>window.__swReg),['store/acct/sw.js','store/acct/'],'its own worker and scope');
  assert.equal(await page.evaluate(()=>window.__subs),1);
@@ -455,7 +455,7 @@ run('Account movement alerts (owner 2026-11-18, «🔔 تنبيه حركة ال�
  assert.deepEqual(await saves(),[{p_token:tok,p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_on:true}],'the server gets the address and his link, nothing else');
  // a later open tells the server the address again (the push service may have changed it)
  await page.evaluate(()=>localStorage.setItem('__keepsub','1'));
- await page.reload();await page.waitForSelector('.ac-push-tile.on');
+ await page.reload();await page.waitForSelector('.ac-push-tile.on',{state:'attached'});
  await page.waitForFunction(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_account_push_save').length>=1);
  assert.deepEqual(await saves(),[{p_token:tok,p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_on:true}],'the same address, told again');
  // off: the server forgets the address

@@ -29,7 +29,7 @@ const openAccount=async(page,base)=>{await page.setViewportSize({width:375,heigh
 run('Customer regular items: two buttons with the counts, the list of what he takes, the chronic list with its dates, and the way back',async({page,base})=>{
  await setup(page,{ok:true,rows:ROWS,at:new Date().toISOString()});
   await openAccount(page,base);
- await page.waitForSelector('.ac-reg-two');
+ await page.waitForSelector('.ac-reg-two',{state:'attached'});
  assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 اللي باخده دايمًا','💊 أدويتي المزمنة']);
  assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 أصناف على حسابي','ميعادين عدّوا'],'6 items; 2 late (the OMEZ he bought today does not count)');
  assert.equal(await text(page,'.ac-reg-dot'),'2');
@@ -97,7 +97,7 @@ run('Customer regular items: the English site, the night look, and the owner\'s 
  await page.addInitScript(()=>{try{localStorage.setItem('asker-lang','en')}catch(e){}});
  await seed(page);
  await openAccount(page,base);
- await page.waitForSelector('.ac-reg-two');
+ await page.waitForSelector('.ac-reg-two',{state:'attached'});
  assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 What I usually take','💊 My chronic medicines']);
  assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 items on my account','2 are past their date']);
  await openMore(page);await page.click('[data-reg-open="chron"]');
@@ -108,7 +108,7 @@ run('Customer regular items: the English site, the night look, and the owner\'s 
  await page.click('[data-reg-close]');await page.waitForSelector('#regSheet',{state:'detached'});
  // the pharmacy's own phone (the bot signed in): a look at the customer's page, the same two buttons (his words: the look must show what the customer sees)
  await page.evaluate(()=>{localStorage.setItem('asker-lang','ar');localStorage.setItem('sb-abcdefgh-auth-token','{}')});
- await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-reg-two');
+ await page.goto(base+'store.html#me='+tok);await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-reg-two',{state:'attached'});
  assert.ok(await page.$('#acctBox .ac-back'),'the way back to the bot is there: this is the owner\'s look');
  assert.equal(await page.$$eval('.ac-reg-two .ac-reg-btn',e=>e.length),2);
  assert.deepEqual(await page.evaluate(()=>window.__fakeWrites.filter(w=>w.rpc==='ar_customer_view').map(w=>w.args.p_preview===true)),[true],'the look is not counted as the customer opening his link');

@@ -36,7 +36,7 @@ const setup=(page,{noFamily=false,members=[],lang}={})=>page.addInitScript(([mov
 },[MOVES,TOK,noFamily,members,lang||'']);
 const fam=(page)=>page.evaluate(()=>JSON.parse(localStorage.getItem('__fam')));
 const seedTables=(page)=>page.evaluate(([c,m,t])=>localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:[],ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[],ar_chats:[],ar_chat_messages:[],ar_chat_push:[]})),[CUSTOMERS,MOVES,TOK]);
-const openAs=async(page,base,token,sel)=>{await page.setViewportSize({width:375,height:812});await seedTables(page);await page.goto(base+'store.html#me='+token);await page.waitForSelector(sel||'[data-view="account"]:not([hidden]) .ac-bal');};
+const openAs=async(page,base,token,sel)=>{await page.setViewportSize({width:375,height:812});await seedTables(page);await page.goto(base+'store.html#me='+token);await page.waitForSelector(sel||'[data-view="account"]:not([hidden]) .ac-bal',{state:'attached'});};
 const MT=(n)=>String(n).padStart(2,'0')+'a'.repeat(62);
 const member=(id,name,o={})=>({id,name,token:MT(id),show_balance:false,on_account:true,created_at:new Date().toISOString(),last_seen_at:null,seen_count:0,...o});
 
@@ -99,7 +99,7 @@ run('Household: ten at most; and no tile at all when the server does not have th
 run('Household: an older server (no household functions) shows no tile and the account works as before',async({page,base})=>{
  await setup(page,{noFamily:true});
  await openAs(page,base,TOK);
- await page.waitForSelector('.ac-fb-tile');assert.equal(await page.$('.ac-fam-tile'),null);assert.equal(await text(page,'.ac-big'),'عليك 1,240 ج');
+ await page.waitForSelector('.ac-fb-tile',{state:'attached'});assert.equal(await page.$('.ac-fam-tile'),null);assert.equal(await text(page,'.ac-big'),'عليك 1,240 ج');
 },{home:true});
 
 run('Household: a person of the house with the total kept from him: a greeting instead of the balance, only the purchases, no PDF, no household controls, cash when the owner said so',async({page,base})=>{
