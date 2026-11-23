@@ -183,22 +183,20 @@ run('Temp sale: name, code, sticker, credit customer over the limit, offline the
  const cash=(await table('ar_temp_sales')).find(r=>r.status==='pending');
  assert.equal(cash.customer_id,null);assert.equal(cash.paid,null);assert.equal(cash.total,200);assert.equal(cash.adjust,-10);assert.equal(cash.kind,'sale');
  assert.equal(await page.$('.ts-due'),null,'a new bill has no change');
- // a return (مرتجع): its own bill, red; «رجّعتله كام فلوس؟» even for cash; marked in the list
+ // a return (مرتجع): its own bill, red; NO «رجّعتله كام فلوس؟» box (his rule 11-22: no return is paid back in part; review money-12); marked in the list
  await page.click('[data-ts-type="return"]');
  assert.equal(await text(page,'#tsSave'),'احفظ المرتجع');
- assert.ok(!(await page.$eval('#tsPaidRow',e=>e.classList.contains('hidden'))));
- assert.equal(await text(page,'#tsPaidLbl'),'رجّعتله كام فلوس؟');
+ assert.ok(await page.$eval('#tsPaidRow',e=>e.classList.contains('hidden')),'a return has no money-given-back box');
  await page.fill('#tsQ','كريم');
  await page.waitForSelector('#tsHits [data-ts-add="4875"]');
  await page.click('#tsHits [data-ts-add="4875"]');
  await closed('return, tap');
- await page.fill('#tsPaid','20');
  await page.click('#tsSave');
  await page.waitForFunction(()=>/اتحفظت ✓/.test(document.getElementById('tsStatus').textContent));
  const back=(await table('ar_temp_sales')).find(r=>r.kind==='return');
- assert.equal(back.total,20);assert.equal(back.paid,20);assert.deepEqual(back.items,[{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}]);
+ assert.equal(back.total,20);assert.equal(back.paid,null);assert.deepEqual(back.items,[{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}]);
  assert.equal(await text(page,'#tsSave'),'احفظ البيعة','the next bill is a sale again');
  await page.click('[data-ts-view="list"]');
  await page.waitForFunction(()=>/مرتجع/.test(document.getElementById('tsRows').textContent));
- assert.match(await text(page,'#tsRows'),/مرتجع[\s\S]*رجعله 20 ج/);
+ assert.match(await text(page,'#tsRows'),/مرتجع/);assert.doesNotMatch(await text(page,'#tsRows'),/رجعله/,'no money given back is shown');
 });

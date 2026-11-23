@@ -129,7 +129,7 @@
   }
   const due = (lines, adj) => r2(total(lines) + (Number(adj) || 0));
   // the row kept on the phone and sent to ar_temp_sales
-  // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; paid = what was given back)
+  // kind: 'sale' or 'return' (مرتجع: a bill of its own, as in PharmaFly; a return has no paid part)
   // adjust: «الفكة» (− off the bill, + added); total is what is asked for, after it
   function record({ id, soldAt, lines, customer, paid, note, kind, adjust }) {
     const adj = r2(adjust);
@@ -147,7 +147,7 @@
       }),
       total: due(lines, adj),
       adjust: adj || null,
-      paid: (customer || kind === 'return') && Number(paid) > 0 ? r2(paid) : null,
+      paid: customer && kind !== 'return' && Number(paid) > 0 ? r2(paid) : null,
       note: String(note || '').trim().slice(0, 300) || null,
       status: 'pending',
     };
@@ -202,7 +202,7 @@
           p: Number(l.p), pu: Number.isFinite(Number(l.pu)) ? Number(l.pu) : priceOf(base, k, 'unit'), x: l.x || null, bs: l.bs && Number.isFinite(Number(l.bs.k)) ? { k: Number(l.bs.k), u: Number(l.bs.u) || 0 } : null };
       }).filter((l) => l.q + l.w > 0);
       const cu = b.cust && b.cust.id != null ? { id: b.cust.id, name: String(b.cust.name || ''), credit_limit: b.cust.credit_limit, balance: b.cust.balance } : null;
-      return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: String(b.paid || ''), note: String(b.note || '').slice(0, 300),
+      return { ...blankBill(), kind: b.kind === 'return' ? 'return' : 'sale', cart, cust: cu, custOpen: !!b.custOpen && !cu, paid: b.kind === 'return' ? '' : String(b.paid || ''), note: String(b.note || '').slice(0, 300),
         adj: r2(b.adj), wait: b.wait != null && b.wait !== '' ? String(b.wait).slice(0, 20) : null, adjOpen: false, adjSign: Number(b.adjSign) > 0 ? 1 : -1 };
     });
     if (!bills.length) bills.push(blankBill());
@@ -779,7 +779,7 @@
   // ---------- the bills open together (up to 3; owner 2026-11-21) ----------
   // the current bill's state, as a bill (what bills[cur] keeps, and what is kept on the phone)
   function snap() {
-    return { kind, cart, cust, custOpen, paid: $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign, wait: waitId };
+    return { kind, cart, cust, custOpen, paid: kind === 'return' ? '' : $('tsPaid') ? $('tsPaid').value : '', note: $('tsNote') ? $('tsNote').value : '', adj, adjOpen, adjSign, wait: waitId };
   }
   function persist() { bills[cur] = snap(); keep(BKEY, { cur, bills }); }
   function applyBill(b) {
@@ -824,7 +824,7 @@
     const box = $('tsCust');
     if (!box) return;
     if (!can('credit')) { cust = null; custOpen = false; }
-    const paid = Number($('tsPaid').value) || 0, ret = kind === 'return', over = ret ? null : overLimit(cust, due(cart, adj), paid);
+    const ret = kind === 'return', paid = ret ? 0 : Number($('tsPaid').value) || 0, over = ret ? null : overLimit(cust, due(cart, adj), paid);
     let html = `<div class="chips"><button type="button" class="chip${!cust && !custOpen ? ' on' : ''}" data-ts-cash>نقدي</button>${can('credit') ? `<button type="button" class="chip${cust || custOpen ? ' on' : ''}" data-ts-credit>عميل آجل</button>` : ''}</div>`;
     if (cust) {
       // his account with this bill, like a PharmaFly invoice (owner 2026-11-13): before, the bill, paid, after
@@ -844,9 +844,10 @@
     }
     const q = $('tsCQ') ? $('tsCQ').value : '';
     box.innerHTML = html;
-    // a credit customer: what he paid now; a return: what was given back to him (cash or credit)
-    $('tsPaidRow').classList.toggle('hidden', !cust && !ret);
-    $('tsPaidLbl').textContent = ret ? 'رجّعتله كام فلوس؟' : 'دفع كام؟';
+    // a credit customer: what he paid now. A return has no such box: «مفيش مرتجع ولا بيع نقدي بيندفع منه جزء» (his rule 2026-11-22), and the robot
+    // never typed it anyway (review 2026-11-23 money-12: the drawer could come up short with no trace)
+    $('tsPaidRow').classList.toggle('hidden', !cust || ret);
+    $('tsPaidLbl').textContent = 'دفع كام؟';
     if ($('tsCQ')) { $('tsCQ').value = q; drawCustHits(); }
     // the bill changed after the «over the limit» question: the question starts again
     if (overSure && overSure !== overKey()) { overSure = ''; saveLabel(); }
