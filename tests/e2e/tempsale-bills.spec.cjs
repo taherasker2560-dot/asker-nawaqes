@@ -152,10 +152,10 @@ run('Temp sale: up to 3 bills open together, each its own; kept on the phone',as
  assert.equal(kept.cur,1);assert.equal(kept.bills.length,3);assert.deepEqual(kept.bills.map(b=>[b.kind,b.cart.length,b.cart[0].c]),[['sale',1,1060],['return',1,4875],['sale',1,7]]);
  assert.equal(kept.bills[0].note,'ملاحظة البيعة الأولى');assert.equal(kept.bills[0].cust.id,101);
  // saving saves THIS bill only: its tab empties, the others stay
- await page.fill('#tsPaid','20');await page.click('#tsSave');
+ await page.click('#tsSave');
  await page.waitForFunction(()=>/اتحفظت ✓/.test(document.getElementById('tsStatus').textContent));
  const rows=await table('ar_temp_sales');
- assert.equal(rows.length,1);assert.equal(rows[0].kind,'return');assert.deepEqual(rows[0].items,[{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}]);
+ assert.equal(rows.length,1);assert.equal(rows[0].kind,'return');assert.equal(rows[0].paid,null,'a return has no paid part');assert.deepEqual(rows[0].items,[{c:4875,n:'CREAM SMALL',q:1,u:'pack',p:20}]);
  assert.deepEqual(await tabs(),['بيعة 1 210 ج','بيعة 2','بيعة 3 5 ج']);
  assert.match(await text(page,'#tsCart'),/لسه مفيش أصناف/);
  // the page is closed and opened again: the bills come back as they were

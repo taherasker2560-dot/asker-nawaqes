@@ -113,6 +113,12 @@
     pdfBad: 'الكشف ما اتعملش. جرب تاني.',
     call: '📞 كلّمنا',
     chat: '💬 كلّمنا',
+    // the four big buttons and «المزيد» (owner 2026-11-23, mockup customer_qr_2026-11-23) and the install box at the top after the counter's QR
+    talk: '💬 كلّم الصيدلية',
+    talkHint: 'اكتب أو ابعت فويس',
+    more: 'المزيد',
+    qrInstall: '📲 خلّي حسابك على شاشة موبايلك',
+    qrInstallHint: 'دوسة واحدة، وبعد كده تفتحه من الأيقونة',
     // a customer's link opened on someone else's phone (owner 2026-11-14: his test messages went under a customer's name)
     notMine: 'مش ده حسابك؟',
     forgetAsk: 'الموبايل هينسى الحساب ده. لو هو حسابك، افتح الرابط تاني من الواتس. تمام؟',
@@ -231,7 +237,7 @@
   }
   // the address without ?me=… (other parts kept)
   function dropMe(s) {
-    const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^(me|install)=/.test(p));
+    const rest = String(s || '').replace(/^\?/, '').split('&').filter((p) => p && !/^(me|install)=/.test(p) && p !== 'from=qr');
     return rest.length ? '?' + rest.join('&') : '';
   }
   const api = { tokenFromHash, tokenFromSearch, dropMe, offerChrome, mintsOwnApp, installPlan, chromeIntent, money, balanceWords, moveTitle, afterText, itemsWord, qtyText, lineValue, discountOf, parseAt, dayLabel, updatedText, movesFor, payOf, pdfStart, manifestFor, isIos, installSteps, TEXTS, KEY };
@@ -259,6 +265,8 @@
   // (no Chrome on the phone) this browser's steps show at once
   // (also from the plain site, no link: its home box sends a visitor to Chrome the same way)
   const handedOff = /[?&]install=1(?:&|$)/.test(location.search);
+  // «from=qr» = opened from the QR on his card at the counter (owner 2026-11-23); it only leaves the address with the secret (dropMe): the install box is on top
+  // for the WhatsApp link too since the same day
   if (fromLink) {
     keep.set(fromLink);
     try { history.replaceState(null, '', location.pathname + dropMe(location.search) + '#account'); } catch (e) { location.hash = 'account'; }
@@ -443,8 +451,8 @@
     }
     const b = balanceWords(st.c.balance), now = new Date();
     const upd = updatedText(st.data_at, now);
-    // 2026-11-16 (owner: «اللي يهمني لما العميل يفتح ياخد الرابط يدوس عليه يوصل لحسابه»): the account comes FIRST; the install button (owner 2026-11-13: «زرار كبير مكتوب
-    // عليه ثبت التطبيق الان») is now a plain button after the account's own buttons, not the first thing the customer sees; not in the installed app
+    // the install button (owner 2026-11-13: «زرار كبير مكتوب عليه ثبت التطبيق الان»): 11-16 it went after the account's buttons («اللي يهمني لما العميل يفتح ياخد الرابط يدوس
+    // عليه يوصل لحسابه»); since 2026-11-23 it is a box at the top until the app is installed (his «وليه ما خليتش زرار التثبيت فى اول صفحه رابط الواتس برضه»); not in the installed app
     let html = '', installHtml = '';
     if (pharmacyPhone) {
       // the owner (or staff) looking at a customer's account: back to the bot, nothing installed or kept
@@ -454,6 +462,9 @@
       const again = (handedOff || installReady) && !installNote;
       installHtml = `<button type="button" class="ac-btn ac-install${again ? ' pulse' : ''}" data-acct-install${installBusy ? ' disabled' : ''}>${esc(installBusy ? TEXTS.installWait : again ? TEXTS.installAgain : TEXTS.install)}</button>` +
         (installNote ? `<p class="ac-install-note">${esc(installNote)}</p>` : `<p class="hint-sm center ac-install-why">${esc(TEXTS.installWhy)}</p>`);
+      // the button in a box at the very top, before the balance, until the app is installed (owner 2026-11-23: first for the counter's QR, then
+      // «وليه ما خليتش زرار التثبيت فى اول صفحه رابط الواتس برضه»: the WhatsApp link too; this replaces 11-16's «the account first, the install after its buttons»)
+      html += `<section class="ac-qr-install"><b>${esc(TEXTS.qrInstall)}</b><small>${esc(TEXTS.qrInstallHint)}</small>${installHtml}</section>`; installHtml = '';
     }
     if (st.stopped) html += `<div class="ac-stop"><strong>⛔ ${esc(TEXTS.stopped)}</strong><span>${esc(TEXTS.stoppedMore)}</span></div>`;
     // a person of the house whose owner keeps the total to himself: a greeting in place of the balance (the server sent no number)
@@ -467,29 +478,28 @@
       (upd ? `<div class="hint-sm">${esc(upd)} · ${esc(TEXTS.every10)}</div>` : '') +
       (st.month ? `<div class="ac-two"><div>${esc(TEXTS.month)}<b>${esc(money(st.month.bought))} ج</b></div><div>${esc(TEXTS.monthPaid)}<b class="paid">${esc(money(st.month.paid))} ج</b></div></div>` : '') +
       '</section>';
-    html += `<a href="#search" class="ac-btn ac-order">${esc(noCredit() ? TEXTS.orderCash : TEXTS.order)}</a>`;
-    // «كرّر دواك بالباركود» (2026-11-17, store/scan.js): the camera / the code / the name put his usual items in the order
-    html += `<a href="#scan" class="ac-btn ac-scan">${esc(TEXTS.scan)}</a>`;
-    // «اللي باخده دايمًا» + «أدويتي المزمنة» (2026-11-17, store/regular.js): his regular items and their refill dates (nothing when he has none)
-    html += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
-    // «⏰ منبه الدوا» (2026-11-17, store/alarm.js): the customer's own dose reminders, kept on his phone
-    html += root.AskerStoreAlarm ? '<div class="ac-al-wrap">' + root.AskerStoreAlarm.tileHtml() + '</div>' : '';
-    // «📋 ابعت الروشتة» (2026-11-18, owner: «مكان مخصص للعميل يبعت الروشتة على الصفحة عشان القراءة الأوتوماتيك»; WhatsApp later): a page of its own that sends the photos as an order the pharmacy reads (in the pharmacy's look it shows too, but sends nothing)
-    const rxTile = root.AskerStoreRx ? root.AskerStoreRx.tileHtml() : '';
-    html += rxTile ? `<div class="ac-al-wrap">${rxTile}</div>` : '';
-    // «📝 شكوى أو اقتراح» (2026-11-18, owner: «رابط يوصل لرسائل الصفحة بالشكاوى والمقترحات … فويس أو مكتوبة»): the messages page, opened as a complaint / suggestion
-    html += root.AskerStoreChat ? `<div class="ac-al-wrap"><a href="#chat" class="ac-reg-btn ac-fb-tile" data-ac-feedback><b>${esc(TEXTS.feedback)}</b><small>${esc(TEXTS.feedbackHint)}</small></a></div>` : '';
-    // «👨‍👩‍👧 أهل البيت» (2026-11-18, store/family.js): the owner of the account sends the app to his house and controls it (nothing for a person of the house)
-    const fam = root.AskerStoreFamily ? root.AskerStoreFamily.tileHtml() : '';
-    html += fam ? `<div class="ac-al-wrap">${fam}</div>` : '';
-    // «🔔 تنبيه حركة الحساب» (2026-11-18, store/acctpush.js): a phone notification when a new movement reaches his account («فيه حركة جديدة على حسابك», no amounts); nothing for a person of his house.
-    // Last of the tiles: the tests pin the order alarm → prescription → complaint → house.
-    const pushTile = root.AskerStoreAcctPush ? root.AskerStoreAcctPush.tileHtml() : '';
-    html += pushTile ? `<div class="ac-al-wrap">${pushTile}</div>` : '';
+    // FOUR big buttons (owner 2026-11-23: «زباينى ناس على قدها فى التكنولوجيا محتاجين نبسط الامور عليهم»; mockup customer_qr_2026-11-23, «ا موافق»): order, the prescription,
+    // talk to the pharmacy, the dose alarm. Everything else is folded under «المزيد» (it stays open once he opens it).
+    // «📋 ابعت الروشتة» (2026-11-18, store/rx.js) and «⏰ منبه الدوا» (2026-11-17, store/alarm.js) keep their own tiles (their clicks and counts); «كلّم الصيدلية» = our messages page
+    // (store/chat.js), WhatsApp only when there is no messages page
     const wa = waHref();
-    html += `<div class="ac-row">${hide ? '' : `<button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button>`}` +
-      // «كلّمنا» = our own messages page now (store/chat.js); WhatsApp only when there is no messages page
-      (root.AskerStoreChat ? `<a class="share" href="#chat">${esc(TEXTS.chat)}</a>` : wa ? `<a class="share" href="${esc(wa)}" target="_blank" rel="noopener">${esc(TEXTS.call)}</a>` : '') + '</div>' +
+    const rxTile = root.AskerStoreRx ? root.AskerStoreRx.tileHtml() : '';
+    const alTile = root.AskerStoreAlarm ? root.AskerStoreAlarm.tileHtml() : '';
+    const talk = root.AskerStoreChat ? `<a class="ac-reg-btn ac-talk" href="#chat"><b>${esc(TEXTS.talk)}</b><small>${esc(TEXTS.talkHint)}</small></a>`
+      : wa ? `<a class="ac-reg-btn ac-talk" href="${esc(wa)}" target="_blank" rel="noopener"><b>${esc(TEXTS.call)}</b></a>` : '';
+    html += `<div class="ac-g4"><a href="#search" class="ac-btn ac-order">${esc(noCredit() ? TEXTS.orderCash : TEXTS.order)}</a>${rxTile}${talk}${alTile}</div>`;
+    // «المزيد»: «كرّر دواك بالباركود» (2026-11-17, store/scan.js), «اللي باخده دايمًا» + «أدويتي المزمنة» (store/regular.js, nothing when he has none),
+    // «📝 شكوى أو اقتراح» (2026-11-18: the messages page as a complaint / suggestion), «👨‍👩‍👧 أهل البيت» (store/family.js, the account's owner only),
+    // «🔔 تنبيه حركة الحساب» (store/acctpush.js, no amounts) and the PDF statement (not for a person of the house: it carries the balance)
+    let more = `<a href="#scan" class="ac-btn ac-scan">${esc(TEXTS.scan)}</a>`;
+    more += root.AskerStoreRegular ? root.AskerStoreRegular.buttonsHtml(st.moves) : '';
+    more += root.AskerStoreChat ? `<div class="ac-al-wrap"><a href="#chat" class="ac-reg-btn ac-fb-tile" data-ac-feedback><b>${esc(TEXTS.feedback)}</b><small>${esc(TEXTS.feedbackHint)}</small></a></div>` : '';
+    const fam = root.AskerStoreFamily ? root.AskerStoreFamily.tileHtml() : '';
+    more += fam ? `<div class="ac-al-wrap">${fam}</div>` : '';
+    const pushTile = root.AskerStoreAcctPush ? root.AskerStoreAcctPush.tileHtml() : '';
+    more += pushTile ? `<div class="ac-al-wrap">${pushTile}</div>` : '';
+    if (!hide) more += `<div class="ac-row"><button type="button" class="share" data-acct-pdf>${esc(st.pdf === 'busy' ? TEXTS.pdfBusy : TEXTS.pdf)}</button></div>`;
+    html += `<details class="ac-more"${st.moreOpen ? ' open' : ''}><summary>${esc(TEXTS.more)}</summary>${more}</details>` +
       installHtml +
       (pharmacyPhone ? '' : `<p class="center"><button type="button" class="linklike ac-notmine" data-acct-forget>${esc(TEXTS.notMine)}</button></p>`);
     if (st.pdf === 'bad') html += `<p class="hint-sm bad center">${esc(TEXTS.pdfBad)}</p>`;
@@ -617,6 +627,8 @@
     draw();
   }
 
+  // «المزيد» stays as he left it when the page redraws (a <details> «toggle» does not bubble: caught on the way down)
+  document.addEventListener('toggle', (e) => { if (e.target && e.target.matches && e.target.matches('#acctBox .ac-more')) st.moreOpen = e.target.open; }, true);
   document.addEventListener('click', (e) => {
     if (e.target.closest('[data-acct-install]') || e.target.closest('#installBtn')) { install(); return; }
     if (e.target.closest('[data-acct-paysheet]')) {

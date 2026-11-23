@@ -56,8 +56,11 @@ assert.deepEqual(T.roundOptions(274.7),[{to:270,adj:-4.7},{to:275,adj:0.3}]);
 assert.deepEqual(T.roundOptions(270),[]);assert.deepEqual(T.roundOptions(3.5),[{to:5,adj:1.5}],'never down to zero');
 const off=T.record({id:'o',soldAt:'t',lines,customer:null,paid:'',note:'',adjust:-5});assert.equal(off.total,225);assert.equal(off.adjust,-5);
 assert.equal(T.due(lines,0.5),230.5);
-// a return (مرتجع): its own bill; paid = what was given back (also to a cash customer)
-const back=T.record({id:'r',soldAt:'t',lines,customer:null,paid:'20',note:'',kind:'return'});assert.equal(back.kind,'return');assert.equal(back.total,230);assert.equal(back.paid,20);
+// a return (مرتجع): its own bill; NO paid part, for a cash or a credit customer (his rule 11-22: «مفيش مرتجع ولا بيع نقدي بيندفع منه جزء»; review money-12);
+// a credit SALE keeps what he paid
+const back=T.record({id:'r',soldAt:'t',lines,customer:null,paid:'20',note:'',kind:'return'});assert.equal(back.kind,'return');assert.equal(back.total,230);assert.equal(back.paid,null);
+const backCredit=T.record({id:'r2',soldAt:'t',lines,customer:{id:101,name:'عميل'},paid:'20',note:'',kind:'return'});assert.equal(backCredit.paid,null,'a credit return keeps no paid part either');
+const saleCredit=T.record({id:'s2',soldAt:'t',lines,customer:{id:101,name:'عميل'},paid:'20',note:'',kind:'sale'});assert.equal(saleCredit.paid,20,'a credit sale keeps what he paid');
 const cash=T.record({id:'x',soldAt:'t',lines,customer:null,paid:'40',note:''});assert.equal(cash.customer_id,null);assert.equal(cash.paid,null,'cash: no paid part');assert.equal(cash.note,null);
 // words and money
 assert.equal(T.qtyText(1,'pack'),'1 علبة');assert.equal(T.qtyText(3,'pack'),'3 علب');assert.equal(T.qtyText(4,'unit'),'4 وحدات');assert.equal(T.qtyText(12,'unit'),'12 وحدة');
@@ -95,7 +98,7 @@ assert.deepEqual(T.record({id:'b',soldAt:'t',lines:both,customer:null,paid:'',no
 // up to 3 bills kept on the phone, made safe when read back
 const cb=T.cleanBills({cur:5,bills:[{kind:'return',cart:[{c:1,n:'A',q:2,p:10,k:2,base:10},{c:'bad'}],cust:{id:3,name:'م'},paid:5,note:'n',adj:-2},{cart:'x'},null]});
 assert.equal(cb.bills.length,1);assert.equal(cb.cur,0,'the open bill is brought into range');assert.equal(cb.bills[0].kind,'return');
-assert.deepEqual(cb.bills[0].cart.map(l=>[l.c,l.q,l.w,l.p,l.pu,l.x]),[[1,2,0,10,5,null]],'a broken line is dropped, the unit price is made');assert.equal(cb.bills[0].cust.id,3);assert.equal(cb.bills[0].paid,'5');assert.equal(cb.bills[0].adj,-2);
+assert.deepEqual(cb.bills[0].cart.map(l=>[l.c,l.q,l.w,l.p,l.pu,l.x]),[[1,2,0,10,5,null]],'a broken line is dropped, the unit price is made');assert.equal(cb.bills[0].cust.id,3);assert.equal(cb.bills[0].paid,'','a restored return keeps no paid part (money-12)');assert.equal(T.cleanBills({bills:[{kind:'sale',cart:[],cust:{id:3,name:'م'},paid:5}]}).bills[0].paid,'5','a credit sale keeps what he paid');assert.equal(cb.bills[0].adj,-2);
 assert.deepEqual(T.cleanBills(null),{cur:0,bills:[T.blankBill()]},'nothing kept: one empty bill');
 const four=T.cleanBills({cur:2,bills:[1,2,3,4].map(()=>({cart:[]}))});assert.equal(four.bills.length,T.MAX_BILLS);assert.equal(T.MAX_BILLS,3);assert.equal(four.cur,2);
 assert.equal(T.cleanBills({bills:[{cart:[{c:1,q:0,w:0,p:5}]}]}).bills[0].cart.length,0,'a line that sells nothing is dropped');

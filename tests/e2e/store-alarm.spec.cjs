@@ -1,6 +1,7 @@
 // «⏰ منبه الدوا» on the customer's own page (owner 2026-11-17: «زر منبه مواعيد الأدوية» … «ينطق بالصوت، صوت جوجل عشان ما يكلفناش»). The phone's speech engine, vibration and notifications
 // are replaced by small recorders; the clock is driven through AskerStoreAlarm.tick(<a date>). Made-up customers and items only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');
+const openMore=(page)=>page.evaluate(()=>{const d=document.querySelector('#acctBox .ac-more');if(d&&!d.open)d.open=true}); // «المزيد» (owner 2026-11-23: four big buttons, the rest folded)
 const pad=n=>String(n).padStart(2,'0');
 const day=(n)=>{const d=new Date(Date.now()-n*864e5);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
 const CUSTOMERS=[{id:101,name:'أحمد محمود',credit_limit:5000,balance:1240,last_at:`${day(0)}T11:00:00`,last_kind:'sale',moves:1}];
@@ -36,7 +37,7 @@ const idbCopy=(page)=>page.evaluate(()=>new Promise((ok)=>{const r=indexedDB.ope
 run('Dose alarm: the tile under the two buttons, a new alarm from his usual medicines, the list, the toggle, edit and delete; the times stay on his phone',async({page,base})=>{
  await setup(page);
  await openAccount(page,base);
- assert.equal(await page.evaluate(()=>document.querySelector('.ac-al-wrap').previousElementSibling.classList.contains('ac-reg-two')),true,'the tile comes right after the two buttons');
+ assert.equal(await page.evaluate(()=>{const t=document.querySelector('.ac-al-tile');return t.parentElement.classList.contains('ac-g4')&&t===t.parentElement.lastElementChild}),true,'the tile is the fourth of the four big buttons (owner 2026-11-23)');
  assert.equal(await text(page,'.ac-al-tile b'),'⏰ منبه الدوا');assert.equal(await text(page,'.ac-al-tile small'),'يقولك بصوته: «ميعاد دواك»');
  await page.click('[data-al-open]');await page.waitForSelector('#alarmSheet .rg-body');
  assert.equal(await text(page,'#alarmSheet .rg-top b'),'منبه الدوا');
@@ -425,7 +426,7 @@ run('Dose alarm in the browser on an Android phone: one button opens the app wit
  assert.equal(decodeURIComponent(m[3]),'https://github.com/taherasker2560-dot/asker-nawaqes/releases/download/alarm-build/asker-alarm.apk','no app on the phone: the download');
  assert.match(await text(page,'#alarmSheet .al-app'),/بعد ما الملف ينزل: افتحه واضغط «تثبيت»/);
  assert.match(await text(page,'#alarmSheet .al-app-head'),/الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:/);
- assert.equal(await text(page,'#alarmSheet .al-app .al-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.','written under the download button: Android only, not on iPhone');
+ assert.match(await text(page,'#alarmSheet .al-app .al-warn'),/^📱 عندك آيفون؟ ضيف الموقع للشاشة الرئيسية .*«🔔 فعّل الإشعارات»: هيجيلك إشعار في ميعاد الجرعة\.$/,'written under the download button: what an iPhone does (owner 2026-11-23, in place of «Android only»)');
  assert.ok(await page.evaluate(()=>{const a=document.querySelector('#alarmSheet .al-app'),b=document.querySelector('#alarmSheet .al-add');return !!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)}),'the download box is the first thing in the sheet, above the alarms and the add button');
  // the push way is still offered there (the app is an extra)
  assert.ok(await page.$('[data-al-notiftest]'),'(notifications are allowed in this test: its test button shows)');
@@ -442,11 +443,11 @@ run('Account movement alerts (owner 2026-11-18, «🔔 تنبيه حركة ال�
  await setup(page,'default');
  await page.addInitScript(()=>{window.__fakeRpcs.ar_account_push_save=()=>({ok:true});if(localStorage.getItem('__keepsub'))window.__sub={endpoint:'https://push.example/dose/'+'a'.repeat(30)}});   // (on every load, so the address told again after a reload is recorded too; a real browser keeps its subscription, the fake one is told to)
  await openAccount(page,base);
- await page.waitForSelector('.ac-push-tile');
+ await page.waitForSelector('.ac-push-tile',{state:'attached'});
  assert.equal(await text(page,'.ac-push-tile b'),'🔔 تنبيه حركة الحساب');
  assert.match(await text(page,'.ac-push-tile small'),/اضغط عشان يوصلك إشعار لما يحصل حركة جديدة على حسابك/);
- await page.click('.ac-push-tile');
- await page.waitForSelector('.ac-push-tile.on');
+ await openMore(page);await page.click('.ac-push-tile');
+ await page.waitForSelector('.ac-push-tile.on',{state:'attached'});
  assert.match(await text(page,'.ac-push-tile small'),/✓ شغّال: هيجيلك إشعار/);
  assert.deepEqual(await page.evaluate(()=>window.__swReg),['store/acct/sw.js','store/acct/'],'its own worker and scope');
  assert.equal(await page.evaluate(()=>window.__subs),1);
@@ -454,17 +455,17 @@ run('Account movement alerts (owner 2026-11-18, «🔔 تنبيه حركة ال�
  assert.deepEqual(await saves(),[{p_token:tok,p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_on:true}],'the server gets the address and his link, nothing else');
  // a later open tells the server the address again (the push service may have changed it)
  await page.evaluate(()=>localStorage.setItem('__keepsub','1'));
- await page.reload();await page.waitForSelector('.ac-push-tile.on');
+ await page.reload();await page.waitForSelector('.ac-push-tile.on',{state:'attached'});
  await page.waitForFunction(()=>window.__fakeWrites.filter(x=>x.rpc==='ar_account_push_save').length>=1);
  assert.deepEqual(await saves(),[{p_token:tok,p_endpoint:'https://push.example/dose/'+'a'.repeat(30),p_on:true}],'the same address, told again');
  // off: the server forgets the address
- await page.click('.ac-push-tile');
+ await openMore(page);await page.click('.ac-push-tile');
  await page.waitForFunction(()=>!document.querySelector('.ac-push-tile.on'));
  assert.equal((await saves()).pop().p_on,false);
  assert.match(await text(page,'.ac-push-tile small'),/اضغط عشان يوصلك إشعار/);
  // the server refuses (a person of his house, a bad link): it is said, and it stays off
  await page.evaluate(()=>{window.__fakeRpcs.ar_account_push_save=()=>({ok:false,error:'not_owner'})});
- await page.click('.ac-push-tile');
+ await openMore(page);await page.click('.ac-push-tile');
  await page.waitForFunction(()=>/ما اتفعّلش/.test((document.querySelector('.ac-push-tile small')||{}).textContent||''));
  assert.equal(await page.$('.ac-push-tile.on'),null);
  // the pharmacy's own phone (the system is signed in): no tile
@@ -515,7 +516,7 @@ run('Alarm app card on the pharmacy app\'s home (owner 2026-11-18: «المنب�
  await page.setViewportSize({width:375,height:812});await page.goto(base+'store.html');
  await page.waitForSelector('#alarmAppBox:not([hidden]) [data-al-getapp]');
  assert.equal(await text(page,'#alarmAppBox strong'),'منبه الدوا');
- assert.equal(await text(page,'#alarmAppBox .al-home-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.');
+ assert.match(await text(page,'#alarmAppBox .al-home-warn'),/^📱 عندك آيفون؟/,'the iPhone\'s way under it, for whoever has one (owner 2026-11-23)');
  assert.equal(await text(page,'#alarmAppBox [data-al-getapp]'),'📲 نزّل تطبيق المنبه');
  const href=await page.$eval('#alarmAppBox [data-al-getapp]',e=>e.getAttribute('href'));
  assert.match(href,/^intent:\/\/alarm#Intent;scheme=askeralarm;package=com\.askerpharmacy\.alarm;S\.browser_fallback_url=https%3A%2F%2Fgithub\.com%2F[^;]+asker-alarm\.apk;end$/);
@@ -530,8 +531,13 @@ run('Alarm app card on the home: an iPhone sees the card and the note with NO do
  await setup(page,'granted');await withUa(page,IPHONE_UA);
  await page.setViewportSize({width:375,height:812});await page.goto(base+'store.html');
  await page.waitForSelector('#alarmAppBox:not([hidden])');
- assert.equal(await text(page,'#alarmAppBox .al-home-warn'),'⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.');
+ // owner 2026-11-23 («يتكتب مكانها عميل ايفون يعمل ايه … فيه حل مش مفيش»): the iPhone's way, and a button that opens the alarm (notifications at the dose time)
+ assert.match(await text(page,'#alarmAppBox'),/على الآيفون المنبه بيوصلك إشعار في ميعاد الجرعة\./);
+ assert.match(await text(page,'#alarmAppBox .al-home-warn'),/ضيف الموقع للشاشة الرئيسية \(زرار المشاركة ⬆ ← «إضافة إلى الشاشة الرئيسية»\) وافتحه من الأيقونة/);
  assert.equal(await page.$('#alarmAppBox [data-al-getapp]'),null,'no download button on an iPhone');
+ assert.equal(await text(page,'#alarmAppBox [data-al-open]'),'⏰ اظبط منبه');
+ await page.click('#alarmAppBox [data-al-open]');await page.waitForSelector('#alarmSheet:not([hidden])');
+ await page.evaluate(()=>history.back());await page.waitForTimeout(300);
  // the pharmacy's own phone, even on Android: nothing
  await withUa(page,ANDROID_UA);
  await page.evaluate(()=>localStorage.setItem('sb-qwrzdjdgvanmhaicncuk-auth-token','{}'));await page.reload();
