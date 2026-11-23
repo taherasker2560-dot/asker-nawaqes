@@ -221,7 +221,7 @@
   const IM = () => root.AskerItemMedia;
   const photo = (id, en, title) => (IM() && id != null && id !== '' && Number.isFinite(Number(id)) ? IM().thumb(id, en, title) : '');
   const photoRow = (id, en, title, inner) => (IM() && id != null && id !== '' && Number.isFinite(Number(id)) ? IM().row(id, en, title, inner) : inner);
-  const QKEY = 'asker-ts-queue', IKEY = 'asker-ts-items', CKEY = 'asker-ts-cust', BKEY = 'asker-ts-bills', XKEY = 'asker-ts-batches';
+  const QKEY = 'asker-ts-queue', IKEY = 'asker-ts-items', CKEY = 'asker-ts-cust', BKEY = 'asker-ts-bills', XKEY = 'asker-ts-batches', SKEY = 'asker-ts-stopped';
   const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v ?? d; } catch (e) { return d; } };
   const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
@@ -280,10 +280,13 @@
       customers = load(CKEY, []).map((a) => ({ id: a[0], name: a[1], credit_limit: a[2], balance: a[3] }));
     }
     // who the owner stopped (ar_customer_stops, «وقّف الآجل» 2026-11-13): said on the bill; the table may not be there yet
+    // kept on the phone too (review 2026-11-23): a failed read used to leave the list EMPTY after a reload, so the «⛔ موقوف» line vanished
     try {
       const { data, error } = await db().from('ar_customer_stops').select('customer_id').range(0, 4999);
-      if (!error) stopped = new Set((data || []).map((r) => String(r.customer_id)));
-    } catch (e) { /* keeps the last list */ }
+      if (error) throw error;
+      stopped = new Set((data || []).map((r) => String(r.customer_id)));
+      keep(SKEY, [...stopped]);
+    } catch (e) { if (!stopped.size) stopped = new Set(load(SKEY, []).map(String)); }
   }
   // an item with no stock (not in the stock list) is looked up by its code on the server
   async function itemByCode(code) {
@@ -863,7 +866,7 @@
   // a credit bill over the customer's limit (owner 2026-11-22: «لازم يبان لي على السيستم إنه متجاوز، وانا اقرر ساعتها … لكن انا لو وافقت خلاص»): the owner's first tap only
   // says so; a second tap saves it WITH his approval (when, by how much; the server signs who), and the robot then passes PharmaFly's «متجاوز» without asking.
   // A staff member's bill over the limit carries no approval: the robot stops on it and asks the owner.
-  let overSure = '';
+  let overSure = '', stopSure = '';
   const overKey = () => (cust ? `${cust.id}|${due(cart, adj)}|${Number($('tsPaid') && $('tsPaid').value) || 0}` : '');
   const overNow = () => (kind !== 'return' && cust ? overLimit(cust, due(cart, adj), Number($('tsPaid') && $('tsPaid').value) || 0) : null);
   function saveLabel() {
@@ -872,6 +875,14 @@
   }
   async function save() {
     if (!cart.length) return say('tsStatus', 'ضيف صنف الأول', 'bad');
+    // «وقّف الآجل» (review 2026-11-23 money-6): a credit sale for a customer the owner stopped is his call only. Staff cannot save it (it used to be a warning,
+    // and the robot then typed it on credit); the owner saves it with a second tap, like the limit.
+    if (kind !== 'return' && cust && stopped.has(String(cust.id))) {
+      if (staffNow()) return say('tsStatus', '⛔ العميل ده موقوف: البيع ليه كاش بس. غيّر العميل لـ «نقدي» أو كلّم صاحب الصيدلية.', 'bad');
+      const sk = 'stop|' + overKey();
+      if (stopSure !== sk) { stopSure = sk; return say('tsStatus', '⛔ العميل ده موقوف والبيع ليه كاش بس. لو عاوز تبيعه آجل برضه دوس «احفظ» تاني.', 'bad'); }
+    }
+    stopSure = '';
     const over = overNow();
     let ok = null;
     if (over && !staffNow()) {

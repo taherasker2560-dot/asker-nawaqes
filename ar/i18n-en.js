@@ -870,6 +870,8 @@ window.AskerEN = {
   "كود {0} · رصيد {1}": "code {0} · stock {1}",
   "مفيش عميل بالاسم ده": "No customer with this name",
   "ضيف صنف الأول": "Add an item first",
+  "⛔ العميل ده موقوف: البيع ليه كاش بس. غيّر العميل لـ «نقدي» أو كلّم صاحب الصيدلية.": "⛔ This customer is stopped: cash sales only. Change the customer to «cash» or ask the pharmacy owner.",
+  "⛔ العميل ده موقوف والبيع ليه كاش بس. لو عاوز تبيعه آجل برضه دوس «احفظ» تاني.": "⛔ This customer is stopped: cash sales only. To sell on credit anyway, tap Save again.",
   "اتحفظت على الموبايل…": "Saved on the phone…",
   "اتحفظت على الموبايل، وهتتبعت أول ما النت يرجع": "Saved on the phone; it will be sent as soon as the internet is back",
   "اتحفظت ✓": "Saved ✓",
