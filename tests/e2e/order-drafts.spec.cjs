@@ -12,7 +12,7 @@ const drafts=(at=new Date().toISOString())=>({generated_at:at,suppliers:[
  {id:'REDA',label:'رضا عطية',count:150,items:many},
  {id:'ELFATH',label:'الفتح',count:0,items:[]}],
  no_offer:[{item_id:9,name_pf:'LONELY ITEM',qty:1,avg30:2,have:0}]});
-const SAVED=[{name:'مخزن نيو سيتى فارما',phone:'01000000001'},{name:'مخزن نيوسيتى (محمود جميل)',phone:'01000000002'},{name:'مخزن ايه ام جروب (رمضان)',phone:'01000000003'},{name:'مخزن رضا عطيه (احمد)',phone:'٠١٠٠٠٠٠٠٠٠٤'}];
+const SAVED=[{name:'مخزن نيو سيتى فارما',phone:'01000000001'},{name:'مخزن نيوسيتى (محمود جميل)',phone:'01000000002'},{name:'مخزن ايه ام جروب (رمضان)',phone:'01000000003'},{name:'مخزن رضا عطيه (ادهم)',phone:'٠١٠٠٠٠٠٠٠٠٤'}];
 const put=(page,o,saved=SAVED)=>page.evaluate(([o,saved])=>{window.__storage['orders/drafts.json']=JSON.stringify(o);window.__tables.ar_orders=[];window.__tables.ar_suppliers=saved;window.__opened=[];window.open=u=>{window.__opened.push(u)}},[o,saved]);
 const msgOf=(page)=>page.inputValue('#odMsg');
 run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table})=>{
@@ -75,7 +75,7 @@ run('orders tab: tick, quantity, supplier chat, mark ordered',async({page,table}
  await page.selectOption('#odSendTo','NEWCITY');assert.ok(!(await page.isVisible('#odCarry')));
  // a long order (150 items): the chat opens without the text, which is only on the clipboard
  await page.click('#odChips [data-sup="REDA"]');
- assert.match(await text(page,'#odTo'),/هتتفتح محادثة: مخزن رضا عطيه \(احمد\)/,'a number written with Arabic digits works');
+ assert.match(await text(page,'#odTo'),/هتتفتح محادثة: مخزن رضا عطيه \(ادهم\)/,'a number written with Arabic digits works');
  await page.click('#odCopy');await waitStatus(page,/الرسالة طويلة/,'odStatus');
  assert.equal(await page.evaluate(()=>window.__opened[1]),'https://wa.me/201000000004');assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/× 1\nشكرًا$/);
  // «شيل الكل»: nothing in the order, nothing to copy or mark; «علّم الكل» puts everything back

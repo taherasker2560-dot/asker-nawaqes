@@ -12,7 +12,7 @@ const CONTACTS=[
  {phone:'01000000001',name:'المحاسب رضا عطيه',kind:'other',last_item:null,private:true},
  {phone:'01000000002',name:'هاني عطيه محاسب Sky',kind:'other',last_item:null,private:true},
  {phone:'01000000003',name:'موزع رضا عطيه الجديد',kind:'other',last_item:null,private:true},
- {phone:'01000000004',name:'مخزن رضا عطيه (احمد)',kind:'other',last_item:null,private:true},
+ {phone:'01000000004',name:'مخزن رضا عطيه (ادهم)',kind:'other',last_item:null,private:true},
  {phone:'01000000005',name:'رضا الحداد',kind:'other',last_item:null,private:true},
  {phone:'01000000006',name:'تليسيلز رضا عطيه',kind:'other',last_item:null,private:true}];
 const seed=(page,extra={})=>page.evaluate(([v,m,c,x])=>{Object.assign(window.__tables,{ar_vendors:v,ar_vendor_moves:m,ar_store_items:[],ar_vendor_links:[],ar_contacts:c,ar_vendor_contacts:[]},x);
@@ -32,7 +32,7 @@ run('Company numbers: three empty places, the suggestions from the name, one tap
  // the picker: what the company's name points to (two words «رضا عطية» in the name), with the job its name says marked; «رضا الحداد» and «هاني عطيه محاسب» are not offered (search finds them)
  await page.click('[data-vn-pick]');
  await page.waitForSelector('#vnRows .vn-sg');
- assert.deepEqual(await page.$$eval('#vnRows .vn-who b',(b)=>b.map((x)=>x.textContent)),['المحاسب رضا عطيه','تليسيلز رضا عطيه','موزع رضا عطيه الجديد','مخزن رضا عطيه (احمد)']);
+ assert.deepEqual(await page.$$eval('#vnRows .vn-who b',(b)=>b.map((x)=>x.textContent)),['المحاسب رضا عطيه','تليسيلز رضا عطيه','موزع رضا عطيه الجديد','مخزن رضا عطيه (ادهم)']);
  const guess=await page.$$eval('#vnRows .vn-sg',(rows)=>rows.map((r)=>[...r.querySelectorAll('.vn-pk.guess')].map((x)=>x.dataset.vnSet)));
  assert.deepEqual(guess,[['accountant'],['telesales'],['distributor'],['distributor']],'a name that says «محاسب» points to the accountant, «تليسيلز» to telesales, «موزع» / «مخزن» to the distributor');
  // one tap: the accountant. Saved as that company's, the slot shows the name and the number
@@ -81,37 +81,37 @@ run('Company numbers: three empty places, the suggestions from the name, one tap
 
 run('Company numbers: the people saved in «الوارد» are offered first (the sales people who send the lists and carry out the orders), the company\'s own first; one already saved shows as taken',async({page})=>{
  await page.evaluate(()=>{});
- await seed(page,{ar_suppliers:[{name:'مخزن ايه ام جروب (محمد على)',phone:'201033645645'},{name:'مخزن رضا عطيه (بكر)',phone:'201069051541'},{name:'مخزن رضا عطيه (احمد)',phone:'201096957316'},{name:'شركه ابن سينا (محمد سعيد)',phone:'201069048503'}],
+ await seed(page,{ar_suppliers:[{name:'مخزن ايه ام جروب (محمد كمال)',phone:'201000009001'},{name:'مخزن رضا عطيه (بهاء)',phone:'201000009006'},{name:'مخزن رضا عطيه (ادهم)',phone:'201000009002'},{name:'شركه ابن سينا (محمد صبرى)',phone:'201000009008'}],
   ar_vendors:[...VENDORS,{id:2374,name:'A M group',short:'AMG',active:true,balance:3120,invoices:3,last_invoice_at:at(1),last_payment_at:null,last_payment:null}],
   ar_vendor_moves:[...MOVES,{id:14,vendor_id:2374,at:at(1),kind:'purchase',code:'11/26/300',inv_date:null,amount:1100,total:1100,balance:3120,lines:[]}],
-  ar_vendor_contacts:[{vendor_id:2374,role:'telesales',phone:'01033645645',name:'مخزن ايه ام جروب (محمد على)'}]});
+  ar_vendor_contacts:[{vendor_id:2374,role:'telesales',phone:'01000009001',name:'مخزن ايه ام جروب (محمد كمال)'}]});
  await openVendor(page,2278);
  await page.click('[data-vn-pick]');
  await page.waitForSelector('#vnRows .vn-h');
  assert.match(await text(page,'#vnRows .vn-h'),/مسجلين في «الوارد»: بيبعتوا القوايم وبينفذوا الطلبيات/);
  // «رضا عطية»'s own people first, then the others saved there; the name of the person as saved in «الوارد», the number as the book writes it
  const rows=await page.$$eval('#vnRows .vn-sg',(r)=>r.map((x)=>[x.querySelector('.vn-who b').textContent,x.querySelector('.vn-who small').textContent.trim()]));
- assert.deepEqual(rows.slice(0,4),[['مخزن رضا عطيه (احمد)','01096957316'],['مخزن رضا عطيه (بكر)','01069051541'],['شركه ابن سينا (محمد سعيد)','01069048503'],['مخزن ايه ام جروب (محمد على)','01033645645']]);
+ assert.deepEqual(rows.slice(0,4),[['مخزن رضا عطيه (ادهم)','01000009002'],['مخزن رضا عطيه (بهاء)','01000009006'],['شركه ابن سينا (محمد صبرى)','01000009008'],['مخزن ايه ام جروب (محمد كمال)','01000009001']]);
  // an inbox person is a sales person: telesales is the highlighted job
  assert.equal(await page.$$eval('#vnRows .vn-sg:first-of-type .vn-pk.guess',(b)=>b.map((x)=>x.dataset.vnSet).join()),'telesales');
  // the book's own suggestions come after, under their own heading
  assert.match(await text(page,'#vnRows'),/من دفترك/);
  // one tap on an inbox person: saved with the name as saved in «الوارد»
- await page.click('#vnRows [data-vn-set="telesales"][data-phone="01096957316"]');
+ await page.click('#vnRows [data-vn-set="telesales"][data-phone="01000009002"]');
  await page.waitForFunction(()=>window.__fakeWrites.some((w)=>w.table==='ar_vendor_contacts'));
  const w=(await page.evaluate(()=>window.__fakeWrites)).filter((x)=>x.table==='ar_vendor_contacts');
- assert.deepEqual({...w[0].v[0],updated_at:'x'},{vendor_id:2278,role:'telesales',phone:'01096957316',name:'مخزن رضا عطيه (احمد)',updated_at:'x'});
- assert.match((await slots(page))[0],/مخزن رضا عطيه \(احمد\) 01096957316/);
+ assert.deepEqual({...w[0].v[0],updated_at:'x'},{vendor_id:2278,role:'telesales',phone:'01000009002',name:'مخزن رضا عطيه (ادهم)',updated_at:'x'});
+ assert.match((await slots(page))[0],/مخزن رضا عطيه \(ادهم\) 01000009002/);
  // the search covers them
- await page.fill('#vnQ','بكر');
- assert.deepEqual(await page.$$eval('#vnRows .vn-who b',(b)=>b.map((x)=>x.textContent)),['مخزن رضا عطيه (بكر)']);
+ await page.fill('#vnQ','بهاء');
+ assert.deepEqual(await page.$$eval('#vnRows .vn-who b',(b)=>b.map((x)=>x.textContent)),['مخزن رضا عطيه (بهاء)']);
  // a company the names do not fit (Latin name here, Arabic there): all of them are offered, and the one already saved as its telesales is marked taken
  await page.click('[data-ve-back]');await page.waitForSelector('#veListView:not(.hidden)');
  await page.click('[data-ve-open="2374"]');await page.waitForSelector('#veStHead .vn-card');
- assert.match((await slots(page))[0],/مخزن ايه ام جروب \(محمد على\) 01033645645/);
+ assert.match((await slots(page))[0],/مخزن ايه ام جروب \(محمد كمال\) 01000009001/);
  await page.click('[data-vn-pick]');await page.waitForSelector('#vnRows .vn-sg');
  assert.equal(await page.$$eval('#vnRows .vn-sg',(r)=>r.length>=4),true,'all four inbox people are there');
- assert.equal(await page.$$eval('#vnRows .vn-pk.on',(b)=>b.map((x)=>x.dataset.phone+':'+x.dataset.vnSet).join()),'01033645645:telesales');
+ assert.equal(await page.$$eval('#vnRows .vn-pk.on',(b)=>b.map((x)=>x.dataset.phone+':'+x.dataset.vnSet).join()),'01000009001:telesales');
 });
 
 run('Company numbers: the missing-item request opens WhatsApp on the telesales number; no number = «انسخ» as before; staff see none of it',async({page})=>{

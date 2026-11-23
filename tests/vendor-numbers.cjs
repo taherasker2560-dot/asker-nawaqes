@@ -16,7 +16,7 @@ const book = W.makeBook([
   { phone: '01000000001', name: 'المحاسب رضا عطيه', kind: 'other' },
   { phone: '01000000002', name: 'هاني عطيه محاسب Sky', kind: 'other' },
   { phone: '01000000003', name: 'موزع رضا عطيه الجديد', kind: 'other' },
-  { phone: '01000000004', name: 'مخزن رضا عطيه (احمد)', kind: 'other' },
+  { phone: '01000000004', name: 'مخزن رضا عطيه (ادهم)', kind: 'other' },
   { phone: '01000000005', name: 'رضا الحداد', kind: 'other' },
   { phone: '01000000006', name: 'Ibn Sina Mhmd', kind: 'other' },
   { phone: '01000000007', name: 'Ibn Sina Mhasb Reda', kind: 'other' },
@@ -26,7 +26,7 @@ const book = W.makeBook([
 ]);
 const names = (list) => list.map((c) => c.name);
 // every word of a two-word name: «رضا الحداد» (only «رضا») and «هاني عطيه محاسب» (only «عطيه») are not offered; the shorter name first
-assert.deepEqual(names(V.suggestFor(book, { name: 'رضا عطية' })), ['المحاسب رضا عطيه', 'تليسيلز رضا عطيه', 'موزع رضا عطيه الجديد', 'مخزن رضا عطيه (احمد)', 'مكتب رضا عطيه الأرضي'], 'the shorter name first, then the order of the book');
+assert.deepEqual(names(V.suggestFor(book, { name: 'رضا عطية' })), ['المحاسب رضا عطيه', 'تليسيلز رضا عطيه', 'موزع رضا عطيه الجديد', 'مخزن رضا عطيه (ادهم)', 'مكتب رضا عطيه الأرضي'], 'the shorter name first, then the order of the book');
 assert.equal(V.suggestFor(book, { name: 'رضا عطية' }).length, 5, 'five contacts hold both words (a landline is offered too: he may want it)');
 assert.equal(V.suggestFor(book, { name: 'رضا عطية' }, 2).length, 2, 'a limit');
 assert.ok(!names(V.suggestFor(book, { name: 'رضا عطية' })).includes('رضا الحداد'));
@@ -37,7 +37,7 @@ assert.deepEqual(V.suggestFor(null, { name: 'رضا عطية' }), []);
 
 // the job a name points to
 for (const [name, role] of [['المحاسب رضا عطيه', 'accountant'], ['هاني عطيه محاسب Sky', 'accountant'], ['Ibn Sina Mhasb Reda', 'accountant'], ['حسابات الحكمة', 'accountant'],
-  ['تليسيلز رضا عطيه', 'telesales'], ['Hikma Telesales', 'telesales'], ['موزع رضا عطيه الجديد', 'distributor'], ['مخزن رضا عطيه (احمد)', 'distributor'], ['Ibn Sina Mwz3 Mh. kholi', 'distributor'],
+  ['تليسيلز رضا عطيه', 'telesales'], ['Hikma Telesales', 'telesales'], ['موزع رضا عطيه الجديد', 'distributor'], ['مخزن رضا عطيه (ادهم)', 'distributor'], ['Ibn Sina Mwz3 Mh. kholi', 'distributor'],
   ['مندوب الحكمة', 'distributor'], ['رضا الحداد', null], ['Kemi Jack', null]]) assert.equal(V.guessRole(name), role, name);
 
 // the search of the picker: words in the name, or digits in the number; by name
@@ -48,14 +48,14 @@ assert.deepEqual(V.findInBook(book, 'zzzz'), []);
 assert.deepEqual(V.findInBook(null, 'sina'), []);
 
 // the people saved in «الوارد» (owner: «الطبيعي ان السيلز هو اللي هيبعت الوارد وينفذ الطلبيات»): the number as the book writes it, the ones that fit the company's name first
-assert.equal(V.normBook('201033645645'), '01033645645'); assert.equal(V.normBook('01033645645'), '01033645645'); assert.equal(V.normBook('447710173736'), '447710173736'); assert.equal(V.normBook('12'), ''); assert.equal(V.normBook(null), '');
+assert.equal(V.normBook('201000009001'), '01000009001'); assert.equal(V.normBook('01000009001'), '01000009001'); assert.equal(V.normBook('447710173736'), '447710173736'); assert.equal(V.normBook('12'), ''); assert.equal(V.normBook(null), '');
 const inbox = V.inboxPeople([
-  { name: 'مخزن ايه ام جروب (محمد على)', phone: '201033645645' }, { name: 'مخزن رضا عطيه (بكر)', phone: '201069051541' }, { name: 'مخزن رضا عطيه (احمد)', phone: '201096957316' },
-  { name: 'شركه ابن سينا (محمد سعيد)', phone: '201069048503' }, { name: 'من غير رقم', phone: null }, { name: '', phone: '201000000000' }], { name: 'رضا عطية' });
-assert.deepEqual(inbox.map((p) => [p.name, p.phone, p.fit]), [['مخزن رضا عطيه (احمد)', '01096957316', 2], ['مخزن رضا عطيه (بكر)', '01069051541', 2], ['شركه ابن سينا (محمد سعيد)', '01069048503', 0], ['مخزن ايه ام جروب (محمد على)', '01033645645', 0]],
+  { name: 'مخزن ايه ام جروب (محمد كمال)', phone: '201000009001' }, { name: 'مخزن رضا عطيه (بهاء)', phone: '201000009006' }, { name: 'مخزن رضا عطيه (ادهم)', phone: '201000009002' },
+  { name: 'شركه ابن سينا (محمد صبرى)', phone: '201000009008' }, { name: 'من غير رقم', phone: null }, { name: '', phone: '201000000000' }], { name: 'رضا عطية' });
+assert.deepEqual(inbox.map((p) => [p.name, p.phone, p.fit]), [['مخزن رضا عطيه (ادهم)', '01000009002', 2], ['مخزن رضا عطيه (بهاء)', '01000009006', 2], ['شركه ابن سينا (محمد صبرى)', '01000009008', 0], ['مخزن ايه ام جروب (محمد كمال)', '01000009001', 0]],
   'the company\'s own people first (by name), the rest by name; no number or no name: left out');
 assert.deepEqual(V.inboxPeople(null, { name: 'x' }), []);
-assert.equal(V.findInBook({ list: inbox }, 'بكر', 5).length, 1, 'the search works on them like on the book');
+assert.equal(V.findInBook({ list: inbox }, 'بهاء', 5).length, 1, 'the search works on them like on the book');
 // the number WhatsApp opens: a mobile gets 20, an international number stays
 assert.equal(V.waDigits('01012345678'), '201012345678');
 assert.equal(V.waDigits('447710173736'), '447710173736');
@@ -74,13 +74,13 @@ for (const bad of ['', '   ', 'abc', '0101234', '01012345678901234', '010-ab-345
 assert.equal(V.typedPerson('01012345678', 'x'.repeat(300)).name.length, 120, 'the name is cut at 120 (the table allows 120)');
 // what the picker shows (the company's card and the missing-item form share it): «الوارد» first, the book after; a search covers both; book = null while it is not loaded
 const L1 = V.pickList(inbox, book, { name: 'رضا عطية' }, '');
-assert.deepEqual(L1.inbox.map((p) => p.phone), ['01096957316', '01069051541', '01069048503', '01033645645'], 'no search: the people of «الوارد», the company\'s own first');
-assert.deepEqual(L1.book.map((c) => c.name), ['المحاسب رضا عطيه', 'تليسيلز رضا عطيه', 'موزع رضا عطيه الجديد', 'مخزن رضا عطيه (احمد)', 'مكتب رضا عطيه الأرضي'], 'the book\'s suggestions (the same list as before)');
-const dup = V.pickList([{ phone: '01000000004', name: 'مخزن رضا عطيه (احمد)', key: 'مخزن رضا عطيه احمد', kind: 'other', private: false, fit: 2 }], book, { name: 'رضا عطية' }, '');
+assert.deepEqual(L1.inbox.map((p) => p.phone), ['01000009002', '01000009006', '01000009008', '01000009001'], 'no search: the people of «الوارد», the company\'s own first');
+assert.deepEqual(L1.book.map((c) => c.name), ['المحاسب رضا عطيه', 'تليسيلز رضا عطيه', 'موزع رضا عطيه الجديد', 'مخزن رضا عطيه (ادهم)', 'مكتب رضا عطيه الأرضي'], 'the book\'s suggestions (the same list as before)');
+const dup = V.pickList([{ phone: '01000000004', name: 'مخزن رضا عطيه (ادهم)', key: 'مخزن رضا عطيه احمد', kind: 'other', private: false, fit: 2 }], book, { name: 'رضا عطية' }, '');
 assert.ok(!dup.book.some((c) => c.phone === '01000000004'), 'a person already shown from «الوارد» (same number) is not shown again from the book');
 assert.equal(L1.search, false);
-const L2 = V.pickList(inbox, book, { name: 'رضا عطية' }, 'بكر');
-assert.deepEqual(L2.inbox.map((p) => p.name), ['مخزن رضا عطيه (بكر)']); assert.equal(L2.search, true);
+const L2 = V.pickList(inbox, book, { name: 'رضا عطية' }, 'بهاء');
+assert.deepEqual(L2.inbox.map((p) => p.name), ['مخزن رضا عطيه (بهاء)']); assert.equal(L2.search, true);
 assert.equal(V.pickList(inbox, null, { name: 'رضا عطية' }, '').book, null, 'the book is not loaded yet');
 assert.equal(V.pickList(inbox, book, { name: 'رضا عطية' }, '', 2, 1).inbox.length, 2, 'limits'); assert.equal(V.pickList(inbox, book, { name: 'رضا عطية' }, '', 2, 1).book.length, 1);
 assert.deepEqual(V.pickList(null, book, { name: 'مخزن الدكتور مستحضرات' }, '').inbox, []);

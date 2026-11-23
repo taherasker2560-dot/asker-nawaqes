@@ -59,19 +59,19 @@ assert.equal(D.urlText('السلام عليكم'),'السلام عليكم');ass
 assert.equal(D.waLink('a b','01012345678'),'https://wa.me/201012345678?text=a%20b');assert.equal(D.waLink('','01012345678'),'https://wa.me/201012345678');
 assert.equal(D.waLink('a',''),'https://wa.me/?text=a','no number = the owner picks the chat');
 // the saved companies (several people per supplier) -> the supplier; «مخزن نيو سيتى فارما» is New City's, not Pharma's
-const saved=[{name:'شركه ابن سينا (محمد سعيد)',phone:'01000000001'},{name:'شركه فارما بالليل (احمد مسعد)',phone:'01000000002'},{name:'شركه فارما بالنهار (امانى)',phone:''},
- {name:'مخزن الفتح (شريف)',phone:'01000000003'},{name:'مخزن ايه ام جروب (رمضان)',phone:'01000000004'},{name:'مخزن ايه ام جروب (محمد على)',phone:'01000000005'},
- {name:'مخزن رضا عطيه (احمد)',phone:'01000000006'},{name:'مخزن نيو سيتى فارما',phone:'01000000007'},{name:'مخزن نيوسيتى (محمود جميل)',phone:'01000000008'}];
+const saved=[{name:'شركه ابن سينا (محمد صبرى)',phone:'01000000001'},{name:'شركه فارما بالليل (احمد سمير)',phone:'01000000002'},{name:'شركه فارما بالنهار (اسماء)',phone:''},
+ {name:'مخزن الفتح (شريف)',phone:'01000000003'},{name:'مخزن ايه ام جروب (رمضان)',phone:'01000000004'},{name:'مخزن ايه ام جروب (محمد كمال)',phone:'01000000005'},
+ {name:'مخزن رضا عطيه (ادهم)',phone:'01000000006'},{name:'مخزن نيو سيتى فارما',phone:'01000000007'},{name:'مخزن نيوسيتى (محمود جميل)',phone:'01000000008'}];
 const names=(id)=>D.contactsFor(id,saved).map(c=>c.name);
 assert.deepEqual(names('NEWCITY'),['مخزن نيو سيتى فارما','مخزن نيوسيتى (محمود جميل)']);
-assert.deepEqual(names('PHARMA'),['شركه فارما بالليل (احمد مسعد)','شركه فارما بالنهار (امانى)'],'New City\'s «فارما» contact is not Pharma\'s');
-assert.deepEqual(names('AMG'),['مخزن ايه ام جروب (رمضان)','مخزن ايه ام جروب (محمد على)']);
-assert.deepEqual(names('ELFATH'),['مخزن الفتح (شريف)']);assert.deepEqual(names('REDA'),['مخزن رضا عطيه (احمد)']);assert.deepEqual(names('IBNSINA'),['شركه ابن سينا (محمد سعيد)']);
+assert.deepEqual(names('PHARMA'),['شركه فارما بالليل (احمد سمير)','شركه فارما بالنهار (اسماء)'],'New City\'s «فارما» contact is not Pharma\'s');
+assert.deepEqual(names('AMG'),['مخزن ايه ام جروب (رمضان)','مخزن ايه ام جروب (محمد كمال)']);
+assert.deepEqual(names('ELFATH'),['مخزن الفتح (شريف)']);assert.deepEqual(names('REDA'),['مخزن رضا عطيه (ادهم)']);assert.deepEqual(names('IBNSINA'),['شركه ابن سينا (محمد صبرى)']);
 assert.deepEqual(D.contactsFor('NOPE',saved),[]);assert.deepEqual(D.contactsFor('AMG',null),[]);
 const ph=D.contactsFor('PHARMA',saved);
-assert.equal(D.chooseContact(ph,null).name,'شركه فارما بالليل (احمد مسعد)','first one with a number');
-assert.equal(D.chooseContact(ph,'شركه فارما بالنهار (امانى)').name,'شركه فارما بالنهار (امانى)','the remembered one wins');
-assert.equal(D.chooseContact(ph,'gone').name,'شركه فارما بالليل (احمد مسعد)','a forgotten name falls back');
+assert.equal(D.chooseContact(ph,null).name,'شركه فارما بالليل (احمد سمير)','first one with a number');
+assert.equal(D.chooseContact(ph,'شركه فارما بالنهار (اسماء)').name,'شركه فارما بالنهار (اسماء)','the remembered one wins');
+assert.equal(D.chooseContact(ph,'gone').name,'شركه فارما بالليل (احمد سمير)','a forgotten name falls back');
 assert.equal(D.chooseContact([{name:'x',phone:''}],null).name,'x');assert.equal(D.chooseContact([],null),null);
 // no approved photo: a shape from the name (same shapes as the store)
 assert.equal(D.shapeOf('FERRODEP 150 ML SYRUP'),'bottle');assert.equal(D.shapeOf('ADRENOCORTINE 1MG AMP'),'injection');assert.equal(D.shapeOf('FLUCON 5CC E.D.'),'drops');
