@@ -230,7 +230,12 @@
           const top = msgs.length ? msgs[msgs.length - 1].id : 0;
           lastId = waitingWords ? Math.min(top, waitingWords.id - 1) : top;
           if (changed) drawMsgs();
-        } else if (d.error === 'chat') { keep.set(null); secret = null; supplier = ''; forwarded = false; msgs = []; lastId = 0; draw(); say(TEXTS.errors.chat); return; }
+        } else if (d.error === 'chat') {
+          keep.set(null); secret = null; supplier = ''; forwarded = false; msgs = []; lastId = 0;
+          // a customer with his own link: «🔄 رابط جديد» gives his chat a new secret (review 2026-11-23 security-3), so his link opens it again at once
+          if (root.AskerStoreAccount && root.AskerStoreAccount.active()) { draw(); return open(); }
+          draw(); say(TEXTS.errors.chat); return;
+        }
       } catch (e) { /* next time */ }
     }
     if (shown()) timer = setTimeout(() => poll(false), POLL_MS);

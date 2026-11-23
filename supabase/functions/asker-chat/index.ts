@@ -183,7 +183,7 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
       return r.ok;
     };
     const ids = (xs: { id: unknown }[]) => xs.map((x) => String(x.id)).join(',');
-    const out = { messages: 0, files: 0, warehouseFiles: 0, inboxFiles: 0, oldFiles: 0 };
+    const out = { messages: 0, files: 0, warehouseFiles: 0, inboxFiles: 0, oldFiles: 0, orphanFiles: 0 };
     // 1) messages older than 7 days (customers' and warehouses'), their files first
     const old = await rows(`/rest/v1/ar_chat_messages?select=id,media&at=lt.${ago(CHAT_KEEP_MS)}&order=id&limit=500`) as { id: number; media: string | null }[];
     if (old.length) {
@@ -226,6 +226,20 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     }
     // 4) the bot's suggestions after 30 days (enough to judge the trial week); a chat's go with it
     await call(`/rest/v1/ar_chat_drafts?created_at=lt.${ago(DRAFT_KEEP_MS)}`, { method: 'DELETE', headers: { ...sh, Prefer: 'return=minimal' } });
+    // 5) the uploads nobody refers to (review 2026-11-23 security-4, migration 202611231500): a stranger's upload that never became a message or an
+    // order, over 2 days old. The database lists them (ar_orphan_uploads); the files go through the storage API (deleting rows would leave them
+    // behind). A list that cannot be had is no list (the function may run before the migration). Each name must have the shape a visitor can
+    // upload, in its own bucket, so a wrong list can never remove anything else (the invoices, the statements, the inbox).
+    const orphan = await call('/rest/v1/rpc/ar_orphan_uploads', { method: 'POST', headers: { ...sh, ...json }, body: JSON.stringify({ p_limit: 500 }) }).catch(() => null);
+    const listed = orphan && orphan.ok ? await orphan.json().catch(() => []) : [];
+    const SHAPE: Record<string, RegExp> = {
+      'ar-chat': /^c\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\.(jpg|png|webp|wav|pdf|xlsx|xls)$/,
+      'ar-store-rx': /^rx\/\d{4}-\d{2}-\d{2}\/[0-9a-f-]{20,40}\.(jpg|png|webp|heic|pdf)$/,
+    };
+    for (const bucket of Object.keys(SHAPE)) {
+      const names = (Array.isArray(listed) ? listed : []).filter((x: { bucket?: unknown; name?: unknown }) => x && x.bucket === bucket && typeof x.name === 'string' && SHAPE[bucket].test(x.name)).map((x: { name: string }) => x.name);
+      if (names.length && await removeFiles(bucket, names)) out.orphanFiles += names.length;
+    }
     console.log('asker-chat cleanup', JSON.stringify(out));
     return reply(200, { ok: true, ...out }, headers);
   }
