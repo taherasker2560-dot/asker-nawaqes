@@ -9,8 +9,10 @@ const W='a'.repeat(64),C='b'.repeat(64),SUP='مخزن تجربة (حسن)';
 const shortages=[{id:'s1',product_name:'BRUFEN 400MG 30TAB'},{id:'s2',product_name:'FLAGYL 125MG SYP'}];
 const names=[{name_key:'FLAGYL 125MG SYP',arabic_name:'فلاجيل ١٢٥ مجم شراب',status:'approved'},{name_key:'BRUFEN 400MG 30TAB',arabic_name:'بروفين ٤٠٠ مجم ٣٠ قرص',status:'approved'}];
 const JPG=new Uint8Array([255,216,255,224,1,2,3]),PDF=new TextEncoder().encode('%PDF-1.4 list');
-function fake({msgs,files={}}){const calls=[],saved=[],stored=[],removed=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
+function fake({msgs,files={},linkHour=0}){const calls=[],saved=[],stored=[],removed=[];const page=(u,a)=>new Response(JSON.stringify(u.includes('offset=0')?a:[]));
  const f=async(url,o={})=>{calls.push({url,o});const u=decodeURIComponent(url);
+  // the Gemini budget (review 2026-11-23): the photos / PDFs from links kept in the last hour
+  if(o.method==='HEAD'&&url.includes('/rest/v1/ar_inbox?select=id&via=eq.link')){assert.match(u,/kind=in\.\(image,pdf\)&received_at=gte\./);return new Response(null,{status:206,headers:{'content-range':'0-0/'+linkHour}})}
   if(url.includes('/rest/v1/ar_chats?'))return page(url,u.includes('secret=eq.'+W)?[{id:'c1',supplier:SUP}]:u.includes('secret=eq.'+C)?[{id:'c2',supplier:null}]:[]);
   if(url.includes('/rest/v1/ar_chat_messages')&&o.method==='PATCH'){const id=+u.match(/id=eq\.(\d+)/)[1],m=msgs.find(x=>x.id===id),b=JSON.parse(o.body);
    if('media' in b){if(m)m.media=b.media;return new Response(null,{status:204})}
@@ -71,6 +73,12 @@ j=await (await F.handle(post({secret:W}),env,f)).json();assert.equal(j.done[8],'
 // at most 4 a call (a long list of photos goes over the next calls)
 msgs=Array.from({length:6},(_,i)=>({id:10+i,kind:'text',body:'بروفين ٤٠٠ '+i,media:null}));f=fake({msgs});
 j=await (await F.handle(post({secret:W}),env,f)).json();assert.equal(Object.keys(j.done).length,4);assert.equal(j.left,2);
+// the Gemini budget (review 2026-11-23 security-1): 60 photos / PDFs from links in the last hour = the next photo is kept UNREAD (no Gemini call), its text is read as before
+msgs=[{id:30,kind:'photo',body:null,media:`c/${day}/33333333-2222-4333-8444-555555555555.jpg`},{id:31,kind:'text',body:'بروفين ٤٠٠',media:null}];
+f=fake({msgs,files:{[msgs[0].media]:JPG},linkHour:F.LINK_GEMINI_HOUR});
+j=await (await F.handle(post({secret:W}),env,f)).json();assert.deepEqual(j.done,{30:'unread',31:'ok'});
+assert.ok(!f.calls.some(c=>c.url.includes('generativelanguage')),'no Gemini over the budget');
+assert.deepEqual([f.saved[0].status,f.saved[0].error],['error','اتأجلت قرايتها: وصل كتير من الروابط في الساعة دي']);assert.ok(f.saved[0].file_path,'the photo is kept for the laptop\'s reader');
 // a customer's chat is never read; a wrong secret; another page's origin
 f=fake({msgs:[{id:20,kind:'text',body:'بانادول',media:null}]});
 j=await (await F.handle(post({secret:C}),env,f)).json();assert.deepEqual(j,{ok:false,error:'not-supplier'});

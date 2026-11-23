@@ -66,10 +66,16 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   // the action, end to end
   const env = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'g' };
   const SECRET = 'a'.repeat(64), CHAT = '11111111-2222-4333-8444-555555555555';
-  function fake({ msgs, auto = [], have = false, customer = 101, phoneAcct = false }) {
-    const gem = [], drafts = [], sent = [], patched = [];
+  function fake({ msgs, auto = [], have = false, customer = 101, phoneAcct = false, hourCount = 0, chatCount = 0 }) {
+    const gem = [], drafts = [], sent = [], patched = [], counted = [];
     const f = async (url, o = {}) => {
       const u = new URL(url), q = decodeURIComponent(u.search);
+      // the Gemini budget's counts (PostgREST count=exact, nothing read): the last hour of all chats, or the last day of this chat
+      if (o.method === 'HEAD' && u.pathname === '/rest/v1/ar_chat_drafts') {
+        assert.match(o.headers.Prefer, /count=exact/); counted.push(q);
+        const n = q.includes('chat_id=eq.') ? chatCount : hourCount;
+        return n === null ? new Response(null, { status: 500 }) : new Response(null, { status: 206, headers: { 'content-range': '0-0/' + n } });
+      }
       if (u.hostname === 'generativelanguage.googleapis.com') {
         const b = JSON.parse(o.body); gem.push(b);
         const prompt = b.contents[0].parts[0].text;
@@ -93,7 +99,7 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
       if (u.pathname === '/rest/v1/ar_chat_push') return new Response('[]');
       throw Error('unexpected ' + url);
     };
-    Object.assign(f, { gem, drafts, sent, patched });
+    Object.assign(f, { gem, drafts, sent, patched, counted });
     return f;
   }
   const req = (body) => new Request('https://p.supabase.co/functions/v1/asker-chat', { method: 'POST', headers: { origin: 'https://taherasker2560-dot.github.io', 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -134,6 +140,26 @@ const assert = require('node:assert/strict'), path = require('node:path'), { pat
   assert.ok(f.drafts[0].facts.includes(D.PHONE_ACCOUNT_FACT));
   for (const g of f.gem) { const t = JSON.stringify(g); assert.ok(!t.includes('7,174.5') && !t.includes('7174') && !t.includes('طاهر عسكر'), 'never given to Gemini'); }
   assert.match(f.gem[1].contents[0].parts[0].text, /ما تقولش أي مبلغ ولا اسم الحساب/);
+  // the Gemini budget (review 2026-11-23 security-1): counted right before Gemini; over it nothing is asked and nothing breaks
+  const B = F.GEMINI_BUDGET;
+  assert.deepEqual(B, { draftsHour: 40, draftsChatDay: 15, draftsCashChatDay: 8, voiceHour: 30 });
+  f = fake({ msgs, hourCount: B.draftsHour });
+  assert.deepEqual(await (await F.handle(req({ action: 'draft', secret: SECRET }), env, f)).json(), { ok: true, skipped: 'budget-hour' });
+  assert.equal(f.gem.length, 0, 'no Gemini call over the hour'); assert.equal(f.drafts.length, 0);
+  assert.match(f.counted[0], /created_at=gte\./);
+  f = fake({ msgs, hourCount: B.draftsHour - 1, chatCount: B.draftsChatDay });
+  assert.equal((await (await F.handle(req({ action: 'draft', secret: SECRET }), env, f)).json()).skipped, 'budget-chat', 'a customer\'s chat: 15 a day');
+  assert.match(f.counted[1], /chat_id=eq\.11111111-2222-4333-8444-555555555555&created_at=gte\./);
+  f = fake({ msgs, customer: null, chatCount: B.draftsCashChatDay });
+  assert.equal((await (await F.handle(req({ action: 'draft', secret: SECRET }), env, f)).json()).skipped, 'budget-chat', 'a number with no account: 8 a day');
+  f = fake({ msgs, customer: 101, chatCount: B.draftsCashChatDay });
+  assert.equal((await (await F.handle(req({ action: 'draft', secret: SECRET }), env, f)).json()).id, 9, 'a customer\'s chat still has room at 8');
+  f = fake({ msgs, hourCount: null });
+  assert.equal((await (await F.handle(req({ action: 'draft', secret: SECRET }), env, f)).json()).skipped, 'budget-hour', 'a count that fails = over (fails closed)');
+  assert.equal(f.gem.length, 0);
+  // already answered or done: no count at all (the budget is asked only before a real Gemini call)
+  f = fake({ msgs, have: true }); await F.handle(req({ action: 'draft', secret: SECRET }), env, f);
+  assert.equal(f.counted.length, 0);
   // a wrong secret
   assert.equal((await F.handle(req({ action: 'draft', secret: 'b'.repeat(64) }), env, fake({ msgs }))).status, 404);
   console.log('PASS: chat draft: the answer from our facts only (items + stock, account, orders), kept for ابعت/عدّل/سيبه, alone only for a kind turned on');

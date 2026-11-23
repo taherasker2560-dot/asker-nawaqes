@@ -206,7 +206,8 @@ async function gem(env: Env, fetchImpl: typeof fetch, parts: unknown[], schema: 
   throw new Error('gemini schema');
 }
 
-export type Ctx = { env: Env; fetchImpl: typeof fetch; base: string; sh: Record<string, string>; rows: (path: string) => Promise<unknown[]> };
+// budget: asked right before Gemini is called ('' = go on, else why not: see GEMINI_BUDGET in index.ts)
+export type Ctx = { env: Env; fetchImpl: typeof fetch; base: string; sh: Record<string, string>; rows: (path: string) => Promise<unknown[]>; budget?: () => Promise<string> };
 export type Chat = { id: string; customer_id: number | null; name: string; phone: string | null };
 export type Draft = { for_msg: number; kind: Kind; body: string; facts: string[] };
 // the suggestion for a chat, or why there is none (answered already, a voice note whose words are not written yet, done before)
@@ -220,6 +221,9 @@ export async function makeDraft(ctx: Ctx, chat: Chat): Promise<{ skipped?: strin
   const last = waiting[waiting.length - 1];
   if (last.kind === 'voice' && !last.body) return { skipped: 'words' };
   if ((await rows(`/rest/v1/ar_chat_drafts?select=id&chat_id=eq.${chat.id}&for_msg=eq.${last.id}&limit=1`)).length) return { skipped: 'done' };
+  // the Gemini budget (review 2026-11-23 security-1): a suggestion is a help, never a must; over the budget the pharmacy answers as before
+  const over = ctx.budget ? await ctx.budget() : '';
+  if (over) return { skipped: 'budget-' + over };
   const history = recent.slice(Math.max(0, from - 8));
   // the photos waiting for an answer (a prescription, a box): Gemini sees them
   const photos: unknown[] = [];

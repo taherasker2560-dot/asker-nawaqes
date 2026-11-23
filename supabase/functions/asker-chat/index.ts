@@ -25,6 +25,10 @@ const DEFAULT_ORIGINS = 'https://taherasker2560-dot.github.io';
 const DEFAULT_SUBJECT = 'https://taherasker2560-dot.github.io/asker-nawaqes/';
 const DEFAULT_MODEL = 'gemini-flash-latest';
 const TIMEOUT_MS = 15000, GEMINI_TIMEOUT_MS = 45000, MAX_AUDIO = 8 * 1024 * 1024;
+// the Gemini budget (review 2026-11-23 security-1: anyone can open a chat with any number, each message asked Gemini twice, the key is paid with
+// auto-reload since 11-15). The busiest real hour so far: 4 suggestions and 3 voice notes; these are ten times that, and over them nothing breaks:
+// no suggestion (the pharmacy answers as before) and a voice note stays a voice note to play.
+export const GEMINI_BUDGET = { draftsHour: 40, draftsChatDay: 15, draftsCashChatDay: 8, voiceHour: 30 };
 // how long things are kept (the nightly clean-up): messages 7 days (owner 2026-11-14 «ب: 7 أيام»); the inbox's photos 2 days
 // (owner 2026-11-14: «صور الوارد دي حاجة مؤقتة … اختار منها بتاعت النهاردة بس … المسح بتاعها عادي ممكن يبقى كل يوم أو كل
 // يومين بالكتير»; what was read from them stays); the bot's suggestions 30 days (the trial week's numbers)
@@ -126,6 +130,14 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return { sent, gone, failed, codes };
   }
 
+  // how many rows a read would give (PostgREST's count, nothing read); a count that cannot be had counts as «too many»: the budget fails closed
+  const countRows = async (path: string): Promise<number> => {
+    const r = await call(path, { method: 'HEAD', headers: { ...sh, Prefer: 'count=exact', Range: '0-0' } }).catch(() => null);
+    const m = /\/(\d+)$/.exec((r && r.headers.get('content-range')) || '');
+    return m ? Number(m[1]) : Infinity;
+  };
+  const ago = (ms: number) => encodeURIComponent(new Date(Date.now() - ms).toISOString());
+
   // ---------- the customer's voice note: its words ----------
   if (body.action === 'voice') {
     const secret = String(body.secret || ''), id = Number(body.id);
@@ -137,6 +149,10 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (!msg || msg.kind !== 'voice' || !msg.media) return reply(404, { error: 'message' }, headers);
     if (msg.body) return reply(200, { ok: true, text: msg.body }, headers);
     if (Date.now() - new Date(String(msg.at)).getTime() > 3600e3) return reply(410, { error: 'old' }, headers);
+    // the Gemini budget (review 2026-11-23 security-1): the voice notes written in the last hour, all chats; over it the note stays a voice note to play
+    if (await countRows(`/rest/v1/ar_chat_messages?select=id&kind=eq.voice&body=not.is.null&at=gte.${ago(3600e3)}`) >= GEMINI_BUDGET.voiceHour) {
+      console.log('asker-chat budget voice'); return reply(429, { error: 'budget' }, headers);
+    }
     const a = await call('/storage/v1/object/ar-chat/' + msg.media, { headers: sh });
     const audio = a.ok ? new Uint8Array(await a.arrayBuffer()) : null;
     if (!audio || !audio.length || audio.length > MAX_AUDIO) return reply(502, { error: 'audio' }, headers);
@@ -299,7 +315,15 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (!chat?.id) return reply(404, { error: 'chat' }, headers);
     if (chat.supplier) return reply(200, { ok: true, skipped: 'warehouse' }, headers);
     let made: Awaited<ReturnType<typeof makeDraft>>;
-    try { made = await makeDraft({ env, fetchImpl, base, sh, rows }, chat); } catch (e) {
+    // the Gemini budget (review 2026-11-23 security-1): the suggestions made in the last hour (all chats), and in the last day for this chat (fewer for a
+    // number that is not a customer's account: anyone can open such a chat)
+    const budget = async (): Promise<string> => {
+      if (await countRows(`/rest/v1/ar_chat_drafts?select=id&created_at=gte.${ago(3600e3)}`) >= GEMINI_BUDGET.draftsHour) return 'hour';
+      const perDay = chat.customer_id ? GEMINI_BUDGET.draftsChatDay : GEMINI_BUDGET.draftsCashChatDay;
+      if (await countRows(`/rest/v1/ar_chat_drafts?select=id&chat_id=eq.${chat.id}&created_at=gte.${ago(864e5)}`) >= perDay) return 'chat';
+      return '';
+    };
+    try { made = await makeDraft({ env, fetchImpl, base, sh, rows, budget }, chat); } catch (e) {
       console.log('asker-chat draft', String((e as Error)?.message || e).slice(0, 200));
       return reply(200, { ok: false, error: 'draft' }, headers);
     }
