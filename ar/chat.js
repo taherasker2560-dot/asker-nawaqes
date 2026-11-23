@@ -81,10 +81,14 @@
     } catch (e) { pushState = 'bad'; }
     drawList();
   }
+  // the owner's phone also hears of new invoice photos on the same push (asker-chat «docs», 11-23: off the laptop's Claude task;
+  // ownerHere is declared further down, and is called only after the page is up)
   function pushHtml() {
-    if (pushState === 'off') return '<button type="button" class="secondary ch-push" data-chat-push>🔔 إشعار على موبايلك لما عميل يكتب (حتى والسيستم مقفول)</button>';
+    if (pushState === 'off') return ownerHere()
+      ? '<button type="button" class="secondary ch-push" data-chat-push>🔔 إشعار على موبايلك لما عميل يكتب أو صور فواتير توصل (حتى والسيستم مقفول)</button>'
+      : '<button type="button" class="secondary ch-push" data-chat-push>🔔 إشعار على موبايلك لما عميل يكتب (حتى والسيستم مقفول)</button>';
     if (pushState === 'busy') return '<p class="status">بيفعّل الإشعار…</p>';
-    if (pushState === 'on') return '<p class="hint ch-push-on">🔔 إشعار الرسايل شغال على الموبايل ده.</p>';
+    if (pushState === 'on') return ownerHere() ? '<p class="hint ch-push-on">🔔 إشعار الرسايل وصور الفواتير شغال على الموبايل ده.</p>' : '<p class="hint ch-push-on">🔔 إشعار الرسايل شغال على الموبايل ده.</p>';
     if (pushState === 'bad') return '<p class="status bad">الموبايل ما سمحش بالإشعار. اسمح للسيستم بالإشعارات من إعدادات المتصفح وجرّب تاني.</p><button type="button" class="secondary ch-push" data-chat-push>🔔 جرّب تاني</button>';
     return '';
   }

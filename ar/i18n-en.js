@@ -2113,6 +2113,8 @@ window.AskerEN = {
   "🔔 إشعار على موبايلك لما عميل يكتب (حتى والسيستم مقفول)": "🔔 A notification on your phone when a customer writes (even with the system closed)",
   "بيفعّل الإشعار…": "Turning the notification on…",
   "🔔 إشعار الرسايل شغال على الموبايل ده.": "🔔 Message notifications are on for this phone.",
+  "🔔 إشعار على موبايلك لما عميل يكتب أو صور فواتير توصل (حتى والسيستم مقفول)": "🔔 A notification on your phone when a customer writes or invoice photos arrive (even with the system closed)",
+  "🔔 إشعار الرسايل وصور الفواتير شغال على الموبايل ده.": "🔔 Message and invoice-photo notifications are on for this phone.",
   "الموبايل ما سمحش بالإشعار. اسمح للسيستم بالإشعارات من إعدادات المتصفح وجرّب تاني.": "The phone did not allow the notification. Allow notifications for the system in the browser's settings and try again.",
   "🔔 جرّب تاني": "🔔 Try again",
   "🗑 امسح المحادثة": "🗑 Delete the chat",

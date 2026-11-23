@@ -10,6 +10,7 @@
 //                                      warehouse's chat (its list from the link): owner and staff with «الوارد».
 //   POST {action:'what', endpoint}     (the bot's worker ar/sw.js, with its own saved push address): what the push was about.
 //   POST {action:'cleanup'}            (pg_cron at night): what is past its time is deleted (messages 7 days, inbox photos 2).
+//   POST {action:'docs'}               (pg_cron every 5 min): new invoice photos (ar_documents) → a push to the owner's phones.
 //   POST {action:'draft', secret}      (the customer's page after he sends): the bot's suggested answer (draft.ts), kept in
 //                                      ar_chat_drafts; sent at once only for a kind the owner let go alone (auto_kinds).
 // Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), GEMINI_API_KEY, GEMINI_MODEL
@@ -42,6 +43,10 @@ function cors(origin: string | null, env: Env, requested?: string | null): Recor
   };
   if (origin && allowed.includes(origin.toLowerCase())) headers['Access-Control-Allow-Origin'] = origin;
   return headers;
+}
+// the hour in Cairo (Egypt keeps summer time again since 2023), 0–23
+export function cairoHour(now: number): number {
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: 'numeric', hourCycle: 'h23' }).format(new Date(now))) % 24;
 }
 const reply = (status: number, body: unknown, headers: Record<string, string>) =>
   new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -202,17 +207,46 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     return reply(200, { ok: true, ...out }, headers);
   }
 
+  // ---------- invoice photos arrived (owner 2026-11-17, the training period: «أول ما الصور تيجي تنبهني») ----------
+  // Until 11-23 a Claude task on the laptop checked every 10 minutes and opened a whole conversation each time (483 of them);
+  // owner 11-23 «عاوزين نخفف الحمل عالرامات باى حاجه شغاله تلقائى». Now pg_cron calls this every 5 minutes (migration
+  // 202611230300): the photos the system got (ar_documents 'new') that nobody was told about yet → one push to the OWNER's phones,
+  // 08:00–23:59 Cairo (a night photo is told at 08:00), and they are marked told (announced_at). Anyone may call it: it only tells
+  // what is really new, once. What the push says comes from «what» below.
+  if (body.action === 'docs') {
+    if (!env.VAPID_PRIVATE_JWK || !env.VAPID_PUBLIC_KEY) return reply(503, { error: 'not-configured' }, headers);
+    if (cairoHour(Date.now()) < 8) return reply(200, { ok: true, skipped: 'night' }, headers);
+    const fresh = await rows('/rest/v1/ar_documents?select=id&status=eq.new&announced_at=is.null&order=received_at&limit=200') as { id: string }[];
+    const ids = fresh.map((x) => String(x.id)).filter((x) => UUID.test(x));
+    if (!ids.length) return reply(200, { ok: true, new: 0 }, headers);
+    const marked = await call('/rest/v1/ar_documents?id=in.(' + ids.join(',') + ')', { method: 'PATCH', headers: { ...sh, ...json, Prefer: 'return=minimal' }, body: JSON.stringify({ announced_at: new Date().toISOString() }) });
+    if (!marked.ok) return reply(502, { error: 'mark' }, headers);   // not marked = not told now, told on the next round
+    const subs = await rows('/rest/v1/ar_chat_staff_push?select=endpoint&user_id=eq.' + (env.OWNER_ID || OWNER_ID)) as { endpoint: string }[];
+    const r = await pushAll(subs.map((s) => s.endpoint), 'ar_chat_staff_push');
+    return reply(200, { ok: true, new: ids.length, ...r }, headers);
+  }
+
   // ---------- what a push was about (owner 2026-11-14 «وصلت السيستم … بس مفيش صوت اشعار»): pushes carry nothing, so the
   // bot's worker (ar/sw.js) asks with its own push address, which must be one the pharmacy saved (ar_chat_staff_push).
-  // The newest of the last 15 minutes: a warehouse that sent from its link, or a customer waiting for an answer.
+  // The newest of the last 15 minutes: a warehouse that sent from its link, a customer waiting for an answer, or (the owner's
+  // phones only) invoice photos just told by «docs».
   if (body.action === 'what') {
     const ep = String((body as { endpoint?: unknown }).endpoint || '');
     if (!/^https:\/\//.test(ep) || ep.length > 1000) return reply(400, { error: 'bad' }, headers);
-    const known = (await rows('/rest/v1/ar_chat_staff_push?select=user_id&endpoint=eq.' + encodeURIComponent(ep) + '&limit=1'))[0];
+    const known = (await rows('/rest/v1/ar_chat_staff_push?select=user_id&endpoint=eq.' + encodeURIComponent(ep) + '&limit=1'))[0] as { user_id?: string } | undefined;
     if (!known) return reply(404, { error: 'endpoint' }, headers);
     const since = encodeURIComponent(new Date(Date.now() - 15 * 60e3).toISOString());
     const w = (await rows(`/rest/v1/ar_chats?select=supplier,last_at&supplier=not.is.null&last_from=eq.customer&last_at=gte.${since}&order=last_at.desc&limit=1`))[0] as { supplier?: string; last_at?: string } | undefined;
     const c = (await rows(`/rest/v1/ar_chats?select=name,last_at&supplier=is.null&waiting=gt.0&last_at=gte.${since}&order=last_at.desc&limit=1`))[0] as { name?: string; last_at?: string } | undefined;
+    const docs = known.user_id === (env.OWNER_ID || OWNER_ID)
+      ? await rows(`/rest/v1/ar_documents?select=supplier,announced_at&announced_at=gte.${since}&order=announced_at.desc&limit=50`) as { supplier?: string | null; announced_at?: string }[] : [];
+    const dAt = docs.length ? String(docs[0].announced_at) : '';
+    if (dAt && (!w || dAt >= String(w.last_at)) && (!c || dAt >= String(c.last_at))) {
+      const batch = docs.filter((d) => String(d.announced_at) === dAt);
+      const who = [...new Set(batch.map((d) => String(d.supplier || '').trim()).filter(Boolean))];
+      return reply(200, { title: batch.length === 1 ? 'وصلت صورة فاتورة' : `وصلت ${batch.length} صور فواتير`,
+        body: (who.length ? who.slice(0, 3).join('، ') + (who.length > 3 ? ' …' : '') + '. ' : '') + 'شوفها في «الفواتير»', tab: 'docs' }, headers);
+    }
     if (w && (!c || String(w.last_at) >= String(c.last_at))) return reply(200, { title: 'وارد جديد من مخزن', body: `${w.supplier} بعت من الرابط، شوف «الوارد»`, tab: 'read' }, headers);
     if (c) return reply(200, { title: 'رسالة جديدة من عميل', body: `${c.name} كتبلك في «خدمة العملاء ← الرسايل»`, tab: 'care' }, headers);
     return reply(200, { title: 'صيدلية عسكر', body: 'فيه جديد في السيستم', tab: '' }, headers);
