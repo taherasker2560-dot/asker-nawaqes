@@ -11,11 +11,16 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   const pubRaw = Buffer.concat([Buffer.from([4]), Buffer.from(pubJwk.x, 'base64url'), Buffer.from(pubJwk.y, 'base64url')]).toString('base64url');
   const env = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service', GEMINI_API_KEY: 'g',
     VAPID_PRIVATE_JWK: JSON.stringify(privateKey.export({ format: 'jwk' })), VAPID_PUBLIC_KEY: pubRaw, VAPID_SUBJECT: 'https://taherasker2560-dot.github.io/asker-nawaqes/' };
-  function fake({ me = OWNER, staff = [], subs = [], msg = null } = {}) {
+  function fake({ me = OWNER, staff = [], subs = [], msg = null, voiceHour = 0 } = {}) {
     const calls = [], deleted = [], patched = [], pushes = [], gones = [];
     const f = async (url, o = {}) => {
       calls.push({ url, o });
       const u = new URL(url);
+      // the Gemini budget's count of the voice notes written in the last hour (review 2026-11-23)
+      if (o.method === 'HEAD' && u.pathname === '/rest/v1/ar_chat_messages') {
+        assert.equal(u.searchParams.get('kind'), 'eq.voice'); assert.equal(u.searchParams.get('body'), 'not.is.null');
+        return new Response(null, { status: 206, headers: { 'content-range': '0-0/' + voiceHour } });
+      }
       if (u.hostname === 'push.example' || u.hostname === 'gone.example') {
         pushes.push({ url, headers: o.headers });
         return new Response('', { status: u.hostname === 'gone.example' ? 410 : 201 });
@@ -89,6 +94,12 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.equal((await F.handle(req({ action: 'voice', secret: SECRET, id: 77 }, null), env, fake({ msg: { ...msg, kind: 'text' } }))).status, 404);
   assert.equal((await F.handle(req({ action: 'voice', secret: SECRET, id: 77 }, null), env, fake({ msg: { ...msg, at: new Date(Date.now() - 2 * 3600e3).toISOString() } }))).status, 410);
   assert.equal((await F.handle(req({ action: 'voice', secret: 'short', id: 77 }, null), env, fake({ msg }))).status, 400);
+  // the Gemini budget: 30 voice notes written in the last hour (all chats) = no Gemini call, the note stays a voice note to play
+  f = fake({ msg, voiceHour: F.GEMINI_BUDGET.voiceHour });
+  r = await F.handle(req({ action: 'voice', secret: SECRET, id: 77 }, null), env, f);
+  assert.equal(r.status, 429); assert.ok(!f.calls.some((c) => c.url.includes('generativelanguage'))); assert.deepEqual(f.patched, []);
+  f = fake({ msg, voiceHour: F.GEMINI_BUDGET.voiceHour - 1 });
+  assert.equal((await F.handle(req({ action: 'voice', secret: SECRET, id: 77 }, null), env, f)).status, 200, 'one under the budget: written');
   // a customer just wrote: the owner's phone and staff with «خدمة العملاء» (not staff without it), once a minute per chat
   const STAFF2 = '00000000-0000-4000-8000-0000000000c2';
   function fake2({ notified = null, lastAt = new Date().toISOString(), supplier = null } = {}) {

@@ -995,6 +995,15 @@ export async function handleInbox(req: Request, env: Env, fetchImpl: typeof fetc
 // (ar_sync_news block 3c), and the laptop's reader fills a photo Google could not read, as for WhatsApp's.
 // No login: the chat's secret is the key, and only a warehouse's chat is read. Each message is taken once (inbox_at).
 const CHAT_DAYS = 3, CHAT_BATCH = 4, CHAT_BUDGET_MS = 90 * 1000;
+export const LINK_GEMINI_HOUR = 60;
+// the photos / PDFs from warehouses' links kept in the last hour (PostgREST's count, nothing read); unknown = over (fails closed)
+async function linkReadsLastHour(env: Env, sh: Record<string, string>, fetchImpl: typeof fetch): Promise<number> {
+  const since = encodeURIComponent(new Date(Date.now() - 3600e3).toISOString());
+  const r = await fetchImpl(`${env.SUPABASE_URL!.replace(/\/$/, '')}/rest/v1/ar_inbox?select=id&via=eq.link&kind=in.(image,pdf)&received_at=gte.${since}`,
+    { method: 'HEAD', headers: { ...sh, Prefer: 'count=exact', Range: '0-0' }, signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(() => null);
+  const m = /\/(\d+)$/.exec((r && r.headers.get('content-range')) || '');
+  return m ? Number(m[1]) : Infinity;
+}
 type ChatMsg = { id: number; kind: string; body: string | null; media: string | null };
 export async function handleChatInbox(req: Request, env: Env, fetchImpl: typeof fetch, headers: Record<string, string>): Promise<Response> {
   const service = env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -1080,8 +1089,13 @@ async function linkItem(env: Env, fetchImpl: typeof fetch, base: string, sh: Rec
       const all: unknown[][] = [];
       for (const n of wb.SheetNames) all.push(...XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '', raw: false, blankrows: false }) as unknown[][]);
       rows = sheetNames(all).slice(0, MAX_LINES).map(lineRow).filter((r): r is Row => !!r);
-    } else rows = await readFileRows(env, fetchImpl, bytes, kind, name, ct);
-  } catch (e) { error = (e as Error).message === 'quota' ? 'خلصت حصة Gemini المجانية' : String((e as Error).message || e).slice(0, 200); }
+    } else {
+      // the Gemini budget (review 2026-11-23 security-1): a warehouse's number opens its chat with no login, so the photos and PDFs read from links
+      // are counted per hour (the busiest real hour: 10). Over it the row is kept unread, as when Gemini fails, and the laptop's reader fills it.
+      if (await linkReadsLastHour(env, sh, fetchImpl) >= LINK_GEMINI_HOUR) throw new Error('budget');
+      rows = await readFileRows(env, fetchImpl, bytes, kind, name, ct);
+    }
+  } catch (e) { const msg = (e as Error).message; error = msg === 'quota' ? 'خلصت حصة Gemini المجانية' : msg === 'budget' ? 'اتأجلت قرايتها: وصل كتير من الروابط في الساعة دي' : String(msg || e).slice(0, 200); }
   const s = await scoreInboxRows(env, sh, fetchImpl, error ? [] : rows);
   const row = { sender: 'رابط المخزن', supplier, kind, body_text: text, file_path: filePath, status: error ? 'error' : 'new', error, rows: s.list, sure: s.sureIds.size, review: s.review, via: 'link', chat_msg: m.id };
   const ins = await fetchImpl(`${base}/rest/v1/ar_inbox`, { method: 'POST', body: JSON.stringify(row), headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
