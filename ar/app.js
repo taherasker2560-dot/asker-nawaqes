@@ -369,7 +369,7 @@
       drawTranslate();
       drawShort();
       applySuppliers((await asked[2]) ?? (cached ? cached.suppliers || [] : []));
-      orders = await asked[3];
+      orders = (await asked[3]) || [];   // the first read has nothing older to keep
       drawShort(); // the «اتطلب» marks need the orders
       drawPending();
       inbox = await asked[4];
@@ -1605,11 +1605,21 @@
       if (error) throw Error(error.message);
       return data || [];
     } catch (e) {
-      return [];
+      return null;   // not «nothing ordered»: the caller keeps what it had (review 2026-11-23 errors-1)
     }
   }
+  let ordersStale = false;
   async function loadOrders() {
-    orders = await fetchOrders();
+    const fresh = await fetchOrders();
+    if (fresh) {
+      orders = fresh;
+      if (ordersStale) { ordersStale = false; status('msgStatus', ''); }
+    } else {
+      // the read failed (weak network when the phone wakes): the «اتطلب» marks he already had stay, and he is told they may be old.
+      // Replacing them with an empty list put items already ordered from another company back in the next company's message.
+      ordersStale = true;
+      status('msgStatus', 'مفيش نت: علامات «اتطلب» مش متحدثة، جرّب تاني', 'bad');
+    }
     drawShort();
   }
   // the companies an item was ordered from today ('' when marked without a company)

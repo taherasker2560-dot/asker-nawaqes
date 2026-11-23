@@ -158,3 +158,20 @@ run('orders tab: two doors, medicines and cosmetics (owner 2026-11-15 «ده ف�
  assert.ok(await page.isVisible('#odDoorEmpty'));assert.match(await text(page,'#odDoorEmpty'),/مفيش أصناف مستحضرات في أمر الشرا دلوقتي/);
  assert.ok(!(await page.isVisible('#odSupBox')));
 });
+
+run('orders tab: a failed read of today\'s «اتطلب» marks keeps the marks it had and says so (review 2026-11-23 errors-3)',async({page})=>{
+ await put(page,drafts());
+ // SALINE was already ordered today (from AMG): it is not offered in this draft again
+ await page.evaluate(()=>{window.__tables.ar_orders=[{id:'o9',name_key:'SALINE 0.9% 500CC RCقديم',product_name:'SALINE 0.9% 500CC RCقديم',supplier:'AMG',ordered_at:new Date().toISOString()}]});
+ await page.click('[data-group="purchases"]');await page.click('[data-pgroup="orders"]');await page.click('[data-tab="drafts"]');
+ await page.waitForSelector('#odChips [data-sup]');
+ assert.doesNotMatch(await msgOf(page),/SALINE/,'ordered today: not in the draft');
+ assert.match(await text(page,'#odStatus'),/صنف اتطلبوا النهارده/);
+ // the connection drops: «تحديث» reads again and the read of ar_orders fails
+ await page.evaluate(()=>localStorage.setItem('__fakeFail','ar_orders'));
+ await page.click('[data-tab="docs"]');await page.click('[data-tab="drafts"]');   // every visit of the tab reads again
+ await page.waitForFunction(()=>/مفيش نت: مش متأكد إيه اللي اتطلب النهارده/.test(document.getElementById('odStatus').textContent));
+ assert.ok(await page.$eval('#odStatus',e=>e.classList.contains('bad')));
+ assert.doesNotMatch(await msgOf(page),/SALINE/,'the marks it had are kept: the item is not offered again');
+ await page.evaluate(()=>localStorage.removeItem('__fakeFail'));
+});

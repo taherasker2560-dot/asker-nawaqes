@@ -2599,6 +2599,8 @@ window.AskerEN = {
   "مخزن انتظار": "waiting store",
   "انتظار": "waiting",
   "سوفيكو": "Sofico",
-  "فارما": "Pharma"
+  "فارما": "Pharma",
+  "مفيش نت: علامات «اتطلب» مش متحدثة، جرّب تاني": "No connection: the «ordered» marks are not up to date, try again",
+  "مفيش نت: مش متأكد إيه اللي اتطلب النهارده، جرّب تاني": "No connection: not sure what was ordered today, try again"
  }
 };
