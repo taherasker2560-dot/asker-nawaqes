@@ -660,7 +660,7 @@
     try {
       const { error } = await db().from('ar_orders').insert(rows);
       if (error) throw error;
-      ordered = await soft(loadOrdered(), ordered);
+      ordered = await soft(loadOrdered(), ordered.concat(rows));   // written: the marks hold even if the re-read fails
       // what was just marked leaves the order right away (owner: «ما يظهرش تاني لما اجي اطلب تعديل»)
       reapply();
       carry[current] = 'new';

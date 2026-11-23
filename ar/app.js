@@ -369,7 +369,9 @@
       drawTranslate();
       drawShort();
       applySuppliers((await asked[2]) ?? (cached ? cached.suppliers || [] : []));
-      orders = (await asked[3]) || [];   // the first read has nothing older to keep
+      const firstOrders = await asked[3];   // the first read has nothing older to keep, but a failure is said, not silent
+      orders = firstOrders || [];
+      if (!firstOrders) { ordersStale = true; status('msgStatus', ORDERS_STALE, 'bad'); }
       drawShort(); // the «اتطلب» marks need the orders
       drawPending();
       inbox = await asked[4];
@@ -1609,16 +1611,18 @@
     }
   }
   let ordersStale = false;
+  const ORDERS_STALE = 'مفيش نت: علامات «اتطلب» مش متحدثة، جرّب تاني';
   async function loadOrders() {
     const fresh = await fetchOrders();
     if (fresh) {
       orders = fresh;
-      if (ordersStale) { ordersStale = false; status('msgStatus', ''); }
+      // only his own warning goes (not another message that is on the screen by now)
+      if (ordersStale) { ordersStale = false; if ($('msgStatus') && $('msgStatus').textContent === ORDERS_STALE) status('msgStatus', ''); }
     } else {
       // the read failed (weak network when the phone wakes): the «اتطلب» marks he already had stay, and he is told they may be old.
       // Replacing them with an empty list put items already ordered from another company back in the next company's message.
       ordersStale = true;
-      status('msgStatus', 'مفيش نت: علامات «اتطلب» مش متحدثة، جرّب تاني', 'bad');
+      status('msgStatus', ORDERS_STALE, 'bad');
     }
     drawShort();
   }
@@ -1640,6 +1644,7 @@
     if (!rows.length) return 0;
     const { error } = await client.from('ar_orders').insert(rows);
     if (error) throw Error(error.message);
+    orders = orders.concat(rows);   // written: the marks hold even if the re-read below fails (the second check of 11-23)
     await loadOrders();
     drawToday();
     return rows.length;
