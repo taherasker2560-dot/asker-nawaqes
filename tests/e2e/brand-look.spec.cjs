@@ -42,7 +42,7 @@ run('Brand look: the account — white page, no blessing strip, no wave, a quiet
  assert.notEqual(look.barBg,'rgb(255, 255, 255)','the bottom bar is the light tint of the color');
  assert.equal(look.accent,'#217bab','the calm sky blue by default');
  assert.equal(look.orderBg,'rgb(235, 244, 249)','the account\'s main button is a big one, so it is SOFT: the tint of the calm sky blue with a line in the color (owner 2026-11-19 night)');
- assert.equal(look.orderRadius,'999px','the buttons stay oval (owner 2026-11-17)');
+ assert.equal(look.orderRadius,'16px','«اطلب» is one of the four big tiles now (owner 2026-11-23), soft 16px corners like the airy look\'s big buttons (owner 2026-11-19/21)');
  if(look.payBg){assert.equal(look.payBg,'rgb(235, 244, 249)','the pay button is a big one too: soft');}
  assert.equal(look.meta,'#217bab','the phone\'s top bar (and the three Android buttons) are the system color');
  // the home: a quiet hero with the round logo, two tiles, three perks, the green footer with the hours
