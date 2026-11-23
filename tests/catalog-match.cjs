@@ -1,6 +1,6 @@
 // Matcher rules on a small invented item list (the real list is private and not in this repository).
 const assert=require('node:assert/strict'),path=require('node:path');
-(async()=>{const M=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','read-supplier-image','match.ts')).href);
+(async()=>{const M=await import(require('node:url').pathToFileURL(path.join(__dirname,'..','supabase','functions','arabic-shortages','match.ts')).href);
 const cat=new M.Catalog([['1','JANUVIA 100MG 28TAB'],['2','JANUVIA 50MG 28TAB'],['3','KAST4  MG SACH'],['4','KAST 10MG 10TAB'],['5','CARBIMAZOLE 5MG 50T.'],['6','TEGRETOL 200MG 30T.'],['7','TEGRETOL CR 200MG 20T.'],['8','NAPIBRADINE 7.5 M TAB'],['9','NAPIBRADINE 5M TAB'],['10','FLAGYL 125MG SYP',['فلاجيل شراب']]]);
 const best=(a,e)=>{const c=cat.candidates(a,e);return [c[0]?.name,M.decide(c)?.confidence]};
 assert.equal(M.normalize('سيرافى ٣٤٠جم'),'سيرافي 340 جم');assert.equal(M.normalize('نابيبرادين ٧,٥مجم'),'نابيبرادين 7.5 مجم');assert.equal(M.normalize('گاست'),'كاست');
