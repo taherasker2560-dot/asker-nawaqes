@@ -878,6 +878,58 @@
       if (st === me) drawStatement();
     }
   }
+  // «📱 QR لحسابه» (owner 2026-11-23: «زباينى ناس على قدها فى التكنولوجيا محتاجين نبسط الامور عليهم» … «هعمل ٢ كيو ار واحد للعملا و واحد لمستخدمين الموقع»;
+  // mockup customer_qr_2026-11-23, «ا موافق»): his own link as a big code ON THE SCREEN (never printed: it opens his account) for him to photograph with his phone
+  // at the counter. The same secret as the WhatsApp link (one is made, not sent, when he has none); «from=qr» makes his page put «ثبّت التطبيق» first.
+  // The code for everybody else (the site) is the printed one of «رابط الموقع» (ar/store-link.js), same library.
+  const QR_LIB = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js';
+  let qrLoading = null;
+  function loadQr() {
+    if (root.qrcode) return Promise.resolve(root.qrcode);
+    if (!qrLoading) qrLoading = new Promise((ok, bad) => {
+      const s = document.createElement('script');
+      s.src = QR_LIB; s.onload = () => (root.qrcode ? ok(root.qrcode) : bad(new Error('lib'))); s.onerror = () => { qrLoading = null; bad(new Error('lib')); };
+      document.head.append(s);
+    });
+    return qrLoading;
+  }
+  const qrUrl = (base, token) => linkUrl(base, token) + '&from=qr';
+  function closeQr() { const d = document.getElementById('cuQr'); if (d) d.remove(); }
+  function drawQr(name, url, svg) {
+    closeQr();
+    const d = document.createElement('div');
+    d.id = 'cuQr'; d.className = 'cu-qr';
+    d.innerHTML = `<div class="cu-qr-card" role="dialog" aria-modal="true" data-url="${esc(url)}">` +
+      `<b class="cu-qr-name">${esc(tr('حساب'))} ${esc(name)}</b><p class="hint">${esc(tr('خلّيه يفتح الكاميرا ويصوّر الكود'))}</p>` +
+      `<div class="cu-qr-img">${svg}</div>` +
+      `<ol class="cu-qr-steps"><li>${esc(tr('يفتح الكاميرا ويصوّر الكود'))}</li><li>${esc(tr('يدوس اللينك اللي يظهر: يفتح حسابه'))}</li><li>${esc(tr('يدوس «📲 ثبّت التطبيق»: الأيقونة على شاشته'))}</li></ol>` +
+      `<p class="hint cu-qr-ios">${esc(tr('آيفون: زرار المشاركة ⬆ ← «إضافة إلى الشاشة الرئيسية»'))}</p>` +
+      `<button type="button" class="secondary cu-qr-close" data-cu-qr-close>${esc(tr('خلاص، اقفل'))}</button></div>`;
+    document.body.appendChild(d);
+  }
+  async function showQr() {
+    const me = st;
+    if (!me || me.linkBusy) return;
+    me.linkBusy = true; me.linkMsg = ''; drawStatement();
+    try {
+      let token = me.link && me.link.token;
+      if (!token) {
+        const { data, error } = await db().rpc('ar_customer_link', { p_customer: me.c.id, p_new: false });
+        if (error) throw new Error(error.message || String(error));
+        if (!data || !data.ok || !data.token) throw new Error((data && data.error) || 'مفيش رابط');
+        me.link = { token: data.token, created_at: new Date().toISOString(), last_seen_at: null, seen_count: 0 };
+        token = data.token;
+      }
+      const qr = await loadQr(), url = qrUrl(location.href, token);
+      const q = qr(0, 'M'); q.addData(url); q.make();
+      drawQr(me.c.name, url, q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }));
+    } catch (e) {
+      Object.assign(me, { linkMsg: 'الكود ما اتعملش: ' + errText(e), linkBad: true });
+    } finally {
+      me.linkBusy = false;
+      if (st === me) drawStatement();
+    }
+  }
   async function setStop(on) {
     const me = st;
     if (!me || me.stopBusy || !stops) return;
@@ -904,6 +956,7 @@
     return '<div class="cu-link">' +
       (stop ? `<p class="cu-stopped">⛔ موقوف من ${esc(whenText(localIso(stop.stopped_at), new Date()))}: رابطه بيقوله «حسابك موقوف»، وطلباته كاش بس</p>` : '') +
       `<button type="button" class="cu-send" data-cu-link-send${st.linkBusy ? ' disabled' : ''}>🔗 ابعتله رابط حسابه على الواتس</button>` +
+      `<button type="button" class="cu-qrbtn" data-cu-link-qr${st.linkBusy ? ' disabled' : ''}>📱 QR لحسابه: صوّره من موبايله</button>` +
       `<button type="button" class="secondary cu-view" data-cu-link-view${st.linkBusy ? ' disabled' : ''}>👁 شوف صفحته</button>` +
       (stop
         ? `<button type="button" class="secondary cu-unstop" data-cu-unstop${st.stopBusy ? ' disabled' : ''}>✅ رجّع الآجل</button>`
@@ -1135,12 +1188,18 @@
       // his personal link and «وقّف الآجل»
       if (e.target.closest('[data-cu-link-send]')) { sendLink(false); return; }
       if (e.target.closest('[data-cu-link-view]')) { viewPage(); return; }
+      if (e.target.closest('[data-cu-link-qr]')) { showQr(); return; }
       if (e.target.closest('[data-cu-pay]')) { st.pay = { open: true }; drawStatement(); const a = $('cuPayAmt'); if (a) a.focus(); return; }
       if (e.target.closest('[data-cu-paycancel]')) { st.pay = { open: false }; drawStatement(); return; }
       if (e.target.closest('[data-cu-paygo]')) { payGo(); return; }
       if (e.target.closest('[data-cu-link-new]')) { sendLink(true); return; }
       if (e.target.closest('[data-cu-stop]')) { setStop(true); return; }
       if (e.target.closest('[data-cu-unstop]')) { setStop(false); return; }
+    });
+    // the QR card sits on the page (outside the panel): its button or a tap beside the card closes it
+    document.addEventListener('click', (e) => {
+      const d = document.getElementById('cuQr');
+      if (d && (e.target.closest('[data-cu-qr-close]') || e.target === d)) closeQr();
     });
     // the message can be changed before sending; a redraw keeps the change
     panel.addEventListener('input', (e) => {

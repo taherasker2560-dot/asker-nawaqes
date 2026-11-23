@@ -51,8 +51,12 @@
     notifTestBody: 'لو سمعت صوت وظهر الإشعار ده، المنبه هيوصلك كده وقت الجرعة. دوس عليه.',
     // the Android app «منبه الدوا» (alarm-android/): the page offers it in the browser, and inside it the same page edits the alarms
     getAppHead: '🔔 الموقع لوحده بيبعتلك إشعار بس. عشان المنبه يرنّ وينطق اسم الدوا والموبايل مقفول، نزّل تطبيق «منبه الدوا»:',
-    getAppIos: '⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.',
+    // owner 2026-11-23: «عاوز اغير تنبيه اندرويد فقط للمنبه و يتكتب مكانها عميل ايفون يعمل ايه عشان … فيه حل مش مفيش»: the iPhone's way (the site on the home screen + the
+    // server's notification at the dose time, store/dose/sw.js), in place of «⚠️ ده لأندرويد بس، ومش بيشتغل على الآيفون.»
+    getAppIos: '📱 عندك آيفون؟ ضيف الموقع للشاشة الرئيسية (زرار المشاركة ⬆ ← «إضافة إلى الشاشة الرئيسية») وافتحه من الأيقونة، وبعدها في «منبه الدوا» اظبط الدوا ودوس «🔔 فعّل الإشعارات»: هيجيلك إشعار في ميعاد الجرعة.',
     homeSub: 'تطبيق أندرويد بيرنّ وينطق اسم الدوا في ميعاده والموبايل مقفول.',
+    homeSubIos: 'على الآيفون المنبه بيوصلك إشعار في ميعاد الجرعة.',
+    iosOpen: '⏰ اظبط منبه',
     homeLinked: '✓ متوصّل: المنبهات اللي بتظبطها هنا بتروح له لوحدها.',
     appLinked: '✓ تطبيق «منبه الدوا» متوصّل: أي منبه تظبطه هنا بيروح له لوحده وهو اللي بيرنّ وينطق (هتشوف وميض سريع لحظة الحفظ).',
     appOpen: '📲 افتح منبه الدوا',
@@ -303,8 +307,9 @@
     box.hidden = !show;
     if (!show) { box.innerHTML = ''; return; }
     const linked = android && appLinked();
-    box.innerHTML = `<span class="al-home-ico" aria-hidden="true">⏰</span><div><strong>${esc(TEXTS.title)}</strong><span>${esc(linked ? TEXTS.homeLinked : TEXTS.homeSub)}</span><span class="al-home-warn">${esc(TEXTS.getAppIos)}</span></div>` +
-      (android ? `<a class="al-home-btn" data-al-getapp href="${esc(appLink())}">${esc(linked ? TEXTS.appOpen : TEXTS.getApp)}</a>` : '');
+    // an iPhone: what to do there (owner 2026-11-23) and a button that opens the alarm sheet; Android: the app's download, with the iPhone's way under it for whoever has one
+    box.innerHTML = `<span class="al-home-ico" aria-hidden="true">⏰</span><div><strong>${esc(TEXTS.title)}</strong><span>${esc(linked ? TEXTS.homeLinked : android ? TEXTS.homeSub : TEXTS.homeSubIos)}</span><span class="al-home-warn">${esc(TEXTS.getAppIos)}</span></div>` +
+      (android ? `<a class="al-home-btn" data-al-getapp href="${esc(appLink())}">${esc(linked ? TEXTS.appOpen : TEXTS.getApp)}</a>` : `<button type="button" class="al-home-btn" data-al-open>${esc(TEXTS.iosOpen)}</button>`);
   }
   let view = '', draft = null, error = '', ring = null, sayCount = 0, sayTimer = null, voiceOk = null, timer = null, client = null, voiceNote = '', diag = null, diagSum = [], appRinging = false, appRingTimer = null, appBatt = false, adminNote = '', adminC = null, diagBusy = false, diagCopied = false;
 

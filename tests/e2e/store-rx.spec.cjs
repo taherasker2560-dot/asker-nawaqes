@@ -14,8 +14,8 @@ run('Prescription: a tile on his account opens a page of its own; photos, his nu
  await setup(page);
  await open(page,base,'.ac-rx-tile');
  assert.equal(await text(page,'.ac-rx-tile b'),'📋 ابعت الروشتة');assert.equal(await text(page,'.ac-rx-tile small'),'صوّرها واحنا نقراها ونكلمك بالأسعار');
- // after the alarm's tile, before the complaint tile
- assert.equal(await page.evaluate(()=>{const w=document.querySelector('.ac-rx-tile').closest('.ac-al-wrap');return !!w.previousElementSibling.querySelector('.ac-al-tile')&&!!w.nextElementSibling.querySelector('.ac-fb-tile')}),true);
+ // the second of the four big buttons, right after «اطلب» (owner 2026-11-23)
+ assert.equal(await page.evaluate(()=>{const t=document.querySelector('.ac-rx-tile');return t.parentElement.classList.contains('ac-g4')&&t.previousElementSibling.classList.contains('ac-order')}),true);
  await page.click('.ac-rx-tile');await page.waitForSelector('#rxSheet');
  assert.equal(await text(page,'#rxSheet .rg-top b'),'ابعت الروشتة');
  assert.match(await text(page,'#rxSheet .rg-hint'),/لحد 4 صور/);

@@ -1,6 +1,7 @@
 // «اللي باخده دايمًا» + «أدويتي المزمنة» on the customer's own page (owner 2026-11-17: «زرارين كده، كل زرار فيهم بيان بالأصناف … وزرار تاني بيان بالأصناف بتاعة
 // المزمن وتحذيراتها اللي احنا عاملينها في الصفحة لينا، تبقى باينة عندهم هنا»). The server's answer is faked; made-up customers and items only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');
+const openMore=(page)=>page.evaluate(()=>{const d=document.querySelector('#acctBox .ac-more');if(d&&!d.open)d.open=true}); // «المزيد» (owner 2026-11-23: four big buttons, the rest folded)
 const pad=n=>String(n).padStart(2,'0');
 const day=(n)=>{const d=new Date(Date.now()-n*864e5);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
 const today=new Date();
@@ -35,7 +36,7 @@ run('Customer regular items: two buttons with the counts, the list of what he ta
  // the buttons come right after «كرّر دواك بالباركود», then the alarm's tile
  assert.equal(await page.evaluate(()=>{const b=document.querySelector('.ac-reg-two');return b.previousElementSibling.classList.contains('ac-scan')&&b.nextElementSibling.classList.contains('ac-al-wrap')}),true);
  // the list of what he takes: the nearest next refill first, Arabic name with the English under it, the pills
- await page.click('[data-reg-open="usual"]');
+ await openMore(page);await page.click('[data-reg-open="usual"]');
  await page.waitForSelector('#regSheet .rg-it');
  assert.equal(await text(page,'#regSheet .rg-top b'),'اللي باخده دايمًا');
  const names=await page.$$eval('#regSheet .rg-it .rg-main > b',e=>e.map(x=>x.textContent));
@@ -53,7 +54,7 @@ run('Customer regular items: two buttons with the counts, the list of what he ta
  await page.click('[data-reg-close]');
  await page.waitForSelector('#regSheet',{state:'detached'});
  // the chronic list: the warning, then the late ones, the soon one, the on-time ones; the on-time ones are quieter
- await page.click('[data-reg-open="chron"]');
+ await openMore(page);await page.click('[data-reg-open="chron"]');
  await page.waitForSelector('#regSheet .rg-warn');
  assert.equal(await text(page,'#regSheet .rg-top b'),'أدويتي المزمنة');
  assert.match(await text(page,'#regSheet .rg-warn'),/فيه أدوية ميعاد علبتها الجاية عدّى/);
@@ -99,7 +100,7 @@ run('Customer regular items: the English site, the night look, and the owner\'s 
  await page.waitForSelector('.ac-reg-two');
  assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn b',e=>e.map(x=>x.textContent)),['🧾 What I usually take','💊 My chronic medicines']);
  assert.deepEqual(await page.$$eval('.ac-reg-two .ac-reg-btn small',e=>e.map(x=>x.textContent)),['6 items on my account','2 are past their date']);
- await page.click('[data-reg-open="chron"]');
+ await openMore(page);await page.click('[data-reg-open="chron"]');
  await page.waitForSelector('#regSheet .rg-it');
  const t=await text(page,'#regSheet');
  assert.match(t,/Past their date/);assert.match(t,/Due 13 days ago/);assert.match(t,/Due 8 days ago/);assert.match(t,/2 days left/);assert.match(t,/Next in 9 days/);

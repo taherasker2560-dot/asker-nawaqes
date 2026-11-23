@@ -3,6 +3,7 @@
 // A person of the house opens his own link: the same app, but the server sends no total when the owner keeps it, and the owner's own controls are not there for him.
 // The server's answers are faked (state kept in localStorage so a reload keeps it); made-up customers only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');
+const openMore=(page)=>page.evaluate(()=>{const d=document.querySelector('#acctBox .ac-more');if(d&&!d.open)d.open=true}); // «المزيد» (owner 2026-11-23: four big buttons, the rest folded)
 const pad=n=>String(n).padStart(2,'0');
 const day=(n)=>{const d=new Date(Date.now()-n*864e5);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
 const TOK='c'.repeat(64);
@@ -45,7 +46,7 @@ run('Household: the owner adds a person, sends his link, decides the total and t
  assert.equal(await text(page,'.ac-fam-tile b'),'👨‍👩‍👧 أهل البيت');assert.equal(await text(page,'.ac-fam-tile small'),'ابعت التطبيق لأهلك وإنت اللي بتتحكم');
  // the tile comes after the complaint tile (and the alarm's)
  assert.equal(await page.evaluate(()=>document.querySelector('.ac-fam-tile').closest('.ac-al-wrap').previousElementSibling.querySelector('.ac-fb-tile')!==null),true);
- await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet');
+ await openMore(page);await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet');
  assert.equal(await text(page,'#familySheet .rg-top b'),'أهل البيت');
  assert.match(await text(page,'#familySheet .rg-hint'),/كل واحد من أهلك بياخد رابط لنفسه/);
  assert.match(await text(page,'#familySheet'),/لسه ما ضفتش حد من أهلك\./);
@@ -78,7 +79,7 @@ run('Household: the owner adds a person, sends his link, decides the total and t
  await page.click('[data-fm-close]');await page.waitForFunction(()=>!document.getElementById('familySheet'));
  assert.equal(await text(page,'.ac-fam-tile small'),'واحد من أهلك');
  // removing him: asked first, then his link is gone
- await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet [data-fm-del]');
+ await openMore(page);await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet [data-fm-del]');
  await page.evaluate(()=>{window.__asked=null;window.confirm=(m)=>{window.__asked=m;return false}});
  await page.click('[data-fm-del]');assert.equal(await page.evaluate(()=>window.__asked),'تشيل ماما من أهل البيت؟ رابطه هيقف فورًا.');assert.equal((await fam(page)).members.length,1,'«لا» keeps him');
  await page.evaluate(()=>{window.confirm=()=>true});
@@ -91,7 +92,7 @@ run('Household: ten at most; and no tile at all when the server does not have th
  await setup(page,{members:Array.from({length:10},(_,i)=>member(i+1,'فرد '+(i+1)))});
  await openAs(page,base,TOK,'.ac-fam-tile');
  assert.equal(await text(page,'.ac-fam-tile small'),'10 من أهلك');
- await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet [data-fm-card]');
+ await openMore(page);await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet [data-fm-card]');
  assert.equal(await page.$$eval('#familySheet [data-fm-card]',e=>e.length),10);
  assert.equal(await text(page,'#familySheet .al-warn'),'وصلت للحد الأقصى (10). شيل حد عشان تضيف.');assert.equal(await page.$('[data-fm-name]'),null);
 },{home:true});
@@ -142,7 +143,7 @@ run('Household: in English too (the owner\'s tile and list, the person\'s greeti
  await setup(page,{lang:'en',members:[member(1,'Omar')]});
  await openAs(page,base,TOK,'.ac-fam-tile');
  assert.equal(await text(page,'.ac-fam-tile b'),'👨‍👩‍👧 My household');assert.equal(await text(page,'.ac-fam-tile small'),'One family member');
- await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet [data-fm-card]');
+ await openMore(page);await page.click('.ac-fam-tile');await page.waitForSelector('#familySheet [data-fm-card]');
  assert.equal(await text(page,'#familySheet .rg-top b'),'Household');
  assert.match(await text(page,'#familySheet .rg-hint'),/Each family member gets his own link/);
  assert.equal(await text(page,'[data-fm-card] > small'),"Hasn't opened the link yet");

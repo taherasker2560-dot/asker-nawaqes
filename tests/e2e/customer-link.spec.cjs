@@ -3,6 +3,7 @@
 // The owner sends the link and stops/allows credit from the customer's statement; the customer opens store.html#me=<secret>
 // and sees only his account, and orders on account or cash. Made-up customers only: the repository is public.
 const {run,text,assert}=require('./harness.cjs');
+const openMore=(page)=>page.evaluate(()=>{const d=document.querySelector('#acctBox .ac-more');if(d&&!d.open)d.open=true}); // «المزيد» (owner 2026-11-23: four big buttons, the rest folded)
 const pad=n=>String(n).padStart(2,'0');
 const at=(d,h,m)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}:00`;
 const today=new Date(),old=new Date(Date.now()-40*864e5);
@@ -286,7 +287,7 @@ run('Customer link: the items\' pictures show in his account when he opens an in
  assert.match(pics[0].text,/PANADOL EXTRA 24 TAB.*66.70/);assert.match(pics[1].text,/VITACID C 1000.*100/,'the other line as before');
  // the PDF he downloads: the picture and a link to the item in the store
  await page.click('[data-acct-filter="home"]');
- const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.click('[data-acct-pdf]')]);
+ await openMore(page);const [dl]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.click('[data-acct-pdf]')]);
  const fs=require('node:fs');const pdf=fs.readFileSync(await dl.path()).toString('latin1');
  assert.ok(pdf.startsWith('%PDF-1.4'));
  assert.equal((pdf.match(/\/Subtype \/Link/g)||[]).length,1,'one link: PANADOL');
@@ -300,10 +301,16 @@ run('Customer link: he lands on his account (the balance first), the install but
  await page.goto(base+'store.html#me='+tok);
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
  // the order of the page: the balance, the order button, the PDF/chat row, then the install button; nothing big about installing above the balance
- const order=await page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-order')?'order':e.matches('.ac-row')?'row':e.matches('[data-acct-install]')?'install':e.matches('.ac-install-why')?'why':e.matches('.ac-tabs')?'tabs':e.className||e.tagName));
+ const order=await page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-g4')?'four':e.matches('.ac-more')?'more':e.matches('[data-acct-install]')?'install':e.matches('.ac-install-why')?'why':e.matches('.ac-tabs')?'tabs':e.matches('.ac-qr-install')?'qr':e.className||e.tagName));
  assert.equal(order[0],'tabs','the four tabs are pinned at the top');
  assert.equal(order[1],'balance','and the account is the first thing under them');
- assert.ok(order.indexOf('install')>order.indexOf('row'),'the install button comes after the account\'s own buttons: '+order.join(','));
+ // owner 2026-11-23: four big buttons (order, prescription, talk to the pharmacy, alarm), the rest folded under «المزيد», then the install button
+ assert.deepEqual(order.slice(2,5),['four','more','install'],order.join(','));
+ assert.equal(order.indexOf('qr'),-1,'from the WhatsApp link: no install box on top');
+ assert.deepEqual(await page.$$eval('#acctBox .ac-g4 > *',els=>els.map(e=>e.matches('.ac-order')?'order':e.matches('.ac-rx-tile')?'rx':e.matches('.ac-talk')?'talk':e.matches('.ac-al-tile')?'alarm':e.className)),['order','rx','talk','alarm']);
+ assert.equal(await page.$eval('#acctBox .ac-more',d=>d.open),false,'«المزيد» starts folded');
+ await openMore(page);await page.click('[data-acct-filter="all"]');await page.click('[data-acct-filter="home"]');
+ assert.equal(await page.$eval('#acctBox .ac-more',d=>d.open),true,'and stays open once he opened it');
  assert.equal(await page.$('.ac-moves'),null,'his movements are on their own pages, not under the buttons');
  // not the big button any more
  const h=await page.$eval('[data-acct-install]',b=>b.getBoundingClientRect().height);
@@ -318,4 +325,44 @@ run('Customer link: he lands on his account (the balance first), the install but
  assert.ok(await page.isVisible('#acctCard'),'the home has «حسابي» to go back');
  await page.click('#acctCard');
  await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+},{home:true});
+// «📱 QR لحسابه» (owner 2026-11-23: «هعمل ٢ كيو ار واحد للعملا و واحد لمستخدمين الموقع»; mockup customer_qr_2026-11-23): the owner shows the customer's own link as a code on HIS screen
+// (never printed), with from=qr; the same secret as the WhatsApp link (one is made, nothing is sent)
+run('Customer QR: the owner shows his code on the screen (his own link + from=qr, the same secret, nothing sent), the steps under it, and closes it',async({page})=>{
+ await page.evaluate(([c,m,p])=>{Object.assign(window.__tables,{ar_customers:c,ar_customer_moves:m,ar_customer_phones:p,ar_customer_links:[],ar_customer_stops:[]});window.__opened=[];window.open=(u)=>{window.__opened.push(u);return null};
+  window.qrcode=()=>({addData(u){window.__qrData=u},make(){},createSvgTag(){return '<svg class="fake-qr" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>'}})},[CUSTOMERS,MOVES,PHONES]);
+ await page.click('[data-group="accounts"]');await page.waitForSelector('#cuBox:not(.hidden)');await page.click('#cuChips [data-cu-view="all"]');
+ await page.click('#cuRows [data-cu="101"]');await page.waitForSelector('#cuSt:not(.hidden) [data-cu-link-qr]');
+ assert.equal(await text(page,'[data-cu-link-qr]'),'📱 QR لحسابه: صوّره من موبايله');
+ await page.click('[data-cu-link-qr]');await page.waitForSelector('#cuQr .fake-qr');
+ const url=await page.evaluate(()=>window.__qrData);
+ const m=/store\.html\?me=([0-9a-f]{64})&from=qr$/.exec(url);assert.ok(m,'his link with from=qr: '+url);
+ assert.equal(await page.$eval('#cuQr .cu-qr-card',e=>e.dataset.url),url);
+ assert.match(await text(page,'#cuQr'),/حساب أحمد محمود/);
+ assert.deepEqual(await page.$$eval('#cuQr .cu-qr-steps li',e=>e.map(x=>x.textContent)),['يفتح الكاميرا ويصوّر الكود','يدوس اللينك اللي يظهر: يفتح حسابه','يدوس «📲 ثبّت التطبيق»: الأيقونة على شاشته']);
+ assert.match(await text(page,'#cuQr .cu-qr-ios'),/آيفون: زرار المشاركة/);
+ const links=await page.evaluate(()=>window.__tables.ar_customer_links);
+ assert.equal(links.length,1,'a link was made for him');assert.equal(links[0].token,m[1],'the same secret the WhatsApp button sends');
+ assert.deepEqual(await page.evaluate(()=>window.__opened),[],'nothing opened or sent');
+ await page.click('[data-cu-qr-close]');assert.equal(await page.$('#cuQr'),null,'closed');
+ // a second time: the same link, no new one
+ await page.click('[data-cu-link-qr]');await page.waitForSelector('#cuQr .fake-qr');
+ assert.equal(await page.evaluate(()=>window.__qrData),url);assert.equal((await page.evaluate(()=>window.__tables.ar_customer_links)).length,1);
+});
+
+run('Customer QR: opened from the counter\'s code (from=qr) «ثبّت التطبيق» is the first thing, above the balance, for this visit; the address is cleaned',async({page,base})=>{
+ const tok='c'.repeat(64);
+ await page.evaluate(([c,m,p,t])=>{localStorage.setItem('__fakeTables',JSON.stringify({ar_customers:c,ar_customer_moves:m,ar_customer_phones:p,ar_customer_links:[{customer_id:101,token:t}],ar_customer_stops:[],ar_store_orders:[]}))},[CUSTOMERS,MOVES,PHONES,tok]);
+ await page.goto(base+'store.html?me='+tok+'&from=qr');
+ await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ assert.equal(await page.evaluate(()=>location.search),'','the secret and from=qr leave the address');
+ const order=()=>page.$$eval('#acctBox > *',els=>els.map(e=>e.matches('.ac-bal')?'balance':e.matches('.ac-qr-install')?'qr':e.matches('.ac-tabs')?'tabs':e.matches('[data-acct-install]')?'install':e.className||e.tagName));
+ assert.deepEqual((await order()).slice(0,3),['tabs','qr','balance']);
+ assert.equal(await text(page,'.ac-qr-install b'),'📲 خلّي حسابك على شاشة موبايلك');
+ assert.equal(await text(page,'.ac-qr-install small'),'دوسة واحدة، وبعد كده تفتحه من الأيقونة');
+ assert.equal(await page.$$eval('#acctBox [data-acct-install]',e=>e.length),1,'one install button, the one on top');
+ assert.equal((await order()).indexOf('install'),-1,'not again at the bottom');
+ // a reload in the same visit keeps it on top
+ await page.reload();await page.waitForSelector('[data-view="account"]:not([hidden]) .ac-bal');
+ assert.ok(await page.$('#acctBox .ac-qr-install [data-acct-install]'));
 },{home:true});
