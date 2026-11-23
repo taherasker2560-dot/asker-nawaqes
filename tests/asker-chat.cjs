@@ -132,10 +132,15 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.deepEqual(f.pushes.sort(), ['gone.example/old', 'push.example/owner', 'push.example/staff-other']);
 
   // «what»: the bot's worker asks what a push was about, with its own saved push address (owner 2026-11-14 «مفيش صوت اشعار»)
-  function fake3({ known = true, warehouse = null, customer = null } = {}) {
+  function fake3({ known = true, warehouse = null, customer = null, docs = [], who = OWNER } = {}) {
     const f = async (url) => {
       const u = new URL(url);
-      if (u.pathname === '/rest/v1/ar_chat_staff_push') { assert.equal(u.searchParams.get('endpoint'), 'eq.https://fcm.example/me'); return new Response(JSON.stringify(known ? [{ user_id: OWNER }] : [])); }
+      if (u.pathname === '/rest/v1/ar_chat_staff_push') { assert.equal(u.searchParams.get('endpoint'), 'eq.https://fcm.example/me'); return new Response(JSON.stringify(known ? [{ user_id: who }] : [])); }
+      if (u.pathname === '/rest/v1/ar_documents') {
+        assert.equal(who, OWNER, 'the invoice photos are the owner\'s: a staff phone never asks');
+        assert.ok(new Date(u.searchParams.get('announced_at').slice(4)) > new Date(Date.now() - 16 * 60e3), 'the last 15 minutes');
+        return new Response(JSON.stringify(docs));
+      }
       if (u.pathname === '/rest/v1/ar_chats') {
         assert.ok(new Date(u.searchParams.get('last_at').slice(4)) > new Date(Date.now() - 16 * 60e3), 'the last 15 minutes');
         if (u.searchParams.get('supplier') === 'not.is.null') { assert.equal(u.searchParams.get('last_from'), 'eq.customer'); return new Response(JSON.stringify(warehouse ? [warehouse] : [])); }
@@ -154,6 +159,15 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
   assert.deepEqual(b, { title: 'رسالة جديدة من عميل', body: 'سامية كتبلك في «خدمة العملاء ← الرسايل»', tab: 'care' });
   b = await (await what(fake3())).json();
   assert.deepEqual(b, { title: 'صيدلية عسكر', body: 'فيه جديد في السيستم', tab: '' });
+  // invoice photos just told (owner 11-17 «أول ما الصور تيجي تنبهني», moved off the laptop's Claude task 11-23): the newest batch, its suppliers
+  b = await (await what(fake3({ customer: { name: 'سامية', last_at: t1 }, docs: [{ supplier: 'شركة تجربة', announced_at: t2 }, { supplier: null, announced_at: t2 }, { supplier: 'شركة تجربة', announced_at: t2 }, { supplier: 'مخزن قديم', announced_at: t1 }] }))).json();
+  assert.deepEqual(b, { title: 'وصلت 3 صور فواتير', body: 'شركة تجربة. شوفها في «الفواتير»', tab: 'docs' });
+  b = await (await what(fake3({ docs: [{ supplier: null, announced_at: t2 }] }))).json();
+  assert.deepEqual(b, { title: 'وصلت صورة فاتورة', body: 'شوفها في «الفواتير»', tab: 'docs' });
+  b = await (await what(fake3({ customer: { name: 'سامية', last_at: t2 }, docs: [{ supplier: 'شركة تجربة', announced_at: t1 }] }))).json();
+  assert.equal(b.tab, 'care', 'a customer who wrote after the photos comes first');
+  b = await (await what(fake3({ who: STAFF, customer: { name: 'سامية', last_at: t1 } }))).json();
+  assert.equal(b.tab, 'care', 'a staff phone is never told about the invoices');
   // a push address the pharmacy never saved: nothing said
   assert.equal((await what(fake3({ known: false }))).status, 404);
   assert.equal((await F.handle(req({ action: 'what', endpoint: 'http://x' }, null), env, fake3())).status, 400);
@@ -197,5 +211,44 @@ const assert = require('node:assert/strict'), path = require('node:path'), crypt
       ['/rest/v1/ar_inbox', '?file_path=like.2026-10-29/*', { file_path: null }]]);
     assert.ok(!JSON.stringify(calls).includes('docs/2026-10-01/inv.jpg"]'), 'the invoices are never deleted');
   }
-  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes or a warehouse sends, «what» for the bot\'s worker, the nightly clean-up');
+  // «docs» (pg_cron every 5 min): the new invoice photos nobody was told about → marked told, then one push to the OWNER's phones only
+  {
+    const D1 = 'aaaaaaaa-0000-4000-8000-000000000001', D2 = 'aaaaaaaa-0000-4000-8000-000000000002', calls = [], pushes = [];
+    const fd = (docs) => async (url, o = {}) => {
+      const u = new URL(url); calls.push({ path: u.pathname, q: decodeURIComponent(u.search), method: o.method || 'GET', body: o.body && typeof o.body === 'string' ? JSON.parse(o.body) : null });
+      if (u.hostname === 'push.example') { pushes.push(u.pathname); return new Response('', { status: 201 }); }
+      if (u.pathname === '/rest/v1/ar_documents' && !o.method) {
+        assert.equal(u.searchParams.get('status'), 'eq.new'); assert.equal(u.searchParams.get('announced_at'), 'is.null');
+        return new Response(JSON.stringify(docs));
+      }
+      if (u.pathname === '/rest/v1/ar_documents' && o.method === 'PATCH') return new Response(null, { status: 204 });
+      if (u.pathname === '/rest/v1/ar_chat_staff_push') {
+        assert.equal(u.searchParams.get('user_id'), 'eq.' + OWNER, 'the owner\'s phones only');
+        return new Response(JSON.stringify([{ endpoint: 'https://push.example/owner1' }, { endpoint: 'https://push.example/owner2' }]));
+      }
+      throw Error('unexpected ' + url);
+    };
+    const day = Date.UTC(2026, 10, 23, 10, 0); // 12:00 Cairo
+    const realNow = Date.now; Date.now = () => day;
+    try {
+      let r = await F.handle(req({ action: 'docs' }, null), env, fd([{ id: D1 }, { id: D2 }])), b = await r.json();
+      assert.deepEqual(b, { ok: true, new: 2, sent: 2, gone: 0, failed: 0, codes: [201, 201] });
+      const patch = calls.find((c) => c.method === 'PATCH');
+      assert.equal(patch.q, `?id=in.(${D1},${D2})`); assert.ok(patch.body.announced_at, 'marked told');
+      assert.ok(calls.indexOf(patch) < calls.findIndex((c) => c.path === '/rest/v1/ar_chat_staff_push'), 'marked before the push: told once');
+      assert.deepEqual(pushes, ['/owner1', '/owner2']);
+      // nothing new: no push
+      calls.length = 0; pushes.length = 0;
+      b = await (await F.handle(req({ action: 'docs' }, null), env, fd([]))).json();
+      assert.deepEqual(b, { ok: true, new: 0 }); assert.equal(pushes.length, 0);
+      // at night (02:00 Cairo) nothing is read: the photo is told at 08:00
+      Date.now = () => Date.UTC(2026, 10, 23, 0, 0);
+      calls.length = 0;
+      b = await (await F.handle(req({ action: 'docs' }, null), env, fd([{ id: D1 }]))).json();
+      assert.deepEqual(b, { ok: true, skipped: 'night' }); assert.equal(calls.length, 0);
+    } finally { Date.now = realNow; }
+    assert.equal(F.cairoHour(Date.UTC(2026, 10, 23, 6, 0)), 8, 'winter: Cairo = UTC+2');
+    assert.equal(F.cairoHour(Date.UTC(2026, 6, 1, 5, 0)), 8, 'summer: Cairo = UTC+3');
+  }
+  console.log('PASS: asker-chat: push after an answer (VAPID, no payload, dead addresses dropped, staff with care only), voice words once, the pharmacy told when a customer writes or a warehouse sends, «what» for the bot\'s worker, the nightly clean-up, new invoice photos told to the owner');
 })().catch((e) => { console.error(e); process.exit(1); });
