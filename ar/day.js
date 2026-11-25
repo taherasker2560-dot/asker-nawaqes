@@ -49,6 +49,7 @@
     return {
       date: String(d.date), netSales: num(d.net_sales), grossSales: num(d.gross_sales), returns: num(d.returns), discounts: num(d.discounts), misc: num(d.misc),
       tickets: num(d.tickets), returnTickets: num(d.return_tickets), profit: num(d.profit), margin: d.margin == null ? null : num(d.margin), collected: num(d.collected),
+      itemsRevenue: num(d.items_revenue), cost: num(d.cost),   // the items' sales and their cost (the cost law): «💹 الربح» adds them up over a period
       free: { lines: num(fr.lines), cost: num(fr.cost) }, fallback: { lines: num(fb.lines), of: num(fb.of) },
       credit: { netNew: num(cr.net_new), paid: num(cr.paid), sales: num(cr.sales), customers: num(cr.customers) },
       hours: Array.isArray(d.hours) ? d.hours.slice(0, 24).map(num) : [],
@@ -221,14 +222,14 @@
     const extra = kind === 'sales' && a ? '<small class="dy-badge">آجل</small>' : '';
     const mp = kind === 'misc' && t.mp ? `<div class="dy-mp">نفس المبلغ اتسجّل شرا من <bdi class="notr">${esc(t.mp.vendor)}</bdi> الساعة ${esc(hm(t.mp.at))}</div>` : '';
     const neg = r.v < 0 ? ' dy-neg' : '';
-    return `<button type="button" class="dy-tk" data-dy-t="${esc(t.id)}"><div class="dy-a"><span class="dy-v${neg}" dir="ltr">${esc(money2(r.v))}</span><b class="notr">${esc(who(t))}</b> ${extra}</div><div class="dy-bb"><span dir="ltr">${esc(sub.map((x) => x).join(' · '))}</span>${kind === 'credit' && t.k === 's' && rem(t) > 0 ? `<span class="dy-rem">باقي ${esc(money2(rem(t)))}</span>` : ''}</div>${mp}</button>`;
+    return `<button type="button" class="dy-tk" data-dy-t="${esc(t.id)}"><div class="dy-a"><span class="dy-v${neg}" dir="ltr">${esc(money2(r.v))}</span><b class="notr">${esc(who(t))}</b> ${extra}</div><div class="dy-bb"><span>${esc(sub.join(' · '))}</span>${kind === 'credit' && t.k === 's' && rem(t) > 0 ? `<span class="dy-rem">باقي ${esc(money2(rem(t)))}</span>` : ''}</div>${mp}</button>`;
   }
   function rowsHtml(L, q) {
     const rows = search(L.rows, q);
     if (!rows.length) return '<p class="hint">مفيش تذاكر هنا</p>';
     let html = rows.map((r) => rowHtml(r, L.kind)).join('');
     if (L.kind === 'returns' && !q && L.extra.supplier.length) {
-      html += '<h3 class="dy-h">مرتجع الشركات</h3>' + L.extra.supplier.map((s) => `<div class="dy-tk dy-static"><div class="dy-a"><span class="dy-v dy-neg" dir="ltr">${esc(money2(s.total))}</span><b class="notr">${esc(s.vendor)}</b></div><div class="dy-bb"><span dir="ltr">${esc(hm(s.t))} · <bdi class="notr">${esc(s.code)}</bdi></span></div></div>`).join('');
+      html += '<h3 class="dy-h">مرتجع الشركات</h3>' + L.extra.supplier.map((s) => `<div class="dy-tk dy-static"><div class="dy-a"><span class="dy-v dy-neg" dir="ltr">${esc(money2(s.total))}</span><b class="notr">${esc(s.vendor)}</b></div><div class="dy-bb"><span>${esc(hm(s.t))} · <bdi class="notr">${esc(s.code)}</bdi></span></div></div>`).join('');
     }
     return html;
   }

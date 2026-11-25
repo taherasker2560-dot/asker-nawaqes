@@ -15,7 +15,7 @@
     <title>سيستم نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=airy-20261119a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=dayv2-20261125b" />
+    <link rel="stylesheet" href="ar/look.css?v=profit-20261125a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the two above (ar/capsule.css, ar/motion.js); remove this line for the previous look -->
     <link rel="stylesheet" href="ar/capsule.css?v=airy-20261119a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="ar/review.css?v=gallery-20261123a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=dayv2-20261125b"></script>
+    <script src="ar/i18n-en.js?v=profit-20261125a"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -224,6 +224,7 @@
         </div>
         <div class="subbar chips" data-for="sales" role="group" aria-label="المبيعات" hidden>
           <button type="button" class="chip" data-tab="day">📅 اليوم</button
+          ><button type="button" class="chip" data-tab="profit">💹 الربح</button
           ><button type="button" class="chip on" data-tab="storeorders">الموقع</button
           ><button type="button" class="chip" data-tab="sales">حركة البيع</button
           ><button type="button" class="chip" data-tab="tempsale">البيع المؤقت</button>
@@ -763,6 +764,11 @@
           <p id="dyOld" class="status hidden">الملف قديم: اللاب مش بيحدّث (مقفول أو من غير نت؟)</p>
           <div id="dyMain"></div>
         </section>
+        <!-- «💹 الربح والهامش» (owner 2026-11-25, ar/profit.js): the profit of a period, each day's profit, the items that earned most, the thin margins, the sales below cost, what was given away at price 0; files day/day.json + day/p_<period>.json; owner only -->
+        <section id="profitPanel" class="card hidden">
+          <div class="sa-head"><h2>💹 الربح والهامش</h2><button id="pfRefresh" type="button" class="secondary small">تحديث</button></div>
+          <div id="pfMain"></div>
+        </section>
         <!-- «الخزن» (owner 2026-11-15, ar/cash.js): PharmaFly's cash boxes, today's in and out, each box's statement; owner only -->
         <section id="cashPanel" class="card hidden">
           <div class="sa-head"><h2>الخزن</h2><button id="csRefresh" type="button" class="secondary small">تحديث</button></div>
@@ -1053,7 +1059,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=voicesale-20261122a"></script>
     <script src="ar/cache.js?v=wait-20261121a"></script>
-    <script src="ar/app.js?v=day-20261125a"></script>
+    <script src="ar/app.js?v=profit-20261125a"></script>
     <script src="ar/staff.js?v=wabiz-20261120a"></script>
     <script src="ar/suppliers.js?v=lists2-20261121a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -1064,7 +1070,8 @@
     <script src="ar/order-compare.js?v=lists2-20261121a"></script>
 <script src="ar/rep-invoices.js?v=lists2-20261121a"></script>
 <script src="ar/returns.js?v=returns-20261120a"></script>
-    <script src="ar/day.js?v=dayv2-20261125b"></script>
+    <script src="ar/day.js?v=profit-20261125a"></script>
+    <script src="ar/profit.js?v=profit-20261125a"></script>
     <script src="ar/po-statement.js?v=lists2-20261121a"></script>
     <script src="ar/store-orders.js?v=call-20261122a"></script>
     <script src="ar/store-settings.js?v=maxq-20261119a"></script>

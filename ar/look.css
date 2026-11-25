@@ -2699,7 +2699,7 @@ button.cu-qr-close { width: 100%; min-height: 46px; border-radius: 14px; margin-
 .dy-k b.dy-c { color: var(--crimson); }
 .dy-k i { font-style: normal; display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
 button.dy-go { width: 100%; margin: 8px 0 0; min-height: 42px; border-radius: 14px; background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); font-weight: 800; box-shadow: none; }
-#dayPanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
+#dayPanel .dy-card, #profitPanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
 .dy-nav { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
 button.dy-b { margin: 0; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; background: var(--card); color: var(--crimson); border: 1px solid var(--line); box-shadow: none; font-size: 18px; }
 button.dy-b:disabled { opacity: 0.35; }
@@ -2710,12 +2710,12 @@ button.dy-b:disabled { opacity: 0.35; }
 .dy-pill { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12.5px; }
 .dy-pill b { color: var(--crimson); }
 .dy-h { margin: 12px 2px 6px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
-#dayPanel table { width: 100%; border-collapse: collapse; font-size: 13px; }
-#dayPanel th, #dayPanel td { padding: 5px 4px; text-align: right; }
-#dayPanel th { color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--line); }
+#dayPanel table, #profitPanel table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#dayPanel th, #dayPanel td, #profitPanel th, #profitPanel td { padding: 5px 4px; text-align: right; }
+#dayPanel th, #profitPanel th { color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--line); }
 #dayPanel td + td, #dayPanel th + th { }
-#dayPanel .dy-n { direction: ltr; text-align: left; }
-#dayPanel tr + tr td { border-top: 1px solid var(--line); }
+#dayPanel .dy-n, #profitPanel .dy-n { direction: ltr; text-align: left; }
+#dayPanel tr + tr td, #profitPanel tr + tr td { border-top: 1px solid var(--line); }
 .dy-sub { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
 .dy-text { font-size: 13px; line-height: 1.9; }
 .dy-ok { color: var(--crimson); font-weight: 700; }
@@ -2756,6 +2756,19 @@ button.dy-tk { cursor: pointer; }
 .dy-rem { color: var(--bad, #a3162f); font-weight: 700; }
 .dy-badge { padding: 1px 8px; border-radius: 999px; background: var(--rose); color: var(--crimson-ink); font-size: 11.5px; font-weight: 700; }
 .dy-mp { margin-top: 5px; padding: 5px 9px; border-radius: 10px; background: var(--rose); color: var(--ink); font-size: 12.5px; line-height: 1.7; }
-#dayPanel tr.dy-red td { background: transparent; }
+#dayPanel tr.dy-red td, #profitPanel tr.dy-red td { background: transparent; }
 .dy-flag { color: var(--bad, #a3162f); font-weight: 700; font-size: 12px; }
 button.dy-bl { display: block; width: 100%; text-align: right; margin: 4px 0 0; min-height: 0; padding: 4px 6px; border: 0; background: transparent; color: var(--crimson-ink); font: inherit; font-size: 12.5px; box-shadow: none; text-decoration: underline; cursor: pointer; }
+/* «💹 الربح والهامش» (owner 2026-11-25, ar/profit.js): the profit of a period; it reuses the «اليوم» cards, lists and invoice (dy-*) and adds the period chips, the day bars and the thin-margin box */
+.pf-wide { grid-column: 1 / span 2; }
+select.pf-month { width: auto; margin: 0; min-height: 0; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12px; box-shadow: none; }
+select.pf-month.on { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 700; }
+.pf-chart { padding-bottom: 24px; }
+.pf-bars { display: flex; align-items: flex-end; gap: 4px; height: 128px; direction: ltr; }
+button.pf-bar { flex: 1; position: relative; min-width: 3px; min-height: 0; margin: 0; padding: 0; background: var(--rose); border: 1px solid var(--line); border-radius: 6px 6px 0 0; box-shadow: none; cursor: pointer; }
+button.pf-bar.t { background: var(--crimson); border-color: var(--crimson); }
+button.pf-bar em { position: absolute; left: -6px; right: -6px; top: -16px; font-style: normal; font-size: 10.5px; color: var(--muted); text-align: center; white-space: nowrap; }
+button.pf-bar span { position: absolute; left: -4px; right: -4px; bottom: -18px; text-align: center; font-size: 10.5px; color: var(--muted); }
+.pf-thr { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.pf-thr input { width: 74px; margin: 0; padding: 6px 8px; border: 1.5px solid var(--crimson); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 14px; direction: ltr; text-align: center; }
+#dayPanel .dy-search input[type="search"], #profitPanel .dy-search input[type="search"] { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }   /* look.css gives every input a !important border: the search box already has its own frame */   /* the global input look drew a second box inside the search box (found 2026-11-25 on the screenshot) */
