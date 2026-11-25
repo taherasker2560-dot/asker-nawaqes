@@ -225,7 +225,7 @@
   const GROUP_OF = {
     home: 'home',
     short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
-    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', sales: 'sales', tempsale: 'sales', day: 'sales', care: 'care',
+    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', sales: 'sales', tempsale: 'sales', day: 'sales', profit: 'sales', care: 'care',
   };
   const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
@@ -299,6 +299,9 @@
     // «📅 اليوم» (ar/day.js, owner 2026-11-25): the pharmacy's day from PharmaFly's own figures; owner only
     $('dayPanel')?.classList.toggle('hidden', tab !== 'day');
     if (tab === 'day') window.AskerDay?.open(); else window.AskerDay?.close();
+    // «💹 الربح والهامش» (ar/profit.js, owner 2026-11-25): the profit of a period and the lists behind it; owner only
+    $('profitPanel')?.classList.toggle('hidden', tab !== 'profit');
+    if (tab === 'profit') window.AskerProfit?.open();
     // «الخزن» (ar/cash.js, owner 2026-11-15): PharmaFly's cash boxes; owner only
     $('cashPanel')?.classList.toggle('hidden', tab !== 'cash');
     if (tab === 'cash') window.AskerCash?.open();
