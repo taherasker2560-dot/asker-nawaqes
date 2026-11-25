@@ -97,8 +97,20 @@
   });
   // the number on the badge: the invoices waiting for his yes
   const need = (rows) => (rows || []).filter((r) => r.status === 'ready').length;
+  // the purchase robot's stops (owner 2026-11-25: «نظام في السيستم يقول لي الحاجات اللي هو واقف عندها مع الفواتير، وإشعار صوتي»). The laptop writes each one in ar_robot_reports
+  // (job «purchases» = it stopped, or typed every line and waits for the check; job «purchases_wait» = a card it will not type, the helper enters it), ref_id «card:<card id>:<stop|check|needs_helper>»,
+  // title = the invoice, details = what it stopped at (+ a second line with who has it). The card goes when the invoice is entered. Same look as «🤖 الروبوت محتاج رأيك» (ar/robot.js).
+  const BUY_HEAD = { stop: '🤖 الروبوت وقف عند فاتورة', check: '🤖 الروبوت كتب الفاتورة ومستني المراجعة', needs_helper: '🤖 الروبوت محتاج المساعد' };
+  const BUY_CHIP = { stop: 'وقف عندها الروبوت', check: 'مستنية المراجعة', needs_helper: 'مستنية المساعد' };
+  const buyRef = (s) => { const m = /^card:(\d+):(stop|check|needs_helper)$/.exec(String((s && s.ref_id) || '')); return m ? { card: m[1], kind: m[2] } : null; };
+  // the stops to show: open, of the purchase robot, the ones that stopped first, then waiting for the check, then the helper's (oldest first inside each)
+  const buyStops = (list) => {
+    const rank = { stop: 0, check: 1, needs_helper: 2 };
+    return (list || []).filter((s) => s && s.status === 'open' && buyRef(s)).sort((a, b) => rank[buyRef(a).kind] - rank[buyRef(b).kind] || String(a.created_at || '').localeCompare(String(b.created_at || '')) || Number(a.id) - Number(b.id));
+  };
+  const buyOf = (list, r) => buyStops(list).find((s) => buyRef(s).card === String(r && r.id)) || null;
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours() % 12 || 12) + ':' + pad(d.getMinutes()) + (d.getHours() < 12 ? ' ص' : ' م'); };
-  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when };
+  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when, buyRef, buyStops, buyOf, BUY_HEAD, BUY_CHIP };
   root.AskerInvReviewLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -110,7 +122,7 @@
   // «🎤» beside the boxes where he writes his own words (owner 2026-11-22, ar/voice.js): said instead of typed, saved the same way when the box changes
   const voice = (selector, label) => (root.AskerVoice ? root.AskerVoice.button(selector, label) : '');
   const COLS ='id,batch,ord,supplier,doc_no,paper_date,total,photos,lines,notes,answers,owner_note,status,result,created_at,done_at';
-  let rows = [], urls = {}, openState = {}, showAllLines = {}, rot = {}, timer = null, loading = false, sig = '', busy = false;
+  let rows = [], stops = [], urls = {}, openState = {}, showAllLines = {}, rot = {}, timer = null, loading = false, sig = '', busy = false;
 
   function say(text, kind) {
     const el = $('rvStatus');
@@ -122,7 +134,8 @@
   const isOpen = (r) => (r.id in openState ? openState[r.id] : WAITING.includes(r.status) && (needs(r) > 0 || askLines(r).length > 0));
 
   function chipHtml(r) {
-    const c = chip(r);
+    const bs = LAPTOP.includes(r.status) ? buyOf(stops, r) : null;   // the purchase robot stopped on this one (or waits for the helper): its card says so
+    const c = bs ? { t: BUY_CHIP[buyRef(bs).kind], kind: buyRef(bs).kind === 'needs_helper' ? 'quiet' : 'bad' } : chip(r);
     const onlyPrices = c.t === 'N_NOTES' && !openNotes(r).length;
     const text = c.t === 'N_NOTES' ? `<span class="rv-n">${esc(c.n)}</span> ${onlyPrices ? (c.n === 1 ? 'محتاج سعرك' : 'محتاجين سعرك') : c.n === 1 ? 'ملاحظة' : 'ملاحظات'}` : esc(c.t);
     return `<span class="rv-chip rv-${c.kind}">${text}</span>`;
@@ -372,13 +385,23 @@
       (notesOf(r).length ? `<h4>ملاحظات${WAITING.includes(r.status) ? ' (محتاجة رأيك)' : ''}</h4>${notesOf(r).map((n) => noteHtml(r, n)).join('')}` : '') +
       footHtml(r) + '</div></div>';
   }
+  // the purchase robot's stops, at the top (the same box look as «🤖 الروبوت محتاج رأيك»); a tap opens that invoice's card
+  function stopsHtml() {
+    const list = buyStops(stops);
+    if (!list.length) return '';
+    return '<div class="rb-box rv-stops" id="rvStops">' + list.map((s) => {
+      const k = buyRef(s).kind;
+      return `<div class="rb-card" data-rv-stop="${esc(buyRef(s).card)}" role="button" tabindex="0"><div class="rb-title">${esc(BUY_HEAD[k])}</div>` +
+        `<div class="rb-details notr"><b>${esc(s.title)}</b>${s.details ? '\n' + esc(s.details) : ''}</div><div class="rb-when">${esc(when(s.created_at))}</div></div>`;
+    }).join('') + '</div>';
+  }
   function draw() {
     const box = $('rvMain');
     if (!box) return;
     const s = sections(rows), sm = summary(rows);
     const head = (t, n) => `<h3 class="py-h">${t}${n ? ` <span class="rv-n">${esc(n)}</span>` : ''}</h3>`;
-    let html = '';
-    if (!rows.length) html = '<p class="hint">مفيش فواتير متجهزة دلوقتي. أول ما تيجي فواتير جديدة هجهّزها وهتظهر هنا.</p>';
+    let html = stopsHtml();
+    if (!rows.length) html += '<p class="hint">مفيش فواتير متجهزة دلوقتي. أول ما تيجي فواتير جديدة هجهّزها وهتظهر هنا.</p>';
     else {
       html += `<div class="rv-sum"><span class="rv-pill"><b>${esc(sm.waiting)}</b> فواتير مستنياك</span><span class="rv-pill"><b>${esc(sm.withNotes)}</b> فيها ملاحظات</span>` +
         (sm.laptop ? `<span class="rv-pill"><b>${esc(sm.laptop)}</b> عند اللاب</span>` : '') + '</div>';
@@ -390,7 +413,7 @@
     }
     box.innerHTML = html;
   }
-  const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]),
+  const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details]),
     Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late])]);
   async function load(force) {
     if (!db() || loading) return;
@@ -408,6 +431,11 @@
         } catch (e) { /* a photo that cannot be shown is not a reason to hide the invoice */ }
       }
       await loadNi(next);
+      // the purchase robot's open stops (the table is shared with the sales robot's questions: only «card:<id>:<kind>» ones are used; none = nothing shows)
+      try {
+        const { data: sd, error: se } = await db().from('ar_robot_reports').select('id,created_at,job,ref_id,title,details,status').eq('status', 'open').order('created_at', { ascending: true }).limit(30);
+        stops = se ? [] : buyStops(sd || []);
+      } catch (e) { stops = []; }
       const before = sig; rows = next; sig = signature();
       // never redraw under his fingers (typing a note, choosing an answer)
       const typing = (document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
@@ -523,6 +551,8 @@
     if ((el = g('data-rv-niedit'))) { niEdit = el.dataset.rvNiedit; sig = signature(); draw(); const i = document.querySelector(`[data-rv-niname="${CSS.escape(niEdit)}"]`); if (i) { i.focus(); i.select(); } return; }
     if ((el = g('data-rv-nisave'))) { const i = document.querySelector(`[data-rv-niname="${CSS.escape(el.dataset.rvNisave)}"]`); return niKeep(el.dataset.rvNisave, i ? i.value : ''); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
+    // a stop of the purchase robot: its invoice's card opens and comes into view
+    if ((el = g('data-rv-stop'))) { const r = find(el.dataset.rvStop); if (r) { openState[r.id] = true; sig = signature(); draw(); const c = document.querySelector(`[data-rv="${CSS.escape(String(r.id))}"]`); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'start' }); } }
   }
   function onChange(e) {
     const t = e.target;
@@ -564,5 +594,5 @@
       return error ? null : (data || []).length;
     } catch (e) { return null; }
   }
-  root.AskerInvReview = { open, close, count };
+  root.AskerInvReview = { open, close, count, load: () => load(true), stops: () => stops };
 })(typeof window === 'undefined' ? globalThis : window);

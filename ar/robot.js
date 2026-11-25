@@ -14,7 +14,10 @@
   }
   const ERR = { 'owner-only': 'الرد لصاحب الصيدلية بس.', empty: 'اختار رد أو اكتب له تعمل إيه.', missing: 'السؤال ده مش موجود.', state: 'السؤال ده اترد عليه قبل كده.', option: 'الرد ده الروبوت مش فاهمه.' };
   const errText = (code) => ERR[code] || 'ماتبعتش. جرّب تاني.';
-  const api = { options, errText };
+  // the PURCHASE robot's stops (owner 2026-11-25: «نظام في السيستم يقول لي الحاجات اللي هو واقف عندها مع الفواتير»): the same table, job «purchases» (it stopped or typed everything
+  // and waits for the check: counted and rung) or «purchases_wait» (a card it will not type: the helper takes it, shown quietly). They live on «مراجعة الفواتير», never in «البيع المؤقت».
+  const isBuy = (r) => !!r && String(r.job || '').startsWith('purchases');
+  const api = { options, errText, isBuy };
   root.AskerRobotLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -62,7 +65,7 @@
     if (!db() || isStaff()) { reports = []; return draw(); }
     try {
       const { data, error } = await db().from('ar_robot_reports').select('id,created_at,job,ref_id,title,details,options,status').eq('status', 'open').order('created_at', { ascending: true }).limit(20);
-      reports = error ? [] : data || [];   // the table is not on the server yet: nothing shows
+      reports = error ? [] : (data || []).filter((r) => !isBuy(r));   // the table is not on the server yet: nothing shows (the purchase robot's stops are on «مراجعة الفواتير»)
     } catch (e) { reports = []; }
     draw();
   }

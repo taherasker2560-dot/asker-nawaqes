@@ -18,4 +18,11 @@ global.window=global;require('../ar/i18n-en.js');require('../ar/i18n.js');const 
 for(const s of ['🤖 الروبوت محتاج رأيك','أو اكتب له تعمل إيه…','اتبعت للروبوت ✓','الرد لصاحب الصيدلية بس.','اختار رد أو اكتب له تعمل إيه.','السؤال ده مش موجود.','السؤال ده اترد عليه قبل كده.','الرد ده الروبوت مش فاهمه.','ماتبعتش. جرّب تاني.',
  '✏️ تعديل الحد','الحد الجديد','الحد الجديد 8,000 ج','مستني يتنفذ في فارمافلاي','اكتب الحد بالأرقام، صفر أو أكتر.','ده نفس الحد اللي في كارته دلوقتي.','اتسجّل: الحد الجديد مستني يتنفذ في فارمافلاي.','موافق: احفظها متجاوزة الحد','✓ موافق على التجاوز',
  'العميل هيعدّي الحد: هيبقى عليه 500 ج والحد 300 ج. لو موافق دوس «احفظ» تاني.'])assert.doesNotMatch(I.translate(s),/[؀-ۿ]/,'Arabic left in English: '+s+' → '+I.translate(s));
+// the PURCHASE robot's stops (owner 2026-11-25): they stay out of the sales box, ring and say a sentence of their own on «مراجعة الفواتير», and the helper's waiting cards never ring
+assert.equal(R.isBuy({job:'purchases'}),true);assert.equal(R.isBuy({job:'purchases_wait'}),true);assert.equal(R.isBuy({job:'sales'}),false);assert.equal(R.isBuy({}),false);assert.equal(R.isBuy(null),false);
+const kb=N.KINDS.find((x)=>x.key==='robotbuy');
+assert.ok(kb,'a kind for the purchase robot\'s stops');assert.equal(kb.group,'purchases');assert.equal(kb.tab,'docs','on the same small tab as the invoices waiting for his yes');assert.equal(kb.say,'الروبوت وقف عند فاتورة','said out loud');assert.match(kb.body(2),/2/);
+assert.deepEqual(N.rises({robot:1,robotbuy:0},{robot:1,robotbuy:1}),['robotbuy'],'a new stop rings');
+assert.equal(N.groupCounts({robotbuy:2,review:1}).purchases,3,'the red number on the section adds the stops to the waiting invoices');
+for(const s of ['🤖 الروبوت وقف عند فاتورة','🤖 الروبوت كتب الفاتورة ومستني المراجعة','🤖 الروبوت محتاج المساعد','وقف عندها الروبوت','مستنية المراجعة','مستنية المساعد','الروبوت وقف عند فاتورة','وقفات روبوت المشتريات'])assert.doesNotMatch(I.translate(s),/[؀-ۿ]/,'Arabic left in English: '+s+' → '+I.translate(s));
 console.log('PASS: robot: the answers as buttons, the refusals, the notification said out loud, the English');
