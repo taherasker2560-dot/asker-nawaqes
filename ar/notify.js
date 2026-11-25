@@ -36,6 +36,9 @@
     { key: 'pay', group: 'accounts', tab: 'pay', sound: 'alert', title: 'أمر دفع محتاج نظرة', body: (n) => `${n} أمر دفع فيه فرق أو لسه ما ظهرش في فارمافلاي` },
     // «🤖 الروبوت محتاج رأيك» (ar/robot.js, owner 2026-11-22: «الاشعار ان الريموت عايز مني حاجه، ده يبقى اشعار صوتي في الموبايل»): the sentence is also SAID out loud
     { key: 'robot', group: 'sales', tab: 'tempsale', sound: 'alert', title: 'الروبوت محتاج رأيك', body: (n) => `${n} سؤال من الروبوت مستني ردّك`, say: 'الروبوت محتاج رأيك' },
+    // «🤖 الروبوت وقف عند فاتورة» (owner 2026-11-25: «نظام في السيستم يقول لي الحاجات اللي هو واقف عندها مع الفواتير، وإشعار صوتي»): the PURCHASE robot stopped in the middle of an invoice, or typed it all
+    // and waits for the check (ar_robot_reports, job «purchases»; shown at the top of «مراجعة الفواتير»). A card it will not type at all (job «purchases_wait») is shown there but never rings.
+    { key: 'robotbuy', group: 'purchases', tab: 'docs', sound: 'alert', title: 'الروبوت وقف عند فاتورة', body: (n) => `${n} فاتورة الروبوت واقف عندها`, say: 'الروبوت وقف عند فاتورة' },
   ];
   // which numbers went up since the last time they were seen (the first time only remembers, it does not ring)
   function rises(prev, now) {
@@ -65,7 +68,7 @@
   const read = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const SEEN = 'asker-notify-seen', PICK = 'asker-notify-sounds', ON = 'asker-notify-on';
-  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', review: 'مراجعة الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب', pay: 'المدفوعات', robot: 'أسئلة الروبوت' };
+  const LABEL = { incoming: 'الوارد', docs: 'الفواتير', review: 'مراجعة الفواتير', expiry: 'الصلاحيات', customers: 'العملاء', store: 'طلبات الموقع', care: 'رسايل العملاء', bags: 'الحقائب', pay: 'المدفوعات', robot: 'أسئلة الروبوت', robotbuy: 'وقفات روبوت المشتريات' };
   // a kind with a sentence: the phone's own voice says it (Arabic when the phone has it)
   function speak(text) {
     try {
@@ -108,6 +111,15 @@
   async function count(q) {
     try { const { data, error } = await q.limit(500); return error ? null : (data || []).length; } catch (e) { return null; }
   }
+  // the robots' open questions, split by who asks: the sales robot's (tab «البيع المؤقت»), and the purchase robot's stops (job «purchases», rung); «purchases_wait» ones are the helper's, not counted
+  async function robotCounts(c) {
+    try {
+      const { data, error } = await c.from('ar_robot_reports').select('id,job').eq('status', 'open').limit(500);
+      if (error) return null;
+      const rows = data || [], buy = (r) => String(r.job || '').startsWith('purchases');
+      return { sales: rows.filter((r) => !buy(r)).length, buy: rows.filter((r) => r.job === 'purchases').length };
+    } catch (e) { return null; }
+  }
   // the incoming: the number the bot itself already shows on «الوارد ← النهارده» (companies with something new); it is
   // read by ar/app.js when the bot opens (read once: tests/e2e/fast-load), and asked again here once a minute after that.
   // Empty = not loaded yet (unknown: it neither rings nor is remembered).
@@ -149,7 +161,7 @@
       waitCounts(),
       count(c.from('ar_invoice_reviews').select('id').eq('status', 'ready')),
       // the robot's open questions (owner only; the table may not be on the server yet: unknown, nothing rings)
-      root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff() ? Promise.resolve(null) : count(c.from('ar_robot_reports').select('id').eq('status', 'open')),
+      root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff() ? Promise.resolve(null) : robotCounts(c),
     ]);
     const a = root.AskerAlerts && root.AskerAlerts.data();
     const today = (l) => (l || []).filter((x) => Number(x.today) > 0).length;
@@ -160,7 +172,7 @@
     if (review != null) out.review = review;
     if (store != null) out.store = store;
     if (care != null) out.care = care;
-    if (robot != null) out.robot = robot;
+    if (robot != null) { out.robot = robot.sales; out.robotbuy = robot.buy; }
     // «💸 المدفوعات» (owner 2026-11-19): a difference or late = the red number and the ring; waiting for his yes = a home row only
     if (pay) { out.pay = pay.look; out.payWait = pay.wait; }
     if (wait) { out.waitCall = wait.call; out.waitNear = wait.near; }
@@ -201,6 +213,7 @@
     if (!box) return;
     const rows = [];
     if (counts.robot) rows.push({ tab: 'tempsale', n: counts.robot, text: '🤖 الروبوت محتاج رأيك' });   // first: the robot is waiting on him
+    if (counts.robotbuy) rows.push({ tab: 'review', n: counts.robotbuy, text: '🤖 الروبوت وقف عند فاتورة' });
     if (counts.incoming) rows.push({ tab: 'read', n: counts.incoming, text: 'جديد في الوارد' });
     if (counts.review) rows.push({ tab: 'review', n: counts.review, text: 'فاتورة متجهزة مستنية موافقتك' });
     if (counts.docs) rows.push({ tab: 'docs', n: counts.docs, text: 'صورة مستنية في الفواتير' });
@@ -227,6 +240,7 @@
     play(soundOf(key));
     if (k.say) setTimeout(() => speak(k.say), 900);   // after the ring, the sentence out loud
     if (key === 'robot' && root.AskerRobot) root.AskerRobot.load();   // the box at the top of «البيع المؤقت» shows the new question
+    if (key === 'robotbuy' && root.AskerInvReview && root.AskerInvReview.load) root.AskerInvReview.load();   // the box at the top of «مراجعة الفواتير» shows the new stop
     try {
       if (!('Notification' in root) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
       const reg = (await navigator.serviceWorker.getRegistration('ar/')) || (await navigator.serviceWorker.register('ar/sw.js', { scope: 'ar/' }));
