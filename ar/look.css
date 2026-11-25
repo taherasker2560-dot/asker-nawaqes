@@ -2686,3 +2686,42 @@ button.cu-qrbtn { display: flex; align-items: center; justify-content: center; g
 .cu-qr-steps { text-align: right; font-size: 15px; line-height: 1.9; margin: 8px 0; padding-inline-start: 22px; }
 .cu-qr-ios { font-size: 12.5px; }
 button.cu-qr-close { width: 100%; min-height: 46px; border-radius: 14px; margin-top: 8px; }
+
+/* «📅 اليوم» (owner 2026-11-25, ar/day.js): the pharmacy's day on one page + the card on «الرئيسية»; the airy look: white cards, the section color in small touches, nothing solid */
+.dy-home { padding: 12px 14px; }
+.dy-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dy-hd h3 { margin: 0 0 6px; }
+.dy-hd small { color: var(--muted); font-size: 12px; }
+.dy-two, .dy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dy-k { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 9px 11px; }
+.dy-k small { display: block; color: var(--muted); font-size: 12px; }
+.dy-k b { font-size: 19px; direction: ltr; display: inline-block; color: var(--ink); }
+.dy-k b.dy-c { color: var(--crimson); }
+.dy-k i { font-style: normal; display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+button.dy-go { width: 100%; margin: 8px 0 0; min-height: 42px; border-radius: 14px; background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); font-weight: 800; box-shadow: none; }
+#dayPanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
+.dy-nav { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+button.dy-b { margin: 0; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; background: var(--card); color: var(--crimson); border: 1px solid var(--line); box-shadow: none; font-size: 18px; }
+button.dy-b:disabled { opacity: 0.35; }
+.dy-stamp { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.dy-stamp b { color: var(--crimson); }
+.dy-grid { margin: 0 0 8px; }
+.dy-line { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.dy-pill { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12.5px; }
+.dy-pill b { color: var(--crimson); }
+.dy-h { margin: 12px 2px 6px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+#dayPanel table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#dayPanel th, #dayPanel td { padding: 5px 4px; text-align: right; }
+#dayPanel th { color: var(--muted); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--line); }
+#dayPanel td + td, #dayPanel th + th { }
+#dayPanel .dy-n { direction: ltr; text-align: left; }
+#dayPanel tr + tr td { border-top: 1px solid var(--line); }
+.dy-sub { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
+.dy-text { font-size: 13px; line-height: 1.9; }
+.dy-ok { color: var(--ok, #2e7d5b); font-weight: 700; }
+.dy-warn { margin: 0 0 8px; padding: 8px 11px; border: 1px solid var(--crimson); border-radius: 12px; background: var(--rose); color: var(--crimson-ink); font-size: 12.5px; line-height: 1.8; }
+.dy-chart { padding-bottom: 24px; }
+.dy-bars { display: flex; align-items: flex-end; gap: 6px; height: 72px; direction: ltr; }
+.dy-bars > div { flex: 1; position: relative; background: var(--rose); border: 1px solid var(--line); border-radius: 6px 6px 0 0; min-width: 6px; }
+.dy-bars > div.t { background: var(--crimson); border-color: var(--crimson); }
+.dy-bars > div > span { position: absolute; left: 0; right: 0; bottom: -17px; text-align: center; font-size: 10.5px; color: var(--muted); }
