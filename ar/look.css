@@ -2718,7 +2718,7 @@ button.dy-b:disabled { opacity: 0.35; }
 #dayPanel tr + tr td { border-top: 1px solid var(--line); }
 .dy-sub { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
 .dy-text { font-size: 13px; line-height: 1.9; }
-.dy-ok { color: var(--ok, #2e7d5b); font-weight: 700; }
+.dy-ok { color: var(--crimson); font-weight: 700; }
 .dy-warn { margin: 0 0 8px; padding: 8px 11px; border: 1px solid var(--crimson); border-radius: 12px; background: var(--rose); color: var(--crimson-ink); font-size: 12.5px; line-height: 1.8; }
 .dy-chart { padding-bottom: 24px; }
 .dy-bars { display: flex; align-items: flex-end; gap: 6px; height: 72px; direction: ltr; }
