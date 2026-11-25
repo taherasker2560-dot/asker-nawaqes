@@ -26,6 +26,8 @@
   const OP = {
     // op 50 (owner 2026-11-19): «اسمها دعم من صاحب المنشاه، ساعات بستخدمها للتصحيح عشان لما بيحصل اخطاء دفع مبتتصلحش عالسيستم»
     50: 'دعم من صاحب المنشأة',
+    // op 8 (decoded 2026-11-26): PharmaFly corrects a drawer hand-over on the main safe in two rows at the same second (minus the first amount, plus the counted one)
+    8: 'تصحيح تسليم الدرج',
   };
   function label(m) {
     const other = m.kind === 'other_in' || m.kind === 'other_out';

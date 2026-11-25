@@ -65,7 +65,7 @@
     if (!o || typeof o !== 'object' || !o.days || typeof o.days !== 'object') return null;
     const days = Object.keys(o.days).map((k) => day(o.days[k])).filter(Boolean).sort((a, b) => b.date.localeCompare(a.date));
     if (!days.length) return null;
-    return { generatedAt: String(o.generated_at || ''), dataAt: String(o.data_at || ''), lastTicketAt: String(o.last_ticket_at || ''), today: String(o.today || days[0].date), days };
+    return { generatedAt: String(o.generated_at || ''), dataAt: String(o.data_at || ''), lastTicketAt: String(o.last_ticket_at || ''), today: String(o.today || days[0].date), days, closes: o.closes && typeof o.closes === 'object' ? o.closes : {} };   // closes: the drawer's shifts, read by ar/close.js
   }
   // one day's detail file: the tickets with their lines
   function parseDetail(o) {

@@ -2699,7 +2699,7 @@ button.cu-qr-close { width: 100%; min-height: 46px; border-radius: 14px; margin-
 .dy-k b.dy-c { color: var(--crimson); }
 .dy-k i { font-style: normal; display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
 button.dy-go { width: 100%; margin: 8px 0 0; min-height: 42px; border-radius: 14px; background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); font-weight: 800; box-shadow: none; }
-#dayPanel .dy-card, #profitPanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
+#dayPanel .dy-card, #profitPanel .dy-card, #closePanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
 .dy-nav { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
 button.dy-b { margin: 0; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; background: var(--card); color: var(--crimson); border: 1px solid var(--line); box-shadow: none; font-size: 18px; }
 button.dy-b:disabled { opacity: 0.35; }
@@ -2773,3 +2773,11 @@ button.pf-bar span { position: absolute; left: -4px; right: -4px; bottom: -18px;
 .pf-thr input { width: 74px; margin: 0; padding: 6px 8px; border: 1.5px solid var(--crimson); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 14px; direction: ltr; text-align: center; }
 #dayPanel .dy-search input[type="search"], #profitPanel .dy-search input[type="search"] { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }   /* look.css gives every input a !important border: the search box already has its own frame */   /* the global input look drew a second box inside the search box (found 2026-11-25 on the screenshot) */
 .dy-note { color: var(--muted); font-size: 12px; }
+/* «🔒 تقفيل اليوم» (owner 2026-11-26, ar/close.js): one card per shift (expected and counted), a short one framed in the warning colour; it reuses the «اليوم» pieces (dy-*) */
+.cl-sh .cl-g { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; text-align: center; font-size: 12px; color: var(--muted); }
+.cl-sh .cl-g b { display: block; color: var(--ink); font-size: 14px; direction: ltr; }
+.cl-sh .dy-a b { text-align: left; font-size: 12.5px; }
+.cl-w { font-weight: 800; font-size: 13.5px; }
+.cl-ok { color: var(--crimson); }
+button.dy-tk.cl-bad, .dy-tk.dy-static.cl-bad { border-color: var(--bad, #a3162f); }
+.dy-k b.dy-neg { color: var(--bad, #a3162f); }   /* a short day: the number in the warning colour (the card's own «b» colour won over .dy-neg) */

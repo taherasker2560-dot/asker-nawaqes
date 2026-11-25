@@ -20,7 +20,10 @@ assert.deepEqual(C.label({ kind: 'vendor', who: 'مخزن الفتح للادو�
 assert.deepEqual(C.label({ kind: 'owner', op: 51, memo: 'ام طاهر' }), { word: 'لصاحب المنشأة', who: '', small: 'ام طاهر' });
 // op 50 is «دعم من صاحب المنشأة» (his name for it, 2026-11-19): no «رقم 50» any more; another unnamed one keeps its number
 assert.deepEqual(C.label({ kind: 'other_in', op: 50, memo: 'كريدت المشرق' }), { word: 'دعم من صاحب المنشأة', who: '', small: 'كريدت المشرق' });
-assert.deepEqual(C.label({ kind: 'other_in', op: 8 }), { word: 'حركة داخلة', who: '', small: 'رقم 8' });
+assert.deepEqual(C.label({ kind: 'other_in', op: 99 }), { word: 'حركة داخلة', who: '', small: 'رقم 99' });
+// op 8 (decoded 2026-11-26): PharmaFly's correction of a drawer hand-over (two rows on the main safe: minus the first amount, plus the counted one)
+assert.deepEqual(C.label({ kind: 'other_in', op: 8 }), { word: 'تصحيح تسليم الدرج', who: '', small: '' });
+assert.equal(C.label({ kind: 'other_out', op: 8 }).word, 'تصحيح تسليم الدرج');
 assert.deepEqual(C.label({ kind: 'transfer_out', who: 'احتياطى 2' }), { word: 'تحويل لخزنة', who: 'احتياطى 2', small: '' });
 assert.equal(C.label({ kind: 'transfer_in' }).word, 'تحويل من خزنة');
 assert.equal(C.label({ kind: 'drawer_out' }).word, 'تسليم الدرج للخزينة');
