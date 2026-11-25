@@ -20,7 +20,7 @@ const seed=(page,{old=false}={})=>page.evaluate(({old})=>{
  const tk=(id,o)=>Object.assign({id,t:'14:05',k:'s',ty:'c',cu:'',total:100,d:0,p:100,memo:'',lines:[{n:'ITEM A 10MG',q:1,pr:100,t:100}]},o);
  const tickets=[tk(1,{}),
   tk(2,{ty:'a',cu:'عميل مثال ١',total:4650,p:0,lines:[{n:'أصناف متنوعة',q:4650,pr:1,t:4650,m:1,memo:'فاتورة قديمة'}],mp:{vendor:'صيدلية مثال',at:'20:27',code:'686347'}}),
-  tk(3,{ty:'a',cu:'زبون تاني',total:520,p:300,d:20,t:'14:20',lines:[{n:'ITEM B',q:0.5,pr:400,t:200},{n:'ITEM C',q:1,pr:95,t:95,bc:1}]}),
+  tk(3,{ty:'a',cu:'زبون تاني',total:520,p:300,d:20,t:'14:20',lines:[{n:'ITEM B',q:0.5,pr:400,t:200},{n:'ITEM C',q:1,pr:95,t:95,bc:1},{n:'ITEM B BOX',q:0.067,pr:0,t:0,ct:1,u:2}]}),
   tk(4,{k:'r',total:-50,p:-50,lines:[{n:'ITEM A 10MG',q:-1,pr:50,t:-50}]}),
   tk(5,{ty:'a',cu:'زبون تاني',k:'r',total:-80,p:0,lines:[{n:'ITEM D',q:-1,pr:80,t:-80}]}),
   tk(6,{total:200,d:5,p:195,lines:[{n:'ITEM E',q:2,pr:100,t:200},{n:'ITEM F',q:1,pr:0,t:0,fr:1,c:12.5}]})];
@@ -118,7 +118,7 @@ run('Day page: every number opens its list with a search box; a ticket opens the
  await page.waitForSelector('#dyMain table');
  assert.match(await txt(page,'#dyMain .dy-h2'),/^تذكرة 3$/);
  assert.match(await txt(page,'#dyMain .dy-card'),/^زبون تاني · آجل/);
- assert.deepEqual(await all(page,'#dyMain table tr'),['الصنف الكمية السعر الإجمالي','ITEM B ½ 400 200','ITEM C · بأقل من التكلفة 1 95 95']);
+ assert.deepEqual(await all(page,'#dyMain table tr'),['الصنف الكمية السعر الإجمالي','ITEM B ½ 400 200','ITEM C · بأقل من التكلفة 1 95 95','ITEM B BOX · سحب من العلبة · 2 وحدة 0.07 0 0']);
  assert.match(await txt(page,'#dyMain'),/الإجمالي 520 خصم 20 دفع 300 الباقي عليه 200/);
  // back = the list with the search kept; back again = the page
  await page.click('[data-dy-back]');

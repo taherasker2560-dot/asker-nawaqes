@@ -17,7 +17,7 @@
     'التكلفة', 'تذكرة', 'بيع', 'والتكلفة', 'خسارة', '✓ مفيش بيع تحت التكلفة', 'تكلفتها (برّه الربح)', 'سطر', 'الأصناف دي في الفترة', 'الربح قبل خصم التذكرة', 'تحديث', 'في الفترة دي', 'الهامش أقل من', 'يوم',
     'بعد المرتجع والخصم', 'من مبيعات الأصناف', 'سطر اتحسب بتكلفة الكارت (مفيش شرا قبله)', 'الصفحة محتاجة ملف اليوم من اللاب: لسه ما وصلش.', 'ملف الأصناف لسه ما وصلش: اللاب بيجهّزه.',
     'آخر بيعات الصنف', 'مفيش أصناف هنا', 'ظاهر أحدث 300 بيعة بس', 'اتصرف من غير سعر', 'تذاكر', 'السعر', 'الإجمالي', 'الصنف', 'خصم', 'دفع', 'الباقي عليه', 'ملاحظة', 'آجل', 'نقدي', 'مرتجع',
-    'عميل', 'عميل نقدي', 'الفاتورة دي مش لاقيها', 'من غير سعر', 'بأقل من التكلفة', 'نفس المبلغ اتسجّل شرا من', 'الساعة', 'تكلفتها', 'الأيام اللي فيها بيانات', ...MONTHS];
+    'عميل', 'عميل نقدي', 'الفاتورة دي مش لاقيها', 'من غير سعر', 'بأقل من التكلفة', 'نفس المبلغ اتسجّل شرا من', 'الساعة', 'تكلفتها', 'الأيام اللي فيها بيانات', 'سحب من العلبة', 'وحدة', ...MONTHS];
 
   // ---------- pure helpers (also used by tests/profit.cjs) ----------
   const monthLabel = (ym) => MONTHS[Number(String(ym).slice(5, 7)) - 1] + ' ' + String(ym).slice(0, 4);
@@ -219,7 +219,7 @@
     const back = '<button type="button" class="dy-back" data-pf-back>› رجوع</button>';
     if (!t) { main.innerHTML = back + '<p class="hint">الفاتورة دي مش لاقيها</p>'; return; }
     const r = rem(t), a = t.ty === 'a';
-    const lines = t.lines.map((l) => `<tr${l.bc || l.fr ? ' class="dy-red"' : ''}><td><span class="notr">${esc(l.n)}</span>${l.bc ? ' <span class="dy-flag">· بأقل من التكلفة</span>' : ''}${l.fr ? ` <span class="dy-flag">· من غير سعر · تكلفتها ${esc(money2(l.c))}</span>` : ''}${l.memo ? `<div class="dy-sub"><span class="notr">${esc(l.memo)}</span></div>` : ''}</td><td class="dy-n">${esc(qtyText(l.q))}</td><td class="dy-n">${esc(money2(l.pr))}</td><td class="dy-n">${esc(money2(l.t))}</td></tr>`).join('');
+    const lines = t.lines.map((l) => `<tr${l.bc || l.fr ? ' class="dy-red"' : ''}><td><span class="notr">${esc(l.n)}</span>${l.bc ? ' <span class="dy-flag">· بأقل من التكلفة</span>' : ''}${l.fr ? ` <span class="dy-flag">· من غير سعر · تكلفتها ${esc(money2(l.c))}</span>` : ''}${l.ct ? ` <span class="dy-note">· سحب من العلبة${l.u ? ' · ' + esc(qtyText(l.u)) + ' وحدة' : ''}</span>` : ''}${l.memo ? `<div class="dy-sub"><span class="notr">${esc(l.memo)}</span></div>` : ''}</td><td class="dy-n">${esc(qtyText(l.q))}</td><td class="dy-n">${esc(money2(l.pr))}</td><td class="dy-n">${esc(money2(l.t))}</td></tr>`).join('');
     main.innerHTML = back + `<h3 class="dy-h2">تذكرة <bdi class="notr">${esc(t.id)}</bdi></h3>` +
       `<div class="dy-card"><b class="notr">${esc(who(t))}</b> · ${a ? 'آجل' : 'نقدي'}${t.k === 'r' ? ' · مرتجع' : ''}<div class="dy-stamp">${esc(dateText(date))} · ${esc(hm(t.t))}</div>${t.memo ? `<div class="dy-sub">ملاحظة: <span class="notr">${esc(t.memo)}</span></div>` : ''}</div>` +
       `<div class="dy-card"><table>${row(['الصنف', 'الكمية', 'السعر', 'الإجمالي'], true)}${lines}</table>` +
