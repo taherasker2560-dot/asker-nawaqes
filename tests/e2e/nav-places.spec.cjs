@@ -34,7 +34,7 @@ run('bottom bar: five sections, «الرئيسية» first, «المشتريات
  // the other sections
  await page.click('[data-group="accounts"]');assert.ok(await vis(page,'customersPanel'));assert.ok(!(await page.isVisible('.subbar[data-for="purchases"]')));
  await page.click('[data-group="sales"]');assert.ok(await vis(page,'storeOrdersPanel'));
- assert.deepEqual(await names(page,'.subbar[data-for="sales"] [data-tab]'),['الموقع','حركة البيع','البيع المؤقت']);
+ assert.deepEqual(await names(page,'.subbar[data-for="sales"] [data-tab]'),['📅 اليوم','الموقع','حركة البيع','البيع المؤقت']);
  await page.click('[data-tab="tempsale"]');assert.ok(await vis(page,'tempSalePanel'));assert.ok(!(await vis(page,'storeOrdersPanel')));
  await page.click('[data-group="care"]');assert.ok(await vis(page,'carePanel'));assert.ok(!(await vis(page,'tempSalePanel')));
  // «المشتريات» comes back where it was; «الرئيسية» comes back with its search
