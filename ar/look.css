@@ -2772,3 +2772,4 @@ button.pf-bar span { position: absolute; left: -4px; right: -4px; bottom: -18px;
 .pf-thr { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
 .pf-thr input { width: 74px; margin: 0; padding: 6px 8px; border: 1.5px solid var(--crimson); border-radius: 10px; background: var(--card); color: var(--ink); font-size: 14px; direction: ltr; text-align: center; }
 #dayPanel .dy-search input[type="search"], #profitPanel .dy-search input[type="search"] { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; }   /* look.css gives every input a !important border: the search box already has its own frame */   /* the global input look drew a second box inside the search box (found 2026-11-25 on the screenshot) */
+.dy-note { color: var(--muted); font-size: 12px; }

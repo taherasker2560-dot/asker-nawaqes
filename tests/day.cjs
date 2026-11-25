@@ -77,7 +77,7 @@ const tk = (id, o) => ({ id, t: '14:05', k: 's', ty: 'c', cu: '', total: 100, d:
 const det = L.parseDetail({ date: '2026-11-25', tickets: [
   tk(1, {}),
   tk(2, { ty: 'a', cu: 'عميل مثال ١', total: 4650, p: 0, lines: [{ n: 'أصناف متنوعة', q: 4650, pr: 1, t: 4650, m: 1, memo: 'فاتورة قديمة' }], mp: { vendor: 'صيدلية مثال', at: '20:27', code: '686347' } }),
-  tk(3, { ty: 'a', cu: 'زبون تاني', total: 520, p: 300, d: 20, lines: [{ n: 'ITEM B', q: 0.5, pr: 400, t: 200 }, { n: 'ITEM C', q: 1, pr: 95, t: 95, bc: 1 }] }),
+  tk(3, { ty: 'a', cu: 'زبون تاني', total: 520, p: 300, d: 20, lines: [{ n: 'ITEM B', q: 0.5, pr: 400, t: 200 }, { n: 'ITEM C', q: 1, pr: 95, t: 95, bc: 1 }, { n: 'ITEM B BOX', q: 0.067, pr: 0, t: 0, ct: 1, u: 2 }] }),
   tk(4, { k: 'r', total: -50, p: -50, lines: [{ n: 'ITEM A 10MG', q: -1, pr: 50, t: -50 }] }),
   tk(5, { ty: 'a', cu: 'زبون تاني', k: 'r', total: -80, p: 0, lines: [{ n: 'ITEM D', q: -1, pr: 80, t: -80 }] }),
   tk(6, { total: 200, d: 5, p: 195, lines: [{ n: 'ITEM E', q: 2, pr: 100, t: 200 }, { n: 'ITEM F', q: 1, pr: 0, t: 0, fr: 1, c: 12.5 }] }),
@@ -90,6 +90,9 @@ assert.equal(det.tickets[1].mp.vendor, 'صيدلية مثال');
 assert.equal(det.tickets[2].lines[1].bc, true);
 assert.equal(det.tickets[5].lines[1].fr, true);
 assert.equal(det.tickets[5].lines[1].c, 12.5);
+assert.equal(det.tickets[2].lines[2].ct, true, 'a stock row of the real item behind a draw line (price 0) is flagged, not a giveaway');
+assert.equal(det.tickets[2].lines[2].u, 2, 'the units taken from the box');
+assert.equal(det.tickets[2].lines[2].fr, false);
 assert.equal(L.rem(det.tickets[2]), 200, '520 - 20 discount - 300 paid');
 assert.equal(L.rem(det.tickets[4]), -80, 'a return on an account takes from what he owes');
 assert.equal(L.who(det.tickets[0]), 'عميل نقدي');
@@ -156,7 +159,7 @@ assert.equal(L.addDays('2026-12-31', 1), '2027-01-01');
 // the day's summary now carries the cost law's facts
 assert.deepEqual(L.parse(file({ '2026-11-25': mk('2026-11-25', { free: { lines: 3, cost: 99.5 }, cost_fallback: { lines: 2, of: 300 } }) })).days[0].free, { lines: 3, cost: 99.5 });
 assert.deepEqual(L.parse(file({ '2026-11-25': mk('2026-11-25', { free: { lines: 3, cost: 99.5 }, cost_fallback: { lines: 2, of: 300 } }) })).days[0].fallback, { lines: 2, of: 300 });
-for (const x of ['5 تذاكر · 3 عميل', 'باقي 4,650', 'تذكرة 5 · الساعة 8:28 م', 'الأيام من الأربعاء 25 نوفمبر', 'من غير سعر 28 · تكلفتها 1,745', 'تذكرة 386436 · بأقل من التكلفة', 'الصافي 8,157', 'نفس المبلغ اتسجّل شرا من الساعة 8:27 م']) {
+for (const x of ['5 تذاكر · 3 عميل', 'باقي 4,650', 'تذكرة 5 · الساعة 8:28 م', 'الأيام من الأربعاء 25 نوفمبر', 'من غير سعر 28 · تكلفتها 1,745', 'تذكرة 386436 · بأقل من التكلفة', 'سحب من العلبة · 2 وحدة', 'الصافي 8,157', 'نفس المبلغ اتسجّل شرا من الساعة 8:27 م']) {
   assert.doesNotMatch(I.translate(x), /[؀-ۿ]/, 'Arabic left in English: ' + x + ' → ' + I.translate(x));
 }
 console.log('PASS: day: the file → the page (money, clock, dates, week, hours, an old file), the English');

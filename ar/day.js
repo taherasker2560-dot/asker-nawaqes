@@ -22,7 +22,7 @@
     'تذكرة', 'المتوسط', 'منه سداد عملاء', 'عميل', 'بيع آجل', 'لحد', 'البيانات', 'بقيمة', 'بيع', 'والتكلفة', ...DAYS, ...MONTHS,
     'اختار يوم', 'النهارده', 'امبارح', 'من أسبوع', 'من شهر', 'ابحث بالاسم أو الصنف أو الرقم أو المبلغ', 'رجوع', 'نقدي', 'الكل', 'كاش', 'آجل', 'تذاكر', 'باقي', 'باقي عليهم', 'دفع', 'خصم', 'الإجمالي', 'الباقي عليه',
     'الصنف', 'الكمية', 'السعر', 'بأقل من التكلفة', 'من غير سعر', 'سداد عميل', 'بيع نقدي', 'مرتجع مدفوع', 'مفيش تذاكر هنا', 'الصافي', 'مرتجع على حساب العميل', 'دفعة', 'ملاحظة', 'الأيام من', 'لحد النهارده',
-    'تكلفتها', 'نفس المبلغ اتسجّل شرا من', 'الساعة', 'مرتجع الشركات', 'التذاكر اللي فيها أصناف متنوعة', 'اتصرفت من غير سعر', 'عميل نقدي', 'الفاتورة دي مش لاقيها', 'فتح الفاتورة', 'اللي اتصرف من غير سعر', 'تكلفة', 'الأيام المتاحة'];
+    'سحب من العلبة', 'وحدة', 'تكلفتها', 'نفس المبلغ اتسجّل شرا من', 'الساعة', 'مرتجع الشركات', 'التذاكر اللي فيها أصناف متنوعة', 'اتصرفت من غير سعر', 'عميل نقدي', 'الفاتورة دي مش لاقيها', 'فتح الفاتورة', 'اللي اتصرف من غير سعر', 'تكلفة', 'الأيام المتاحة'];
 
   // ---------- pure helpers (also used by tests/day.cjs) ----------
   const money = (n) => Math.round(num(n)).toLocaleString('en-US');
@@ -73,7 +73,7 @@
     const tickets = o.tickets.filter((t) => t && t.id != null).map((t) => ({
       id: num(t.id), t: String(t.t || ''), k: t.k === 'r' ? 'r' : 's', ty: t.ty === 'a' ? 'a' : 'c', cu: String(t.cu || ''), total: num(t.total), d: num(t.d), p: num(t.p), memo: String(t.memo || ''),
       mp: t.mp && typeof t.mp === 'object' ? { vendor: String(t.mp.vendor || ''), at: String(t.mp.at || ''), code: String(t.mp.code || '') } : null,
-      lines: (Array.isArray(t.lines) ? t.lines : []).filter((l) => l && l.n != null).map((l) => ({ n: String(l.n), q: num(l.q), pr: num(l.pr), t: num(l.t), bc: !!l.bc, m: !!l.m, fr: !!l.fr, c: l.c == null ? null : num(l.c), memo: String(l.memo || '') })),
+      lines: (Array.isArray(t.lines) ? t.lines : []).filter((l) => l && l.n != null).map((l) => ({ n: String(l.n), q: num(l.q), pr: num(l.pr), t: num(l.t), bc: !!l.bc, m: !!l.m, fr: !!l.fr, ct: !!l.ct, u: l.u == null ? 0 : num(l.u), c: l.c == null ? null : num(l.c), memo: String(l.memo || '') })),
     }));
     return { date: String(o.date || ''), tickets, supplierReturns: (Array.isArray(o.supplier_returns) ? o.supplier_returns : []).filter((r) => r && r.code != null).map((r) => ({ code: String(r.code), vendor: String(r.vendor || ''), total: num(r.total), t: String(r.t || '') })) };
   }
@@ -257,7 +257,7 @@
     const back = '<button type="button" class="dy-back" data-dy-back>› رجوع</button>';
     if (!t) { main.innerHTML = back + '<p class="hint">الفاتورة دي مش لاقيها</p>'; return; }
     const r = rem(t), a = t.ty === 'a';
-    const lines = t.lines.map((l) => `<tr${l.bc || l.fr ? ' class="dy-red"' : ''}><td><span class="notr">${esc(l.n)}</span>${l.bc ? ' <span class="dy-flag">· بأقل من التكلفة</span>' : ''}${l.fr ? ` <span class="dy-flag">· من غير سعر · تكلفتها ${esc(money2(l.c))}</span>` : ''}${l.memo ? `<div class="dy-sub"><span class="notr">${esc(l.memo)}</span></div>` : ''}</td><td class="dy-n">${esc(qtyText(l.q))}</td><td class="dy-n">${esc(money2(l.pr))}</td><td class="dy-n">${esc(money2(l.t))}</td></tr>`).join('');
+    const lines = t.lines.map((l) => `<tr${l.bc || l.fr ? ' class="dy-red"' : ''}><td><span class="notr">${esc(l.n)}</span>${l.bc ? ' <span class="dy-flag">· بأقل من التكلفة</span>' : ''}${l.fr ? ` <span class="dy-flag">· من غير سعر · تكلفتها ${esc(money2(l.c))}</span>` : ''}${l.ct ? ` <span class="dy-note">· سحب من العلبة${l.u ? ' · ' + esc(qtyText(l.u)) + ' وحدة' : ''}</span>` : ''}${l.memo ? `<div class="dy-sub"><span class="notr">${esc(l.memo)}</span></div>` : ''}</td><td class="dy-n">${esc(qtyText(l.q))}</td><td class="dy-n">${esc(money2(l.pr))}</td><td class="dy-n">${esc(money2(l.t))}</td></tr>`).join('');
     main.innerHTML = back + `<h3 class="dy-h2">تذكرة <bdi class="notr">${esc(t.id)}</bdi></h3>` +
       `<div class="dy-card"><b class="notr">${esc(who(t))}</b> · ${a ? 'آجل' : 'نقدي'}${t.k === 'r' ? ' · مرتجع' : ''}<div class="dy-stamp">${esc(dateText(picked))} · ${esc(hm(t.t))}</div>${t.memo ? `<div class="dy-sub">ملاحظة: <span class="notr">${esc(t.memo)}</span></div>` : ''}</div>` +
       `<div class="dy-card"><table>${row(['الصنف', 'الكمية', 'السعر', 'الإجمالي'], true)}${lines}</table>` +

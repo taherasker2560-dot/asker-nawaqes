@@ -867,6 +867,8 @@ window.AskerEN = {
   "اللي اتصرف من غير سعر": "What was given away with no price",
   "تكلفة": "cost",
   "الأيام المتاحة": "Available days",
+  "سحب من العلبة": "Taken from the box",
+  "وحدة": "unit",
   "💹 الربح": "💹 Profit",
   "💹 الربح والهامش": "💹 Profit and margin",
   "شهر معيّن": "A month",
