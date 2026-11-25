@@ -2725,3 +2725,37 @@ button.dy-b:disabled { opacity: 0.35; }
 .dy-bars > div { flex: 1; position: relative; background: var(--rose); border: 1px solid var(--line); border-radius: 6px 6px 0 0; min-width: 6px; }
 .dy-bars > div.t { background: var(--crimson); border-color: var(--crimson); }
 .dy-bars > div > span { position: absolute; left: 0; right: 0; bottom: -17px; text-align: center; font-size: 10.5px; color: var(--muted); }
+
+/* «📅 اليوم» v2 (same night, his notes): the date picker, every number a button, the lists with a search box, one invoice */
+button.dy-k { text-align: right; width: 100%; margin: 0; min-height: 0; padding: 9px 11px; cursor: pointer; box-shadow: none; font: inherit; color: var(--ink); }
+button.dy-k.dy-tap { border: 1.5px solid var(--crimson); position: relative; background: var(--card); }
+button.dy-k.dy-tap::after { content: "›"; position: absolute; left: 10px; top: 6px; color: var(--crimson); font-size: 18px; }
+button.dy-k.dy-star { background: var(--rose); }
+.dy-k.dy-star small { color: var(--crimson-ink); font-weight: 700; }
+button.dy-ptap { margin: 0; min-height: 0; cursor: pointer; border: 1.5px solid var(--crimson); color: var(--crimson); background: var(--card); font-weight: 700; box-shadow: none; font-size: 12.5px; }
+.dy-pick { display: flex; align-items: center; gap: 8px; }
+.dy-date { position: relative; flex: 1; display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1.5px solid var(--crimson); border-radius: 12px; padding: 9px 10px; font-weight: 700; font-size: 14px; background: var(--card); }
+.dy-date small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.dy-date input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; padding: 0; border: 0; cursor: pointer; }
+button.dy-chip { margin: 0; min-height: 0; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12px; box-shadow: none; cursor: pointer; }
+button.dy-chip.on { border-color: var(--crimson); background: var(--rose); color: var(--crimson-ink); font-weight: 700; }
+button.dy-chip:disabled { opacity: 0.4; }
+button.dy-back { margin: 0 0 6px; min-height: 0; padding: 5px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--crimson); font-weight: 700; font-size: 13px; box-shadow: none; cursor: pointer; }
+.dy-h2 { margin: 4px 2px 8px; font-size: 15px; }
+.dy-search { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--crimson); border-radius: 12px; padding: 4px 10px; background: var(--card); margin: 0 0 8px; }
+.dy-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; margin: 0; padding: 7px 0; font-size: 14px; color: var(--ink); }
+.dy-tot { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding: 5px 4px; }
+.dy-tot b { color: var(--crimson); }
+button.dy-tk, .dy-tk.dy-static { display: block; width: 100%; text-align: right; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 9px 11px; margin: 0 0 7px; box-shadow: none; min-height: 0; font: inherit; color: var(--ink); }
+button.dy-tk { cursor: pointer; }
+.dy-a { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
+.dy-a b { flex: 1; font-weight: 700; overflow-wrap: anywhere; }
+.dy-v { font-weight: 800; direction: ltr; }
+.dy-neg { color: var(--bad, #a3162f); }
+.dy-bb { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; font-size: 12px; color: var(--muted); }
+.dy-rem { color: var(--bad, #a3162f); font-weight: 700; }
+.dy-badge { padding: 1px 8px; border-radius: 999px; background: var(--rose); color: var(--crimson-ink); font-size: 11.5px; font-weight: 700; }
+.dy-mp { margin-top: 5px; padding: 5px 9px; border-radius: 10px; background: var(--rose); color: var(--ink); font-size: 12.5px; line-height: 1.7; }
+#dayPanel tr.dy-red td { background: transparent; }
+.dy-flag { color: var(--bad, #a3162f); font-weight: 700; font-size: 12px; }
+button.dy-bl { display: block; width: 100%; text-align: right; margin: 4px 0 0; min-height: 0; padding: 4px 6px; border: 0; background: transparent; color: var(--crimson-ink); font: inherit; font-size: 12.5px; box-shadow: none; text-decoration: underline; cursor: pointer; }
