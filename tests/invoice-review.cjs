@@ -129,4 +129,10 @@ assert.equal(L.answerKind({ status: 'answered', answer_key: null, answer_text: '
 // the English of every new fixed line
 { global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js'); const I = global.AskerI18n; I._use(global.AskerEN);
   for (const s of [...Object.values(L.OPT_HELP), ...Object.values(L.ANSWER_HEAD), ...Object.values(L.ANSWER_NEXT), L.BUY_HEAD.off, 'رديت على الروبوت', 'رديت:', '✓ ما اتحفظش حاجة في فارمافلاي', 'شاشة فارمافلاي وقت الوقفة (دوسة تكبّرها)', 'أو اكتب له تعمل إيه…', 'اتبعت للروبوت ✓']) assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s)); }
+// «صور الأصناف» (2026-11-27): each item once; no new item (it has its own box photo), no rejected line; the internet ones only once «تمام» can be kept
+const pr = { lines: [{ n: 1, id: 101, name: 'A' }, { n: 2, id: 102, name: 'B' }, { n: 3, id: 103, name: 'C' }, { n: 4, name: 'NEW' }, { n: 5, id: 101, name: 'A' }, { n: 6, id: 105, name: 'E' }], answers: { R6: { v: 'reject' } } };
+const stOf = (id) => ({ 101: 'none', 102: 'net', 103: 'ok', 105: 'none' })[id] || null;
+assert.deepEqual(require('../ar/invoice-review.js').picNeeds(pr, stOf, true), { none: [{ id: 101, name: 'A' }], net: [{ id: 102, name: 'B' }], n: 2 });
+assert.deepEqual(require('../ar/invoice-review.js').picNeeds(pr, stOf, false).net, [], 'before the server change only the items with no photo are asked');
+assert.equal(require('../ar/invoice-review.js').picNeeds(pr, () => null, true).n, 0, 'nothing is asked before the photos are read');
 console.log('PASS: invoice review helpers');

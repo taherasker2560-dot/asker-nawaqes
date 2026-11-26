@@ -106,7 +106,7 @@
 /* a NEW item's box photo (owner 2026-11-22, mockup mockups/new_item_photo_2026-11-22.jpg): «📷 صوّر العلبة» under the line, «بيقرا العلبة…» while the laptop reads it, then the reading */
 .rv-nirow td { border-top: 0; padding-top: 0; }
 .rv-ni { grid-column: 1 / -1; margin-top: 6px; }
-.rv-ni-cam { display: flex; justify-content: center; align-items: center; gap: 6px; width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 14px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.rv-ni-cam, .rv-pcam { display: flex; justify-content: center; align-items: center; gap: 6px; width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 14px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font-size: 13.5px; font-weight: 700; cursor: pointer; }
 .rv-ni-b .rv-ni-cam { width: auto; padding: 6px 12px; font-size: 13px; font-weight: 400; border-color: var(--line); background: var(--card); color: var(--ink); }
 .rv-ni-wait { padding: 8px 10px; border-radius: 12px; border: 1.5px dashed var(--crimson); color: var(--crimson-ink); font-size: 13px; }
 .rv-ni-wait.bad { border-color: var(--bad); color: var(--bad); margin-bottom: 6px; }
@@ -122,6 +122,25 @@
 .rv-ni-edit input { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; border-radius: 10px; }
 .rv-ni-edit button { flex: none; width: auto; min-height: 0; padding: 6px 12px; border-radius: 12px; border: 1.5px solid var(--crimson); background: var(--rose); color: var(--crimson-ink); font: inherit; font-size: 13px; font-weight: 700; box-shadow: none; }
 /* the camera and the phone's photos side by side (owner 2026-11-23: «ادوس على الكاميرا ديت يفتح لي تحميل … من الستور من عندي») */
-.rv-ni-two { display: flex; gap: 8px; width: 100%; }
+.rv-ni-two, .rv-ptwo { display: flex; gap: 8px; width: 100%; }
+.rv-pic-row .rv-ptwo { width: auto; flex: none; }
+.rv-pic-row .rv-pcam { width: auto; margin: 0; padding: 7px 12px; font-size: 12.5px; }
+.rv-pic-row .rv-ppick { font-weight: 400; border-color: var(--line); background: var(--card); color: var(--ink); }
 .rv-ni-two .rv-ni-cam { flex: 1; width: auto; }
 .rv-ni-b .rv-ni-two { width: auto; flex: none; }
+
+/* «صور الأصناف» (owner 2026-11-27, «تطلبها في مراجعة المشتريات»): inside an invoice card, the items with no photo and the internet photos to look at */
+.rv-pics { margin: 10px 0 4px; border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; }
+.rv-pics summary { cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 700; font-size: 14px; list-style: none; }
+.rv-pics summary small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.rv-pic-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px dashed var(--line); padding: 8px 0 4px; margin-top: 6px; flex-wrap: wrap; }
+.rv-pic-row b { flex: 1; min-width: 140px; font-size: 12.5px; text-align: right; overflow-wrap: anywhere; }
+.rv-pic-wait { font-size: 12px; color: var(--muted); }
+.rv-pic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0; }
+.rv-pics button.rv-pic-tile { display: block; position: relative; width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 5px; border: 1px solid var(--line) !important; border-radius: 12px; background: #fff; color: var(--ink); box-shadow: none; font: inherit; cursor: pointer; }
+.rv-pic-tile img { display: block; width: 100%; height: 84px; object-fit: contain; }
+.rv-pic-tile small { display: block; font-size: 10.5px; line-height: 1.35; max-height: 2.7em; overflow: hidden; margin-top: 3px; text-align: center; }
+.rv-pics button.rv-pic-tile.bad { border: 2px solid var(--bad, #a3162f) !important; }
+.rv-pic-tile em { position: absolute; top: -7px; right: 6px; background: var(--bad, #a3162f); color: #fff; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 700; padding: 1px 7px; }
+.rv-pics button.rv-pic-ok { width: 100%; margin: 6px 0 2px; border: 1.5px solid var(--crimson) !important; border-radius: 14px; background: var(--rose); color: var(--crimson-ink); font-weight: 800; box-shadow: none; }
+.rv-pic-n { flex: none; font-size: 11.5px; font-weight: 700; color: var(--crimson); white-space: nowrap; }

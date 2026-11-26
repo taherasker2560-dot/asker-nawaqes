@@ -148,7 +148,21 @@
   const stopOptions = (s) => (Array.isArray(s && s.options) ? s.options : []).filter((o) => o && typeof o.key === 'string' && o.key && typeof o.label === 'string' && o.label).slice(0, 6);
   const buyOf = (list, r) => buyStops(list).find((s) => buyRef(s).card === String(r && r.id)) || null;
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours() % 12 || 12) + ':' + pad(d.getMinutes()) + (d.getHours() < 12 ? ' ص' : ' م'); };
-  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when, buyRef, buyStops, buyOf, BUY_HEAD, BUY_CHIP, stopParts, answerKind, stopOptions, OPT_HELP, ANSWER_HEAD, ANSWER_NEXT };
+  // ---- «صور الأصناف» (owner 2026-11-27: «أي صنف ملوش صورة… أو صورته مش تمام أول ما يدخل مشتريات تطلب صورته» → «تطلبها في مراجعة المشتريات») ----
+  // the invoice's items (each once; a new item without a card yet has its own box photo; a rejected line goes back) whose photo is missing ('none') or is one nobody of ours chose ('net').
+  // stateOf(id) = AskerItemMedia.photoState; the internet ones are asked only once «تمام» can be kept (canConfirm: after migration 202611271000)
+  function picNeeds(r, stateOf, canConfirm) {
+    const none = [], net = [], seen = new Set();
+    for (const l of linesOf(r)) {
+      const id = l && Number(l.id);
+      if (!(id > 0) || seen.has(id) || rejected(r, l)) continue;
+      seen.add(id);
+      const st = stateOf(id), x = { id, name: String(l.name || l.paper || '') };
+      if (st === 'none') none.push(x); else if (st === 'net' && canConfirm) net.push(x);
+    }
+    return { none, net, n: none.length + net.length };
+  }
+  const api = { picNeeds, STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when, buyRef, buyStops, buyOf, BUY_HEAD, BUY_CHIP, stopParts, answerKind, stopOptions, OPT_HELP, ANSWER_HEAD, ANSWER_NEXT };
   root.AskerInvReviewLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -338,6 +352,52 @@
     }
     return next;
   }
+  // ---------- «صور الأصناف»: the camera for an item with no photo; the internet photos side by side, a tap marks a wrong one, «تمام» keeps the rest for good ----------
+  let picBad = {}, picOpen = {}, picBusy = {};
+  const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
+  const picsOf = (r) => { const M = media(); return M ? picNeeds(r, (id) => M.photoState(id), M.canConfirm()) : { none: [], net: [], n: 0 }; };
+  function picRow(r, x, label) {
+    const k = r.id + '|' + x.id;
+    const pick = (text, camera) => `<label class="rv-pcam${camera ? '' : ' rv-ppick'}">${text}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ''} hidden data-rv-pcam="${esc(k)}"></label>`;
+    return `<div class="rv-pic-row"><b class="notr" dir="ltr">${esc(x.name)}</b>${picBusy[x.id] ? '<span class="rv-pic-wait">بحفظ الصورة…</span>' : `<span class="rv-ptwo">${pick(label, true)}${pick('🖼 من الصور', false)}</span>`}</div>`;
+  }
+  function picsHtml(r) {
+    const p = picsOf(r);
+    if (!p.n) return '';
+    const M = media(), bad = picBad[r.id] || new Set(), wrong = p.net.filter((x) => bad.has(x.id)), good = p.net.length - wrong.length;
+    const head = [p.none.length ? `<bdi dir="ltr">${p.none.length}</bdi> <span>من غير صورة</span>` : '', p.net.length ? `<bdi dir="ltr">${p.net.length}</bdi> <span>صورتها من النت</span>` : ''].filter(Boolean).join(' · ');
+    const open = r.id in picOpen ? picOpen[r.id] : true;
+    let h = `<details class="rv-pics" data-rv-pics="${esc(r.id)}"${open ? ' open' : ''}><summary><span>📷 صور الأصناف</span><small>${head}</small></summary>`;
+    h += p.none.map((x) => picRow(r, x, '📷 صوّر')).join('');
+    if (p.net.length) {
+      h += '<p class="rv-hint">صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.</p><div class="rv-pic-grid">' +
+        p.net.map((x) => `<button type="button" class="rv-pic-tile${bad.has(x.id) ? ' bad' : ''}" data-rv-pbad="${esc(r.id + '|' + x.id)}" aria-pressed="${bad.has(x.id)}"><img src="${esc(M.photoSrc(x.id) || '')}" alt="" loading="lazy"><small class="notr" dir="ltr">${esc(x.name)}</small>${bad.has(x.id) ? '<em>مش تمام</em>' : ''}</button>`).join('') + '</div>';
+      h += wrong.map((x) => picRow(r, x, '📷 صوّرها')).join('');
+      if (good > 0) h += `<button type="button" class="rv-pic-ok" data-rv-pok="${esc(r.id)}"><span>${wrong.length ? '✓ الباقي صوره تمام' : '✓ كلهم تمام'}</span> (<bdi dir="ltr">${good}</bdi>)</button>`;
+    }
+    return h + '</details>';
+  }
+  async function picPhoto(input) {
+    const [rid, id] = split(input.dataset.rvPcam), file = input.files && input.files[0], M = media();
+    input.value = '';
+    if (!file || !M) return;
+    picBusy[id] = true; sig = signature(); draw();
+    const url = URL.createObjectURL(file);
+    try {
+      await M.upload(Number(id), niDraw(await niLoad(url), 800, 0.85));
+      say('الصورة بقت صورة الصنف ✓', 'good');
+    } catch (e) { say('الصورة ما اتحفظتش: ' + (e.message || e), 'bad'); }
+    finally { URL.revokeObjectURL(url); delete picBusy[id]; sig = signature(); draw(); }
+  }
+  async function picConfirm(rid) {
+    const r = find(rid), M = media();
+    if (!r || !M || busy) return;
+    const bad = picBad[r.id] || new Set(), ids = picsOf(r).net.map((x) => x.id).filter((id) => !bad.has(id));
+    busy = true;
+    try { await M.confirm(ids); say('تمام ✓ مش هيتسأل عليهم تاني', 'good'); }
+    catch (e) { say('ما اتحفظش: ' + (e.message || e), 'bad'); }
+    finally { busy = false; sig = signature(); draw(); }
+  }
   // the small line under an item: its last cost and how much it moved (or «new»), the quantity
   function moveHtml(l) {
     const parts = [];
@@ -425,9 +485,10 @@
   function card(r) {
     const open = isOpen(r);
     const sub = [r.paper_date, 'صافي ' + money(r.total), linesOf(r).length + ' سطر'].filter(Boolean).join(' · ');
+    const pn = picsOf(r).n;
     return `<div class="rv-card${open ? ' open' : ''}" data-rv="${esc(r.id)}"><div class="rv-hd" role="button" tabindex="0" data-rv-toggle="${esc(r.id)}">` +
-      `<span class="rv-ord">${r.ord == null ? '·' : esc(r.ord)}</span><span class="rv-t"><strong class="notr">${esc(r.supplier)} · ${esc(r.doc_no)}</strong><span dir="ltr">${esc(sub)}</span></span>${chipHtml(r)}</div>` +
-      `<div class="rv-body">${photosHtml(r)}${compact(r) ? compactHtml(r) : linesHtml(r)}${checkHtml(r)}` +
+      `<span class="rv-ord">${r.ord == null ? '·' : esc(r.ord)}</span><span class="rv-t"><strong class="notr">${esc(r.supplier)} · ${esc(r.doc_no)}</strong><span dir="ltr">${esc(sub)}</span></span>${pn ? `<span class="rv-pic-n">📷 ${pn}</span>` : ''}${chipHtml(r)}</div>` +
+      `<div class="rv-body">${photosHtml(r)}${compact(r) ? compactHtml(r) : linesHtml(r)}${checkHtml(r)}${picsHtml(r)}` +
       (notesOf(r).length ? `<h4>ملاحظات${WAITING.includes(r.status) ? ' (محتاجة رأيك)' : ''}</h4>${notesOf(r).map((n) => noteHtml(r, n)).join('')}` : '') +
       footHtml(r) + '</div></div>';
   }
@@ -510,7 +571,11 @@
     box.querySelectorAll('[data-rv-say]').forEach((i) => { if (said[i.dataset.rvSay]) i.value = said[i.dataset.rvSay]; });
   }
   const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details, x.status, x.answer_key, x.answer_text, (x.options || []).length]), Object.keys(snaps),
-    Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late])]);
+    Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late]),
+    rows.map((r) => { const p = picsOf(r); return [p.none.map((x) => x.id), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : ''))]; }), Object.entries(picBad).map(([k, s]) => [k, [...s]]), Object.keys(picBusy)]);
+  // never redraw under his fingers (typing a note, choosing an answer), nor while he is speaking into a box
+  const typingNow = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
+    !!(root.AskerVoice && root.AskerVoice.listening());
   async function load(force) {
     if (!db() || loading) return;
     loading = true;
@@ -534,10 +599,7 @@
         await loadSnaps(stops);
       } catch (e) { stops = []; }
       const before = sig; rows = next; sig = signature();
-      // never redraw under his fingers (typing a note, choosing an answer)
-      const typing = (document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
-        !!(root.AskerVoice && root.AskerVoice.listening()); // nor while he is speaking into a box
-      if (force || (sig !== before && !typing)) draw();
+      if (force || (sig !== before && !typingNow())) draw();
       say('');
     } catch (e) {
       say('مقدرتش أجيب الفواتير المتجهزة: ' + (e.message || e), 'bad');
@@ -645,6 +707,8 @@
     if ((el = g('data-rv-all'))) { showAllLines[el.dataset.rvAll] = true; return draw(); }
     if ((el = g('data-rv-shot'))) { const [r, i] = split(el.dataset.rvShot); return viewer(r, Number(i)); }
     if ((el = g('data-rv-niok'))) return niKeep(el.dataset.rvNiok);
+    if ((el = g('data-rv-pok'))) return picConfirm(el.dataset.rvPok);
+    if ((el = g('data-rv-pbad'))) { const [r, id] = split(el.dataset.rvPbad), s = picBad[r] || (picBad[r] = new Set()); if (s.has(Number(id))) s.delete(Number(id)); else s.add(Number(id)); sig = signature(); draw(); return; }
     if ((el = g('data-rv-niedit'))) { niEdit = el.dataset.rvNiedit; sig = signature(); draw(); const i = document.querySelector(`[data-rv-niname="${CSS.escape(niEdit)}"]`); if (i) { i.focus(); i.select(); } return; }
     if ((el = g('data-rv-nisave'))) { const i = document.querySelector(`[data-rv-niname="${CSS.escape(el.dataset.rvNisave)}"]`); return niKeep(el.dataset.rvNisave, i ? i.value : ''); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
@@ -657,6 +721,7 @@
   function onChange(e) {
     const t = e.target;
     if (t.matches('[data-rv-cam]')) return niPhoto(t);
+    if (t.matches('[data-rv-pcam]')) return picPhoto(t);
     if (t.matches('[data-rv-alt]')) { const [r, n, k] = split(t.dataset.rvAlt); const row = find(r), note = row && notesOf(row).find((x) => x.id === n); const alt = note && (note.alts || []).find((x) => x.k === k); return answer(r, n, { v: 'alt', k, t: alt ? alt.t : '' }); }
     if (t.matches('[data-rv-price]')) { const [r, n] = split(t.dataset.rvPrice); const v = parseNum(t.value); return v > 0 ? setPrice(r, n, v) : undefined; }
     if (t.matches('[data-rv-text]')) { const [r, n] = split(t.dataset.rvText); const v = t.value.trim().slice(0, 200); return v ? answer(r, n, { v: 'text', t: v }) : undefined; }
@@ -684,6 +749,10 @@
   }
   function close() { clearInterval(timer); timer = null; clearTimeout(niTimer); niTimer = null; shot && shot.remove(); shot = null; }
   const main = $('rvMain');
+  // the photos' list or a fix arrived after the cards were drawn: they are drawn again (not under his fingers)
+  root.AskerItemMedia?.onChange?.(() => { if (panelOn() && rows.length) { const next = signature(); if (next !== sig && !typingNow()) { sig = next; draw(); } } });
+  // «صور الأصناف» folded or opened by him stays so while the card is drawn again («toggle» does not bubble: caught on the way down)
+  $('rvMain')?.addEventListener('toggle', (e) => { const d = e.target; if (d.dataset && d.dataset.rvPics) picOpen[d.dataset.rvPics] = d.open; }, true);
   if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-niname]')) { e.preventDefault(); niKeep(e.target.dataset.rvNiname, e.target.value); } else if (e.target.matches('[data-rv-say]')) { e.preventDefault(); main.querySelector(`[data-rv-send="${CSS.escape(e.target.dataset.rvSay)}"]`)?.click(); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
   document.addEventListener('keydown', onKey);
   $('rvRefresh')?.addEventListener('click', () => load(true));
