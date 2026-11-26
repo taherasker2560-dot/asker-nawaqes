@@ -109,4 +109,24 @@ assert.equal(L.buyOf(list, { id: 2 }).id, 2);
 assert.equal(L.buyOf(list, { id: 5 }), null, 'a done stop is not shown');
 assert.equal(L.buyOf(list, { id: 99 }), null);
 assert.ok(L.BUY_HEAD.stop && L.BUY_HEAD.check && L.BUY_HEAD.needs_helper && L.BUY_CHIP.stop && L.BUY_CHIP.check && L.BUY_CHIP.needs_helper);
+// 2026-11-26: the stop cards can be answered. An ANSWERED stop still shows (the laptop is carrying it out); «off» is its own card, last
+assert.deepEqual(L.buyRef({ ref_id: 'robot:off' }), { card: '', kind: 'off' });
+assert.deepEqual(L.buyStops([stop(8, 'robot:off', { job: 'purchases_wait' }), stop(9, 'card:9:stop', { status: 'answered' }), stop(10, 'card:10:needs_helper')]).map((s) => s.id), [9, 10, 8]);
+assert.ok(L.BUY_HEAD.off);
+// the laptop's lines: why, who has it, nothing saved, the picture of PharmaFly's screen
+assert.deepEqual(L.stopParts({ details: 'وقف عند التاريخ\nالمساعد: مش شغال من 10:41 ص\nSAFE:1\nSHOT:robot/stop_40_20261126132900.json' }), { why: 'وقف عند التاريخ', who: 'المساعد: مش شغال من 10:41 ص', safe: true, shot: 'robot/stop_40_20261126132900.json' });
+assert.deepEqual(L.stopParts({ details: 'السطر 7\nمحادثة الفواتير ماسكاها ✓' }), { why: 'السطر 7', who: 'محادثة الفواتير ماسكاها ✓', safe: false, shot: '' }, 'an old card (no machine lines) reads as before');
+assert.equal(L.stopParts({ details: 'x\nSHOT:../secret/file.jpg' }).shot, '', 'only a picture in robot/ is ever asked for');
+assert.equal(L.stopParts({ details: 'x\nSHOT:robot/a/b.jpg' }).shot, '');
+assert.deepEqual(L.stopParts(null), { why: '', who: '', safe: false, shot: '' });
+// the buttons: only well formed ones, at most six; every key the laptop sends has its words under it and its words once tapped
+assert.deepEqual(L.stopOptions({ options: [{ key: 'retry', label: 'a' }, { key: '', label: 'b' }, { label: 'c' }, null] }), [{ key: 'retry', label: 'a' }]);
+assert.equal(L.stopOptions({ options: 'x' }).length, 0);
+for (const k of ['retry', 'manual', 'helper', 'off', 'on']) { assert.ok(L.OPT_HELP[k], 'help ' + k); assert.ok(L.ANSWER_HEAD[k] && L.ANSWER_NEXT[k], 'answered ' + k); }
+assert.equal(L.answerKind({ status: 'open', answer_key: 'retry' }), '');
+assert.equal(L.answerKind({ status: 'answered', answer_key: 'manual' }), 'manual');
+assert.equal(L.answerKind({ status: 'answered', answer_key: null, answer_text: 'سيبها' }), 'text', 'his own words with no button');
+// the English of every new fixed line
+{ global.window = global; require('../ar/i18n-en.js'); require('../ar/i18n.js'); const I = global.AskerI18n; I._use(global.AskerEN);
+  for (const s of [...Object.values(L.OPT_HELP), ...Object.values(L.ANSWER_HEAD), ...Object.values(L.ANSWER_NEXT), L.BUY_HEAD.off, 'رديت على الروبوت', 'رديت:', '✓ ما اتحفظش حاجة في فارمافلاي', 'شاشة فارمافلاي وقت الوقفة (دوسة تكبّرها)', 'أو اكتب له تعمل إيه…', 'اتبعت للروبوت ✓']) assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s)); }
 console.log('PASS: invoice review helpers');
