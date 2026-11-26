@@ -980,6 +980,8 @@ window.AskerEN = {
   "كل الكمية متسعّرة بمتوسط التكلفة اللي على كارت الصنف": "Every quantity is priced at the average cost on the item's card",
   "المخزن الرئيسي": "Main store",
   "مخازن الانتظار": "Waiting stores",
+  "المخزن": "Store",
+  "بالتكلفة": "At cost",
   "في المخزن الرئيسي:": "In the main store:",
   "صنف من غير شرا قبل كده: اتسعّر بتكلفة الكارت": "items never bought before, priced at the card's cost",
   "منهم من غير تكلفة خالص (اتحسبوا صفر)": "of them with no cost at all (counted as zero)",

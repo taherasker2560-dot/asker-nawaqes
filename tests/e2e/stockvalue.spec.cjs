@@ -10,7 +10,7 @@ const seed=(page)=>page.evaluate(()=>{
  const day=(law,at)=>({at,stores:[st(1,'Main - مثال',law,law-3000,law+297000,{no_buy:13,no_cost:11,avg_zero:14}),st(2,'مخزن هالك مثال',40181,39533,52112),st(5,'مخزن انتظار أ',231,231,383),st(6,'مخزن انتظار ب',2730,2676,3372)]});
  window.__storage['day/stock.json']=JSON.stringify({v:1,latest:'2026-11-26',days:{'2026-11-26':day(994227,'2026-11-26 22:25'),'2026-11-25':day(990000,'2026-11-25 23:40')}});
 });
-const openPage=async(page)=>{await seed(page);await page.evaluate(()=>window.AskerApp.showTab('stockval'));await page.waitForSelector('#stockValPanel:not(.hidden) .dy-grid')};
+const openPage=async(page)=>{await seed(page);await page.evaluate(()=>window.AskerApp.showTab('stockval'));await page.waitForSelector('#stockValPanel:not(.hidden) .sv-tbl')};
 
 run('Stock value: the tab, the main store on the law with the public price, the other and waiting stores, the other basis, a past day',async({page})=>{
  await openPage(page);
@@ -18,32 +18,32 @@ run('Stock value: the tab, the main store on the law with the public price, the 
  assert.deepEqual(await all(page,'#svMain [data-sv-basis]'),['آخر شرا (قانونك)','متوسط تكلفة فارمافلاي']);
  assert.equal(await page.$eval('[data-sv-basis="law"]',(b)=>b.classList.contains('on')),true,'it opens on his law');
  assert.match(await txt(page,'#svMain .dy-stamp'),/^حسب بيانات فارما فلاي لحد .* 26 .*10:25 م كل الكمية متسعّرة بتكلفة آخر شرا للصنف$/);
- assert.match(await txt(page,'#svMain .dy-grid'),/^المخزن الرئيسي 994,227 بسعر الجمهور 1,291,227 · 5,825 صنف$/);
- assert.match(await txt(page,'#svMain .sv-stores'),/^مخزن هالك مثال 40,181 مخازن الانتظار 2,961 مخزن انتظار أ 231 مخزن انتظار ب 2,730$/);
+ assert.deepEqual(await all(page,'#svMain .sv-tbl th'),['المخزن','بالتكلفة','بسعر الجمهور']);
+ assert.deepEqual(await all(page,'#svMain .sv-tbl tbody tr'),['المخزن الرئيسي 5,825 صنف 994,227 1,291,227','مخزن هالك مثال 40,181 52,112','مخازن الانتظار 2,961 3,755','مخزن انتظار أ 231 383','مخزن انتظار ب 2,730 3,372','الإجمالي 1,037,369 1,347,094'],'every store at cost and at the public price, then the total');
  assert.match(await txt(page,'#svMain'),/في المخزن الرئيسي: 13 صنف من غير شرا قبل كده: اتسعّر بتكلفة الكارت · 11 منهم من غير تكلفة خالص \(اتحسبوا صفر\) الرصيد اللي صفر أو بالسالب مش محسوب\./);
  // day by day: the main store, newest first, with the move
  const days=await all(page,'#svMain .sv-day');
  assert.equal(days.length,2);
- assert.match(days[0],/^994,227 .*26 .*\+4,227$/);
+ assert.match(days[0],/^994,227 .*26 .*بسعر الجمهور 1,291,227 \+4,227$/);
  assert.match(days[1],/^990,000 .*25 /);
  // the other basis: named, framed, its own numbers and its own gap
  await page.click('[data-sv-basis="avg"]');
- assert.match(await txt(page,'#svMain .dy-grid'),/^المخزن الرئيسي 991,227 بسعر الجمهور 1,291,227 /);
+ assert.match(await txt(page,'#svMain .sv-main'),/^المخزن الرئيسي 5,825 صنف 991,227 1,291,227$/);
  assert.match(await txt(page,'#svMain .dy-card.pf-other'),/إنت شايف على متوسط تكلفة فارمافلاي، مش على آخر شرا كل الكمية متسعّرة بمتوسط التكلفة اللي على كارت الصنف/);
  assert.match(await txt(page,'#svMain'),/14 صنف متوسطه صفر على الكارت/);
  assert.doesNotMatch(await txt(page,'#svMain'),/من غير شرا قبل كده/);
  // a past day: its own stores, and back
  await page.click('[data-sv-basis="law"]');
  await page.click('[data-sv-day="2026-11-25"]');
- assert.match(await txt(page,'#svMain .dy-grid'),/^المخزن الرئيسي 990,000 /);
+ assert.match(await txt(page,'#svMain .sv-main'),/ 990,000 /);
  assert.match(await txt(page,'#svMain .dy-stamp'),/ 25 .*11:40 م/);
  await page.click('[data-sv-latest]');
- assert.match(await txt(page,'#svMain .dy-grid'),/^المخزن الرئيسي 994,227 /);
+ assert.match(await txt(page,'#svMain .sv-main'),/ 994,227 /);
  // opened again after looking at the other basis: his law
  await page.click('[data-sv-basis="avg"]');
  await page.evaluate(()=>{window.AskerApp.showTab('home');window.AskerApp.showTab('stockval')});
  await page.waitForFunction(()=>document.querySelector('[data-sv-basis="law"]')?.classList.contains('on'));
- assert.match(await txt(page,'#svMain .dy-grid'),/^المخزن الرئيسي 994,227 /);
+ assert.match(await txt(page,'#svMain .sv-main'),/ 994,227 /);
 });
 run('Stock value: no file yet; a staff member sees nothing',async({page})=>{
  await page.evaluate(()=>window.AskerApp.showTab('stockval'));
