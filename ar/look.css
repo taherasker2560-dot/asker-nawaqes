@@ -2845,3 +2845,20 @@ button.rv-opt.rv-opt-main { background: var(--rose); }
 .rp-back { margin: 0 0 8px; }
 .rp-back button { width: auto; margin: 0; min-height: 0; padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--crimson); background: var(--card); color: var(--crimson-ink); font: inherit; font-size: 13px; font-weight: 700; box-shadow: none; }
 #spareBar .sp-slot.on.sp-fix { border: 1.5px solid var(--crimson); }
+
+/* «💼 فلوسك في الصيدلية» (2026-11-27), on top of «قيمة المخزون» */
+#stockValPanel .sv-mt { margin: 0 0 6px; font-size: 15px; }
+#stockValPanel .sv-ml { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 2px; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
+#stockValPanel .sv-ml bdi[dir="ltr"] { white-space: nowrap; font-weight: 700; }
+#stockValPanel button.sv-cash { width: 100%; min-height: 0; margin: 0; background: transparent; border: 0 !important; border-bottom: 1px dashed var(--line) !important; border-radius: 0; box-shadow: none; color: var(--ink); font: inherit; font-size: 13.5px; text-align: start; cursor: pointer; }
+#stockValPanel .sv-net { border-bottom: 0; border-top: 2px solid var(--crimson); font-weight: 800; font-size: 16px; }
+#stockValPanel .sv-net bdi[dir="ltr"] { color: var(--crimson); font-weight: 800; }
+#stockValPanel .sv-boxes { background: var(--rose); border-radius: 12px; padding: 4px 10px; margin: 4px 0 6px; }
+#stockValPanel .sv-box { display: flex; align-items: center; gap: 8px; padding: 6px 0; margin: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
+#stockValPanel .sv-box input { width: 20px; height: 20px; min-height: 0; margin: 0; flex: none; accent-color: var(--crimson); }
+#stockValPanel .sv-box bdi.notr { flex: 1; overflow-wrap: anywhere; }
+#stockValPanel .sv-apart { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+#stockValPanel .sv-apart .sv-ml { border-bottom: 0; padding: 2px 2px 2px 0; font-size: 12.5px; }
+#stockValPanel .sv-idle { font-size: 12.5px; color: var(--muted); border-bottom: 0; }
+#stockValPanel .sv-mdays { margin-top: 6px; }
+#stockValPanel .sv-mdays summary { cursor: pointer; font-weight: 700; font-size: 13.5px; color: var(--crimson); padding: 6px 0; }
