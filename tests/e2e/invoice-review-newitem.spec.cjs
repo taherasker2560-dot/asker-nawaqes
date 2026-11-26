@@ -70,3 +70,42 @@ run('Invoice review: a new item\'s box photo is read, shown under its line, kept
  assert.equal(await page.evaluate(()=>window.__up.length),1,'the photo is set once');
  assert.equal(await page.$('#rvMain [data-rv-cam]'),null,'no camera on an entered invoice');
 });
+
+// 2026-11-26 (card 41, «مش لاقى مكان ادخل فيه صور الاصناف الجديده»): in a cosmetics invoice a new item that needs no price was folded under «زي آخر مرة» with no camera,
+// and after approval the camera of every line was gone
+const cosmetics=(page)=>page.evaluate(()=>{
+ window.__tables.ar_item_reads=[];
+ window.__tables.ar_invoice_reviews=[{id:41,batch:'2026-11-26',ord:1,supplier:'مورد مثال',doc_no:'777002',paper_date:'2026-11-26',total:381,photos:[],
+  lines:[{n:1,paper:'صنف قديم مثال',qty:1,disc:20,exp:'082029',id:101,name:'EXAMPLE 10MG 20 TAB',net:100,total:100,pub:125},
+   {n:2,paper:'أكياس مثال',qty:1,disc:25,exp:'082029',id:0,name:'',total:111,pub:150},
+   {n:3,paper:'غسول مثال',qty:1,exp:'082029',id:0,name:'',ask:'price',net:170,total:170,pub:220}],
+  notes:[],answers:{},owner_note:null,status:'ready',result:null,created_at:new Date().toISOString(),done_at:null}];
+});
+const cams=(page)=>page.$$eval('#rvMain [data-rv-cam]:not([data-rv-pick])',(b)=>b.map(x=>x.dataset.rvCam).sort());
+const show=async(page)=>{if(!(await page.isVisible('#rvMain .rv-ni-cam, #rvMain .rv-ni-read')))await page.click('#rvMain [data-rv-toggle="41"]');};
+run('Invoice review: every new item of a cosmetics invoice has its camera, in sight, before and after approval',async({page})=>{
+ await cosmetics(page);await open(page);await show(page);
+ assert.deepEqual(await cams(page),['41|2','41|3'],'the line with no price to ask has it too');
+ assert.ok(await page.isVisible('#rvMain .rv-sr[data-line="2"] .rv-ni-cam'),'in sight, not inside a fold');
+ assert.match(await page.$eval('#rvMain',(x)=>x.textContent),/أصناف جديدة \(1\)/);
+ assert.equal(await page.$('#rvMain .rv-same [data-line="2"]'),null,'a new item is not «same as last time»');
+ // he approves without a photo (price typed), then finds the camera still there
+ await page.fill('#rvMain [data-rv-price="41|3"]','220');await page.press('#rvMain [data-rv-price="41|3"]','Enter');
+ await page.waitForFunction(()=>window.__tables.ar_invoice_reviews[0].answers.L3);
+ await page.click('#rvMain [data-rv-approve="41"]');
+ await page.waitForFunction(()=>window.__tables.ar_invoice_reviews[0].status==='approved');
+ await show(page);
+ assert.deepEqual(await cams(page),['41|2','41|3'],'still there after he approved');
+ await page.setInputFiles('#rvMain [data-rv-cam="41|2"]',{name:'box.png',mimeType:'image/png',buffer:PNG});
+ await page.waitForFunction(()=>window.__tables.ar_item_reads.some(x=>x.line_n==='2'));
+ await laptop(page,'2',{found:true,name_en:'EXAMPLE SACHETS 10',form:'أكياس',count:10,company:'',price:150,active:'',confidence:'high',note:''});
+ await page.waitForSelector('#rvMain .rv-ni-read',{timeout:12000});
+ await page.click('#rvMain [data-rv-niok="41|2"]');
+ await page.waitForFunction(()=>window.__tables.ar_invoice_reviews[0].answers.N2);
+ // the laptop started typing: the row is no longer his to write, so a kept name shows without buttons; a line with no kept name still takes a photo
+ await page.evaluate(()=>{window.__tables.ar_invoice_reviews[0].status='entering'});
+ await page.click('#rvRefresh');
+ await page.waitForFunction(()=>!document.querySelector('#rvMain [data-rv-niok]'),null,{timeout:8000});
+ await show(page);
+ assert.deepEqual(await cams(page),['41|3'],'line 2 has its kept name: no retake while the laptop types');
+});
