@@ -2718,6 +2718,9 @@ button.dy-b:disabled { opacity: 0.35; }
 #dayPanel tr + tr td, #profitPanel tr + tr td { border-top: 1px solid var(--line); }
 .dy-sub { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.7; }
 .dy-text { font-size: 13px; line-height: 1.9; }
+/* the purchases line opens the day's invoices (2026-11-26): a card that is a button, not a coloured one */
+#dayPanel button.dy-card.dy-buys { display: block; width: 100%; text-align: start; font: inherit; font-size: 13px; line-height: 1.9; color: var(--ink); cursor: pointer; box-shadow: none; min-height: 0; }
+#dayPanel .dy-buys .dy-more { color: var(--accent, #217bab); font-weight: 800; }
 .dy-ok { color: var(--crimson); font-weight: 700; }
 .dy-warn { margin: 0 0 8px; padding: 8px 11px; border: 1px solid var(--crimson); border-radius: 12px; background: var(--rose); color: var(--crimson-ink); font-size: 12.5px; line-height: 1.8; }
 .dy-chart { padding-bottom: 24px; }

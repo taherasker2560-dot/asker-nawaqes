@@ -19,6 +19,7 @@
     'مصروفات', 'دفعات للموردين', 'سحب المالك', 'حسب الساعة', 'بيع غريب', '✓ مفيش بيع تحت التكلفة', 'من سيستمنا', 'آخر ٧ أيام (المبيعات)', 'تحديث', 'مفيش بيانات لليوم ده',
     'الصفحة محتاجة ملف اليوم من اللاب: لسه ما وصلش.', 'الملف قديم: اللاب مش بيحدّث (مقفول أو من غير نت؟)', 'اليوم اللي بعده', 'اليوم اللي قبله', '🤖 فواتير اتدخلت', 'وقفات الروبوت', 'طلبات الموقع', 'بيع مؤقت',
     'أصناف متنوعة (بالقيمة)', 'مرتجع', 'خصومات', 'مرتجع للشركات', 'فواتير شراء', 'الربح تقريبي: بتكلفة آخر شرا لكل صنف.', 'اتباع بأقل من التكلفة', 'اتجمّعت من فارما فلاي',
+    'المشتريات', 'أصناف جديدة', 'أسعار اتغيّرت', 'أسعار جمهور اتغيّرت', 'مرتجع منفصل', 'مفيش فواتير هنا', 'تفاصيل المشتريات لليوم ده لسه ما وصلتش من اللاب', 'ابحث بالمورد أو رقم الفاتورة أو الصنف', 'سعر الجمهور',
     'تذكرة', 'المتوسط', 'منه سداد عملاء', 'عميل', 'بيع آجل', 'لحد', 'البيانات', 'بقيمة', 'بيع', 'والتكلفة', ...DAYS, ...MONTHS,
     'اختار يوم', 'النهارده', 'امبارح', 'من أسبوع', 'من شهر', 'ابحث بالاسم أو الصنف أو الرقم أو المبلغ', 'رجوع', 'نقدي', 'الكل', 'كاش', 'آجل', 'تذاكر', 'باقي', 'باقي عليهم', 'دفع', 'خصم', 'الإجمالي', 'الباقي عليه',
     'الصنف', 'الكمية', 'السعر', 'بأقل من التكلفة', 'من غير سعر', 'سداد عميل', 'بيع نقدي', 'مرتجع مدفوع', 'مفيش تذاكر هنا', 'الصافي', 'مرتجع على حساب العميل', 'دفعة', 'ملاحظة', 'الأيام من', 'لحد النهارده',
@@ -56,7 +57,7 @@
       boxes: (Array.isArray(d.boxes) ? d.boxes : []).filter((b) => b && b.name).map(box),
       expenses: (Array.isArray(d.expenses) ? d.expenses : []).filter((e) => e && e.name).map((e) => ({ name: String(e.name), amount: num(e.amount) })),
       supplierPaid: num(d.supplier_paid), ownerOut: num(d.owner_out),
-      purchases: { n: num(pu.n), total: num(pu.total), returnsN: num(pu.returns_n), returns: num(pu.returns) },
+      purchases: { n: num(pu.n), total: num(pu.total), returnsN: num(pu.returns_n), returns: num(pu.returns), newN: num(pu.new_n), pricesN: num(pu.prices_n) },
       belowCost: { n: num(bc.n), lines: (Array.isArray(bc.lines) ? bc.lines : []).filter((l) => l && l.ticket != null).map((l) => ({ ticket: num(l.ticket), item: String(l.item || ''), price: num(l.price), cost: num(l.cost), at: String(l.at || '') })) },
     };
   }
@@ -75,7 +76,31 @@
       mp: t.mp && typeof t.mp === 'object' ? { vendor: String(t.mp.vendor || ''), at: String(t.mp.at || ''), code: String(t.mp.code || '') } : null,
       lines: (Array.isArray(t.lines) ? t.lines : []).filter((l) => l && l.n != null).map((l) => ({ n: String(l.n), q: num(l.q), pr: num(l.pr), t: num(l.t), bc: !!l.bc, m: !!l.m, fr: !!l.fr, ct: !!l.ct, u: l.u == null ? 0 : num(l.u), c: l.c == null ? null : num(l.c), memo: String(l.memo || '') })),
     }));
-    return { date: String(o.date || ''), tickets, supplierReturns: (Array.isArray(o.supplier_returns) ? o.supplier_returns : []).filter((r) => r && r.code != null).map((r) => ({ code: String(r.code), vendor: String(r.vendor || ''), total: num(r.total), t: String(r.t || '') })) };
+    return { date: String(o.date || ''), tickets, buys: parseBuys(o.buys), supplierReturns: (Array.isArray(o.supplier_returns) ? o.supplier_returns : []).filter((r) => r && r.code != null).map((r) => ({ code: String(r.code), vendor: String(r.vendor || ''), total: num(r.total), t: String(r.t || '') })) };
+  }
+  // the day's purchases (owner 2026-11-26, «ا، ابنيها»: the end-of-day purchase report): each invoice with what it sent back, the item cards made that day that came on
+  // them, and the public prices that moved from the item's previous purchase. null = a file written before this.
+  function parseBuys(b) {
+    if (!b || typeof b !== 'object' || !Array.isArray(b.invoices)) return null;
+    const list = (a) => (Array.isArray(a) ? a : []).filter((x) => x && typeof x === 'object');
+    return {
+      invoices: list(b.invoices).filter((x) => x.code != null).map((x) => ({ code: String(x.code), vendor: String(x.vendor || ''), t: String(x.t || ''), net: num(x.net), lines: num(x.lines), ret: num(x.ret) })),
+      newCards: list(b.new_cards).filter((x) => x.n != null).map((x) => ({ n: String(x.n), price: num(x.price) })),
+      prices: list(b.prices).filter((x) => x.n != null).map((x) => ({ n: String(x.n), was: num(x.was), now: num(x.now) })),
+    };
+  }
+  // what the purchases list shows, narrowed by the search (the vendor, the invoice number, an amount, an item name). The separate return documents (not a «~» one of
+  // an invoice, like the PMM one) are shown apart.
+  function buysView(det, q) {
+    const b = det && det.buys;
+    if (!b) return null;
+    const words = norm(q || '').split(' ').filter(Boolean);
+    const hit = (...parts) => { if (!words.length) return true; const x = norm(parts.join(' ')); return words.every((w) => x.includes(w)); };
+    const invoices = b.invoices.filter((v) => hit(v.vendor, v.code, v.net, v.ret || ''));
+    const apart = (det.supplierReturns || []).filter((r) => !String(r.code).startsWith('~') && hit(r.vendor, r.code, Math.abs(r.total)));
+    const round = (x) => Math.round(x * 100) / 100;
+    return { invoices, apart, newCards: b.newCards.filter((x) => hit(x.n, x.price)), prices: b.prices.filter((x) => hit(x.n, x.was, x.now)),
+      sum: round(invoices.reduce((a, v) => a + v.net, 0)), ret: round(invoices.reduce((a, v) => a + v.ret, 0)) };
   }
   const rem = (t) => Math.round((t.total - t.d - t.p) * 100) / 100;       // what an account ticket left on the customer (negative for a return)
   const who = (t) => (t.cu ? t.cu : (t.ty === 'a' ? 'عميل' : 'عميل نقدي'));
@@ -137,7 +162,7 @@
     return out;
   }
   const avgTicket = (d) => (d && d.tickets > 0 ? d.grossSales / d.tickets : 0);
-  const api = { WORDS, money, money2, clock, hm, dateText, dayChar, addDays, qtyText, parse, parseDetail, day, listFor, search, norm, rem, who, stamp, isOld, week, hours, avgTicket };
+  const api = { WORDS, money, money2, clock, hm, dateText, dayChar, addDays, qtyText, parse, parseDetail, day, listFor, buysView, search, norm, rem, who, stamp, isOld, week, hours, avgTicket };
   root.AskerDayLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -198,8 +223,10 @@
     const extraHtml = pills.length ? `<div class="dy-line">${pills.join('')}</div>` : '';
     const boxes = d.boxes.length ? `<h3 class="dy-h">الخزن</h3><div class="dy-card"><table>${row(['الخزنة', 'داخل', 'خارج', 'الرصيد الآن'], true)}${d.boxes.map((b) => row([`<span class="notr">${esc(b.name)}</span>`, money(b.in), money(b.out), b.balance == null ? '' : money(b.balance)])).join('')}</table>` +
       ([d.expenses.length ? 'مصروفات: ' + d.expenses.map((e) => `<span class="notr">${esc(e.name)}</span> ${esc(money(e.amount))}`).join('، ') : '', d.supplierPaid ? 'دفعات للموردين: ' + money(d.supplierPaid) : '', d.ownerOut ? 'سحب المالك: ' + money(d.ownerOut) : ''].filter(Boolean).map((x) => `<div class="dy-sub">${x}</div>`).join('')) + '</div>' : '';
-    const pu = `<h3 class="dy-h">المشتريات والمرتجعات</h3><div class="dy-card dy-text">🧾 فواتير شراء <b dir="ltr">${esc(d.purchases.n)}</b> بقيمة <b dir="ltr">${esc(money(d.purchases.total))}</b>` +
-      (d.purchases.returnsN ? ` · مرتجع للشركات <b dir="ltr">${esc(money(d.purchases.returns))}</b>` : '') + (d.returns ? ` · مرتجع <b dir="ltr">${esc(money(d.returns))}</b>` : '') + '</div>';
+    const puIn = `🧾 فواتير شراء <b dir="ltr">${esc(d.purchases.n)}</b> بقيمة <b dir="ltr">${esc(money(d.purchases.total))}</b>` +
+      (d.purchases.returnsN ? ` · مرتجع للشركات <b dir="ltr">${esc(money(d.purchases.returns))}</b>` : '') + (d.returns ? ` · مرتجع <b dir="ltr">${esc(money(d.returns))}</b>` : '') +
+      (d.purchases.newN ? ` · أصناف جديدة <b dir="ltr">${esc(d.purchases.newN)}</b>` : '') + (d.purchases.pricesN ? ` · أسعار اتغيّرت <b dir="ltr">${esc(d.purchases.pricesN)}</b>` : '');
+    const pu = '<h3 class="dy-h">المشتريات والمرتجعات</h3>' + (d.purchases.n ? `<button type="button" class="dy-card dy-text dy-buys" data-dy-open="buys">${puIn} <span class="dy-more">›</span></button>` : `<div class="dy-card dy-text">${puIn}</div>`);
     const hs = hours(d);
     const hr = hs.length ? `<h3 class="dy-h">حسب الساعة</h3><div class="dy-card dy-chart"><div class="dy-bars">${bars(hs.map((x) => ({ v: x.v, lbl: x.h % 12 || 12 })), 'v', () => '')}</div></div>` : '';
     const bc = d.belowCost.n ? `<div class="dy-warn"><b>${esc(d.belowCost.n)}</b> اتباع بأقل من التكلفة` + d.belowCost.lines.map((l) => `<button type="button" class="dy-bl" data-dy-t="${esc(l.ticket)}">تذكرة <bdi class="notr">${esc(l.ticket)}</bdi> · <bdi class="notr">${esc(l.item)}</bdi> · بيع <bdi class="notr">${esc(money2(l.price))}</bdi> والتكلفة <bdi class="notr">${esc(money2(l.cost))}</bdi>${l.at ? ' · <bdi class="notr">' + esc(l.at) + '</bdi>' : ''}</button>`).join('') + '</div>' : '<div class="dy-card"><span class="dy-ok">✓ مفيش بيع تحت التكلفة</span></div>';
@@ -239,10 +266,28 @@
     const cus = L.kind === 'credit' ? ` · ${esc(L.extra.customers)} عميل` : '';
     return `<div class="dy-tot"><span>${esc(n)} تذاكر${cus}</span><b dir="ltr">${lbl ? esc(lbl) + ' ' : ''}${esc(money2(sum))}</b></div>`;
   }
+  // the purchases list: the invoices (with their «-» returns), the separate returns, the new cards, the public prices that moved
+  const stat = (v, name, sub, extra, neg) => `<div class="dy-tk dy-static"><div class="dy-a"><span class="dy-v${neg ? ' dy-neg' : ''}" dir="ltr">${v}</span><b class="notr">${esc(name)}</b></div><div class="dy-bb"><span>${sub}</span>${extra || ''}</div></div>`;
+  function buysHtml(B) {
+    const inv = B.invoices.map((v) => stat(esc(money2(v.net)), v.vendor, `${esc(hm(v.t))} · <bdi class="notr">${esc(v.code)}</bdi> · ${esc(v.lines)} سطر`, v.ret ? `<span class="dy-rem">مرتجع ${esc(money2(v.ret))}</span>` : '')).join('');
+    const apart = B.apart.length ? '<h3 class="dy-h">مرتجع منفصل</h3>' + B.apart.map((r) => stat(esc(money2(r.total)), r.vendor, `${esc(hm(r.t))} · <bdi class="notr">${esc(r.code)}</bdi>`, '', true)).join('') : '';
+    const nw = B.newCards.length ? '<h3 class="dy-h">أصناف جديدة</h3>' + B.newCards.map((x) => stat(esc(money2(x.price)), x.n, 'سعر الجمهور')).join('') : '';
+    const pr = B.prices.length ? '<h3 class="dy-h">أسعار جمهور اتغيّرت</h3>' + B.prices.map((x) => stat(esc(money2(x.now)), x.n, `من <bdi class="notr">${esc(money2(x.was))}</bdi> إلى <bdi class="notr">${esc(money2(x.now))}</bdi>`)).join('') : '';
+    return (inv || '<p class="hint">مفيش فواتير هنا</p>') + apart + nw + pr;
+  }
+  const buysTotals = (B) => `<div class="dy-tot"><span>${esc(B.invoices.length)} فاتورة${B.ret ? ` · مرتجع ${esc(money2(B.ret))}` : ''}</span><b dir="ltr">${esc(money2(B.sum))}</b></div>`;
+  function drawBuys() {
+    const main = $('dyMain'), B = buysView(dets[picked], view.q);
+    const head = `<button type="button" class="dy-back" data-dy-back>› رجوع</button><h3 class="dy-h2">المشتريات · ${esc(dateText(picked))}</h3>`;
+    if (!B) { main.innerHTML = head + '<p class="hint">تفاصيل المشتريات لليوم ده لسه ما وصلتش من اللاب</p>'; return; }
+    main.innerHTML = head + `<div class="dy-search"><span aria-hidden="true">🔎</span><input id="dySearch" type="search" inputmode="search" autocomplete="off" placeholder="ابحث بالمورد أو رقم الفاتورة أو الصنف" aria-label="ابحث بالمورد أو رقم الفاتورة أو الصنف" value="${esc(view.q || '')}" /></div>` +
+      `<div id="dyTot">${buysTotals(B)}</div><div id="dyRows">${buysHtml(B)}</div>`;
+  }
   function drawList() {
     const main = $('dyMain'), d = cur(), det = dets[picked];
     if (!main || !d) return;
     if (!det) { main.innerHTML = '<p class="hint">الصفحة محتاجة ملف اليوم من اللاب: لسه ما وصلش.</p><button type="button" class="dy-back" data-dy-back>› رجوع</button>'; return; }
+    if (view.kind === 'buys') { drawBuys(); return; }
     const L = listFor(view.kind, det, view.f);
     const filt = view.kind === 'disc' ? `<div class="dy-line">${FILT.map(([k, l]) => `<button type="button" class="dy-chip${(view.f || 'all') === k ? ' on' : ''}" data-dy-f="${k}">${esc(l)}${L.extra.counts ? ' ' + esc(L.extra.counts[k]) : ''}</button>`).join('')}</div>` : '';
     const note = view.kind === 'misc' ? '<p class="hint">التذاكر اللي فيها أصناف متنوعة</p>' : (view.kind === 'free' ? '<p class="hint">اتصرفت من غير سعر</p>' : '');
@@ -351,6 +396,7 @@
     p.addEventListener('input', (e) => {
       if (e.target.id === 'dySearch' && view && view.ticket == null) {
         view.q = e.target.value;
+        if (view.kind === 'buys') { const B = buysView(dets[picked], view.q); if (B) { $('dyRows').innerHTML = buysHtml(B); $('dyTot').innerHTML = buysTotals(B); } return; }
         const L = listFor(view.kind, dets[picked], view.f);
         $('dyRows').innerHTML = rowsHtml(L, view.q);
         $('dyTot').innerHTML = totalsLine(L, search(L.rows, view.q));

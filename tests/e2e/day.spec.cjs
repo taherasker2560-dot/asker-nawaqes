@@ -24,7 +24,8 @@ const seed=(page,{old=false}={})=>page.evaluate(({old})=>{
   tk(4,{k:'r',total:-50,p:-50,lines:[{n:'ITEM A 10MG',q:-1,pr:50,t:-50}]}),
   tk(5,{ty:'a',cu:'زبون تاني',k:'r',total:-80,p:0,lines:[{n:'ITEM D',q:-1,pr:80,t:-80}]}),
   tk(6,{total:200,d:5,p:195,lines:[{n:'ITEM E',q:2,pr:100,t:200},{n:'ITEM F',q:1,pr:0,t:0,fr:1,c:12.5}]})];
- window.__storage['day/d_'+ymd(today)+'.json']=JSON.stringify({v:1,date:ymd(today),tickets,supplier_returns:[{code:'~11/26/232796',vendor:'مورد مثال',total:-302.4,t:'14:24'}]});
+ const buys={invoices:[{code:'11/26/232796',vendor:'مورد مثال',t:'14:20',net:900.5,lines:4,ret:302.4},{code:'11/26/600',vendor:'مخزن مثال',t:'16:00',net:99.5,lines:1,ret:0}],new_cards:[{n:'ITEM NEW 10 TAB',price:91}],prices:[{n:'ITEM B',was:210,now:285}]};
+ window.__storage['day/d_'+ymd(today)+'.json']=JSON.stringify({v:1,date:ymd(today),tickets,buys,supplier_returns:[{code:'~11/26/232796',vendor:'مورد مثال',total:-302.4,t:'14:24'},{code:'11/26/94',vendor:'مورد تاني',total:-1700,t:'14:26'}]});
  window.__storage['day/d_'+ago(1)+'.json']=JSON.stringify({v:1,date:ago(1),tickets:[tk(11,{total:1100,p:1100})],supplier_returns:[]});
  // our own system's events of today
  const now=new Date().toISOString();
@@ -185,6 +186,23 @@ run('Day page: every number opens its list with a search box; a ticket opens the
  assert.match(await txt(page,'#dyTot'),/^1 تذاكر تكلفة 12.5$/);
  await page.click('#dyRows .dy-tk');await page.waitForSelector('#dyMain table');
  assert.match(await txt(page,'#dyMain table'),/ITEM F · من غير سعر · تكلفتها 12.5/);
+},{home:true});
+
+run('Day page: the purchases line opens the day\'s invoices, returns, new cards and moved prices',async({page})=>{
+ await openPage(page);
+ await page.click('[data-dy-open="buys"]');
+ await page.waitForSelector('#dySearch');
+ assert.match(await txt(page,'#dyMain .dy-h2'),/^المشتريات · /);
+ assert.match(await txt(page,'#dyTot'),/^2 فاتورة · مرتجع 302.4 1,000$/);
+ const rows=await all(page,'#dyRows .dy-tk');
+ assert.match(rows[0],/^900.5 مورد مثال .*11\/26\/232796 · 4 سطر مرتجع 302.4$/);
+ assert.match(rows[1],/^99.5 مخزن مثال /);
+ assert.match(await txt(page,'#dyRows'),/مرتجع منفصل -1,700 مورد تاني .*أصناف جديدة 91 ITEM NEW 10 TAB سعر الجمهور أسعار جمهور اتغيّرت 285 ITEM B من 210 إلى 285/);
+ assert.equal(/-302.4 مورد مثال/.test(await txt(page,'#dyRows')),false,'the «~» return of an invoice is not repeated as a separate one');
+ await page.fill('#dySearch','مخزن');
+ assert.equal(await page.$$eval('#dyRows .dy-tk',(r)=>r.length),1);
+ assert.match(await txt(page,'#dyTot'),/^1 فاتورة 99.5$/);
+ await page.click('[data-dy-back]');await page.waitForSelector('#dyMain .dy-grid');
 },{home:true});
 
 run('Day page: an old file warns, no file says so, and a staff member sees no card',async({page})=>{
