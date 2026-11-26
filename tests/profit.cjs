@@ -103,10 +103,36 @@ assert.deepEqual(P.searchBelow(pf.below.lines, '7').map((l) => l.tk), [7], 'the 
 assert.deepEqual(P.searchBelow(pf.below.lines, '2026-11-24').map((l) => l.tk), [5], 'the date');
 assert.deepEqual(P.searchBelow(pf.below.lines, '2:20').map((l) => l.tk), [7], 'the time of day');
 
+// «الصافي بعد المصروفات» (owner 2026-11-26): the period's own days only; spent = −amount (a refund takes itself off); the owner's moves apart; any other kind is not money spent
+const mv = (at, kind, amount, who, memo) => ({ at, kind, amount, who, memo });
+const S = P.spending([
+  mv('2026-11-25T10:00:00', 'expense', -3000, 'مرتبات مثال', 'دفعة أولى'),
+  mv('2026-11-19T00:10:00', 'expense', '-500.50', 'أكياس مثال', null),
+  mv('2026-11-20T12:00:00', 'expense', -1000, 'مرتبات مثال', ''),
+  mv('2026-11-18T23:59:59', 'expense', -9999, 'مرتبات مثال', 'قبل الفترة'),
+  mv('2026-11-26T00:00:00', 'expense', -8888, 'مرتبات مثال', 'بعد الفترة'),
+  mv('2026-11-21T09:00:00', 'expense', 100, 'أكياس مثال', 'رجع'),
+  mv('2026-11-25T23:59:59', 'expense', -1, '  ', null),
+  mv('2026-11-22T09:00:00', 'owner', -700, null, 'سحب مثال'),
+  mv('2026-11-23T09:00:00', 'owner', 200, null, 'رجّع'),
+  mv('2026-11-23T09:00:00', 'vendor', -5000, 'مورد مثال', ''), null,
+], P.range(data, '7'));
+assert.equal(S.total, 4401.5);
+assert.equal(S.n, 5);
+assert.deepEqual(S.heads.map((h) => [h.name, h.total]), [['مرتبات مثال', 4000], ['أكياس مثال', 400.5], ['مصروف', 1]], 'the biggest heading first; a move with no heading is «مصروف»');
+assert.deepEqual(S.heads[0].moves.map((m) => [m.d, m.t, m.v]), [['2026-11-25', '10:00', 3000], ['2026-11-20', '12:00', 1000]], 'newest first');
+assert.equal(S.heads[1].moves[0].v, -100, 'money back is a minus under its heading');
+assert.equal(S.own.total, 500, 'the owner took 700 and put 200 back; never inside the expenses');
+assert.equal(P.spending([mv('2026-11-25T10:00:00', 'owner', 900, null, '')], P.range(data, '7')).own.total, -900, 'more came back than was taken: the net keeps its sign');
+assert.deepEqual(P.spending(null, P.range(data, '7')), { total: 0, n: 0, heads: [], own: { total: 0, moves: [] } });
+assert.deepEqual(P.spending([mv('2026-11-25T10:00:00', 'expense', -5, 'x', '')], null).heads, []);
+assert.deepEqual(P.searchMoves(S.heads[0].moves, 'دفعة').map((m) => m.v), [3000], 'by the note');
+assert.deepEqual(P.searchMoves(S.heads[0].moves, '2026-11-20').map((m) => m.v), [1000], 'by the date');
+
 // the English: every fixed word, and the lines made of words + numbers
 for (const s of P.WORDS) assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s));
 for (const s of ['الفترة من الأربعاء 19 نوفمبر إلى الأربعاء 25 نوفمبر', '7 يوم', '3 سطر اتحسب بتكلفة الكارت (مفيش شرا قبله)', 'تحت التكلفة 3', 'بيع بصفر سعر 28 · تكلفتها 1,745', '10 علبة · هامش 30%', 'تكلفة آخر شرا 70', 'تذكرة 5 · 2 × 95',
-  '3 سطر · ظاهر أحدث 300 بيعة بس', 'خسارة 30', 'تكلفتها 250', 'نوفمبر 2026', 'الأصناف دي في الفترة · الربح قبل خصم التذكرة', 'الهامش أقل من']) {
+  '3 سطر · ظاهر أحدث 300 بيعة بس', 'خسارة 30', 'تكلفتها 250', 'نوفمبر 2026', 'الأصناف دي في الفترة · الربح قبل خصم التذكرة', 'الهامش أقل من', '21 حركة']) {
   assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s));
 }
 console.log('PASS: profit: the periods, the headline numbers, the bars, the period file, the thin margins, the searches, the English');
