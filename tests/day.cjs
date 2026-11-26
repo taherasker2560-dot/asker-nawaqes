@@ -162,4 +162,23 @@ assert.deepEqual(L.parse(file({ '2026-11-25': mk('2026-11-25', { free: { lines: 
 for (const x of ['5 تذاكر · 3 عميل', 'باقي 4,650', 'تذكرة 5 · الساعة 8:28 م', 'الأيام من الأربعاء 25 نوفمبر', 'من غير سعر 28 · تكلفتها 1,745', 'تذكرة 386436 · بأقل من التكلفة', 'سحب من العلبة · 2 وحدة', 'الصافي 8,157', 'نفس المبلغ اتسجّل شرا من الساعة 8:27 م']) {
   assert.doesNotMatch(I.translate(x), /[؀-ۿ]/, 'Arabic left in English: ' + x + ' → ' + I.translate(x));
 }
-console.log('PASS: day: the file → the page (money, clock, dates, week, hours, an old file), the English');
+// the day's purchases (2026-11-26): the invoices with their returns, the separate return documents apart, the new cards, the prices that moved, the search
+assert.equal(det.buys, null, 'a file written before this has no purchases part');
+const bdet = L.parseDetail({ date: '2026-11-25', tickets: [], supplier_returns: [{ code: '~11/26/500', vendor: 'مورد مثال', total: -100, t: '15:00' }, { code: '11/26/94', vendor: 'مورد تاني', total: -1700, t: '14:26' }],
+  buys: { invoices: [{ code: '11/26/500', vendor: 'مورد مثال', t: '14:00', net: 900.5, lines: 4, ret: 100 }, { code: '11/26/600', vendor: 'مخزن مثال', t: '16:00', net: 99.5, lines: 1, ret: 0 }, { vendor: 'x' }],
+    new_cards: [{ n: 'ITEM NEW 10 TAB', price: 91 }], prices: [{ n: 'ITEM B', was: 210, now: 285 }] } });
+assert.equal(bdet.buys.invoices.length, 2, 'a row with no number is dropped');
+const B = L.buysView(bdet, '');
+assert.equal(B.sum, 1000); assert.equal(B.ret, 100);
+assert.deepEqual(B.apart.map((r) => r.code), ['11/26/94'], 'only the separate return, not the «~» one of an invoice');
+assert.equal(B.newCards.length, 1); assert.equal(B.prices.length, 1);
+assert.deepEqual(L.buysView(bdet, 'مخزن').invoices.map((v) => v.code), ['11/26/600'], 'search by the supplier');
+assert.deepEqual(L.buysView(bdet, '500').invoices.map((v) => v.code), ['11/26/500'], 'search by the number');
+assert.equal(L.buysView(bdet, 'item new').newCards.length, 1); assert.equal(L.buysView(bdet, 'item new').prices.length, 0, 'a search narrows every part');
+assert.equal(L.buysView(bdet, '285').prices.length, 1, 'a price is searchable');
+assert.equal(L.buysView(L.parseDetail({ tickets: [] }), ''), null);
+assert.deepEqual([L.parse(file({ '2026-11-25': mk('2026-11-25', { purchases: { n: 3, total: 5, returns_n: 0, returns: 0, new_n: 2, prices_n: 1 } }) })).days[0].purchases.newN, L.parse(file({ '2026-11-25': mk('2026-11-25') })).days[0].purchases.pricesN], [2, 0]);
+for (const x of ['🧾 فواتير شراء 10 بقيمة 18,411 · مرتجع للشركات 2,449 · أصناف جديدة 6 · أسعار اتغيّرت 6', '10 فاتورة · مرتجع 748.91', '2 فاتورة', '4 سطر', 'من 210 إلى 285', 'سعر الجمهور']) {
+  assert.doesNotMatch(I.translate(x), /[؀-ۿ]/, 'Arabic left in English: ' + x + ' → ' + I.translate(x));
+}
+console.log('PASS: day: the file → the page (money, clock, dates, week, hours, an old file, the purchases), the English');
