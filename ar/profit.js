@@ -13,6 +13,9 @@
   const FIXED = [['7', '٧ أيام'], ['30', '٣٠ يوم'], ['90', '٩٠ يوم']];
   const WINDOW = 90;          // the laptop builds the period files over the last 90 days (today included)
   const LOW_DEFAULT = 10;     // the thin-margin line, in %: his own number, changed on the screen
+  // «احسب على» (owner 2026-11-26: «يبقى عندي الأوبشن لو عايز أحسبها على التكلفة»): the COST LAW is the basis the page always opens on; the other one is the cost PharmaFly itself wrote on each sale line
+  // (the only other cost that exists for a past day: its average cost at that moment, غالبًا; the item card keeps no history of its own)
+  const BASES = [['law', 'آخر شرا (قانونك)'], ['pf', 'تكلفة فارمافلاي']];
   // every fixed word the page draws, whole or as a piece next to a number (the English lines are checked against this list in tests/profit.cjs)
   const WORDS = ['💹 الربح', '💹 الربح والهامش', ...FIXED.map((x) => x[1]), 'شهر معيّن', 'الربح', 'الهامش', 'المبيعات الصافية', 'الفترة من', 'إلى', 'التكلفة من آخر فاتورة شرا للصنف', 'الربح تقريبي',
     'الربح كل يوم (دوسة على العمود تفتح «اليوم»)', 'أكتر أصناف ربحًا', 'هامش ضعيف', 'تحت التكلفة', 'بيع بصفر سعر', 'رجوع', 'ابحث باسم الصنف', 'علبة', 'هامش', 'تكلفة آخر شرا', 'الكمية', 'المبيعات',
@@ -22,7 +25,10 @@
     'عميل', 'عميل نقدي', 'الفاتورة دي مش لاقيها', 'من غير سعر', 'بأقل من التكلفة', 'نفس المبلغ اتسجّل شرا من', 'الساعة', 'تكلفتها', 'الأيام اللي فيها بيانات', 'سحب من العلبة', 'وحدة',
     // «الصافي بعد المصروفات» (owner 2026-11-26)
     'الصافي بعد المصروفات', 'الربح من البيع', 'المصروفات', 'الصافي', 'مسحوبات صاحب المنشأة', 'لوحدها، مش مصروف', 'المصروف بيتحسب يوم ما اتدفع: المرتبات والضرايب على دفعات، فصافي الأيام القليلة ممكن يبان غريب.',
-    'المصروفات بتتحمّل…', 'المصروفات ما وصلتش من السيرفر: دوس تحديث.', 'مفيش مصروفات متسجلة في الفترة دي', 'حركة', 'ابحث بالملاحظة أو التاريخ', 'من غير ملاحظة', 'مفيش حركات هنا', 'مصروف', ...MONTHS];
+    'المصروفات بتتحمّل…', 'المصروفات ما وصلتش من السيرفر: دوس تحديث.', 'مفيش مصروفات متسجلة في الفترة دي', 'حركة', 'ابحث بالملاحظة أو التاريخ', 'من غير ملاحظة', 'مفيش حركات هنا', 'مصروف',
+    // «احسب على» (owner 2026-11-26)
+    'احسب على', ...BASES.map((x) => x[1]), 'إنت شايف على تكلفة فارمافلاي، مش على آخر شرا', 'الرقم اللي فارمافلاي كتبه على سطر البيع ساعتها (غالبًا متوسط التكلفة)', 'الأساس ده لسه بيتجهز على اللاب', 'يوم لسه من الفترة دي',
+    'سطر من غير تكلفة، اتحسب بآخر شرا', 'أصناف الأساس ده لسه بتتجهز على اللاب.', ...MONTHS];
 
   // ---------- pure helpers (also used by tests/profit.cjs) ----------
   const monthLabel = (ym) => MONTHS[Number(String(ym).slice(5, 7)) - 1] + ' ' + String(ym).slice(0, 4);
@@ -43,25 +49,28 @@
     return ds.length ? { from: ds[0], to: ds[ds.length - 1] } : null;
   }
   // the headline numbers of a period: the sum of the days' own numbers (day.json), the margin on the items' sales after the tickets' discounts, as each day computes it
-  function totals(data, key) {
+  // under the other basis a day the laptop has not worked out yet is counted in `missing`: the page then shows no total at all (a half total would be false)
+  function totals(data, key, basis) {
     const r = range(data, key);
     if (!r) return null;
-    const t = { from: r.from, to: r.to, days: 0, sales: 0, rev: 0, disc: 0, cost: 0, profit: 0, free: { lines: 0, cost: 0 }, fb: 0, margin: null };
+    const t = { from: r.from, to: r.to, days: 0, sales: 0, rev: 0, disc: 0, cost: 0, profit: 0, free: { lines: 0, cost: 0 }, fb: 0, margin: null, missing: 0 };
     for (const d of data.days) {
       if (d.date < r.from || d.date > r.to) continue;
-      t.days++; t.sales += d.netSales; t.rev += d.itemsRevenue; t.disc += d.discounts; t.cost += d.cost; t.profit += d.profit;
-      t.free.lines += d.free.lines; t.free.cost += d.free.cost; t.fb += d.fallback.lines;
+      const o = basis === 'pf' ? d.pf : null;
+      if (basis === 'pf' && !o) t.missing++;
+      t.days++; t.sales += d.netSales; t.rev += d.itemsRevenue; t.disc += d.discounts; t.cost += o ? o.cost : d.cost; t.profit += o ? o.profit : d.profit;
+      t.free.lines += d.free.lines; t.free.cost += o ? o.freeCost : d.free.cost; t.fb += o ? o.noCost : d.fallback.lines;
     }
     t.margin = t.rev - t.disc > 0 ? Math.round((t.profit / (t.rev - t.disc)) * 1000) / 10 : null;
     return t;
   }
   // one bar per day of the period, oldest first (a day with no data = 0)
-  function chart(data, key) {
+  function chart(data, key, basis) {
     const r = range(data, key), out = [];
     if (!r) return out;
     for (let k = r.from, n = 0; k <= r.to && n < 400; k = D.addDays(k, 1), n++) {
       const f = data.days.find((d) => d.date === k);
-      out.push({ date: k, ch: D.dayChar(k), day: Number(k.slice(8, 10)), v: f ? f.profit : 0, has: !!f });
+      out.push({ date: k, ch: D.dayChar(k), day: Number(k.slice(8, 10)), v: !f ? 0 : basis === 'pf' ? (f.pf ? f.pf.profit : 0) : f.profit, has: !!f });
     }
     return out;
   }
@@ -77,8 +86,13 @@
       low: (Array.isArray(o.low) ? o.low : []).filter((e) => e && e.n != null).map(item),
       below: { n: num(b.n), loss: num(b.loss), lines: ls(b.lines) },
       free: { lines: num(f.lines), cost: num(f.cost), items: (Array.isArray(f.items) ? f.items : []).filter((e) => e && e.n != null).map((e) => ({ i: num(e.i), n: String(e.n), q: num(e.q), cost: num(e.cost), tickets: num(e.tickets), ls: ls(e.ls) })) },
+      alt: o.pf && Array.isArray(o.pf.items) ? Object.assign(parse(Object.assign({}, o.pf, { pf: null })), { missing: num(o.pf.missing) }) : null,
     };
   }
+  // the lists of the chosen basis out of a parsed period file (null = the laptop has not built them for every day yet)
+  const listsOf = (f, basis) => (!f ? null : basis !== 'pf' ? f : f.alt && !f.alt.missing ? f.alt : null);
+  // a sale line sold under the chosen basis' cost (the law's flag is written by the laptop; the other basis is read off the line's own `k`)
+  const underCost = (t, l, basis) => (basis !== 'pf' ? !!l.bc : t.k !== 'r' && !l.m && !l.ct && !l.fr && l.q > 0 && l.k > 0 && l.pr < l.k - 0.01);
   // the thin margins: under his line (the list the laptop wrote holds the 150 thinnest items with sales of at least 30; a line above that shows what it has)
   const lowList = (pf, thr) => ((pf && pf.low) || []).filter((e) => e.margin != null && e.margin < num(thr)).sort((a, b) => a.margin - b.margin);
   const unitCost = (e) => (Math.abs(e.q) > 0.0005 ? e.cost / e.q : 0);
@@ -110,7 +124,7 @@
     return { total: round2(total), n, heads: list, own: { total: round2(own.total), moves: own.moves.sort(newest) } };
   }
   const searchMoves = (rows, q) => { const w = norm(q).split(' ').filter(Boolean); return w.length ? rows.filter((m) => { const x = norm(m.memo + ' ' + m.d + ' ' + m.t + ' ' + Math.abs(m.v)); return w.every((y) => x.includes(y)); }) : rows; };
-  const api = { WORDS, FIXED, WINDOW, LOW_DEFAULT, monthLabel, months, range, totals, chart, parse, lowList, unitCost, lineProfit, loss, searchItems, searchBelow, barPct, spending, searchMoves };
+  const api = { WORDS, FIXED, BASES, listsOf, underCost, WINDOW, LOW_DEFAULT, monthLabel, months, range, totals, chart, parse, lowList, unitCost, lineProfit, loss, searchItems, searchBelow, barPct, spending, searchMoves };
   root.AskerProfitLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -120,7 +134,10 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
-  let data = null, key = '7', files = {}, dets = {}, spends = {}, view = null, thr = LOW_DEFAULT;
+  let data = null, key = '7', basis = 'law', files = {}, dets = {}, spends = {}, view = null, thr = LOW_DEFAULT;
+  const lists = () => listsOf(files[key] && files[key].v, basis);
+  const noLists = () => (basis === 'pf' && files[key] && files[key].v ? 'أصناف الأساس ده لسه بتتجهز على اللاب.' : 'ملف الأصناف لسه ما وصلش: اللاب بيجهّزه.');
+  const fbWord = () => (basis === 'pf' ? 'سطر من غير تكلفة، اتحسب بآخر شرا' : 'سطر اتحسب بتكلفة الكارت (مفيش شرا قبله)');
   try { const v = Number(root.localStorage && root.localStorage.getItem('pf_low')); if (Number.isFinite(v) && v > 0) thr = v; } catch (e) { /* a private window: the default stays */ }
   const row = (cells, head) => `<tr>${cells.map((c, i) => (head ? `<th${i ? ' class="dy-n"' : ''}>${esc(c)}</th>` : `<td${i ? ' class="dy-n"' : ''}>${c}</td>`)).join('')}</tr>`;
   const pill = (txt, open) => `<button type="button" class="dy-pill dy-ptap" data-pf-open="${open}">${txt} ›</button>`;
@@ -221,22 +238,26 @@
     const main = $('pfMain');
     if (!main) return;
     if (!data) { main.innerHTML = '<p class="hint">الصفحة محتاجة ملف اليوم من اللاب: لسه ما وصلش.</p>'; return; }
-    const T = totals(data, key), f = files[key] && files[key].v;
+    const T = totals(data, key, basis), f = lists();
     const chips = FIXED.map(([k, l]) => `<button type="button" class="dy-chip${k === key ? ' on' : ''}" data-pf-key="${k}">${esc(l)}</button>`).join('');
     const sel = `<select id="pfMonth" class="pf-month${/^m/.test(key) ? ' on' : ''}" aria-label="شهر معيّن"><option value="">شهر معيّن</option>${months(data).map((ym) => `<option value="m${esc(ym)}"${key === 'm' + ym ? ' selected' : ''}>${esc(monthLabel(ym))}</option>`).join('')}</select>`;
     if (!T) { main.innerHTML = `<div class="dy-card"><div class="dy-line">${chips}${sel}</div></div><p class="hint">مفيش بيانات لليوم ده</p>`; return; }
     const kp = `<div class="dy-grid"><div class="dy-k"><small>الربح</small><b class="dy-c" dir="ltr">${esc(money(T.profit))}</b><i>${esc(T.days)} يوم</i></div>` +
       `<div class="dy-k"><small>الهامش</small><b class="dy-c" dir="ltr">${T.margin == null ? '' : esc(T.margin) + '%'}</b><i>من مبيعات الأصناف</i></div>` +
       `<div class="dy-k pf-wide"><small>المبيعات الصافية</small><b dir="ltr">${esc(money(T.sales))}</b><i>بعد المرتجع والخصم</i></div></div>`;
-    const ch = chart(data, key);
+    const ch = chart(data, key, basis);
     const chartHtml = `<h3 class="dy-h">الربح كل يوم (دوسة على العمود تفتح «اليوم»)</h3><div class="dy-card pf-chart"><div class="pf-bars">${bars(ch)}</div></div>`;
     const pills = [pill('أكتر أصناف ربحًا', 'top'), pill('هامش ضعيف', 'low')];
     if (f) pills.push(f.below.n ? pill(`تحت التكلفة ${esc(f.below.n)}`, 'below') : '');
     if (T.free.lines) pills.push(pill(`بيع بصفر سعر ${esc(T.free.lines)} · تكلفتها ${esc(money(T.free.cost))}`, 'free'));
     const ok = f && !f.below.n ? '<div class="dy-card"><span class="dy-ok">✓ مفيش بيع تحت التكلفة</span></div>' : '';
-    const fb = T.fb ? `<p class="hint">${esc(T.fb)} سطر اتحسب بتكلفة الكارت (مفيش شرا قبله)</p>` : '';
-    main.innerHTML = `<div class="dy-card"><div class="dy-line">${chips}${sel}</div><div class="dy-stamp">الفترة من ${esc(dateText(T.from))} إلى ${esc(dateText(T.to))}<br>التكلفة من آخر فاتورة شرا للصنف · الربح تقريبي</div></div>` +
-      kp + netCard(T) + chartHtml + (f ? `<div class="dy-line">${pills.filter(Boolean).join('')}</div>` : '<p class="hint">ملف الأصناف لسه ما وصلش: اللاب بيجهّزه.</p>') + ok + fb;
+    const fb = T.fb ? `<p class="hint">${esc(T.fb)} ${fbWord()}</p>` : '';
+    const other = basis === 'pf';
+    const bases = `<div class="dy-line pf-basis"><span class="pf-by">احسب على</span>${BASES.map(([k, l]) => `<button type="button" class="dy-chip${k === basis ? ' on' : ''}" data-pf-basis="${k}" aria-pressed="${k === basis}">${esc(l)}</button>`).join('')}</div>`;
+    const how = other ? '<b>إنت شايف على تكلفة فارمافلاي، مش على آخر شرا</b><br>الرقم اللي فارمافلاي كتبه على سطر البيع ساعتها (غالبًا متوسط التكلفة)<br>الربح تقريبي' : 'التكلفة من آخر فاتورة شرا للصنف · الربح تقريبي';
+    const head = `<div class="dy-card${other ? ' pf-other' : ''}"><div class="dy-line">${chips}${sel}</div>${bases}<div class="dy-stamp">الفترة من ${esc(dateText(T.from))} إلى ${esc(dateText(T.to))}<br>${how}</div></div>`;
+    if (other && T.missing) { main.innerHTML = head + `<p class="hint">الأساس ده لسه بيتجهز على اللاب · <bdi dir="ltr">${esc(T.missing)}</bdi> يوم لسه من الفترة دي</p>`; return; }
+    main.innerHTML = head + kp + netCard(T) + chartHtml + (f ? `<div class="dy-line">${pills.filter(Boolean).join('')}</div>` : `<p class="hint">${noLists()}</p>`) + ok + fb;
   }
 
   // ---------- the lists, one item, one invoice ----------
@@ -244,7 +265,7 @@
   function itemRow(e) {
     const m = e.margin == null ? '' : ' · هامش <bdi dir="ltr">' + esc(e.margin) + '%</bdi>';
     return `<button type="button" class="dy-tk" data-pf-i="${esc(e.i)}"><div class="dy-a"><span class="dy-v${neg(e.profit)}" dir="ltr">${esc(money2(e.profit))}</span><b class="notr">${esc(e.n)}</b></div>` +
-      `<div class="dy-bb"><span>${esc(qtyText(e.q))} علبة${m}${e.cf ? ' *' : ''}</span><span>تكلفة آخر شرا <bdi class="notr">${esc(money2(unitCost(e)))}</bdi></span></div></button>`;
+      `<div class="dy-bb"><span>${esc(qtyText(e.q))} علبة${m}${e.cf ? ' *' : ''}</span><span>${basis === 'pf' ? 'تكلفة فارمافلاي' : 'تكلفة آخر شرا'} <bdi class="notr">${esc(money2(unitCost(e)))}</bdi></span></div></button>`;
   }
   function freeRow(e) {
     return `<button type="button" class="dy-tk" data-pf-i="${esc(e.i)}"><div class="dy-a"><span class="dy-v dy-neg" dir="ltr">${esc(money2(e.cost))}</span><b class="notr">${esc(e.n)}</b></div>` +
@@ -256,8 +277,8 @@
   }
   // the rows and the total line of the list on screen (also redrawn on every key typed in the search box)
   function listBody() {
-    const f = files[key] && files[key].v, q = view.q || '';
-    if (!f) return { rows: '<p class="hint">ملف الأصناف لسه ما وصلش: اللاب بيجهّزه.</p>', tot: '' };
+    const f = lists(), q = view.q || '';
+    if (!f) return { rows: `<p class="hint">${noLists()}</p>`, tot: '' };
     let rows = [], tot = '';
     if (view.kind === 'top' || view.kind === 'low') {
       const all = view.kind === 'top' ? f.items : lowList(f, thr), r = searchItems(all, q);
@@ -275,20 +296,20 @@
     return { rows: rows.length ? rows.join('') : '<p class="hint">مفيش أصناف هنا</p>', tot };
   }
   function drawList() {
-    const main = $('pfMain'), T = totals(data, key);
+    const main = $('pfMain'), T = totals(data, key, basis);
     const thrBox = view.kind === 'low' ? `<div class="pf-thr"><label for="pfThr">الهامش أقل من</label><input id="pfThr" type="number" inputmode="decimal" min="0" step="1" value="${esc(thr)}" /><span>%</span></div>` : '';
     const note = view.kind === 'top' || view.kind === 'low' ? `<p class="hint">الأصناف دي في الفترة · الربح قبل خصم التذكرة${T ? ' · ' + esc(dateText(T.from)) + ' ← ' + esc(dateText(T.to)) : ''}</p>` : (view.kind === 'free' ? '<p class="hint">اتصرف من غير سعر</p>' : '');
     const b = listBody();
     main.innerHTML = `<button type="button" class="dy-back" data-pf-back>› رجوع</button><h3 class="dy-h2">${esc(KINDS[view.kind])}</h3>` +
       `<div class="dy-search"><span aria-hidden="true">🔎</span><input id="pfSearch" type="search" inputmode="search" autocomplete="off" placeholder="ابحث باسم الصنف" aria-label="ابحث باسم الصنف" value="${esc(view.q || '')}" /></div>` +
-      thrBox + note + `<div class="dy-tot" id="pfTot">${b.tot}</div><div id="pfRows">${b.rows}</div>`;
+      thrBox + (basis === 'pf' ? '<p class="hint"><b>إنت شايف على تكلفة فارمافلاي، مش على آخر شرا</b></p>' : '') + note + `<div class="dy-tot" id="pfTot">${b.tot}</div><div id="pfRows">${b.rows}</div>`;
   }
   function findItem(f, id) {
     const hit = (a) => (a || []).find((e) => e.i === id);
     return (view.kind === 'free' ? hit(f.free.items) : (hit(f.items) || hit(f.low))) || hit(f.free.items) || null;
   }
   function drawItem() {
-    const main = $('pfMain'), f = files[key] && files[key].v, back = '<button type="button" class="dy-back" data-pf-back>› رجوع</button>';
+    const main = $('pfMain'), f = lists(), back = '<button type="button" class="dy-back" data-pf-back>› رجوع</button>';
     const e = f && findItem(f, view.item);
     if (!e) { main.innerHTML = back + '<p class="hint">مفيش أصناف هنا</p>'; return; }
     const isFree = view.kind === 'free';
@@ -298,7 +319,7 @@
         `<div class="dy-tot"><span>الربح</span><b dir="ltr" class="${neg(e.profit).trim()}">${esc(money2(e.profit))}${e.margin == null ? '' : ' · ' + esc(e.margin) + '%'}</b></div>`;
     const lines = e.ls.map((l) => `<button type="button" class="dy-tk" data-pf-d="${esc(l.d)}" data-pf-t="${esc(l.tk)}"><div class="dy-a"><span class="dy-v${neg(isFree ? -l.c * l.q : lineProfit(l))}" dir="ltr">${esc(money2(isFree ? -l.c * l.q : lineProfit(l)))}</span><b>${esc(dateText(l.d))}</b></div>` +
       `<div class="dy-bb"><span>تذكرة ${esc(l.tk)} · ${esc(qtyText(l.q))} × ${esc(money2(l.pr))}</span><span>تكلفة <bdi class="notr">${esc(money2(l.c))}</bdi></span></div></button>`).join('');
-    main.innerHTML = back + `<h3 class="dy-h2"><span class="notr">${esc(e.n)}</span></h3><div class="dy-card">${head}</div><h3 class="dy-h">آخر بيعات الصنف</h3>${lines}${e.cf ? '<p class="hint">* سطر اتحسب بتكلفة الكارت (مفيش شرا قبله)</p>' : ''}`;
+    main.innerHTML = back + `<h3 class="dy-h2"><span class="notr">${esc(e.n)}</span></h3><div class="dy-card">${head}</div><h3 class="dy-h">آخر بيعات الصنف</h3>${lines}${e.cf ? `<p class="hint">* ${fbWord()}</p>` : ''}`;
   }
   function drawTicket() {
     const main = $('pfMain'), date = view.date, det = dets[date];
@@ -306,7 +327,7 @@
     const back = '<button type="button" class="dy-back" data-pf-back>› رجوع</button>';
     if (!t) { main.innerHTML = back + '<p class="hint">الفاتورة دي مش لاقيها</p>'; return; }
     const r = rem(t), a = t.ty === 'a';
-    const lines = t.lines.map((l) => `<tr${l.bc || l.fr ? ' class="dy-red"' : ''}><td><span class="notr">${esc(l.n)}</span>${l.bc ? ' <span class="dy-flag">· بأقل من التكلفة</span>' : ''}${l.fr ? ` <span class="dy-flag">· من غير سعر · تكلفتها ${esc(money2(l.c))}</span>` : ''}${l.ct ? ` <span class="dy-note">· سحب من العلبة${l.u ? ' · ' + esc(qtyText(l.u)) + ' وحدة' : ''}</span>` : ''}${l.memo ? `<div class="dy-sub"><span class="notr">${esc(l.memo)}</span></div>` : ''}</td><td class="dy-n">${esc(qtyText(l.q))}</td><td class="dy-n">${esc(money2(l.pr))}</td><td class="dy-n">${esc(money2(l.t))}</td></tr>`).join('');
+    const lines = t.lines.map((l) => `<tr${underCost(t, l, basis) || l.fr ? ' class="dy-red"' : ''}><td><span class="notr">${esc(l.n)}</span>${underCost(t, l, basis) ? ' <span class="dy-flag">· بأقل من التكلفة</span>' : ''}${l.fr ? ` <span class="dy-flag">· من غير سعر · تكلفتها ${esc(money2(basis === 'pf' && l.k != null ? l.k : l.c))}</span>` : ''}${l.ct ? ` <span class="dy-note">· سحب من العلبة${l.u ? ' · ' + esc(qtyText(l.u)) + ' وحدة' : ''}</span>` : ''}${l.memo ? `<div class="dy-sub"><span class="notr">${esc(l.memo)}</span></div>` : ''}</td><td class="dy-n">${esc(qtyText(l.q))}</td><td class="dy-n">${esc(money2(l.pr))}</td><td class="dy-n">${esc(money2(l.t))}</td></tr>`).join('');
     main.innerHTML = back + `<h3 class="dy-h2">تذكرة <bdi class="notr">${esc(t.id)}</bdi></h3>` +
       `<div class="dy-card"><b class="notr">${esc(who(t))}</b> · ${a ? 'آجل' : 'نقدي'}${t.k === 'r' ? ' · مرتجع' : ''}<div class="dy-stamp">${esc(dateText(date))} · ${esc(hm(t.t))}</div>${t.memo ? `<div class="dy-sub">ملاحظة: <span class="notr">${esc(t.memo)}</span></div>` : ''}</div>` +
       `<div class="dy-card"><table>${row(['الصنف', 'الكمية', 'السعر', 'الإجمالي'], true)}${lines}</table>` +
@@ -325,6 +346,7 @@
   async function open() {
     bind();
     view = null;
+    basis = 'law';   // it always opens on his law; the other basis is only for as long as he is looking
     await loadDay(true);
     if (data && !range(data, key)) key = '7';
     if (data) await ensure(key, true);
@@ -340,6 +362,7 @@
       const t = (s) => e.target.closest(s);
       let el;
       if ((el = t('[data-pf-key]'))) { setKey(el.dataset.pfKey); return; }
+      if ((el = t('[data-pf-basis]'))) { basis = el.dataset.pfBasis === 'pf' ? 'pf' : 'law'; view = null; draw(); return; }
       if ((el = t('[data-pf-open]'))) { view = { kind: el.dataset.pfOpen, q: '' }; draw(); return; }
       if ((el = t('[data-pf-head]'))) { const c = spendNow(), h = c && c.v && c.v.heads[Number(el.dataset.pfHead)]; if (h) { view = { kind: 'exp', head: h.name, q: '' }; draw(); window.scrollTo({ top: 0 }); } return; }
       if (t('[data-pf-own]')) { view = { kind: 'own', q: '' }; draw(); window.scrollTo({ top: 0 }); return; }

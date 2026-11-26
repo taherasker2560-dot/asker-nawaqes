@@ -51,6 +51,8 @@
       date: String(d.date), netSales: num(d.net_sales), grossSales: num(d.gross_sales), returns: num(d.returns), discounts: num(d.discounts), misc: num(d.misc),
       tickets: num(d.tickets), returnTickets: num(d.return_tickets), profit: num(d.profit), margin: d.margin == null ? null : num(d.margin), collected: num(d.collected),
       itemsRevenue: num(d.items_revenue), cost: num(d.cost),   // the items' sales and their cost (the cost law): «💹 الربح» adds them up over a period
+      // the other basis «💹 الربح» can show when he picks it (PharmaFly's own cost on the sale lines); null = the laptop has not worked this day out yet
+      pf: d.pf && typeof d.pf === 'object' ? { cost: num(d.pf.cost), profit: num(d.pf.profit), below: num(d.pf.below), noCost: num(d.pf.no_cost), freeCost: num(d.pf.free_cost) } : null,
       free: { lines: num(fr.lines), cost: num(fr.cost) }, fallback: { lines: num(fb.lines), of: num(fb.of) },
       credit: { netNew: num(cr.net_new), paid: num(cr.paid), sales: num(cr.sales), customers: num(cr.customers) },
       hours: Array.isArray(d.hours) ? d.hours.slice(0, 24).map(num) : [],
@@ -74,7 +76,7 @@
     const tickets = o.tickets.filter((t) => t && t.id != null).map((t) => ({
       id: num(t.id), t: String(t.t || ''), k: t.k === 'r' ? 'r' : 's', ty: t.ty === 'a' ? 'a' : 'c', cu: String(t.cu || ''), total: num(t.total), d: num(t.d), p: num(t.p), memo: String(t.memo || ''),
       mp: t.mp && typeof t.mp === 'object' ? { vendor: String(t.mp.vendor || ''), at: String(t.mp.at || ''), code: String(t.mp.code || '') } : null,
-      lines: (Array.isArray(t.lines) ? t.lines : []).filter((l) => l && l.n != null).map((l) => ({ n: String(l.n), q: num(l.q), pr: num(l.pr), t: num(l.t), bc: !!l.bc, m: !!l.m, fr: !!l.fr, ct: !!l.ct, u: l.u == null ? 0 : num(l.u), c: l.c == null ? null : num(l.c), memo: String(l.memo || '') })),
+      lines: (Array.isArray(t.lines) ? t.lines : []).filter((l) => l && l.n != null).map((l) => ({ n: String(l.n), q: num(l.q), pr: num(l.pr), t: num(l.t), bc: !!l.bc, m: !!l.m, fr: !!l.fr, ct: !!l.ct, u: l.u == null ? 0 : num(l.u), c: l.c == null ? null : num(l.c), k: l.k == null ? null : num(l.k), memo: String(l.memo || '') })),
     }));
     return { date: String(o.date || ''), tickets, buys: parseBuys(o.buys), supplierReturns: (Array.isArray(o.supplier_returns) ? o.supplier_returns : []).filter((r) => r && r.code != null).map((r) => ({ code: String(r.code), vendor: String(r.vendor || ''), total: num(r.total), t: String(r.t || '') })) };
   }
