@@ -19,7 +19,9 @@ assert.equal(S.parse({ days: { '2026-11-26': { stores: [{ id: 1, law: 'x' }] } }
 
 const law = S.view(data.days[0], 'law');
 assert.deepEqual(law.main, { value: 1000.5, sale: 1500.5, items: 10 });
-assert.deepEqual(law.others, [{ id: 2, name: 'مخزن هالك مثال', value: 40, items: 20 }]);
+assert.deepEqual(law.others, [{ id: 2, name: 'مخزن هالك مثال', value: 40, sale: 52, items: 20 }]);
+assert.deepEqual(law.total, { value: 1070.11, sale: 1588.5 }, 'every store, at cost and at the public price');
+assert.equal(law.waiting.sale, 36);
 assert.equal(law.waiting.value, 29.61, 'the waiting stores together');
 assert.deepEqual(law.waiting.list.map((s) => s.id), [5, 6]);
 assert.deepEqual([law.noBuy, law.noCost, law.avgZero], [3, 2, 0], 'the gaps of the main store only');
@@ -27,12 +29,14 @@ const avg = S.view(data.days[0], 'avg');
 assert.equal(avg.main.value, 970.5);
 assert.equal(avg.main.sale, 1500.5, 'the public price is the same on both bases');
 assert.equal(avg.waiting.value, 28.32);
+assert.deepEqual(avg.total, { value: 1037.82, sale: 1588.5 });
 assert.deepEqual([avg.noBuy, avg.noCost, avg.avgZero], [0, 0, 4], 'each basis says only its own gaps');
 assert.equal(S.view(null, 'law'), null);
 assert.equal(S.view({ date: 'x', at: '', stores: [{ id: 2, name: 'a', law: 1 }] }, 'law').main, null);
 
 assert.deepEqual(S.history(data, 'law').map((h) => [h.date, h.value, h.diff]), [['2026-11-26', 1000.5, 20.5], ['2026-11-25', 980, 80], ['2026-11-24', 900, null]]);
 assert.deepEqual(S.history(data, 'avg').map((h) => h.value), [970.5, 950, 870]);
+assert.deepEqual(S.history(data, 'law').map((h) => h.sale), [1500.5, 1480, 1400], 'the public price beside each day');
 assert.equal(S.history(data, 'law', 2).length, 2);
 assert.equal(S.history(data, 'law', 2)[1].diff, 80, 'the change is against the day before it in the file, even when it is not listed');
 assert.deepEqual(S.history(null, 'law'), []);

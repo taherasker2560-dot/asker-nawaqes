@@ -2819,8 +2819,17 @@ button.rv-opt.rv-opt-main { background: var(--rose); }
 #stockValPanel .pf-basis { align-items: center; }
 #stockValPanel .pf-by { color: var(--muted); font-size: 12.5px; }
 #stockValPanel .dy-card.pf-other { border: 1.5px solid var(--crimson); background: var(--rose); }
-#stockValPanel .sv-stores .sv-sub { padding-inline-start: 18px; font-size: 12px; color: var(--muted); }
-#stockValPanel .sv-stores .sv-sub b { color: var(--muted); font-weight: 600; }
+#stockValPanel .sv-tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#stockValPanel .sv-tbl th { color: var(--muted); font-size: 11.5px; font-weight: 600; text-align: start; padding: 2px 2px 6px; border: 0; border-bottom: 1px solid var(--line); background: transparent; }
+#stockValPanel .sv-tbl td { padding: 8px 2px; border: 0; border-bottom: 1px dashed var(--line); vertical-align: top; line-height: 1.5; }
+#stockValPanel .sv-tbl .sv-n { text-align: end; white-space: nowrap; padding-inline-start: 8px; }
+#stockValPanel .sv-tbl td.sv-c { color: var(--crimson); font-weight: 700; }
+#stockValPanel .sv-tbl tr.sv-main td { font-weight: 800; font-size: 14.5px; }
+#stockValPanel .sv-tbl tr.sv-main small { display: block; font-weight: 400; font-size: 11.5px; color: var(--muted); }
+#stockValPanel .sv-tbl tr.sv-sub td { font-size: 12px; font-weight: 400; color: var(--muted); padding-top: 5px; padding-bottom: 5px; }
+#stockValPanel .sv-tbl tr.sv-sub td:first-child { padding-inline-start: 14px; }
+#stockValPanel .sv-tbl tr.sv-total td { border-top: 2px solid var(--crimson); border-bottom: 0; font-weight: 800; font-size: 14.5px; }
+/* (every store: its cost and its value at the public price, then the total, owner 2026-11-26) */
 #stockValPanel .sv-day.sv-on { border: 1.5px solid var(--crimson); }
 #stockValPanel .sv-down { color: var(--bad, #a3162f); }
 #stockValPanel .sv-up { color: var(--muted); }
