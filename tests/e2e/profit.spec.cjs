@@ -136,6 +136,53 @@ run('Profit page: no day file at all, and a day file without the period files',a
  await page.evaluate(()=>window.AskerApp.showTab('profit'));
  await page.waitForFunction(()=>/الصفحة محتاجة ملف اليوم من اللاب/.test(document.querySelector('#pfMain').textContent)||document.querySelector('#pfMain .dy-grid'));
 });
+// «الصافي بعد المصروفات» (owner 2026-11-26, «ا، ابعتها»): the profit minus the expenses the cash boxes paid on the same days; each heading opens its moves; the owner's withdrawals are apart
+const moves=(page,extra=0)=>page.evaluate((extra)=>{
+ const pad=(n)=>String(n).padStart(2,'0'),ago=(n,t)=>{const d=new Date();d.setDate(d.getDate()-n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+(t||'10:00:00')};
+ let id=1;const m=(at,kind,amount,who,memo)=>({id:id++,at,kind,amount,who,memo});
+ const rows=[m(ago(0),'expense',-800,'مرتبات مثال','قبض أول'),m(ago(2),'expense',-200,'مرتبات مثال',''),m(ago(1),'expense',-50,'أكياس مثال','شنط'),
+  m(ago(8),'expense',-5000,'ضرايب مثال','قسط'),m(ago(0),'owner',-300,null,'سحب مثال'),m(ago(1),'vendor',-999,'مورد مثال',''),m(ago(1),'sales',4000,null,'')];
+ for(let i=0;i<extra;i++)rows.push(m(ago(0,'11:00:00'),'expense',-1,'تثريات مثال',''));
+ window.__tables.ar_cash_moves=rows;
+},extra);
+run('Profit page: the net after expenses — the headings, the net of 7 and 30 days, a heading opens its moves, the owner apart',async({page})=>{
+ await seed(page);await moves(page);
+ await page.evaluate(()=>window.AskerDay.load());await page.evaluate(()=>window.AskerApp.showTab('profit'));
+ await page.waitForSelector('#profitPanel .pf-total');
+ const card=()=>txt(page,'#pfMain .pf-net');
+ assert.match(await card(),/^الربح من البيع 1,351 − المصروفات 1,050 مرتبات مثال 1,000 › أكياس مثال 50 › = الصافي 301 المصروف بيتحسب يوم ما اتدفع/,'the supplier and the sales are not expenses, 8 days ago is outside the 7 days');
+ assert.match(await txt(page,'#pfMain .pf-own'),/^مسحوبات صاحب المنشأة لوحدها، مش مصروف 300 ›$/);
+ assert.equal(await page.$eval('#pfMain .pf-total b',(b)=>b.classList.contains('dy-neg')),false);
+ // a heading: its moves, newest first, searchable by the note
+ await page.click('#pfMain [data-pf-head="0"]');
+ await page.waitForSelector('#pfSearch');
+ assert.match(await txt(page,'#pfMain'),/مرتبات مثال.*2 حركة 1,000 800 .*قبض أول 10:00 ص 200 .*من غير ملاحظة 10:00 ص/);
+ await page.fill('#pfSearch','قبض');
+ assert.match(await txt(page,'#pfTot'),/^1 حركة 800$/);
+ await page.click('[data-pf-back]');
+ await page.waitForSelector('#pfMain .pf-total');
+ await page.click('#pfMain [data-pf-own]');
+ assert.match(await txt(page,'#pfMain'),/مسحوبات صاحب المنشأة لوحدها، مش مصروف.*1 حركة 300 300 .*سحب مثال/);
+ await page.click('[data-pf-back]');
+ // 30 days: the lump of 8 days ago comes in and the net goes below zero, in the warning colour
+ await page.click('[data-pf-key="30"]');
+ await page.waitForFunction(()=>/6,050/.test(document.querySelector('#pfMain .pf-net')?.textContent||''));
+ assert.match(await card(),/ضرايب مثال 5,000 ›.*مرتبات مثال 1,000 ›.*= الصافي -4,304 /);
+ assert.equal(await page.$eval('#pfMain .pf-total b',(b)=>b.classList.contains('dy-neg')),true);
+});
+run('Profit page: more than a page of moves is all counted; a server that does not answer shows no net',async({page})=>{
+ await seed(page);await moves(page,1005);
+ await page.evaluate(()=>window.AskerDay.load());await page.evaluate(()=>window.AskerApp.showTab('profit'));
+ await page.waitForSelector('#profitPanel .pf-total');
+ assert.match(await txt(page,'#pfMain .pf-net'),/− المصروفات 2,055 .*تثريات مثال 1,005 ›.*= الصافي -704 /,'the 1,012 rows came in two pages');
+ await page.evaluate(()=>localStorage.setItem('__fakeFail','ar_cash_moves'));
+ await page.click('#pfRefresh');
+ await page.waitForFunction(()=>/المصروفات ما وصلتش من السيرفر/.test(document.querySelector('#pfMain .pf-net')?.textContent||''));
+ assert.equal(await page.$('#pfMain .pf-total'),null,'no net without its expenses');
+ assert.equal(await page.$('#pfMain .pf-own'),null);
+ await page.evaluate(()=>localStorage.removeItem('__fakeFail'));
+});
+
 run('Profit page: a staff member sees nothing',async({page})=>{
  await seed(page);
  await page.evaluate(()=>{window.AskerStaff.isStaff=()=>true;return window.AskerDay.load()});
