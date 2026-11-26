@@ -100,17 +100,55 @@
   // the purchase robot's stops (owner 2026-11-25: «نظام في السيستم يقول لي الحاجات اللي هو واقف عندها مع الفواتير، وإشعار صوتي»). The laptop writes each one in ar_robot_reports
   // (job «purchases» = it stopped, or typed every line and waits for the check; job «purchases_wait» = a card it will not type, the helper enters it), ref_id «card:<card id>:<stop|check|needs_helper>»,
   // title = the invoice, details = what it stopped at (+ a second line with who has it). The card goes when the invoice is entered. Same look as «🤖 الروبوت محتاج رأيك» (ar/robot.js).
-  const BUY_HEAD = { stop: '🤖 الروبوت وقف عند فاتورة', check: '🤖 الروبوت كتب الفاتورة ومستني المراجعة', needs_helper: '🤖 الروبوت محتاج المساعد' };
+  const BUY_HEAD = { stop: '🤖 الروبوت وقف عند فاتورة', check: '🤖 الروبوت كتب الفاتورة ومستني المراجعة', needs_helper: '🤖 الروبوت محتاج المساعد', off: '⏸️ الروبوت واقف بأمرك' };
   const BUY_CHIP = { stop: 'وقف عندها الروبوت', check: 'مستنية المراجعة', needs_helper: 'مستنية المساعد' };
-  const buyRef = (s) => { const m = /^card:(\d+):(stop|check|needs_helper)$/.exec(String((s && s.ref_id) || '')); return m ? { card: m[1], kind: m[2] } : null; };
-  // the stops to show: open, of the purchase robot, the ones that stopped first, then waiting for the check, then the helper's (oldest first inside each)
-  const buyStops = (list) => {
-    const rank = { stop: 0, check: 1, needs_helper: 2 };
-    return (list || []).filter((s) => s && s.status === 'open' && buyRef(s)).sort((a, b) => rank[buyRef(a).kind] - rank[buyRef(b).kind] || String(a.created_at || '').localeCompare(String(b.created_at || '')) || Number(a.id) - Number(b.id));
+  const buyRef = (s) => {
+    const ref = String((s && s.ref_id) || '');
+    if (ref === 'robot:off') return { card: '', kind: 'off' };
+    const m = /^card:(\d+):(stop|check|needs_helper)$/.exec(ref);
+    return m ? { card: m[1], kind: m[2] } : null;
   };
+  // the stops to show: waiting for him (open) or being carried out by the laptop (answered), of the purchase robot: the ones that stopped first, then waiting for the check, then the helper's, then «off»
+  const buyStops = (list) => {
+    const rank = { stop: 0, check: 1, needs_helper: 2, off: 3 };
+    return (list || []).filter((s) => s && (s.status === 'open' || s.status === 'answered') && buyRef(s)).sort((a, b) => rank[buyRef(a).kind] - rank[buyRef(b).kind] || String(a.created_at || '').localeCompare(String(b.created_at || '')) || Number(a.id) - Number(b.id));
+  };
+  // ---- 2026-11-26 «متشوف الروبوت وقف ليه و اعملى اوبشن حوه السيستم  اعرف اتصرف» (mockup robot_stop_answers_2026-11-26): the card says what happened, that nothing was saved, whether the
+  // helper is on, shows PharmaFly's screen at the stop, and offers the answers the laptop carries out (Hub\purchase_entry\ROBOT_ANSWERS.ps1). The laptop's lines: why, who has it, SAFE:1, SHOT:<path>
+  function stopParts(s) {
+    const out = { why: '', who: '', safe: false, shot: '' }, text = [];
+    for (const raw of String((s && s.details) || '').split('\n')) {
+      const line = raw.trim();
+      if (line === 'SAFE:1') out.safe = true;
+      else if (line.startsWith('SHOT:')) out.shot = /^SHOT:robot\/[\w.-]+$/.test(line) ? line.slice(5) : '';
+      else if (line) text.push(line);
+    }
+    out.why = text[0] || '';
+    out.who = text.slice(1).join('\n');
+    return out;
+  }
+  // what each button will do (the words under it), and what the card says once he tapped it
+  const OPT_HELP = {
+    retry: 'الروبوت يكتبها من الأول أول ما شاشة المشتريات تتقفل (من «خروج» من غير حفظ)، ونسخة الصيدلية تأكد إنها ما اتحفظتش.',
+    manual: 'الروبوت يسيبها. أول ما تتحفظ يتأكد من الأصناف والصافي ويعلّمها «اتدخلت»، ويكمّل اللي بعدها.',
+    helper: 'محادثة الفواتير تكمّلها. لو مش شغالة، السطر اللي فوق بيقول.',
+    off: 'ما يكتبش أي فاتورة لحد ما تدوس «شغّل الروبوت».',
+    on: 'يرجع يكتب الفواتير المعتمدة.',
+  };
+  const ANSWER_HEAD = { retry: '🔁 هيجرّب تاني', manual: '🙋 إنت هتدخلها', helper: '🧑‍💻 اتبعتت للمساعد', off: '⏸️ وقّفت الروبوت', on: '▶️ بيشتغل تاني', text: '✍️ كلامك اتبعت' };
+  const ANSWER_NEXT = {
+    retry: 'هيعيدها أول ما الشاشة تتقفل ونسخة الصيدلية الجديدة تأكد إنها ما اتحفظتش.',
+    manual: 'سابها ومستني الحفظ في فارمافلاي (بيشوفه بعد نسخة الصيدلية الجاية).',
+    helper: 'اتبعتت لمحادثة الفواتير.',
+    off: 'هيتوقف خلال دقيقتين.',
+    on: 'هيشتغل خلال دقيقتين.',
+    text: 'محادثة الفواتير هتقرا كلامك.',
+  };
+  const answerKind = (s) => (s && s.status === 'answered' ? (ANSWER_HEAD[s.answer_key] ? s.answer_key : 'text') : '');
+  const stopOptions = (s) => (Array.isArray(s && s.options) ? s.options : []).filter((o) => o && typeof o.key === 'string' && o.key && typeof o.label === 'string' && o.label).slice(0, 6);
   const buyOf = (list, r) => buyStops(list).find((s) => buyRef(s).card === String(r && r.id)) || null;
   const when = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : pad(d.getHours() % 12 || 12) + ':' + pad(d.getMinutes()) + (d.getHours() < 12 ? ' ص' : ' م'); };
-  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when, buyRef, buyStops, buyOf, BUY_HEAD, BUY_CHIP };
+  const api = { STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when, buyRef, buyStops, buyOf, BUY_HEAD, BUY_CHIP, stopParts, answerKind, stopOptions, OPT_HELP, ANSWER_HEAD, ANSWER_NEXT };
   root.AskerInvReviewLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -122,7 +160,7 @@
   // «🎤» beside the boxes where he writes his own words (owner 2026-11-22, ar/voice.js): said instead of typed, saved the same way when the box changes
   const voice = (selector, label) => (root.AskerVoice ? root.AskerVoice.button(selector, label) : '');
   const COLS ='id,batch,ord,supplier,doc_no,paper_date,total,photos,lines,notes,answers,owner_note,status,result,created_at,done_at';
-  let rows = [], stops = [], urls = {}, openState = {}, showAllLines = {}, rot = {}, timer = null, loading = false, sig = '', busy = false;
+  let rows = [], stops = [], urls = {}, openState = {}, showAllLines = {}, rot = {}, timer = null, loading = false, sig = '', busy = false, snaps = {};
 
   function say(text, kind) {
     const el = $('rvStatus');
@@ -135,7 +173,7 @@
 
   function chipHtml(r) {
     const bs = LAPTOP.includes(r.status) ? buyOf(stops, r) : null;   // the purchase robot stopped on this one (or waits for the helper): its card says so
-    const c = bs ? { t: BUY_CHIP[buyRef(bs).kind], kind: buyRef(bs).kind === 'needs_helper' ? 'quiet' : 'bad' } : chip(r);
+    const c = bs ? (bs.status === 'answered' ? { t: 'رديت على الروبوت', kind: 'quiet' } : { t: BUY_CHIP[buyRef(bs).kind], kind: buyRef(bs).kind === 'needs_helper' ? 'quiet' : 'bad' }) : chip(r);
     const onlyPrices = c.t === 'N_NOTES' && !openNotes(r).length;
     const text = c.t === 'N_NOTES' ? `<span class="rv-n">${esc(c.n)}</span> ${onlyPrices ? (c.n === 1 ? 'محتاج سعرك' : 'محتاجين سعرك') : c.n === 1 ? 'ملاحظة' : 'ملاحظات'}` : esc(c.t);
     return `<span class="rv-chip rv-${c.kind}">${text}</span>`;
@@ -385,21 +423,69 @@
       (notesOf(r).length ? `<h4>ملاحظات${WAITING.includes(r.status) ? ' (محتاجة رأيك)' : ''}</h4>${notesOf(r).map((n) => noteHtml(r, n)).join('')}` : '') +
       footHtml(r) + '</div></div>';
   }
-  // the purchase robot's stops, at the top (the same box look as «🤖 الروبوت محتاج رأيك»); a tap opens that invoice's card
+  // the purchase robot's stops, at the top (the same box look as «🤖 الروبوت محتاج رأيك»); a tap on the words opens that invoice's card
+  function stopCard(s) {
+    const ref = buyRef(s), k = ref.kind, p = stopParts(s), a = answerKind(s), opts = stopOptions(s);
+    const head = a ? ANSWER_HEAD[a] : BUY_HEAD[k];
+    const who = p.who ? `<span class="${p.who.includes('مش شغال') ? 'rv-who-off' : 'rv-who'}">${esc(p.who)}</span>` : '';
+    const tap = ref.card ? ` data-rv-stop="${esc(ref.card)}" role="button" tabindex="0"` : '';
+    let h = `<div class="rb-card" data-rv-card="${esc(s.id)}"><div class="rb-title">${esc(head)}</div>` +
+      `<div class="rv-sw"${tap}><div class="rb-details notr"><b>${esc(s.title)}</b>${p.why ? '\n' + esc(p.why) : ''}${who ? '\n' + who : ''}</div></div>`;
+    if (p.safe && !a && k !== 'off') h += '<span class="rv-safe">✓ ما اتحفظش حاجة في فارمافلاي</span>';
+    if (p.shot) h += `<button type="button" class="rv-snap" data-rv-snap="${esc(p.shot)}">${snaps[p.shot] ? `<img alt="" src="${esc(snaps[p.shot])}">` : ''}<span>شاشة فارمافلاي وقت الوقفة (دوسة تكبّرها)</span></button>`;
+    if (a) {
+      const said = s.answer_text ? s.answer_text : ((opts.find((o) => o.key === s.answer_key) || {}).label || '');
+      h += `<div class="rv-answered">${said ? `<span>رديت:</span> <b class="notr">«${esc(said)}»</b> ✓<br>` : ''}${esc(ANSWER_NEXT[a])}</div>`;
+    } else if (opts.length) {
+      h += `<div class="rv-opts">${opts.map((o, i) => `<button type="button" class="rv-opt${i === 0 ? ' rv-opt-main' : ''}" data-rv-answer="${esc(s.id)}|${esc(o.key)}"><b class="notr">${esc(o.label)}</b>${OPT_HELP[o.key] ? `<small>${esc(OPT_HELP[o.key])}</small>` : ''}</button>`).join('')}</div>`;
+      if (k !== 'off') h += `<div class="rb-own"><input type="text" maxlength="1000" autocomplete="off" placeholder="أو اكتب له تعمل إيه…" aria-label="اكتب للروبوت" data-rv-say="${esc(s.id)}" />${voice(`[data-rv-say="${esc(s.id)}"]`, 'قول للروبوت يعمل إيه')}<button type="button" class="secondary" data-rv-send="${esc(s.id)}">ابعت</button></div>`;
+    }
+    return h + `<div class="rb-when">${esc(when(s.created_at))}</div></div>`;
+  }
   function stopsHtml() {
     const list = buyStops(stops);
     if (!list.length) return '';
-    return '<div class="rb-box rv-stops" id="rvStops">' + list.map((s) => {
-      const k = buyRef(s).kind;
-      return `<div class="rb-card" data-rv-stop="${esc(buyRef(s).card)}" role="button" tabindex="0"><div class="rb-title">${esc(BUY_HEAD[k])}</div>` +
-        `<div class="rb-details notr"><b>${esc(s.title)}</b>${s.details ? '\n' + esc(s.details) : ''}</div><div class="rb-when">${esc(when(s.created_at))}</div></div>`;
-    }).join('') + '</div>';
+    return '<div class="rb-box rv-stops" id="rvStops">' + list.map(stopCard).join('') + '</div>';
+  }
+  async function answerStop(id, key, text) {
+    if (busy || !db()) return;
+    busy = true;
+    try {
+      const { data, error } = await db().rpc('ar_robot_answer', { p_id: Number(id), p_key: key || null, p_text: text || null });
+      if (error) throw error;
+      if (!data || !data.ok) { say((root.AskerRobotLib || { errText: () => 'ماتبعتش. جرّب تاني.' }).errText(data && data.error), 'bad'); await load(true); }
+      else {
+        stops = stops.map((x) => (String(x.id) === String(id) ? { ...x, status: 'answered', answer_key: key || null, answer_text: text || null } : x));
+        sig = signature(); draw(); say('اتبعت للروبوت ✓', 'good');
+      }
+    } catch (e) { say('ماتبعتش. جرّب تاني.', 'bad'); }
+    busy = false;
+    if (root.AskerNotify && root.AskerNotify.tick) root.AskerNotify.tick();
+  }
+  // the screen of PharmaFly at the stop, full size (the same dark viewer as an invoice photo)
+  function snapViewer(path) {
+    if (!snaps[path]) return;
+    shot && shot.remove();
+    shot = document.createElement('div');
+    shot.className = 'rv-shot';
+    shot.innerHTML = `<div class="rv-shot-bar"><button type="button" data-rv-close>قفل</button></div><div class="rv-shot-img rv-snap-big"><img alt="" src="${esc(snaps[path])}"></div>`;
+    shot.addEventListener('click', (e) => { if (e.target.closest('[data-rv-close]') || e.target === shot) { shot.remove(); shot = null; } });
+    document.body.appendChild(shot);
+  }
+  async function loadSnaps(list) {
+    for (const s of list) {
+      const p = stopParts(s).shot;
+      if (!p || snaps[p] || !db().storage) continue;
+      try { const { data: blob, error } = await db().storage.from('asker-private').download(p); if (!error && blob) snaps[p] = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: 'image/jpeg' })); } catch (e) { /* the card still says what happened */ }
+    }
   }
   function draw() {
     const box = $('rvMain');
     if (!box) return;
     const s = sections(rows), sm = summary(rows);
     const head = (t, n) => `<h3 class="py-h">${t}${n ? ` <span class="rv-n">${esc(n)}</span>` : ''}</h3>`;
+    const said = {};   // words he typed or said in a stop card stay when the box is drawn again
+    box.querySelectorAll('[data-rv-say]').forEach((i) => { if (i.value) said[i.dataset.rvSay] = i.value; });
     let html = stopsHtml();
     if (!rows.length) html += '<p class="hint">مفيش فواتير متجهزة دلوقتي. أول ما تيجي فواتير جديدة هجهّزها وهتظهر هنا.</p>';
     else {
@@ -412,8 +498,9 @@
       if (s.done.length) html += head('اتدخلت', s.done.length) + s.done.map(card).join('');
     }
     box.innerHTML = html;
+    box.querySelectorAll('[data-rv-say]').forEach((i) => { if (said[i.dataset.rvSay]) i.value = said[i.dataset.rvSay]; });
   }
-  const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details]),
+  const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details, x.status, x.answer_key, x.answer_text, (x.options || []).length]), Object.keys(snaps),
     Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late])]);
   async function load(force) {
     if (!db() || loading) return;
@@ -433,8 +520,9 @@
       await loadNi(next);
       // the purchase robot's open stops (the table is shared with the sales robot's questions: only «card:<id>:<kind>» ones are used; none = nothing shows)
       try {
-        const { data: sd, error: se } = await db().from('ar_robot_reports').select('id,created_at,job,ref_id,title,details,status').eq('status', 'open').order('created_at', { ascending: true }).limit(30);
+        const { data: sd, error: se } = await db().from('ar_robot_reports').select('id,created_at,job,ref_id,title,details,status,options,answer_key,answer_text').in('status', ['open', 'answered']).order('created_at', { ascending: true }).limit(40);
         stops = se ? [] : buyStops(sd || []);
+        await loadSnaps(stops);
       } catch (e) { stops = []; }
       const before = sig; rows = next; sig = signature();
       // never redraw under his fingers (typing a note, choosing an answer)
@@ -551,6 +639,9 @@
     if ((el = g('data-rv-niedit'))) { niEdit = el.dataset.rvNiedit; sig = signature(); draw(); const i = document.querySelector(`[data-rv-niname="${CSS.escape(niEdit)}"]`); if (i) { i.focus(); i.select(); } return; }
     if ((el = g('data-rv-nisave'))) { const i = document.querySelector(`[data-rv-niname="${CSS.escape(el.dataset.rvNisave)}"]`); return niKeep(el.dataset.rvNisave, i ? i.value : ''); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
+    if ((el = g('data-rv-answer'))) { const [id, k] = split(el.dataset.rvAnswer); return answerStop(id, k, ''); }
+    if ((el = g('data-rv-send'))) { const i = document.querySelector(`[data-rv-say="${CSS.escape(el.dataset.rvSend)}"]`), v = i ? i.value.trim() : ''; if (!v) { say('اختار رد أو اكتب له تعمل إيه.', 'bad'); return; } return answerStop(el.dataset.rvSend, '', v.slice(0, 1000)); }
+    if ((el = g('data-rv-snap'))) return snapViewer(el.dataset.rvSnap);
     // a stop of the purchase robot: its invoice's card opens and comes into view
     if ((el = g('data-rv-stop'))) { const r = find(el.dataset.rvStop); if (r) { openState[r.id] = true; sig = signature(); draw(); const c = document.querySelector(`[data-rv="${CSS.escape(String(r.id))}"]`); if (c && c.scrollIntoView) c.scrollIntoView({ block: 'start' }); } }
   }
@@ -584,7 +675,7 @@
   }
   function close() { clearInterval(timer); timer = null; clearTimeout(niTimer); niTimer = null; shot && shot.remove(); shot = null; }
   const main = $('rvMain');
-  if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-niname]')) { e.preventDefault(); niKeep(e.target.dataset.rvNiname, e.target.value); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
+  if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-niname]')) { e.preventDefault(); niKeep(e.target.dataset.rvNiname, e.target.value); } else if (e.target.matches('[data-rv-say]')) { e.preventDefault(); main.querySelector(`[data-rv-send="${CSS.escape(e.target.dataset.rvSay)}"]`)?.click(); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
   document.addEventListener('keydown', onKey);
   $('rvRefresh')?.addEventListener('click', () => load(true));
   // the badge / home row: how many invoices wait for his yes (asked by ar/notify.js with the other counts)

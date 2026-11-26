@@ -61,3 +61,58 @@ run('Purchase robot stops: the cards at the top of «مراجعة الفواتي
  await page.evaluate(()=>{window.__tables.ar_robot_reports.find(r=>r.id===22).status='done';return window.AskerInvReview.load()});
  await page.waitForFunction(()=>!document.getElementById('rvStops'));
 });
+
+run('Purchase robot stops answered from the page: what happened, nothing saved, the helper, the screen picture, the buttons and their help, his words, the answered card, «off» and «on»',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  const at=(m)=>new Date(Date.now()-m*60000).toISOString();
+  window.__storage['robot/stop_31_20261126132900.jpg']='picture';
+  window.__tables.ar_robot_reports=[
+   {id:31,created_at:at(5),job:'purchases',ref_id:'card:31:stop',title:'مورد أ 900001',details:'التاريخ اتكتب غلط\nالمساعد: مش شغال من 10:41 ص\nSAFE:1\nSHOT:robot/stop_31_20261126132900.jpg',status:'open',
+    options:[{key:'retry',label:'🔁 جرّب تاني'},{key:'manual',label:'🙋 أنا هدخلها بإيدي'},{key:'helper',label:'🧑‍💻 ابعتها للمساعد'},{key:'off',label:'⏸️ وقّف الروبوت'}]},
+   {id:32,created_at:at(3),job:'purchases_wait',ref_id:'robot:off',title:'الروبوت',details:'مفيش فاتورة هتتكتب لوحدها.',status:'open',options:[{key:'on',label:'▶️ شغّل الروبوت'}]}];
+  window.__answers=[];
+  window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_robot_answer:(a)=>{window.__answers.push(a);const r=window.__tables.ar_robot_reports.find(x=>x.id===a.p_id);if(!r||r.status!=='open')return {ok:false,error:'state'};r.status='answered';r.answer_key=a.p_key;r.answer_text=a.p_text;return {ok:true}}});
+ });
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');await page.waitForSelector('#rvStops .rb-card .rv-opt');
+ const first='#rvStops [data-rv-card="31"]';
+ assert.match((await texts(page,first))[0],/🤖 الروبوت وقف عند فاتورة مورد أ 900001 التاريخ اتكتب غلط المساعد: مش شغال من 10:41 ص ✓ ما اتحفظش حاجة في فارمافلاي/);
+ assert.equal(await page.$$eval(first+' .rv-who-off',x=>x.length),1,'the helper that is off is marked');
+ await page.waitForSelector(first+' .rv-snap img',{state:'attached'});
+ assert.deepEqual(await page.$$eval(first+' .rv-opt b',x=>x.map(e=>e.textContent)),['🔁 جرّب تاني','🙋 أنا هدخلها بإيدي','🧑‍💻 ابعتها للمساعد','⏸️ وقّف الروبوت']);
+ assert.match((await texts(page,first+' .rv-opt small'))[0],/أول ما شاشة المشتريات تتقفل/);
+ // the picture opens big and closes
+ await page.click(first+' .rv-snap');await page.waitForSelector('.rv-shot .rv-snap-big img',{state:'attached'});await page.click('.rv-shot [data-rv-close]');
+ assert.equal(await page.$$eval('.rv-shot',x=>x.length),0);
+ // typed words stay through a redraw
+ await page.fill(first+' [data-rv-say]','دخّلها بعد الضهر');
+ await page.evaluate(()=>{document.activeElement.blur();window.__tables.ar_robot_reports[0].title='مورد أ 900001 ';return window.AskerInvReview.load()});
+ assert.equal(await page.inputValue(first+' [data-rv-say]'),'دخّلها بعد الضهر');
+ await page.click(first+' [data-rv-answer="31|manual"]');
+ await page.waitForSelector(first+' .rv-answered');
+ assert.deepEqual(await page.evaluate(()=>window.__answers),[{p_id:31,p_key:'manual',p_text:null}]);
+ assert.match((await texts(page,first))[0],/🙋 إنت هتدخلها.*رديت: «🙋 أنا هدخلها بإيدي» ✓ سابها ومستني الحفظ/);
+ assert.equal(await page.$$eval(first+' .rv-opt',x=>x.length),0,'one answer: the buttons leave');
+ assert.equal(await page.$eval('[data-rv="31"] .rv-chip',x=>x.textContent.trim()),'رديت على الروبوت');
+ // «off» card: one button, no box for words
+ const off='#rvStops [data-rv-card="32"]';
+ assert.match((await texts(page,off))[0],/⏸️ الروبوت واقف بأمرك الروبوت مفيش فاتورة هتتكتب لوحدها/);
+ assert.equal(await page.$$eval(off+' [data-rv-say]',x=>x.length),0);
+ await page.click(off+' [data-rv-answer="32|on"]');
+ await page.waitForSelector(off+' .rv-answered');
+ assert.equal((await page.evaluate(()=>window.__answers))[1].p_key,'on');
+});
+run('Purchase robot stops: his own words without a button',async({page})=>{
+ await seed(page);
+ await page.evaluate(()=>{
+  window.__tables.ar_robot_reports=[{id:41,created_at:new Date().toISOString(),job:'purchases',ref_id:'card:31:check',title:'مورد أ 900001',details:'مستني المراجعة\nالمساعد: شغال ✓\nSAFE:1',status:'open',options:[{key:'manual',label:'🙋 أنا هراجعها وأحفظها'}]}];
+  window.__answers=[];window.__fakeRpcs=Object.assign(window.__fakeRpcs||{},{ar_robot_answer:(a)=>{window.__answers.push(a);window.__tables.ar_robot_reports[0].status='answered';return {ok:true}}});
+ });
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');await page.waitForSelector('#rvStops [data-rv-say]');
+ await page.click('#rvStops [data-rv-send="41"]');
+ assert.equal((await page.evaluate(()=>window.__answers)).length,0,'nothing is sent empty');
+ await page.fill('#rvStops [data-rv-say="41"]','سيبها للصبح');await page.press('#rvStops [data-rv-say="41"]','Enter');
+ await page.waitForSelector('#rvStops .rv-answered');
+ assert.deepEqual(await page.evaluate(()=>window.__answers),[{p_id:41,p_key:null,p_text:'سيبها للصبح'}]);
+ assert.match((await texts(page,'#rvStops .rb-card'))[0],/✍️ كلامك اتبعت.*رديت: «سيبها للصبح» ✓/);
+});
