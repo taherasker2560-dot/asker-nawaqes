@@ -132,7 +132,7 @@
     const fold = `<details class="sv-mdays"${daysOpen ? ' open' : ''}><summary><span aria-hidden="true">📈</span> <span>فلوسك يوم بيوم</span></summary>` +
       (hist ? `<p class="hint">صافي الربح = ربح اليوم على آخر شرا ناقص مصروفاته. تغيّر الصافي مش لازم يساوي صافي الربح ناقص مسحوباتك بالظبط.</p>${hist}` : '<p class="hint">لسه مفيش يوم خلص.</p>') + '</details>';
     if (!w) return `<div class="dy-card sv-money">${title}<p class="hint">الفلوس لليوم ده ما اتسجلتش.</p>${fold}</div>`;
-    const boxes = boxesOpen ? '<div class="sv-boxes">' + w.boxes.map((b) => `<label class="sv-box"><input type="checkbox" data-sv-box="${b.id}"${b.in ? ' checked' : ''}><bdi class="notr">${esc(b.name)}</bdi>${amount(b.bal)}</label>`).join('') +
+    const boxes = boxesOpen ? '<div class="sv-boxes">' + w.boxes.map((b) => `<label class="sv-box"><input type="checkbox" data-sv-box="${b.id}"${b.in ? ' checked' : ''}><span class="sv-bn"><bdi class="notr">${esc(b.name)}</bdi></span>${amount(b.bal)}</label>`).join('') +
       '<p class="hint">شيل العلامة من أي خزنة مش من فلوس الصيدلية. اختيارك بيتحفظ على الموبايل ده.</p></div>' : '';
     const apart = [...w.waste.map((s) => `<div class="sv-ml"><span><bdi class="notr">${esc(s.name)}</bdi></span>${amount(s.value)}</div>`), ...w.left.map((b) => `<div class="sv-ml"><span><bdi class="notr">${esc(b.name)}</bdi></span>${amount(b.bal)}</div>`)].join('');
     // the money carries its own moment: the same as the stock's, unless the last run could not read it

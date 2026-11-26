@@ -2856,7 +2856,7 @@ button.rv-opt.rv-opt-main { background: var(--rose); }
 #stockValPanel .sv-boxes { background: var(--rose); border-radius: 12px; padding: 4px 10px; margin: 4px 0 6px; }
 #stockValPanel .sv-box { display: flex; align-items: center; gap: 8px; padding: 6px 0; margin: 0; font-size: 13px; font-weight: 400; cursor: pointer; }
 #stockValPanel .sv-box input { width: 20px; height: 20px; min-height: 0; margin: 0; flex: none; accent-color: var(--crimson); }
-#stockValPanel .sv-box bdi.notr { flex: 1; overflow-wrap: anywhere; }
+#stockValPanel .sv-box .sv-bn { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 #stockValPanel .sv-apart { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
 #stockValPanel .sv-apart .sv-ml { border-bottom: 0; padding: 2px 2px 2px 0; font-size: 12.5px; }
 #stockValPanel .sv-idle { font-size: 12.5px; color: var(--muted); border-bottom: 0; }
