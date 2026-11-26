@@ -691,7 +691,10 @@
     $('veQ')?.addEventListener('input', (e) => find(e.target.value));
     window.addEventListener('popstate', () => { if (st || it) closeStatement(); });
   }
-  root.AskerVendors = { open, list: () => list, statement: (id) => openStatement(id) };
+  // from outside the screen («📊 التقارير», a home button): home = back to the suppliers list; findItem = «🔎 الصنف ده جه من مين؟» (its box is hidden until this runs)
+  const home = () => { if (st || it) closeStatement(); };
+  const findItem = () => { bind(); openItem(); };
+  root.AskerVendors = { open, list: () => list, statement: (id) => openStatement(id), home, findItem };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 })(typeof window === 'undefined' ? globalThis : window);

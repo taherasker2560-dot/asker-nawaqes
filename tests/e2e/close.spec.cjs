@@ -1,5 +1,5 @@
-// «🔒 تقفيل اليوم» (owner 2026-11-26, mockup day_close_2026-11-26, his «طيب كمل»): the drawer's closes from PharmaFly's shifts (day/day.json «closes», written by the laptop). The small tab in
-// «المبيعات»; the date bar; the day's shortage and what went into the main safe; one card per shift (a short one framed); the money out of the day; the thirty days with his own «big difference» line; a day
+// «🔒 تقفيل اليوم» (owner 2026-11-26, mockup day_close_2026-11-26, his «طيب كمل»): the drawer's closes from PharmaFly's shifts (day/day.json «closes», written by the laptop). A report of «📊 التقارير» (2026-11-27; before that a small tab in
+// «المبيعات»); the date bar; the day's shortage and what went into the main safe; one card per shift (a short one framed); the money out of the day; the thirty days with his own «big difference» line; a day
 // of that list opens; no file; no closes yet; a staff member. The server's file is played here. Made-up numbers and names only: the repository is public.
 const {run,assert}=require('./harness.cjs');
 const flat=(x)=>{const w=document.createTreeWalker(x,NodeFilter.SHOW_TEXT),a=[];let n;while((n=w.nextNode()))a.push(n.nodeValue);return a.join(' ').replace(/\s+/g,' ').trim()};
@@ -17,10 +17,10 @@ const seed=(page,{closes=true}={})=>page.evaluate(({closes})=>{
 },{closes});
 const openPage=async(page,o)=>{await seed(page,o);await page.evaluate(()=>window.AskerDay.load());await page.evaluate(()=>window.AskerApp.showTab('dayclose'));await page.waitForSelector('#closePanel:not(.hidden) #clMain > *')};
 
-run('Day close: the small tab, the date bar, the shortage, the main safe, the shift cards, the money out',async({page})=>{
+run('Day close: the way back to the reports, the date bar, the shortage, the main safe, the shift cards, the money out',async({page})=>{
  await openPage(page);
  await page.waitForSelector('#clMain .dy-grid');
- assert.equal(await txt(page,'.subbar[data-for="sales"] [data-tab="dayclose"]'),'🔒 التقفيل');
+ assert.ok(await page.isVisible('#rpBack'),'a report of «📊 التقارير»: the way back is on top');
  const today=await page.evaluate(()=>window.__today),yest=await page.evaluate(()=>window.__yesterday);
  assert.equal(await page.inputValue('#clDate'),today);
  assert.deepEqual(await all(page,'#clMain .dy-pick ~ .dy-line .dy-chip'),['النهارده','امبارح','من أسبوع']);

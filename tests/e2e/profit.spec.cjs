@@ -1,5 +1,5 @@
 // «💹 الربح والهامش» (owner 2026-11-25, mockup profit_page_2026-11-25, his «ا»): the profit of a period from the laptop's files in the private bucket asker-private/day (day.json = the days' own numbers,
-// p_<period>.json = the lists, d_<date>.json = a day's tickets). The small tab in «المبيعات»; the period chips and the month box; the profit, the margin, the net sales; the bar of each day (a tap opens that
+// p_<period>.json = the lists, d_<date>.json = a day's tickets). A report of «📊 التقارير» (2026-11-27); the period chips and the month box; the profit, the margin, the net sales; the bar of each day (a tap opens that
 // day); the lists (أكتر أصناف ربحًا، هامش ضعيف with his own line, تحت التكلفة، بيع بصفر سعر) each with a search box; an item opens its latest sales; a sale opens the whole invoice; back; no file; a staff member
 // who sees none. The server's files are played here. Made-up numbers and names only: the repository is public.
 const {run,assert}=require('./harness.cjs');
@@ -28,10 +28,9 @@ const seed=(page,{files=true}={})=>page.evaluate(({files})=>{
 },{files});
 const openPage=async(page,o)=>{await seed(page,o);await page.evaluate(()=>window.AskerDay.load());await page.evaluate(()=>window.AskerApp.showTab('profit'));await page.waitForSelector('#profitPanel:not(.hidden) .dy-grid')};
 
-run('Profit page: the small tab, the period chips and the month box, the three numbers, the bars, the pills, the period switch',async({page})=>{
+run('Profit page: the way back to the reports, the period chips and the month box, the three numbers, the bars, the pills, the period switch',async({page})=>{
  await openPage(page);
- assert.equal(await page.getAttribute('.subbar[data-for="sales"] [data-tab="profit"]','class').then((c)=>/chip/.test(c)),true,'the small tab is in «المبيعات»');
- assert.equal(await txt(page,'.subbar[data-for="sales"] [data-tab="profit"]'),'💹 الربح');
+ assert.ok(await page.isVisible('#rpBack'),'a report of «📊 التقارير»: the way back is on top');
  assert.deepEqual(await all(page,'#pfMain [data-pf-key]'),['٧ أيام','٣٠ يوم','٩٠ يوم']);
  assert.equal(await page.$eval('[data-pf-key="7"]',(b)=>b.classList.contains('on')),true,'7 days is the first view');
  const monthOpts=await all(page,'#pfMonth option');

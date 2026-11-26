@@ -225,10 +225,12 @@
   const GROUP_OF = {
     home: 'home',
     short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
-    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', sales: 'sales', tempsale: 'sales', day: 'sales', dayclose: 'sales', profit: 'sales', stockval: 'sales', care: 'care',
+    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', tempsale: 'sales', care: 'care',
+    // «📊 التقارير» (ar/reports.js, owner 2026-11-26): its page and the reports that are screens of their own; no button of the bar is lit on them
+    reports: 'reports', sales: 'reports', day: 'reports', dayclose: 'reports', profit: 'reports', stockval: 'reports',
   };
   const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
-  const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
+  const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care', reports: 'reports' };
   const lastPTab = { short: 'short', orders: 'drafts', stock: 'stock' };
   function showTab(tab) {
     // a staff member only reaches the sections open for him (the database refuses the rest anyway)
@@ -263,7 +265,7 @@
     // «🤖 الروبوت محتاج رأيك» (ar/robot.js, owner 2026-11-22): the robot's open questions at the top of «البيع المؤقت»
     if (tab === 'tempsale') window.AskerRobot?.open();
     // the sale (and later the stock count) takes the whole page: no search on top (owner 2026-11-13)
-    $('app')?.classList.toggle('focus', tab === 'tempsale' || tab === 'count');
+    $('app')?.classList.toggle('focus', tab === 'tempsale' || tab === 'count' || tab === 'reports');
     // and the sale's bill gets the most room: no data-age line there either (owner 2026-11-13 «في 2 سنتي»)
     document.body.classList.toggle('ts-page', tab === 'tempsale');
     $('carePanel')?.classList.toggle('hidden', tab !== 'care');
@@ -320,6 +322,10 @@
     // «العمليات» (ar/ops.js, owner 2026-11-15): what Adam recorded by voice
     $('opsPanel')?.classList.toggle('hidden', tab !== 'ops');
     if (tab === 'ops') window.AskerOps?.open();
+    // «📊 التقارير» (ar/reports.js, owner 2026-11-26): its page, and «‹ التقارير» on top of a report
+    $('reportsPanel')?.classList.toggle('hidden', tab !== 'reports');
+    if (tab === 'reports') window.AskerReports?.open();
+    window.AskerReports?.onTab?.(tab);
     // the 📌 «في الرئيسية» of this section (ar/shortcuts.js, owner 2026-11-15)
     window.AskerShortcuts?.onTab?.(tab);
   }

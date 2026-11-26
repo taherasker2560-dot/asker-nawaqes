@@ -45,15 +45,15 @@ run('home buttons: his own, up to 30, in his order; the 📌 inside a section',a
  // «الرسايل» has no small tabs: its 📌 sits on top of it
  await page.click('[data-group="care"]');assert.ok(await page.isVisible('#carePanel .qa-pin'));
  // at most 30 (2026-11-19, it was 12): a full home refuses the 31st with a note
- await page.evaluate(()=>localStorage.setItem('asker-home-buttons',JSON.stringify(AskerShortcuts.ALL.map(x=>x[0]).filter(x=>x!=='sales').slice(0,30))));
+ await page.evaluate(()=>localStorage.setItem('asker-home-buttons',JSON.stringify(AskerShortcuts.ALL.map(x=>x[0]).filter(x=>x!=='tempsale').slice(0,30))));
  await page.reload();await ready(page);
  assert.equal((await names(page,home)).length,30);
- await page.click('[data-group="sales"]');await page.click('[data-tab="sales"]');
+ await page.click('[data-group="sales"]');await page.click('[data-tab="tempsale"]');
  await page.click('.subbar[data-for="sales"] .qa-pin');
  assert.match(await page.textContent('#qaToast'),/مليانة \(30 زرار\)/);
  assert.equal((await names(page,home)).length,30);
  await page.click('[data-group="home"]');await page.click('#qaEdit');
- assert.ok(await page.$eval('#qaSheet [data-qa-flip="sales"]',b=>b.disabled),'«+ ضيف» is off while the home is full');
+ assert.ok(await page.$eval('#qaSheet [data-qa-flip="tempsale"]',b=>b.disabled),'«+ ضيف» is off while the home is full');
  // «رجّع الأصلي»: the six again
  await page.click('#qaReset');await page.click('#qaDone');
  assert.deepEqual(await names(page,home),['النواقص','الوارد','الطلبيات','الفواتير','البيع المؤقت','المخزون']);

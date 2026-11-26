@@ -45,7 +45,7 @@ run('Day page: the home card, the date bar, the four numbers, the boxes, the pur
  assert.match(await txt(page,'#dayCard'),/📅 النهارده لحد 8:28 م.*المبيعات 5,470 .*الربح \(تقريبي\) 190 21.1٪.*تفاصيل اليوم ←/);
  await page.click('#dayCard [data-go="day"]');
  await page.waitForSelector('#dayPanel:not(.hidden) .dy-grid');
- assert.equal(await page.getAttribute('.subbar[data-for="sales"] [data-tab="day"]','class').then((c)=>/chip/.test(c)),true,'the small tab is in «المبيعات»');
+ assert.ok(await page.isVisible('#rpBack'),'a report of «📊 التقارير»: the way back is on top');
  // the date bar: today, the picker, the quick days
  const today=await page.evaluate(()=>window.__today),yest=await page.evaluate(()=>window.__yesterday);
  assert.equal(await page.inputValue('#dyDate'),today);

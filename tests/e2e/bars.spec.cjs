@@ -30,21 +30,22 @@ run('bars: five spare buttons at the very bottom, under the bottom bar: empty sl
  // the row is the very bottom of the screen, the bottom bar sits right above it, and the header has no spare row any more
  const g=await page.evaluate(()=>{const r=(s)=>document.querySelector(s).getBoundingClientRect(),sp=r('#spareBar'),nav=r('.bottomnav'),hd=r('.appbar');return {spBottom:sp.bottom,spH:sp.height,navBottom:nav.bottom,spTop:sp.top,vh:window.innerHeight,inHead:!!document.querySelector('.appbar #spareBar'),hdH:hd.height}});
  assert.ok(Math.abs(g.spBottom-g.vh)<=1,'the spare row is the last thing at the bottom: '+g.spBottom+' of '+g.vh);assert.equal(Math.round(g.spH),56,'the row is 56px high');assert.ok(Math.abs(g.navBottom-g.spTop)<=1,'the bottom bar sits right on top of the row: '+g.navBottom+' vs '+g.spTop);assert.equal(g.inHead,false,'not in the header any more');assert.ok(g.hdH<130,'the header is slim again: '+g.hdH);
- assert.equal(await page.$$eval('#spareBar .sp-slot.on',n=>n.length),0,'all empty at first');
+ assert.deepEqual(await page.$$eval('#spareBar .sp-slot.on',n=>n.map(x=>x.textContent.trim())),['التقارير'],'only the sixth button (the reports, fixed) at first');
+ const mine='#spareBar .sp-slot.on:not(.sp-fix)';
  // an empty slot opens the picker; picking «الفواتير» fills it
  await page.click('#spareBar .sp-slot >> nth=2');assert.ok(await page.isVisible('#spSheet .qa-sheet-in'),'the picker opens');
  await page.click('#spSheet [data-sp-pick="docs"]');assert.ok(!(await page.isVisible('#spSheet .qa-sheet-in')),'and closes');
- assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-spare-buttons'))),[null,null,'docs',null,null],'kept on the phone');
- assert.match(await page.textContent('#spareBar .sp-slot.on'),/الفواتير/);
+ assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('asker-spare-buttons'))),['reports',null,'docs',null,null],'kept on the phone');
+ assert.match(await page.textContent(mine),/الفواتير/);
  // a tap opens the section
- await page.click('#spareBar .sp-slot.on');await page.waitForSelector('#docsPanel',{state:'visible'});
+ await page.click(mine);await page.waitForSelector('#docsPanel',{state:'visible'});
  // after a reload it is still there, and a long press changes it
  await page.reload();await ready(page);
- assert.equal(await page.$$eval('#spareBar .sp-slot.on',n=>n.length),1,'still there after a reload');
- const b=await page.locator('#spareBar .sp-slot.on').boundingBox();
+ assert.equal(await page.$$eval(mine,n=>n.length),1,'still there after a reload');
+ const b=await page.locator(mine).boundingBox();
  await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
  assert.ok(await page.isVisible('#spSheet .qa-sheet-in'),'a long press opens the picker');
- await page.click('#spClear');assert.equal(await page.$$eval('#spareBar .sp-slot.on',n=>n.length),0,'«فضّي الخانة» empties it');
+ await page.click('#spClear');assert.equal(await page.$$eval(mine,n=>n.length),0,'«فضّي الخانة» empties it');
  // a staff phone has no row
  await page.evaluate(()=>document.documentElement.classList.add('staff'));
  assert.ok(!(await page.isVisible('#spareBar')),'staff do not see the spare row');

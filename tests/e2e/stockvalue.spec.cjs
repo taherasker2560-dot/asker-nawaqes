@@ -1,4 +1,4 @@
-// «📦 قيمة المخزون» (owner 2026-11-26, «ا، ابعتها» on the mockup): the tab in «المبيعات»; the main store on his law with the public price beside it, the other stores, the waiting stores together; the other
+// «📦 قيمة المخزون» (owner 2026-11-26, «ا، ابعتها» on the mockup): a report of «📊 التقارير» (2026-11-27); the main store on his law with the public price beside it, the other stores, the waiting stores together; the other
 // basis (PharmaFly's average) named and framed, and the law again on the next opening; the main store day by day, a day opening its own stores; no file; a staff member sees none. The server's file is
 // played here. Made-up numbers and names only: the repository is public.
 const {run,assert}=require('./harness.cjs');
@@ -12,9 +12,9 @@ const seed=(page)=>page.evaluate(()=>{
 });
 const openPage=async(page)=>{await seed(page);await page.evaluate(()=>window.AskerApp.showTab('stockval'));await page.waitForSelector('#stockValPanel:not(.hidden) .sv-tbl')};
 
-run('Stock value: the tab, the main store on the law with the public price, the other and waiting stores, the other basis, a past day',async({page})=>{
+run('Stock value: the way back to the reports, the main store on the law with the public price, the other and waiting stores, the other basis, a past day',async({page})=>{
  await openPage(page);
- assert.equal(await txt(page,'.subbar[data-for="sales"] [data-tab="stockval"]'),'📦 قيمة المخزون');
+ assert.ok(await page.isVisible('#rpBack'),'a report of «📊 التقارير»: the way back is on top');
  assert.deepEqual(await all(page,'#svMain [data-sv-basis]'),['آخر شرا (قانونك)','متوسط تكلفة فارمافلاي']);
  assert.equal(await page.$eval('[data-sv-basis="law"]',(b)=>b.classList.contains('on')),true,'it opens on his law');
  assert.match(await txt(page,'#svMain .dy-stamp'),/^حسب بيانات فارما فلاي لحد .* 26 .*10:25 م كل الكمية متسعّرة بتكلفة آخر شرا للصنف$/);

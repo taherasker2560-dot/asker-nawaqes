@@ -2833,3 +2833,15 @@ button.rv-opt.rv-opt-main { background: var(--rose); }
 #stockValPanel .sv-day.sv-on { border: 1.5px solid var(--crimson); }
 #stockValPanel .sv-down { color: var(--bad, #a3162f); }
 #stockValPanel .sv-up { color: var(--muted); }
+/* «📊 التقارير» (owner 2026-11-26, ar/reports.js): the reports in four groups of soft cards, two a row; «‹ التقارير» on top of a report; the sixth button (the first slot under the bar) is framed */
+#reportsPanel h3.rp-g { margin: 14px 2px 7px; font-size: 13px; color: var(--muted); font-weight: 700; }
+#reportsPanel h3.rp-g:first-child { margin-top: 2px; }
+#reportsPanel .rp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#reportsPanel button.rp-card { display: flex; gap: 9px; align-items: center; justify-content: flex-start; text-align: start; width: 100%; min-width: 0; margin: 0; min-height: 60px; padding: 9px 10px; border: 1px solid var(--line) !important; border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: none; font: inherit; cursor: pointer; }
+#reportsPanel .rp-card svg { width: 22px; height: 22px; flex: none; color: var(--crimson); }
+#reportsPanel .rp-card span { display: block; min-width: 0; }
+#reportsPanel .rp-card b { display: block; font-size: 13.5px; line-height: 1.4; }
+#reportsPanel .rp-card small { display: block; font-size: 11px; line-height: 1.5; color: var(--muted); font-weight: 400; }
+.rp-back { margin: 0 0 8px; }
+.rp-back button { width: auto; margin: 0; min-height: 0; padding: 6px 14px; border-radius: 999px; border: 1.5px solid var(--crimson); background: var(--card); color: var(--crimson-ink); font: inherit; font-size: 13px; font-weight: 700; box-shadow: none; }
+#spareBar .sp-slot.on.sp-fix { border: 1.5px solid var(--crimson); }
