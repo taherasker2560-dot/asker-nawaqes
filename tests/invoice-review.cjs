@@ -114,7 +114,7 @@ assert.deepEqual(L.buyRef({ ref_id: 'robot:off' }), { card: '', kind: 'off' });
 assert.deepEqual(L.buyStops([stop(8, 'robot:off', { job: 'purchases_wait' }), stop(9, 'card:9:stop', { status: 'answered' }), stop(10, 'card:10:needs_helper')]).map((s) => s.id), [9, 10, 8]);
 assert.ok(L.BUY_HEAD.off);
 // the laptop's lines: why, who has it, nothing saved, the picture of PharmaFly's screen
-assert.deepEqual(L.stopParts({ details: 'وقف عند التاريخ\nالمساعد: مش شغال من 10:41 ص\nSAFE:1\nSHOT:robot/stop_40_20261126132900.jpg' }), { why: 'وقف عند التاريخ', who: 'المساعد: مش شغال من 10:41 ص', safe: true, shot: 'robot/stop_40_20261126132900.jpg' });
+assert.deepEqual(L.stopParts({ details: 'وقف عند التاريخ\nالمساعد: مش شغال من 10:41 ص\nSAFE:1\nSHOT:robot/stop_40_20261126132900.json' }), { why: 'وقف عند التاريخ', who: 'المساعد: مش شغال من 10:41 ص', safe: true, shot: 'robot/stop_40_20261126132900.json' });
 assert.deepEqual(L.stopParts({ details: 'السطر 7\nمحادثة الفواتير ماسكاها ✓' }), { why: 'السطر 7', who: 'محادثة الفواتير ماسكاها ✓', safe: false, shot: '' }, 'an old card (no machine lines) reads as before');
 assert.equal(L.stopParts({ details: 'x\nSHOT:../secret/file.jpg' }).shot, '', 'only a picture in robot/ is ever asked for');
 assert.equal(L.stopParts({ details: 'x\nSHOT:robot/a/b.jpg' }).shot, '');

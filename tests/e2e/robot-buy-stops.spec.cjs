@@ -66,9 +66,9 @@ run('Purchase robot stops answered from the page: what happened, nothing saved, 
  await seed(page);
  await page.evaluate(()=>{
   const at=(m)=>new Date(Date.now()-m*60000).toISOString();
-  window.__storage['robot/stop_31_20261126132900.jpg']='picture';
+  window.__storage['robot/stop_31_20261126132900.json']=JSON.stringify({type:'image/jpeg',b64:'cGljdHVyZQ=='});
   window.__tables.ar_robot_reports=[
-   {id:31,created_at:at(5),job:'purchases',ref_id:'card:31:stop',title:'مورد أ 900001',details:'التاريخ اتكتب غلط\nالمساعد: مش شغال من 10:41 ص\nSAFE:1\nSHOT:robot/stop_31_20261126132900.jpg',status:'open',
+   {id:31,created_at:at(5),job:'purchases',ref_id:'card:31:stop',title:'مورد أ 900001',details:'التاريخ اتكتب غلط\nالمساعد: مش شغال من 10:41 ص\nSAFE:1\nSHOT:robot/stop_31_20261126132900.json',status:'open',
     options:[{key:'retry',label:'🔁 جرّب تاني'},{key:'manual',label:'🙋 أنا هدخلها بإيدي'},{key:'helper',label:'🧑‍💻 ابعتها للمساعد'},{key:'off',label:'⏸️ وقّف الروبوت'}]},
    {id:32,created_at:at(3),job:'purchases_wait',ref_id:'robot:off',title:'الروبوت',details:'مفيش فاتورة هتتكتب لوحدها.',status:'open',options:[{key:'on',label:'▶️ شغّل الروبوت'}]}];
   window.__answers=[];
@@ -79,6 +79,7 @@ run('Purchase robot stops answered from the page: what happened, nothing saved, 
  assert.match((await texts(page,first))[0],/🤖 الروبوت وقف عند فاتورة مورد أ 900001 التاريخ اتكتب غلط المساعد: مش شغال من 10:41 ص ✓ ما اتحفظش حاجة في فارمافلاي/);
  assert.equal(await page.$$eval(first+' .rv-who-off',x=>x.length),1,'the helper that is off is marked');
  await page.waitForSelector(first+' .rv-snap img',{state:'attached'});
+ assert.equal(await page.$eval(first+' .rv-snap img',x=>x.getAttribute('src')),'data:image/jpeg;base64,cGljdHVyZQ==','the picture comes out of its JSON');
  assert.deepEqual(await page.$$eval(first+' .rv-opt b',x=>x.map(e=>e.textContent)),['🔁 جرّب تاني','🙋 أنا هدخلها بإيدي','🧑‍💻 ابعتها للمساعد','⏸️ وقّف الروبوت']);
  assert.match((await texts(page,first+' .rv-opt small'))[0],/أول ما شاشة المشتريات تتقفل/);
  // the picture opens big and closes

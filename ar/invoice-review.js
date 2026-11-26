@@ -476,7 +476,8 @@
     for (const s of list) {
       const p = stopParts(s).shot;
       if (!p || snaps[p] || !db().storage) continue;
-      try { const { data: blob, error } = await db().storage.from('asker-private').download(p); if (!error && blob) snaps[p] = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: 'image/jpeg' })); } catch (e) { /* the card still says what happened */ }
+      // the bucket takes no image files: the laptop puts the jpg inside a JSON {type, b64} (Hub\purchase_entry\ROBOT_REPORT.ps1 Send-StopShot)
+      try { const { data: blob, error } = await db().storage.from('asker-private').download(p); if (!error && blob) { const j = JSON.parse(await blob.text()); if (j && j.type === 'image/jpeg' && /^[A-Za-z0-9+/]+=*$/.test(j.b64 || '')) snaps[p] = 'data:image/jpeg;base64,' + j.b64; } } catch (e) { /* the card still says what happened */ }
     }
   }
   function draw() {
