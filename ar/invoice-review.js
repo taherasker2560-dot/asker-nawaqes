@@ -210,8 +210,12 @@
     // the camera, and the phone's own photos next to it (owner 2026-11-23: «عايز كمان ادوس على الكاميرا ديت يفتح لي تحميل، ممكن احملها من الستور من عندي»):
     // the same input with no «capture», so the phone offers its gallery / files
     const pick = (label, camera) => `<label class="rv-ni-cam${camera ? '' : ' rv-ni-pick'}">${label}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ' data-rv-pick'} hidden data-rv-cam="${esc(k)}"></label>`;
-    const cam = (label) => wait ? `<span class="rv-ni-two">${pick(label, true)}${pick('🖼 من الصور', false)}</span>` : '';
-    if (!s) return wait ? `<div class="rv-ni">${cam('📷 صوّر العلبة')}</div>` : '';
+    // the camera stays after he approves, until the new card exists (2026-11-26, card 41: «مش لاقى مكان ادخل فيه صور الاصناف الجديده»).
+    // «تمام» / «غيّر الاسم» (and taking a kept name back) write on the invoice row, which is his until the laptop starts it (RLS: ready / held / approved)
+    const editable = wait || r.status === 'approved';
+    const shoot = wait || (LAPTOP.includes(r.status) && !niCodeOf(r, l) && (editable || !answersOf(r)['N' + l.n]));
+    const cam = (label) => shoot ? `<span class="rv-ni-two">${pick(label, true)}${pick('🖼 من الصور', false)}</span>` : '';
+    if (!s) return shoot ? `<div class="rv-ni">${cam('📷 صوّر العلبة')}</div>` : '';
     if (s.status === 'sending' || s.status === 'pending' || s.status === 'reading') {
       return `<div class="rv-ni"><div class="rv-ni-wait">📷 ${s.status === 'sending' ? 'ببعت الصورة…' : 'الصورة وصلت… بيقرا العلبة'}${s.late ? ' (لو طوّل: اللاب ممكن يكون مقفول)' : ''}</div></div>`;
     }
@@ -223,11 +227,11 @@
     const meta = [res.form, Number(res.count) > 0 ? `العلبة فيها ${res.count}` : '', res.company, Number(res.price) > 0 ? `السعر على العلبة ${money(res.price)}` : 'السعر مش على العلبة']
       .filter(Boolean).map((x) => `<span class="notr">${esc(x)}</span>`).join(' · ');
     const code = niCodeOf(r, l);
-    const edit = niEdit === k && wait
+    const edit = niEdit === k && editable
       ? `<div class="rv-ni-edit"><input type="text" dir="ltr" maxlength="120" autocapitalize="characters" value="${esc(name)}" data-rv-niname="${esc(k)}" aria-label="اسم الصنف"><button type="button" class="rv-yes on" data-rv-nisave="${esc(k)}">احفظ</button></div>`
       : '';
-    const btns = wait && niEdit !== k
-      ? `<div class="rv-nb rv-ni-b"><button type="button" class="rv-yes${mine ? ' on' : ''}" data-rv-niok="${esc(k)}">تمام</button><button type="button" data-rv-niedit="${esc(k)}">غيّر الاسم</button>${cam('📷 تاني')}</div>`
+    const btns = niEdit !== k && (editable || shoot)
+      ? `<div class="rv-nb rv-ni-b">${editable ? `<button type="button" class="rv-yes${mine ? ' on' : ''}" data-rv-niok="${esc(k)}">تمام</button><button type="button" data-rv-niedit="${esc(k)}">غيّر الاسم</button>` : ''}${cam('📷 تاني')}</div>`
       : '';
     return `<div class="rv-ni"><div class="rv-ni-read">${pic ? `<img class="rv-ni-ph" alt="" src="${esc(pic)}">` : '<span class="rv-ni-ph">📷</span>'}<div class="rv-ni-m">` +
       `<b class="notr" dir="ltr">${esc(name)}</b><small>${meta}</small>` +
@@ -345,7 +349,11 @@
   }
   // a cosmetics invoice (his mockup): the lines that need his price as a list of boxes (name, the cost, the public price), Enter goes to the next; the rest folded «زي آخر مرة»
   function compactHtml(r) {
-    const locked = !WAITING.includes(r.status), asks = askLines(r), rest = linesOf(r).filter((l) => l.ask !== 'price');
+    const locked = !WAITING.includes(r.status), asks = askLines(r), other = linesOf(r).filter((l) => l.ask !== 'price');
+    // a new item is never folded under «زي آخر مرة»: its own list, each with its box photo (card 41, 2026-11-26)
+    const news = other.filter((l) => !l.id), rest = other.filter((l) => l.id);
+    const sameRow = (l, extra) => `<div class="rv-sr${rejected(r, l) ? ' rv-rejd' : ''}${flagged(r, l) ? ' rv-flag' : ''}" data-line="${esc(l.n)}"><div class="rv-nm"><b class="notr">${esc(l.name || l.paper)}</b><small>${moveHtml(l)} · ${expHtml(r, l)}</small>${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
+      `<div class="rv-cost" dir="ltr">${esc(money(l.net != null ? l.net : Number(l.total) / (Number(l.qty) || 1)))}</div><div class="rv-cost rv-pc" dir="ltr">${esc(l.card || l.price || l.pub || '')}</div>${extra || ''}</div>`;
     let h = '';
     if (asks.length) {
       const left = openPrices(r).length;
@@ -361,11 +369,11 @@
             (ch && !rej ? `<div class="rv-chg">${card ? `الكارت هيتغير: <span dir="ltr">${esc(card)} ← ${esc(ch)}</span>` : `سعره: <span dir="ltr">${esc(ch)}</span>`}</div>` : '') + niHtml(r, l) + '</div>';
         }).join('');
     }
+    if (news.length) h += `<h4 class="rv-ph4">أصناف جديدة (${esc(news.length)})</h4>` + news.map((l) => sameRow(l, niHtml(r, l))).join('');
     if (rest.length) {
       const near = rest.filter((l) => expKind(l.exp) || rejected(r, l) || flagged(r, l)).length;
-      h += `<details class="rv-same"${near || !asks.length ? ' open' : ''}><summary>زي آخر مرة (${esc(rest.length)}) <span>${near ? `فيه ${esc(near)} صلاحية قريبة` : 'سعر الكارت فاضل زي ما هو'}</span></summary>` +
-        rest.map((l) => `<div class="rv-sr${rejected(r, l) ? ' rv-rejd' : ''}${flagged(r, l) ? ' rv-flag' : ''}"><div class="rv-nm"><b class="notr">${esc(l.name || l.paper)}</b><small>${moveHtml(l)} · ${expHtml(r, l)}</small>${l.info ? `<small class="rv-info notr">${esc(l.info)}</small>` : ''}</div>` +
-          `<div class="rv-cost" dir="ltr">${esc(money(l.net != null ? l.net : Number(l.total) / (Number(l.qty) || 1)))}</div><div class="rv-cost rv-pc" dir="ltr">${esc(l.card || l.price || l.pub || '')}</div></div>`).join('') + '</details>';
+      h += `<details class="rv-same"${near || !(asks.length || news.length) ? ' open' : ''}><summary>زي آخر مرة (${esc(rest.length)}) <span>${near ? `فيه ${esc(near)} صلاحية قريبة` : 'سعر الكارت فاضل زي ما هو'}</span></summary>` +
+        rest.map((l) => sameRow(l)).join('') + '</details>';
     }
     return h;
   }
