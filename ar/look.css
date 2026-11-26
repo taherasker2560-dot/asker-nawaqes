@@ -2811,3 +2811,7 @@ button.rv-opt.rv-opt-main { background: var(--rose); }
 #profitPanel .pf-total { border-top: 2px solid var(--crimson); margin-top: 4px; padding-top: 8px; font-weight: 800; font-size: 14.5px; }
 #profitPanel .pf-total b { font-size: 19px; }
 #profitPanel .pf-total b.dy-neg { color: var(--bad, #a3162f); }
+/* «احسب على» (owner 2026-11-26): the basis chips; while he looks at another basis than his law the head card is framed, so it can never pass for the law's numbers */
+#profitPanel .pf-basis { margin-top: 8px; align-items: center; }
+#profitPanel .pf-by { color: var(--muted); font-size: 12.5px; }
+#profitPanel .dy-card.pf-other { border: 1.5px solid var(--crimson); background: var(--rose); }

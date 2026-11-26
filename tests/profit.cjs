@@ -17,6 +17,37 @@ assert.equal(data.days[0].itemsRevenue, 1800);
 assert.equal(data.days[0].cost, 1390);
 assert.equal(D.parse({ days: { '2026-11-25': { date: '2026-11-25' } } }).days[0].itemsRevenue, 0, 'a missing number is 0');
 
+// «احسب على» (owner 2026-11-26): his law is the default; the other basis is PharmaFly's own cost, read from each day's `pf`; a day without it is counted, never guessed
+{
+  const two = {}; for (let i = 0; i < 7; i++) { const k = D.addDays('2026-11-25', -i); two[k] = mk(k, { pf: { cost: 650, profit: 240, below: i === 0 ? 2 : 0, no_cost: i === 0 ? 3 : 0, free_cost: 5 } }); }
+  const both = D.parse({ today: '2026-11-25', days: two });
+  const law = P.totals(both, '7'), other = P.totals(both, '7', 'pf');
+  assert.deepEqual([law.profit, law.cost, law.fb, law.free.cost, law.missing], [1330, 4900, 7, 350, 0], 'with no basis named: the law, untouched');
+  assert.deepEqual(P.totals(both, '7', 'law'), law);
+  assert.deepEqual([other.profit, other.cost, other.fb, other.free.cost, other.missing, other.rev, other.sales], [1680, 4550, 3, 35, 0, law.rev, law.sales], 'the same sales, the other cost');
+  assert.equal(other.margin, Math.round((1680 / (6300 - 70)) * 1000) / 10);
+  assert.deepEqual(P.chart(both, '7', 'pf').map((x) => x.v), [240, 240, 240, 240, 240, 240, 240]);
+  assert.deepEqual(P.chart(both, '7').map((x) => x.v), [190, 190, 190, 190, 190, 190, 190]);
+  delete two['2026-11-20'].pf;
+  assert.equal(P.totals(D.parse({ today: '2026-11-25', days: two }), '7', 'pf').missing, 1, 'a day the laptop has not worked out');
+  assert.equal(D.parse({ days: { '2026-11-25': { date: '2026-11-25' } } }).days[0].pf, null);
+  const file = P.parse({ items: [{ n: 'A', q: 1, rev: 10, cost: 6, profit: 4 }], pf: { missing: 0, items: [{ n: 'A', q: 1, rev: 10, cost: 7, profit: 3 }], below: { n: 1, loss: 2, lines: [] } } });
+  assert.equal(P.listsOf(file, 'law').items[0].cost, 6);
+  assert.equal(P.listsOf(file, 'pf').items[0].cost, 7);
+  assert.equal(P.listsOf(file, 'pf').below.n, 1);
+  assert.equal(P.listsOf(P.parse({ items: [], pf: { missing: 2, items: [] } }), 'pf'), null, 'lists that miss days are not shown');
+  assert.equal(P.listsOf(P.parse({ items: [] }), 'pf'), null, 'an older file has no other basis');
+  assert.equal(P.listsOf(null, 'pf'), null);
+  const sale = { k: 's' };
+  assert.equal(P.underCost(sale, { bc: false, q: 1, pr: 10, k: 12 }, 'law'), false, 'under the law the laptop\'s flag stands');
+  assert.equal(P.underCost(sale, { bc: false, q: 1, pr: 10, k: 12 }, 'pf'), true);
+  assert.equal(P.underCost(sale, { bc: true, q: 1, pr: 10, k: 9 }, 'pf'), false);
+  assert.equal(P.underCost({ k: 'r' }, { q: 1, pr: 10, k: 12 }, 'pf'), false, 'a return is not a sale under cost');
+  assert.equal(P.underCost(sale, { q: 1, pr: 0, k: 12, fr: true }, 'pf'), false);
+  assert.equal(P.underCost(sale, { q: 1, pr: 10, k: null }, 'pf'), false, 'an older line with no number is not flagged');
+  assert.deepEqual(P.BASES.map((x) => x[0]), ['law', 'pf']);
+}
+
 // the periods: the last N days up to today; a month = its days that the 90-day window holds
 assert.deepEqual(P.range(data, '7'), { from: '2026-11-19', to: '2026-11-25' });
 assert.deepEqual(P.range(data, '30'), { from: '2026-10-27', to: '2026-11-25' });
@@ -132,7 +163,8 @@ assert.deepEqual(P.searchMoves(S.heads[0].moves, '2026-11-20').map((m) => m.v), 
 // the English: every fixed word, and the lines made of words + numbers
 for (const s of P.WORDS) assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s));
 for (const s of ['الفترة من الأربعاء 19 نوفمبر إلى الأربعاء 25 نوفمبر', '7 يوم', '3 سطر اتحسب بتكلفة الكارت (مفيش شرا قبله)', 'تحت التكلفة 3', 'بيع بصفر سعر 28 · تكلفتها 1,745', '10 علبة · هامش 30%', 'تكلفة آخر شرا 70', 'تذكرة 5 · 2 × 95',
-  '3 سطر · ظاهر أحدث 300 بيعة بس', 'خسارة 30', 'تكلفتها 250', 'نوفمبر 2026', 'الأصناف دي في الفترة · الربح قبل خصم التذكرة', 'الهامش أقل من', '21 حركة']) {
+  '3 سطر · ظاهر أحدث 300 بيعة بس', 'خسارة 30', 'تكلفتها 250', 'نوفمبر 2026', 'الأصناف دي في الفترة · الربح قبل خصم التذكرة', 'الهامش أقل من', '21 حركة',
+  'الأساس ده لسه بيتجهز على اللاب · 12 يوم لسه من الفترة دي', '4 سطر من غير تكلفة، اتحسب بآخر شرا', '10 علبة · هامش 30% تكلفة فارمافلاي 70']) {
   assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s));
 }
 console.log('PASS: profit: the periods, the headline numbers, the bars, the period file, the thin margins, the searches, the English');

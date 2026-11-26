@@ -32,7 +32,7 @@ run('Profit page: the small tab, the period chips and the month box, the three n
  await openPage(page);
  assert.equal(await page.getAttribute('.subbar[data-for="sales"] [data-tab="profit"]','class').then((c)=>/chip/.test(c)),true,'the small tab is in «المبيعات»');
  assert.equal(await txt(page,'.subbar[data-for="sales"] [data-tab="profit"]'),'💹 الربح');
- assert.deepEqual(await all(page,'#pfMain .dy-chip'),['٧ أيام','٣٠ يوم','٩٠ يوم']);
+ assert.deepEqual(await all(page,'#pfMain [data-pf-key]'),['٧ أيام','٣٠ يوم','٩٠ يوم']);
  assert.equal(await page.$eval('[data-pf-key="7"]',(b)=>b.classList.contains('on')),true,'7 days is the first view');
  const monthOpts=await all(page,'#pfMonth option');
  assert.equal(monthOpts[0],'شهر معيّن');
@@ -181,6 +181,57 @@ run('Profit page: more than a page of moves is all counted; a server that does n
  assert.equal(await page.$('#pfMain .pf-total'),null,'no net without its expenses');
  assert.equal(await page.$('#pfMain .pf-own'),null);
  await page.evaluate(()=>localStorage.removeItem('__fakeFail'));
+});
+
+// «احسب على» (owner 2026-11-26): the page opens on his law; the other basis is only what he picks, framed and named, and a half-built basis shows no number
+const otherBasis=(page,{gap=false}={})=>page.evaluate(({gap})=>{
+ const doc=JSON.parse(window.__storage['day/day.json']),keys=Object.keys(doc.days).sort().reverse();
+ keys.forEach((k,i)=>{doc.days[k].pf={cost:650,profit:240+i,below:i===0?1:0,no_cost:i===0?3:0,free_cost:i===0?4:0}});
+ if(gap)delete doc.days[keys[2]].pf;
+ window.__storage['day/day.json']=JSON.stringify(doc);
+ for(const n of ['day/p_7.json','day/p_30.json']){const f=JSON.parse(window.__storage[n]),a=f.items[0];
+  f.pf={missing:gap?1:0,items:[Object.assign({},a,{cost:800,profit:200,margin:20})],low:[],below:{n:1,loss:3,lines:[{d:window.__today,tk:3,t:'14:20',n:'ITEM B',q:0.5,pr:400,c:406}]},free:{lines:1,cost:4,items:[]}};
+  window.__storage[n]=JSON.stringify(f);}
+ const d=JSON.parse(window.__storage['day/d_'+window.__today+'.json']);d.v=3;d.tickets[0].lines[0].k=406;d.tickets[0].lines[1].k=90;window.__storage['day/d_'+window.__today+'.json']=JSON.stringify(d);
+},{gap});
+run('Profit page: «احسب على» — the law first, the other basis named and framed, its numbers, lists and invoice flags, and the law again on the next opening',async({page})=>{
+ await seed(page);await otherBasis(page);
+ await page.evaluate(()=>window.AskerDay.load());await page.evaluate(()=>window.AskerApp.showTab('profit'));await page.waitForSelector('#profitPanel:not(.hidden) .dy-grid');
+ assert.deepEqual(await all(page,'#pfMain [data-pf-basis]'),['آخر شرا (قانونك)','تكلفة فارمافلاي']);
+ assert.equal(await page.$eval('[data-pf-basis="law"]',(b)=>b.classList.contains('on')),true,'it opens on his law');
+ assert.match((await all(page,'.dy-grid .dy-k'))[0],/^الربح 1,351 /);
+ assert.equal(await page.$('#pfMain .dy-card.pf-other'),null);
+ await page.click('[data-pf-basis="pf"]');
+ assert.match((await all(page,'.dy-grid .dy-k'))[0],/^الربح 1,701 7 يوم$/);
+ assert.match((await all(page,'.dy-grid .dy-k'))[1],/^الهامش 27.4% /);
+ assert.match(await txt(page,'#pfMain .dy-card.pf-other'),/إنت شايف على تكلفة فارمافلاي، مش على آخر شرا الرقم اللي فارمافلاي كتبه على سطر البيع ساعتها \(غالبًا متوسط التكلفة\)/);
+ assert.match(await txt(page,'#pfMain'),/3 سطر من غير تكلفة، اتحسب بآخر شرا/);
+ assert.match(await txt(page,'.pf-bars'),/240/);
+ await page.click('[data-pf-open="top"]');await page.waitForSelector('#pfSearch');
+ assert.match((await all(page,'#pfRows .dy-tk'))[0],/^200 ITEM A 10MG 10 علبة · هامش 20% تكلفة فارمافلاي 80$/);
+ assert.match(await txt(page,'#pfMain'),/إنت شايف على تكلفة فارمافلاي/);
+ await page.click('[data-pf-back]');
+ // the invoice under the other basis: its own flags (ITEM B sold 400 under 406; ITEM C 95 over 90)
+ await page.click('[data-pf-open="below"]');await page.click('#pfRows .dy-tk');await page.waitForSelector('#pfMain table');
+ assert.match(await txt(page,'#pfMain table'),/ITEM B · بأقل من التكلفة/);
+ assert.doesNotMatch(await txt(page,'#pfMain table'),/ITEM C · بأقل من التكلفة/);
+ await page.click('[data-pf-back]');await page.click('[data-pf-back]');
+ await page.click('[data-pf-basis="law"]');
+ assert.match((await all(page,'.dy-grid .dy-k'))[0],/^الربح 1,351 /);
+ await page.click('[data-pf-basis="pf"]');
+ await page.evaluate(()=>window.AskerApp.showTab('home'));await page.evaluate(()=>window.AskerApp.showTab('profit'));
+ await page.waitForFunction(()=>document.querySelector('[data-pf-basis="law"]')?.classList.contains('on'));
+ assert.match((await all(page,'.dy-grid .dy-k'))[0],/^الربح 1,351 /,'opened again: his law');
+});
+run('Profit page: «احسب على» — a period the laptop has not finished shows no number on the other basis, the law is whole',async({page})=>{
+ await seed(page);await otherBasis(page,{gap:true});
+ await page.evaluate(()=>window.AskerDay.load());await page.evaluate(()=>window.AskerApp.showTab('profit'));await page.waitForSelector('#profitPanel:not(.hidden) .dy-grid');
+ await page.click('[data-pf-basis="pf"]');
+ assert.match(await txt(page,'#pfMain'),/الأساس ده لسه بيتجهز على اللاب · 1 يوم لسه من الفترة دي/);
+ assert.equal(await page.$('#pfMain .dy-grid'),null,'no half total');
+ assert.equal(await page.$('#pfMain .pf-net'),null);
+ await page.click('[data-pf-basis="law"]');
+ assert.match((await all(page,'.dy-grid .dy-k'))[0],/^الربح 1,351 /);
 });
 
 run('Profit page: a staff member sees nothing',async({page})=>{
