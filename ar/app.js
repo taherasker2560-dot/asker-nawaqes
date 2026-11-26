@@ -225,7 +225,7 @@
   const GROUP_OF = {
     home: 'home',
     short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
-    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', sales: 'sales', tempsale: 'sales', day: 'sales', dayclose: 'sales', profit: 'sales', care: 'care',
+    customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', sales: 'sales', tempsale: 'sales', day: 'sales', dayclose: 'sales', profit: 'sales', stockval: 'sales', care: 'care',
   };
   const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care' };
@@ -302,6 +302,9 @@
     // «💹 الربح والهامش» (ar/profit.js, owner 2026-11-25): the profit of a period and the lists behind it; owner only
     $('profitPanel')?.classList.toggle('hidden', tab !== 'profit');
     if (tab === 'profit') window.AskerProfit?.open();
+    // «📦 قيمة المخزون» (ar/stockvalue.js, owner 2026-11-26): what the stock is worth, store by store and day by day; owner only
+    $('stockValPanel')?.classList.toggle('hidden', tab !== 'stockval');
+    if (tab === 'stockval') window.AskerStockValue?.open();
     // «🔒 تقفيل اليوم» (ar/close.js, owner 2026-11-26): the drawer's closes shift by shift; owner only
     $('closePanel')?.classList.toggle('hidden', tab !== 'dayclose');
     if (tab === 'dayclose') window.AskerClose?.open();
