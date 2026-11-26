@@ -14,7 +14,8 @@ for (const x of S.ALL) {
   assert.match(x[3], /^[MmLlHhVvCcSsAaZz0-9 .,\-]+$/, 'an icon path: ' + x[0]);
 }
 // the screens inside a section name the section they open and the block they scroll to; both are in the page
-const tabs = new Set([...html.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]).concat(['home', 'care']));
+// «📊 التقارير» and the report screens of their own (2026-11-27) have no small tab: they open from that page (ar/reports.js; tests/reports.cjs checks the app knows them)
+const tabs = new Set([...html.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]).concat(['home', 'care', 'reports'], require('../ar/reports.js').OWN));
 let inside = 0;
 for (const x of S.ALL) {
   const [id, , , , tab, anchor, app] = x;

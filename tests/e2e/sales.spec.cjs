@@ -18,8 +18,8 @@ const setData=(page)=>page.evaluate(([s,i])=>{window.__tables.ar_sales=s;window.
 const ids=(page)=>page.$$eval('#saList [data-sa-inv]',x=>x.map(e=>+e.dataset.saInv));
 run('Sales activity: the day, the bars, the invoices, cash / credit / returns, an item, a customer',async({page})=>{
  await setData(page);
- await page.click('[data-group="sales"]');
- await page.click('.subbar[data-for="sales"] [data-tab="sales"]');
+ await page.click('#spareBar .sp-slot >> nth=0');
+ await page.click('#rpMain [data-rp="sales"]');
  await page.waitForSelector('#saSum .sa-s');
  // today: sales 455 in 3 invoices = cash 174 (2) + credit 281 (1); one return −116
  assert.deepEqual(await page.$$eval('#saSum .sa-s',x=>x.map(e=>e.textContent.replace(/\s+/g,' ').trim())),
@@ -93,7 +93,7 @@ run('Sales activity: the day, the bars, the invoices, cash / credit / returns, a
 run('Sales activity: a cash return says cash return, a credit return says credit return and the customer',async({page})=>{
  const R=[{id:6002,at:at(0,14,5),customer_id:7,kind:'return',total:-165,lines:[{i:102,p:1,u:0,k:3,s:165,d:0}]},{id:6001,at:at(0,13,40),customer_id:null,kind:'return',total:-116,lines:[{i:101,p:1,u:0,k:2,s:116,d:0}]}];
  await page.evaluate(([s,i])=>{window.__tables.ar_sales=s;window.__tables.ar_store_items=i;window.__tables.ar_customers=[{id:7,name:'عميل تجربة واحد'}]},[R,ITEMS]);
- await page.click('[data-group="sales"]');await page.click('.subbar[data-for="sales"] [data-tab="sales"]');await page.waitForSelector('#saList [data-sa-inv]');
+ await page.click('#spareBar .sp-slot >> nth=0');await page.click('#rpMain [data-rp="sales"]');await page.waitForSelector('#saList [data-sa-inv]');
  assert.match(await text(page,'[data-sa-inv="6002"]'),/فاتورة رقم 6,002 مرتجع آجل · عميل تجربة واحد ?-165/);
  assert.match(await text(page,'[data-sa-inv="6001"]'),/فاتورة رقم 6,001 مرتجع نقدي ?-116/);
  assert.equal(await page.$$eval('#saList .sa-tag.ret',x=>x.length),2);

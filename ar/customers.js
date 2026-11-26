@@ -1110,13 +1110,19 @@
     drawList();
     if (st) drawStatement();
   }
+  // the list on a chosen filter, from outside the screen (the home's «محتاج شغل», a card of «📊 التقارير»): the search emptied, an open statement closed
+  function presetView(v) {
+    view = v; if (view === 'chronic') chronMode = 'late'; shown = SHOW; query = ''; if ($('cuQ')) $('cuQ').value = '';
+    // drawn here too: a list loaded in the last five minutes is not drawn again when the screen opens
+    if (st) closeStatement(); else drawList();
+  }
   function bind() {
     const panel = $('customersPanel');
     if (!panel) return;
     // «محتاج شغل» on the home: its «ديون قديمة» row opens this list on that view (before the tab opens)
     document.addEventListener('click', (e) => {
       const b = e.target.closest('.todo-row[data-go="customers"][data-view]');
-      if (b) { view = b.dataset.view; if (view === 'chronic') chronMode = 'late'; shown = SHOW; query = ''; if ($('cuQ')) $('cuQ').value = ''; if (st) closeStatement(); }
+      if (b) presetView(b.dataset.view);
     }, true);
     panel.addEventListener('click', (e) => {
       const v = e.target.closest('[data-cu-view]');
@@ -1226,6 +1232,7 @@
     load: loadList,
     list: () => list,
     show: (v) => { if (v) view = v; if (st) closeStatement(); else drawList(); },
+    preset: presetView,
     statement: (id) => openStatement(id),
     // ar/app.js takeShare: a contact shared for a customer's number (true = taken here)
     takeContactShare,

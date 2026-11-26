@@ -40,9 +40,15 @@
     ['pay', 'المدفوعات', 'الحسابات', 'M3 8h18v10H3zM3 12h18M7 16h3M17 4l-3 3M17 4l3 3M17 4v5'],
     ['ops', 'العمليات', 'الحسابات', 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3M5 11a7 7 0 0 0 14 0M12 18v3'],
     ['storeorders', 'الموقع', 'المبيعات', 'M4 9l1.5-5h13L20 9M4 9h16v11H4zM9 20v-6h6v6'],
-    ['sales', 'حركة البيع', 'المبيعات', 'M4 19h16M7 16V10M12 16V6M17 16v-4'],
     ['tempsale', 'البيع المؤقت', 'المبيعات', 'M4 7h16v12H4zM8 7V5h8v2M8 12h8M8 15h5'],
     ['care', 'الرسايل', 'خدمة العملاء', 'M4 5h16v11H9l-5 4z'],
+    // «📊 التقارير» (owner 2026-11-26): its page and the reports that are screens of their own (ar/reports.js)
+    ['reports', 'التقارير', 'التقارير', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'],
+    ['day', 'اليوم', 'التقارير', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4'],
+    ['profit', 'الربح والهامش', 'التقارير', 'M4 19h16M5 15l5-5 4 3 5-6'],
+    ['dayclose', 'تقفيل اليوم', 'التقارير', 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z'],
+    ['stockval', 'قيمة المخزون', 'التقارير', 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9'],
+    ['sales', 'حركة البيع', 'التقارير', 'M4 19h16M7 16V10M12 16V6M17 16v-4'],
     // the screens that live INSIDE a section (owner 2026-11-19): [id, label, group, icon, the section it opens, the block it scrolls to]
     ['users', 'المستخدمين', 'المبيعات', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0', 'storeorders', 'siteUsers'],
     ['sitesettings', 'إعدادات الموقع', 'المبيعات', 'M4 8h9M17 8h3M4 16h3M11 16h9M15 5v6M7 13v6', 'storeorders', 'storeSettings'],
@@ -76,7 +82,7 @@
   const APP_OF = Object.fromEntries(ALL.filter((x) => x[6]).map((x) => [x[0], x[6]]));
   const GROUPS = [...new Set(ALL.map((x) => x[2]))];
   // «ألوان الأقسام» (owner 2026-11-19, ar/look.css): the section a button belongs to decides its shade of the system color; a work app wears the shade of the section it serves
-  const SEC_OF_GROUP = { 'المشتريات': 'purchases', 'الحسابات': 'accounts', 'المبيعات': 'sales', 'خدمة العملاء': 'care', 'الرئيسية': 'home' };
+  const SEC_OF_GROUP = { 'المشتريات': 'purchases', 'الحسابات': 'accounts', 'المبيعات': 'sales', 'خدمة العملاء': 'care', 'الرئيسية': 'home', 'التقارير': 'home' };
   const APP_SEC = { wab: 'care', cams: 'home', ibnsina: 'purchases', pharma: 'purchases', drugeye: 'home', doses: 'home', instapay: 'accounts' };
   const SEC = Object.fromEntries(ALL.map((x) => [x[0], x[6] ? APP_SEC[x[6]] || 'home' : SEC_OF_GROUP[x[2]] || 'home']));
   // the small white mark on every button = its section's own icon of the bottom bar (owner 2026-11-19: «الحاجة اللي خاصة بالمشتريات تبقى عليها علامة المشتريات»);
@@ -124,7 +130,18 @@
     const out = Array.isArray(v) ? v.slice(0, SPARE_N) : [];
     while (out.length < SPARE_N) out.push(null);
     return out.map((t) => (typeof t === 'string' && LABEL[t] ? t : null));
-  }  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, SEC, APP_SEC, SPARE_KEY, SPARE_N, clean, parse, toggle, move, spareParse };
+  }
+  // «الزرار السادس» (owner 2026-11-26: «هيبقى هو ده الزرار السادس، ده بتاع التقارير»): the first slot is always «التقارير». What he had there moves to the first empty slot (with none empty it stays
+  // reachable from its own section and the picker); «التقارير» picked into another slot before this is taken out of it.
+  const FIXED = 'reports';
+  function pinReports(list) {
+    const out = list.slice(0, SPARE_N).map((t, i) => (i && t === FIXED ? null : t));
+    const had = out[0];
+    out[0] = FIXED;
+    if (had && had !== FIXED && !out.slice(1).includes(had)) { const j = out.indexOf(null, 1); if (j > 0) out[j] = had; }
+    return out;
+  }
+  const api = { MAX, KEY, DEFAULT, ALL, LABEL, TAB_OF, ANCHOR_OF, APP_OF, SEC, APP_SEC, SPARE_KEY, SPARE_N, FIXED, clean, parse, toggle, move, spareParse, pinReports };
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
 
@@ -337,13 +354,15 @@
   const PLUS = 'M12 5v14M5 12h14';
   let spare = spareParse(null);
   try { spare = spareParse(localStorage.getItem(SPARE_KEY)); } catch (e) {}
+  spare = pinReports(spare);
   const saveSpare = () => { try { localStorage.setItem(SPARE_KEY, JSON.stringify(spare)); } catch (e) {} };
+  saveSpare();
   let spareAt = -1, spareSwallow = 0;
   function drawSpare() {
     const box = $('spareBar');
     if (!box) return;
     box.innerHTML = spare.map((t, i) => (t
-      ? `<button type="button" class="sp-slot on" data-sp="${i}" ${APP_OF[t] ? `data-app="${APP_OF[t]}"` : `data-go="${TAB_OF[t]}"`}${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`
+      ? `<button type="button" class="sp-slot on${i === 0 ? ' sp-fix' : ''}" data-sp="${i}" ${APP_OF[t] ? `data-app="${APP_OF[t]}"` : `data-go="${TAB_OF[t]}"`}${ANCHOR_OF[t] ? ` data-anchor="${ANCHOR_OF[t]}"` : ''}>${svg(ICON[t])}<span>${esc(LABEL[t])}</span></button>`
       : `<button type="button" class="sp-slot" data-sp="${i}" aria-label="خانة فاضية: اضغط واختار شاشة">${svg(PLUS)}</button>`)).join('');
   }
   function drawSpareSheet() {
@@ -351,7 +370,7 @@
     if (!sh) { sh = document.createElement('div'); sh.id = 'spSheet'; sh.className = 'bg-sheet qa-sheet hidden'; document.body.appendChild(sh); }
     const cur = spare[spareAt];
     const groups = GROUPS.map((g) => {
-      const rows = ALL.filter((x) => x[2] === g);
+      const rows = ALL.filter((x) => x[2] === g && x[0] !== FIXED); // «التقارير» already sits in the first slot
       return rows.length ? `<h4>${esc(g)}</h4>` + rows.map(([t, l]) => `<div class="sp-sheet-row"><span class="qa-l">${esc(l)}</span><button type="button" class="small qa-add${t === cur ? ' on' : ''}" data-sp-pick="${t}">اختار</button></div>`).join('') : '';
     }).join('');
     sh.innerHTML = `<div class="bg-sheet-in qa-sheet-in" role="dialog" aria-label="خانة احتياطي"><h3><span>اختار شاشة للخانة دي</span></h3>` + groups +
@@ -365,7 +384,7 @@
     let timer = 0;
     const stop = () => { clearTimeout(timer); timer = 0; };
     box.addEventListener('pointerdown', (e) => {
-      const b = e.target.closest ? e.target.closest('.sp-slot.on') : null;
+      const b = e.target.closest ? e.target.closest('.sp-slot.on:not(.sp-fix)') : null; // the sixth button is fixed
       if (!b) return;
       stop();
       timer = setTimeout(() => { timer = 0; spareSwallow = Date.now() + 700; openSpare(Number(b.dataset.sp)); }, 500);

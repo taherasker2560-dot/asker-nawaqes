@@ -1,6 +1,6 @@
 // The bottom bar has 5 sections (owner 2026-11-12): «الرئيسية» (one search for an item, first screen), «المشتريات» in three
 // groups (نواقص: النواقص، الوارد، الترجمة / طلبيات: الطلبيات، الفواتير، قوايم المخازن / مخزون: المخزون، جرد المخزون),
-// «الحسابات» (العملاء، الموردين), «المبيعات» (الموقع، حركة البيع، البيع المؤقت) and «خدمة العملاء». Each section, and each group of
+// «الحسابات» (العملاء، الموردين), «المبيعات» (الموقع، البيع المؤقت; the reports moved to «📊 التقارير», 2026-11-27) and «خدمة العملاء». Each section, and each group of
 // «المشتريات», remembers the small tab you were on. «حدّث النواقص دلوقتي» is gone (the list is sent every hour).
 const {run,assert}=require('./harness.cjs');
 const vis=(page,id)=>page.isVisible('#'+id);
@@ -34,7 +34,7 @@ run('bottom bar: five sections, «الرئيسية» first, «المشتريات
  // the other sections
  await page.click('[data-group="accounts"]');assert.ok(await vis(page,'customersPanel'));assert.ok(!(await page.isVisible('.subbar[data-for="purchases"]')));
  await page.click('[data-group="sales"]');assert.ok(await vis(page,'storeOrdersPanel'));
- assert.deepEqual(await names(page,'.subbar[data-for="sales"] [data-tab]'),['📅 اليوم','🔒 التقفيل','💹 الربح','📦 قيمة المخزون','الموقع','حركة البيع','البيع المؤقت']);
+ assert.deepEqual(await names(page,'.subbar[data-for="sales"] [data-tab]'),['الموقع','البيع المؤقت']);
  await page.click('[data-tab="tempsale"]');assert.ok(await vis(page,'tempSalePanel'));assert.ok(!(await vis(page,'storeOrdersPanel')));
  await page.click('[data-group="care"]');assert.ok(await vis(page,'carePanel'));assert.ok(!(await vis(page,'tempSalePanel')));
  // «المشتريات» comes back where it was; «الرئيسية» comes back with its search

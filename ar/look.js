@@ -5,19 +5,23 @@
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
-  const GROUP = { home: 'الرئيسية', purchases: 'المشتريات', accounts: 'الحسابات', sales: 'المبيعات', care: 'خدمة العملاء' };
+  const GROUP = { home: 'الرئيسية', purchases: 'المشتريات', accounts: 'الحسابات', sales: 'المبيعات', care: 'خدمة العملاء', reports: 'التقارير' };
+  // the reports page and the reports that are screens of their own (ar/reports.js): no button of the bar is lit on them
+  const REPORTS = ['reportsPanel', 'dayPanel', 'closePanel', 'profitPanel', 'stockValPanel', 'salesPanel'];
   const PANEL = {
     homePanel: '', shortPanel: 'النواقص', readPanel: 'الوارد', translatePanel: 'الترجمة', draftsPanel: 'الطلبيات',
     docsPanel: 'الفواتير', suppliersPanel: 'قوايم المخازن', stockPanel: 'المخزون', countPanel: 'جرد المخزون', expiryPanel: 'الصلاحيات',
     customersPanel: 'العملاء', vendorsPanel: 'الموردين', storeOrdersPanel: 'طلبات الموقع', salesPanel: 'حركة البيع',
     tempSalePanel: 'البيع المؤقت', cashPanel: 'الخزن', payPanel: 'المدفوعات', waitPanel: 'الانتظار', carePanel: '',
+    reportsPanel: '', dayPanel: 'اليوم', closePanel: 'تقفيل اليوم', profitPanel: 'الربح والهامش', stockValPanel: 'قيمة المخزون',
   };
 
   // 1) where you are
   function where() {
     const p = document.querySelector('.brand p');
     if (!p || $('app')?.classList.contains('hidden')) return;
-    const g = document.querySelector('.bottomnav [data-group]:not(.secondary)')?.dataset.group || 'home';
+    const lit = document.querySelector('.bottomnav [data-group]:not(.secondary)')?.dataset.group;
+    const g = lit || (REPORTS.some((id) => $(id) && !$(id).classList.contains('hidden')) ? 'reports' : 'home');
     const open = Object.keys(PANEL).find((id) => $(id) && !$(id).classList.contains('hidden'));
     const sub = open ? PANEL[open] : '';
     p.textContent = (GROUP[g] || '') + (sub ? ' · ' + sub : '');
@@ -45,6 +49,8 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(where, 0);
     if (!anchor) return;
+    // «الصنف جه من مين» is a view of its own inside the suppliers: it has to be opened, scrolling to it is not enough
+    if (anchor === 'veFindBox') return window.AskerVendors?.findItem?.();
     // the block may still be loading (a screen that draws after its data arrives): look every quarter of a second, up to three seconds, and scroll once when it shows
     let tries = 0;
     const timer = setInterval(() => {

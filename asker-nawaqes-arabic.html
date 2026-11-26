@@ -15,7 +15,7 @@
     <title>سيستم نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=airy-20261119a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=svsale-20261126a" />
+    <link rel="stylesheet" href="ar/look.css?v=reports-20261127a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the two above (ar/capsule.css, ar/motion.js); remove this line for the previous look -->
     <link rel="stylesheet" href="ar/capsule.css?v=airy-20261119a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="ar/review.css?v=gallery-20261123a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=svsale-20261126a"></script>
+    <script src="ar/i18n-en.js?v=reports-20261127a"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -223,18 +223,20 @@
           ><button type="button" class="chip" data-tab="ops">العمليات</button>
         </div>
         <div class="subbar chips" data-for="sales" role="group" aria-label="المبيعات" hidden>
-          <button type="button" class="chip" data-tab="day">📅 اليوم</button
-          ><button type="button" class="chip" data-tab="dayclose">🔒 التقفيل</button
-          ><button type="button" class="chip" data-tab="profit">💹 الربح</button
-          ><button type="button" class="chip" data-tab="stockval">📦 قيمة المخزون</button
-          ><button type="button" class="chip on" data-tab="storeorders">الموقع</button
-          ><button type="button" class="chip" data-tab="sales">حركة البيع</button
+          <button type="button" class="chip on" data-tab="storeorders">الموقع</button
           ><button type="button" class="chip" data-tab="tempsale">البيع المؤقت</button>
         </div>
 
         <!-- «الرئيسية»: the first screen under the search -->
         <!-- the modern home (2026-11-12): greeting with the logo, three numbers, quick ways into the sections (ar/look.js) -->
         <!-- a staff member's home: the sections open for him (ar/staff.js) -->
+        <!-- «‹ التقارير» (ar/reports.js, owner 2026-11-26): on top of a report that was opened from the reports page -->
+        <div id="rpBack" class="rp-back hidden"><button type="button" data-go="reports">‹ التقارير</button></div>
+        <!-- «📊 التقارير» (ar/reports.js, owner 2026-11-26): every report on one page, behind the sixth button; owner only -->
+        <section id="reportsPanel" class="card hidden">
+          <div class="sa-head"><h2>📊 التقارير</h2></div>
+          <div id="rpMain"></div>
+        </section>
         <section id="staffHomePanel" class="card staff-home hidden"></section>
         <section id="homePanel" class="card home">
           <!-- compact home (owner 2026-11-13): a small greeting with a button to the store page, the numbers in one thin
@@ -1071,7 +1073,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=voicesale-20261122a"></script>
     <script src="ar/cache.js?v=wait-20261121a"></script>
-    <script src="ar/app.js?v=stockval-20261126a"></script>
+    <script src="ar/app.js?v=reports-20261127a"></script>
     <script src="ar/staff.js?v=wabiz-20261120a"></script>
     <script src="ar/suppliers.js?v=lists2-20261121a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -1086,6 +1088,7 @@
     <script src="ar/profit.js?v=basis-20261126b"></script>
     <script src="ar/close.js?v=dayclose-20261126a"></script>
     <script src="ar/stockvalue.js?v=svsale-20261126a"></script>
+    <script src="ar/reports.js?v=reports-20261127a"></script>
     <script src="ar/po-statement.js?v=lists2-20261121a"></script>
     <script src="ar/store-orders.js?v=call-20261122a"></script>
     <script src="ar/store-settings.js?v=maxq-20261119a"></script>
@@ -1095,16 +1098,16 @@
     <script src="ar/item-media.js?v=niphoto-20261122a"></script>
     <script src="ar/stock.js?v=voicehome-20261122a"></script>
     <script src="ar/home.js?v=voicehome-20261122a"></script>
-    <script src="ar/look.js?v=bars-20261121a"></script>
-    <script src="ar/shortcuts.js?v=bars-20261121a"></script>
+    <script src="ar/look.js?v=reports-20261127a"></script>
+    <script src="ar/shortcuts.js?v=reports-20261127a"></script>
     <script src="ar/barhide.js?v=typing-20261121a" defer></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=lists3-20261121a"></script>
     <script src="ar/item-photos.js?v=photos-20261116a"></script>
     <script src="ar/store-link.js?v=airy-20261119a"></script>
-    <script src="ar/customers.js?v=qr-20261123a"></script>
+    <script src="ar/customers.js?v=reports-20261127a"></script>
 <script src="ar/sales.js?v=retlabel-20261122a"></script>
-<script src="ar/vendors.js?v=voicepeople-20261123a"></script>
+<script src="ar/vendors.js?v=reports-20261127a"></script>
 <script src="ar/ops.js?v=ops-20261120a"></script>
 <script src="ar/cash.js?v=dayclose-20261126a"></script>
 <script src="ar/pay.js?v=apps-20261119a"></script>
