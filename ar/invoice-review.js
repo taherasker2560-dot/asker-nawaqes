@@ -250,7 +250,7 @@
     return `<div class="rv-ni"><div class="rv-ni-read">${pic ? `<img class="rv-ni-ph" alt="" src="${esc(pic)}">` : '<span class="rv-ni-ph">📷</span>'}<div class="rv-ni-m">` +
       `<b class="notr" dir="ltr">${esc(name)}</b><small>${meta}</small>` +
       (res.active ? `<small class="notr">💊 ${esc(res.active)}</small>` : '') + (res.note ? `<small class="rv-ni-note notr">${esc(res.note)}</small>` : '') +
-      (code ? `<small class="rv-ni-done">اتعمل كارت <b dir="ltr">${esc(code)}</b> من الصورة${s.status === 'applied' ? ' · والصورة بقت صورة الصنف ✓' : ''}</small>` : '') +
+      (code ? `<small class="rv-ni-done">اتعمل كارت <b dir="ltr">${esc(code)}</b> من الصورة${s.status === 'applied' ? boxPhotoNow(s, code) : ''}</small>` : '') +
       edit + btns + '</div></div></div>';
   }
   // the readings of the invoices shown (the newest per line; a photo taken again cancels the older one)
@@ -282,6 +282,12 @@
     const { data, error } = await db().from('ar_store_items').select('id,name').eq('name', t).limit(2);
     return !error && data && data.length === 1 && Number(data[0].id) > 0 ? Number(data[0].id) : null;
   }
+  // what happened to the box photo: waiting for his yes (a user took it), on the item, or neither (he refused it). held / shown = what this page's own send answered, kept until the next read
+  function boxPhotoNow(s, code) {
+    if (s.held || root.AskerPhotoWant?.held?.(code)) return ' · والصورة مستنية موافقتك';
+    const M = root.AskerItemMedia;
+    return s.shown || (M && M.photoState && M.photoState(Number(code)) === 'ok') ? ' · والصورة بقت صورة الصنف ✓' : '';
+  }
   // after the invoice is entered: the box photo becomes the new card's photo (once). The card is the code the laptop wrote when it marked the invoice «entered»; when that was left out
   // (2026-11-23, card 28: the card was made and the box photo never reached it), the system finds it by its exact name, once the card has come from PharmaFly. A photo a person gave the
   // card meanwhile stays: the box photo never replaces it.
@@ -297,7 +303,8 @@
         try {
           const code = niCodeOf(r, l) || (await niCardByName(niName(r, l, s)));
           if (!code) { s.uploading = false; continue; }
-          if (!(M.photoState && M.photoState(code) === 'ok')) await M.upload(code, await niSmall(niPics[s.id], 800));
+          // the reading's number goes with it: a box a user took waits for the owner's yes, whoever's page puts it on the card (2026-11-27)
+          if (!(M.photoState && M.photoState(code) === 'ok')) { const sent = await M.upload(code, await niSmall(niPics[s.id], 800), s.id); s.held = !!(sent && sent.pending); s.shown = !s.held; }
           await db().from('ar_item_reads').update({ status: 'applied' }).eq('id', s.id);
           s.status = 'applied';
           s.card = code;
@@ -423,8 +430,8 @@
     picBusy[id] = true; sig = signature(); draw();
     const url = URL.createObjectURL(file);
     try {
-      await M.upload(Number(id), niDraw(await niLoad(url), 800, 0.85));
-      say('الصورة بقت صورة الصنف ✓', 'good');
+      const sent = await M.upload(Number(id), niDraw(await niLoad(url), 800, 0.85));
+      say(sent && sent.pending ? 'الصورة وصلت ✓ مستنية موافقة صاحب الصيدلية' : 'الصورة بقت صورة الصنف ✓', 'good');
     } catch (e) { say('الصورة ما اتحفظتش: ' + (e.message || e), 'bad'); }
     finally { URL.revokeObjectURL(url); delete picBusy[id]; sig = signature(); draw(); }
   }

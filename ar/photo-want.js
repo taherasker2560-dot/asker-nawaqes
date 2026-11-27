@@ -6,7 +6,10 @@
    بس تحت الاصناف الجديده»): the items of the prepared invoices with NO photo, by themselves; and the ones he adds from an invoice card because their photo is wrong, whoever chose it.
    A line leaves once its photo is sent (a new item), once an item with none gets a person's photo / «تمام», once one he added gets a NEW photo / «تمام» after he added it, or with his ✕.
    His WhatsApp numbers: the whole list or only what is new since the last time;
-   he presses send in WhatsApp. A staff member with «صور مطلوبة»: the names, the camera and the phone's photos; nothing else (tables ar_photo_wanted / ar_photo_numbers, migration 202611271200). */
+   he presses send in WhatsApp. A staff member with «صور مطلوبة»: the names, the camera and the phone's photos; nothing else (tables ar_photo_wanted / ar_photo_numbers, migration 202611271200).
+   HIS APPROVAL (the same night: «لما الصور تنضاف، لأن مش أنا اللي بضيفها، تفضل معروضة مستنية موافقتي، ما تدخلش في المعروض على طول»): a photo anyone but him adds, from anywhere, is not shown; it waits
+   in «مستنية موافقتك» on top of this box (ar_photo_pending, migration 202611272300; the server keeps it back, not the page). ✓ shows it; ✕ keeps it off and sends the item back as «صوّرها تاني».
+   While it waits the item is not asked for again, and the one who took it sees that it arrived. */
 (function (root) {
   'use strict';
 
@@ -36,7 +39,7 @@
       if (!r || r.removed_at) return false;
       const st = stateOf(Number(r.item_id));
       if (st == null) return false;
-      if (r.why !== 'picked') return st !== 'ok';
+      if (r.why !== 'picked' && r.why !== 'retake') return st !== 'ok';
       const at = fixedAt ? fixedAt(Number(r.item_id)) : null;
       return !(at && Date.parse(at) > Date.parse(r.added_at));
     }).map((r) => ({ ...r, kind: 'item', key: 'i:' + r.item_id })).sort(newestFirst);
@@ -59,8 +62,21 @@
     return out;
   }
   const sameDay = (a, b) => { const x = new Date(a), y = new Date(b); return !isNaN(x) && x.toDateString() === y.toDateString(); };
+  // an item whose photo waits for his yes is not asked for again: his list (and what he sends) leaves it out; the one who takes photos still sees it, marked «arrived»
+  function withHeld(items, pending, owner) {
+    const held = new Set((pending || []).map((p) => Number(p.item_id)));
+    if (!held.size) return items.slice();
+    const out = [];
+    for (const e of items) {
+      if (e.kind !== 'item' || !held.has(Number(e.item_id))) out.push(e);
+      else if (!owner) out.push({ ...e, held: true });
+    }
+    return out;
+  }
   // the small line under a name
   function why(e, owner) {
+    if (e.held) return 'صورتها وصلت، مستنية موافقة صاحب الصيدلية';
+    if (e.why === 'retake') return owner ? 'رفضت صورتها، مستنية صورة جديدة' : 'الصورة اللي فاتت ما اتقبلتش، صوّرها تاني';
     if (e.kind === 'new') {
       if (e.retry) return 'الصورة ما اتقرتش، صوّرها تاني';
       return owner && e.supplier ? 'من فاتورة ' + e.supplier : 'صوّر العلبة من قدّام';
@@ -80,7 +96,7 @@
     return /^\d{10,15}$/.test(d) ? d : '';
   }
   const localPhone = (d) => (/^201\d{9}$/.test(String(d)) ? '0' + String(d).slice(2) : String(d));
-  const api = { newWaiting, waiting, autoRows, why, newSince, waText, intlPhone, localPhone };
+  const api = { newWaiting, waiting, withHeld, autoRows, why, newSince, waText, intlPhone, localPhone };
   root.AskerPhotoWantLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -91,7 +107,8 @@
   const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
   const stateOf = (id) => { const M = media(); return M ? M.photoState(id) : null; };
   const fixedAt = (id) => { const M = media(); return M && M.fixedAt ? M.fixedAt(id) : null; };
-  let rows = [], newRows = [], reads = [], numbers = [], ready = false, owner = false, showing = false, all = false, adding = false, busy = {}, timer = null, sig = '';
+  let rows = [], newRows = [], reads = [], numbers = [], pending = [], ready = false, owner = false, showing = false, all = false, adding = false, busy = {}, timer = null, sig = '';
+  const imgUrl = (path) => ((root.AskerItemMediaLib && root.AskerItemMediaLib.IMG_URL) || '') + path;
   const listeners = [];
   const told = () => { for (const f of listeners) try { f(); } catch (e) { /* the invoice cards are not on screen */ } };
 
@@ -107,6 +124,7 @@
     rows = data || [];
     ready = true;
     await readNew();
+    await readPending();
     if (owner) {
       const n = await c.from('ar_photo_numbers').select('id,name,phone,last_sent_at,created_at').order('created_at', { ascending: true }).limit(50);
       numbers = n.error ? [] : n.data || [];
@@ -124,15 +142,20 @@
     const x = await c.from('ar_item_reads').select('id,review_id,line_n,status,result,created_at').in('review_id', ids).eq('kind', 'new_item').neq('status', 'cancelled').order('created_at', { ascending: false }).limit(500);
     if (!x.error) reads = x.data || [];
   }
+  // the photos waiting for his yes (before migration 202611272300 there are none)
+  async function readPending() {
+    const p = await db().from('ar_photo_pending').select('id,item_id,name,img,by_name,live,at').eq('status', 'pending').order('at', { ascending: false }).limit(200);
+    pending = p.error ? [] : p.data || [];
+  }
   // the new ones first, then the ones he put
-  const list = () => newWaiting(newRows, reads).concat(waiting(rows, stateOf, fixedAt));
+  const list = () => withHeld(newWaiting(newRows, reads).concat(waiting(rows, stateOf, fixedAt)), pending, owner);
 
   const pick = (key, text, camera, label) => `<label class="pw-cam${camera ? '' : ' pw-gal'}" aria-label="${label}">${text}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ''} hidden data-pw-photo="${esc(key)}"></label>`;
   function itemHtml(e) {
     const isNew = e.kind === 'new';
     return `<div class="pw-it${isNew ? ' pw-isnew' : ''}" data-pw-item="${esc(e.key)}"><div class="pw-nm"><b class="notr" dir="auto">${esc(e.name)}</b>` +
       `<small>${isNew ? '<em class="pw-tag">صنف جديد</em> ' : ''}<span${isNew && !e.retry && owner && e.supplier ? ' class="notr"' : ''}>${esc(why(e, owner))}</span></small></div>` +
-      (busy[e.key] ? '<span class="pw-wait">بحفظ الصورة…</span>' : pick(e.key, '📷', true, 'صوّر العلبة') + pick(e.key, '🖼', false, 'هات من الصور')) +
+      (busy[e.key] ? '<span class="pw-wait">بحفظ الصورة…</span>' : e.held ? '<span class="pw-held">⏳ مستنية الموافقة</span>' : pick(e.key, '📷', true, 'صوّر العلبة') + pick(e.key, '🖼', false, 'هات من الصور')) +
       (owner ? `<button type="button" class="pw-x" data-pw-x="${esc(e.key)}" aria-label="شيلها من القايمة">✕</button>` : '') + '</div>';
   }  const when = (iso) => {
     const d = new Date(iso);
@@ -148,16 +171,29 @@
       `<div class="pw-two"><button type="button" class="pw-btn main" data-pw-send="${esc(n.id)}|all"${items.length ? '' : ' disabled'}><span>📤 واتس: الكل</span> (<bdi dir="ltr">${items.length}</bdi>)</button>` +
       `<button type="button" class="pw-btn" data-pw-send="${esc(n.id)}|new"${fresh ? '' : ' disabled'}><span>الجديد بس</span> (<bdi dir="ltr">${fresh}</bdi>)</button></div></div>`;
   }
+  // one photo that waits for him: big enough to judge, a tap fills the screen with it. A «live» one was already shown when the approval began
+  function approveHtml(p) {
+    return `<div class="pw-ap" data-pw-ap="${esc(p.id)}"><button type="button" class="pw-thumb" data-pw-big="${esc(p.id)}" aria-label="كبّر الصورة"><img src="${esc(imgUrl(p.img))}" alt="" loading="lazy"></button>` +
+      `<div class="pw-ab"><b class="notr" dir="auto">${esc(p.name)}</b><small>${p.by_name ? `<span>صوّرها</span> <bdi class="notr">${esc(p.by_name)}</bdi> · ` : ''}<bdi>${esc(when(p.at))}</bdi></small>` +
+      (p.live ? '<small class="pw-live">متعرضة دلوقتي: لو رفضتها تتشال</small>' : '') +
+      (busy['a:' + p.id] ? '<span class="pw-wait">بحفظ…</span>' : `<button type="button" class="pw-btn main" data-pw-yes="${esc(p.id)}">${p.live ? '✓ تمام، خليها' : '✓ تمام، اعرضها'}</button><button type="button" class="pw-btn" data-pw-no="${esc(p.id)}">✕ لأ، تتصوّر تاني</button>`) +
+      '</div></div>';
+  }
+  const approvals = () => (owner && pending.length ? `<div class="pw-appr"><h3><span>⏳ مستنية موافقتك</span> (<bdi dir="ltr">${pending.length}</bdi>)</h3><p class="hint">دوس على الصورة تكبر. الصورة الجديدة ما بتتعرضش غير لما توافق.</p>` +
+    pending.map(approveHtml).join('') + '</div>' : '');
   function draw() {
     const box = $('pwMain'), panel = $('photoWantPanel');
     if (!box || !panel) return;
     const items = ready ? list() : [];
     // the box is there even when nothing waits: that is where he saves his numbers, and where he looks for it. Only before the list is on the server the owner sees nothing
     panel.classList.toggle('pw-empty', owner && !ready);
-    const cnt = $('pwCount');
-    if (cnt) { cnt.textContent = items.length ? String(items.length) : ''; cnt.hidden = !items.length; }
+    const cnt = $('pwCount'), asked = items.filter((e) => !e.held).length;
+    if (cnt) { cnt.textContent = asked ? String(asked) : ''; cnt.hidden = !asked; }
+    const ask = $('pwApprCount'), mine = owner && ready ? pending.length : 0;
+    if (ask) { ask.textContent = mine ? '⏳ ' + mine : ''; ask.hidden = !mine; }
     if (!ready) { box.innerHTML = owner ? '' : '<p class="hint">القايمة لسه مش متاحة. جرّب كمان شوية.</p>'; return; }
-    let h = items.length ? '' : '<p class="hint">مفيش صور مطلوبة دلوقتي ✓</p>' + (owner ? '<p class="hint">الصنف الجديد واللي من غير صورة بيدخلوا هنا لوحدهم. ولو صنف صورته غلط، ضيفه من أصناف الفاتورة.</p>' : '');
+    let h = approvals();
+    h += items.length ? '' : '<p class="hint">مفيش صور مطلوبة دلوقتي ✓</p>' + (owner ? '<p class="hint">الصنف الجديد واللي من غير صورة بيدخلوا هنا لوحدهم. ولو صنف صورته غلط، ضيفه من أصناف الفاتورة.</p>' : '');
     if (owner) {
       h += numbers.map((n) => numberHtml(n, items)).join('');
       h += adding
@@ -172,7 +208,7 @@
     if (others.length > cap) h += `<button type="button" class="pw-more" data-pw-more>${all ? 'اقفل القايمة ▴' : `<span>… وكمان</span> <bdi dir="ltr">${others.length - cap}</bdi> ▾`}</button>`;
     box.innerHTML = h;
   }
-  const signature = () => JSON.stringify([ready, owner, adding, all, Object.keys(busy), numbers.map((n) => [n.id, n.name, n.phone, n.last_sent_at]), ready ? list().map((r) => [r.key, r.name, !!r.retry, r.supplier || '']) : []]);
+  const signature = () => JSON.stringify([ready, owner, adding, all, Object.keys(busy), numbers.map((n) => [n.id, n.name, n.phone, n.last_sent_at]), pending.map((p) => [p.id, p.img]), ready ? list().map((r) => [r.key, r.name, !!r.retry, r.supplier || '', !!r.held, r.why || '']) : []]);
   const typing = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#pwMain') && a.tagName === 'INPUT' && a.type !== 'file'); };
   function redraw(force) {
     const next = signature();
@@ -238,8 +274,9 @@
         say('الصورة وصلت ✓ اللاب هيقرا العلبة', 'good');
       } else {
         if (!M) throw new Error('القايمة لسه مش متاحة');
-        await M.upload(Number(e.item_id), cv.toDataURL('image/jpeg', 0.85));
-        say('الصورة بقت صورة الصنف ✓', 'good');
+        const sent = await M.upload(Number(e.item_id), cv.toDataURL('image/jpeg', 0.85));
+        if (sent && sent.pending) { await readPending(); say('الصورة وصلت ✓ مستنية موافقة صاحب الصيدلية', 'good'); }
+        else say('الصورة بقت صورة الصنف ✓', 'good');
       }
     } catch (err) { say('الصورة ما اتحفظتش: ' + (err.message || err), 'bad'); }
     finally { URL.revokeObjectURL(url); delete busy[key]; redraw(true); told(); }
@@ -289,9 +326,40 @@
     if (error) return say('الرقم ما اتمسحش: ' + error.message, 'bad');
     numbers = numbers.filter((x) => x !== n); redraw(true);
   }
+  // his answer on a waiting photo (the server does the rest: ar_photo_decide)
+  async function decide(id, yes) {
+    const p = pending.find((x) => String(x.id) === String(id));
+    if (!p || busy['a:' + id]) return;
+    if (!yes && !root.confirm(p.live ? `ترفض صورة «${p.name}»؟ هتتشال من على الصنف، ويرجع للقايمة يتصوّر تاني.` : `ترفض صورة «${p.name}»؟ مش هتتعرض، والصنف يرجع للقايمة يتصوّر تاني.`)) return;
+    busy['a:' + id] = true; redraw(true);
+    let done = null, failed = null;
+    try { const r = await db().rpc('ar_photo_decide', { p_id: Number(p.id), p_ok: yes }); done = r.data; failed = r.error; }
+    catch (e) { failed = e; }
+    delete busy['a:' + id];
+    if (failed) { say('ما اتحفظش: ' + (failed.message || failed), 'bad'); return redraw(true); }
+    say(done && done.ok === false ? 'الصورة دي اتغيّرت قبل كده، والقايمة اتحدّثت' : yes ? 'اتعرضت على الصنف ✓' : 'اترفضت، والصنف رجع للقايمة', 'good');
+    pending = pending.filter((x) => x !== p);
+    redraw(true);
+    try { await refresh(true); } catch (e) { /* the answer is kept; the list is read again within a minute */ }
+  }
+  const unbig = () => { const o = document.querySelector('.pw-big'); if (o) o.remove(); };
+  function big(id) {
+    const p = pending.find((x) => String(x.id) === String(id));
+    if (!p) return;
+    unbig();
+    const o = document.createElement('div');
+    o.className = 'pw-big';
+    o.setAttribute('role', 'dialog');
+    o.innerHTML = `<img src="${esc(imgUrl(p.img))}" alt=""><b class="notr" dir="auto">${esc(p.name)}</b><button type="button" aria-label="اقفل">✕</button>`;
+    o.addEventListener('click', unbig);
+    document.body.appendChild(o);
+  }
   function onClick(e) {
     const g = (a) => e.target.closest('[' + a + ']');
     let el;
+    if ((el = g('data-pw-yes'))) return decide(el.dataset.pwYes, true);
+    if ((el = g('data-pw-no'))) return decide(el.dataset.pwNo, false);
+    if ((el = g('data-pw-big'))) return big(el.dataset.pwBig);
     if ((el = g('data-pw-x'))) return remove(el.dataset.pwX);
     if (g('data-pw-more')) { all = !all; return redraw(true); }
     if (g('data-pw-add')) { adding = true; redraw(true); const i = $('pwPhone'); if (i) i.focus(); return; }
@@ -317,7 +385,8 @@
     clearInterval(timer);
     timer = setInterval(() => { if (showing && !document.hidden && !typing() && !Object.keys(busy).length) refresh(false).catch(() => {}); }, 60000);
   }
-  function close() { showing = false; clearInterval(timer); timer = null; adding = false; }
+  function close() { showing = false; clearInterval(timer); timer = null; adding = false; unbig(); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') unbig(); });
 
   const main = $('pwMain');
   if (main) {
@@ -326,5 +395,6 @@
     main.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.target.id === 'pwPhone' || e.target.id === 'pwName')) { e.preventDefault(); saveNumber(); } });
   }
   root.AskerItemMedia?.onChange?.(() => { if (showing) redraw(false); });
-  root.AskerPhotoWant = { open, close, noteReviews, toggle, wanted, can: () => ready, onChange(f) { listeners.push(f); } };
+  const held = (id) => pending.some((p) => Number(p.item_id) === Number(id));
+  root.AskerPhotoWant = { open, close, noteReviews, toggle, wanted, held, can: () => ready, onChange(f) { listeners.push(f); } };
 })(typeof window === 'undefined' ? globalThis : window);

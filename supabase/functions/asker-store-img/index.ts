@@ -3,7 +3,10 @@
 // depends on another website.
 //   POST {id, url}   one of the photos the night search found (a normal download, no tricks) -> {img}
 //   POST {id, data}  a photo from his phone, already made small by the page (base64 JPEG)     -> {img}
-// Only the owner or an active staff member (public.ar_is_staff; was «storeorders» only until 2026-11-21). Writes public.ar_store_edits.img.
+// Only the owner or an active staff member (public.ar_is_staff; was «storeorders» only until 2026-11-21).
+// The owner's photo goes on the item at once (public.ar_store_edits.img). Anyone else's is NOT shown: it waits for his yes (owner 2026-11-27:
+// «لما الصور تنضاف … تفضل معروضة مستنية موافقتي»; public.ar_photo_submit, migration 202611272300) and the answer says {pending: true}.
+// POST {id, data, read}: read = the ar_item_reads row the box photo came from; the one who TOOK it counts, whoever's page sends it.
 // Secrets used: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (set by Supabase), ALLOWED_ORIGINS (optional).
 // Deploy with --no-verify-jwt (the caller is checked here).
 
@@ -68,10 +71,22 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
     if (!c.ok || (await c.json().catch(() => false)) !== true) return reply(403, { error: 'forbidden', message: 'التعديل ده لصاحب الصيدلية وفريقه بس.' }, headers);
   }
 
-  let body: { id?: unknown; url?: unknown; data?: unknown };
+  let body: { id?: unknown; url?: unknown; data?: unknown; read?: unknown };
   try { body = await req.json(); } catch { return reply(400, { error: 'body', message: 'الطلب ناقص.' }, headers); }
   const id = String(body.id ?? '');
   if (!/^[0-9]{1,12}$/.test(id)) return reply(400, { error: 'id', message: 'رقم الصنف غلط.' }, headers);
+
+  // who the photo is from: the one who asks, or the one who took the box photo it was read from. It is shown at once only when both are the owner
+  const owner = env.OWNER_ID || OWNER_ID;
+  let from = user.id;
+  const read = String(body.read ?? '');
+  if (/^[0-9]{1,15}$/.test(read)) {
+    const q = await call('/rest/v1/ar_item_reads?id=eq.' + read + '&select=requested_by', { headers: sh });
+    const rows = q.ok ? await q.json().catch(() => null) as { requested_by?: string }[] | null : null;
+    if (!Array.isArray(rows)) return reply(502, { error: 'who', message: 'الصورة ما اتحفظتش، جرّب تاني.' }, headers); // never shown on a guess
+    if (rows[0]?.requested_by && rows[0].requested_by !== owner) from = rows[0].requested_by;
+  }
+  const waits = user.id !== owner || from !== owner;
 
   let bytes: Uint8Array;
   if (typeof body.data === 'string') {
@@ -95,6 +110,14 @@ export async function handle(req: Request, env: Env, fetchImpl: typeof fetch): P
   const type = kind === 'jpg' ? 'image/jpeg' : 'image/' + kind;
   const up = await call('/storage/v1/object/ar-store-img/' + path, { method: 'POST', headers: { ...sh, 'Content-Type': type, 'Cache-Control': '31536000', 'x-upsert': 'true' }, body: bytes });
   if (!up.ok) return reply(502, { error: 'upload', message: 'الصورة ما اتحفظتش، جرّب تاني.' }, headers);
+  if (waits) {
+    const put = await call('/rest/v1/rpc/ar_photo_submit', {
+      method: 'POST', headers: { ...sh, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_item: Number(id), p_img: path, p_by: from }),
+    });
+    const kept = put.ok ? await put.json().catch(() => null) as { ok?: boolean } | null : null;
+    if (!kept?.ok) return reply(502, { error: 'save', message: 'الصورة ما وصلتش لصاحب الصيدلية، جرّب تاني.' }, headers);
+    return reply(200, { img: path, pending: true }, headers);
+  }
   const row = await call('/rest/v1/ar_store_edits?on_conflict=item_id', {
     method: 'POST', headers: { ...sh, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ item_id: Number(id), img: path, img_off: false, updated_at: new Date().toISOString(), updated_by: user.id }),

@@ -349,6 +349,8 @@
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) { note(b.message || 'الصورة ما اتحفظتش، جرّب تاني.', true); return; }
+      // a photo that is not the owner's waits for his yes (2026-11-27): the item shows what it showed before
+      if (b.pending) { note('الصورة وصلت ✓ مستنية موافقة صاحب الصيدلية'); return; }
       edits[cur.id] = Object.assign({ item_id: Number(cur.id), descr: null, desc_off: false }, edits[cur.id] || {}, { img: b.img, img_off: false, updated_by: data && data.session && data.session.user && data.session.user.id, updated_at: new Date().toISOString() });
       last = ['اتغيّرت الصورة ✔', false]; changed(); busy = false; await draw(true);
     } catch (e) { note('النت مش مستقر، جرّب تاني.', true); } finally { busy = false; }
@@ -381,15 +383,17 @@
     reload: () => loadEdits().then(changed),
     // set an item's photo from a picture the page already has (a data: URL), through the same function as the sheet's phone photo (owner / staff session).
     // Used by «مراجعة الفواتير»: a new item's box photo becomes its photo once its PharmaFly card exists (owner 2026-11-22). Throws with the function's message on a refusal.
-    async upload(id, data) {
+    // readId = the reading the picture came from (the one who TOOK it counts). Answers {img, pending}: pending = not shown yet, it waits for the owner's yes (2026-11-27)
+    async upload(id, data, readId) {
       const c = app(), { data: s } = await c.auth.getSession();
       const tok = s && s.session && s.session.access_token;
-      const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: KEY }, body: JSON.stringify({ id: Number(id), data }) });
+      const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: KEY }, body: JSON.stringify(readId ? { id: Number(id), data, read: readId } : { id: Number(id), data }) });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) throw new Error(b.message || 'الصورة ما اتحفظتش');
+      if (b.pending) return { img: b.img, pending: true };
       edits[id] = Object.assign({ item_id: Number(id), descr: null, desc_off: false }, edits[id] || {}, { img: b.img, img_off: false, updated_by: s && s.session && s.session.user && s.session.user.id, updated_at: new Date().toISOString() });
       changed();
-      return b.img;
+      return { img: b.img, pending: false };
     },
     // «صور الأصناف» in «مراجعة الفواتير»: the state of an item's photo (null until the photo list and the fixes are read), the photo to show, and whether «تمام» can be kept (migration 202611271000)
     photoState(id) { load(); return loaded ? photoState(id, pics, edits) : null; },

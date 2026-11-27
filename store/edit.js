@@ -63,6 +63,8 @@
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) { note(b.message || 'الصورة ما اتحفظتش، جرّب تاني.', true); return; }
+      // a photo that is not the owner's waits for his yes (2026-11-27): the store keeps showing what it showed
+      if (b.pending) { note('الصورة وصلت ✓ مستنية موافقة صاحب الصيدلية'); return; }
       S.setEdit(item.id, Object.assign({ item_id: item.id, descr: null, desc_off: false }, S.edits()[item.id] || {}, { img: b.img, img_off: false }));
       note('اتغيّرت الصورة ✔');
     } catch (e) { note('النت مش مستقر، جرّب تاني.', true); } finally { busy = false; }

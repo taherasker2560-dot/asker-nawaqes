@@ -39,6 +39,19 @@ assert.equal(P.why(nw[2],true),'من فاتورة مورد مثال');
 assert.equal(P.why(nw[2],false),'صوّر العلبة من قدّام','a user is not told whose invoice');
 assert.equal(P.why(nw[0],true),'الصورة ما اتقرتش، صوّرها تاني');
 assert.equal(P.why(w[0],true),'إنت ضفتها من المراجعة');assert.equal(P.why({...w[0],why:'none'},true),'من غير صورة');assert.equal(P.why(w[0],false),'صوّرها أو هاتها من الصور');
+// ---- his approval (the same night: a photo someone else adds waits for him) ----
+// one whose photo he refused waits like one he added: until a new photo or «تمام» after that, whatever the item shows meanwhile
+const re=[{item_id:9,name:'I',why:'retake',added_at:'2026-11-27T20:00:00Z',removed_at:null}];
+assert.deepEqual(P.waiting(re,ok,()=>'2026-11-20T08:00:00Z').map((r)=>r.item_id),[9]);
+assert.deepEqual(P.waiting(re,ok,()=>'2026-11-27T21:00:00Z'),[]);
+assert.equal(P.why({...re[0],kind:'item'},true),'رفضت صورتها، مستنية صورة جديدة');
+assert.equal(P.why({...re[0],kind:'item'},false),'الصورة اللي فاتت ما اتقبلتش، صوّرها تاني');
+// while a photo waits for him, the item is not asked for again: out of his list, still in the user's, marked; a new item's line is not touched
+const both=[nw[2],...w], waitFor=[{item_id:2}];
+assert.deepEqual(P.withHeld(both,waitFor,true).map((e)=>e.key),['n:5|1','i:1']);
+assert.deepEqual(P.withHeld(both,waitFor,false).map((e)=>e.key+(e.held?' held':'')),['n:5|1','i:2 held','i:1']);
+assert.equal(P.why(P.withHeld(both,waitFor,false)[1],false),'صورتها وصلت، مستنية موافقة صاحب الصيدلية');
+assert.deepEqual(P.withHeld(both,[],true),both);assert.deepEqual(P.withHeld(both,null,false),both);
 // ---- what is new for a number, and the message (new items first, and marked) ----
 const all=nw.concat(w);
 assert.equal(P.newSince(all,null).length,5,'never sent: all of it');
