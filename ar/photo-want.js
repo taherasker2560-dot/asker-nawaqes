@@ -16,6 +16,9 @@
   // ---------- pure helpers (tests/photo-want.cjs) ----------
   const FIRST = 3, FIRST_STAFF = 60;
   const newestFirst = (a, b) => String(b.added_at || '').localeCompare(String(a.added_at || '')) || String(a.key).localeCompare(String(b.key), 'en', { numeric: true });
+  // the items: the latest added first; of those brought at the same moment (one look at the invoices brings many), the newest card first. On 2026-11-27 two cards made that day were
+  // the last two of twenty, behind «… وكمان», and he took them as missing
+  const newestCard = (a, b) => String(b.added_at || '').localeCompare(String(a.added_at || '')) || Number(b.item_id) - Number(a.item_id);
   // the NEW lines still waiting for their box: listed by the server, not rejected / cancelled / taken off, and no box photo on its way. reads = the readings of those invoices; the newest one of a
   // line decides: sent, being read, read or on its card = done here; failed, or read with nothing found = wanted again
   function newWaiting(rows, reads) {
@@ -42,7 +45,7 @@
       if (r.why !== 'picked' && r.why !== 'retake') return st !== 'ok';
       const at = fixedAt ? fixedAt(Number(r.item_id)) : null;
       return !(at && Date.parse(at) > Date.parse(r.added_at));
-    }).map((r) => ({ ...r, kind: 'item', key: 'i:' + r.item_id })).sort(newestFirst);
+    }).map((r) => ({ ...r, kind: 'item', key: 'i:' + r.item_id })).sort(newestCard);
   }
   // the items of the prepared invoices that have no photo and are not in the table yet (a rejected line goes back to the supplier; one he took off stays off)
   function autoRows(reviews, have, stateOf) {
