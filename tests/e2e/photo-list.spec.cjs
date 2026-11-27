@@ -11,6 +11,22 @@ const waitNames=(page,n)=>page.waitForFunction((n)=>document.querySelectorAll('#
 const shown=(page,sel)=>page.$eval(sel,(e)=>getComputedStyle(e).display!=='none'&&!e.classList.contains('hidden'));
 const shot=async(page,name)=>{if(process.env.SHOT_DIR)await page.screenshot({path:process.env.SHOT_DIR+'/'+name+'.png',fullPage:true})};
 
+run('Photo list (owner), nothing waiting: the box is still there, says why, and takes his numbers',async({page,table})=>{
+ await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify({ar_invoice_reviews:[],ar_photo_wanted:[],ar_photo_numbers:[]})));
+ await page.reload();
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');
+ await page.waitForSelector('#pwMain [data-pw-add]');
+ assert.ok(await shown(page,'#photoWantPanel'),'he finds it before any invoice arrives');
+ assert.match(await txt(page,'#pwMain'),/مفيش صور مطلوبة دلوقتي ✓ اللي من غير صورة بيتضاف لوحده لما فاتورة جديدة تيجي للمراجعة/);
+ assert.equal(await page.isDisabled('[data-pw-group]'),true,'nothing to send yet');
+ await page.click('[data-pw-add]');await page.fill('#pwPhone','0100 000 0100');await page.click('[data-pw-save]');
+ await page.waitForSelector('#pwMain .pw-num');
+ assert.equal((await table('ar_photo_numbers'))[0].phone,'201000000100');
+ assert.equal(await page.isDisabled('[data-pw-send$="|all"]'),true);
+ await shot(page,'photo-list-empty');
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+});
+
 run('Photo list (owner): no-photo items add themselves, he nominates wrong ones, numbers and WhatsApp, ✕ and the camera',async({page,table})=>{
  await photoFn(page);
  page.on('dialog',(d)=>d.accept());

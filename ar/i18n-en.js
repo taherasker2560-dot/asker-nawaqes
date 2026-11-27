@@ -2748,6 +2748,7 @@ window.AskerEN = {
   "＋ رقم جديد": "＋ New number",
   "👥 ابعت لجروب": "👥 Send to a group",
   "مفيش صور مطلوبة دلوقتي ✓": "No photos wanted right now ✓",
+  "اللي من غير صورة بيتضاف لوحده لما فاتورة جديدة تيجي للمراجعة.": "Items with no photo add themselves when a new invoice comes up for review.",
   "اقفل القايمة ▴": "Close the list ▴",
   "… وكمان": "… and more:",
   "الصورة ما اتحفظتش: {0}": "The photo was not saved: {0}",

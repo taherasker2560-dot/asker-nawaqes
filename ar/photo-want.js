@@ -100,27 +100,26 @@
     return `<div class="pw-num"><div class="pw-nh"><b>${n.name ? `<span class="notr">${esc(n.name)}</span> · ` : ''}<span class="notr" dir="ltr">${esc(localPhone(n.phone))}</span></b>` +
       `<button type="button" class="pw-x" data-pw-delnum="${esc(n.id)}" aria-label="امسح الرقم">✕</button></div>` +
       (n.last_sent_at ? `<small class="pw-last"><span>آخر إرسال:</span> <bdi>${esc(when(n.last_sent_at))}</bdi></small>` : '<small class="pw-last">لسه ما اتبعتلوش</small>') +
-      `<div class="pw-two"><button type="button" class="pw-btn main" data-pw-send="${esc(n.id)}|all"><span>📤 واتس: الكل</span> (<bdi dir="ltr">${items.length}</bdi>)</button>` +
+      `<div class="pw-two"><button type="button" class="pw-btn main" data-pw-send="${esc(n.id)}|all"${items.length ? '' : ' disabled'}><span>📤 واتس: الكل</span> (<bdi dir="ltr">${items.length}</bdi>)</button>` +
       `<button type="button" class="pw-btn" data-pw-send="${esc(n.id)}|new"${fresh ? '' : ' disabled'}><span>الجديد بس</span> (<bdi dir="ltr">${fresh}</bdi>)</button></div></div>`;
   }
   function draw() {
     const box = $('pwMain'), panel = $('photoWantPanel');
     if (!box || !panel) return;
     const items = ready ? list() : [];
-    // the owner sees the box only when something waits (the invoices under it are the page's work); a staff member always gets an answer
-    panel.classList.toggle('pw-empty', owner && !items.length);
+    // the box is there even when nothing waits: that is where he saves his numbers, and where he looks for it. Only before the list is on the server the owner sees nothing
+    panel.classList.toggle('pw-empty', owner && !ready);
     const cnt = $('pwCount');
     if (cnt) { cnt.textContent = items.length ? String(items.length) : ''; cnt.hidden = !items.length; }
     if (!ready) { box.innerHTML = owner ? '' : '<p class="hint">القايمة لسه مش متاحة. جرّب كمان شوية.</p>'; return; }
-    let h = '';
+    let h = items.length ? '' : '<p class="hint">مفيش صور مطلوبة دلوقتي ✓</p>' + (owner ? '<p class="hint">اللي من غير صورة بيتضاف لوحده لما فاتورة جديدة تيجي للمراجعة.</p>' : '');
     if (owner) {
       h += numbers.map((n) => numberHtml(n, items)).join('');
       h += adding
         ? '<div class="pw-add"><input type="text" id="pwName" maxlength="60" placeholder="الاسم (اختياري)" aria-label="اسم صاحب الرقم"><input type="tel" id="pwPhone" dir="ltr" maxlength="20" inputmode="tel" placeholder="01xxxxxxxxx" aria-label="رقم الواتس">' +
           '<div class="pw-two"><button type="button" class="pw-btn main" data-pw-save>احفظ الرقم</button><button type="button" class="pw-btn" data-pw-cancel>إلغاء</button></div></div>'
-        : '<div class="pw-two"><button type="button" class="pw-btn" data-pw-add>＋ رقم جديد</button><button type="button" class="pw-btn" data-pw-group>👥 ابعت لجروب</button></div>';
+        : `<div class="pw-two"><button type="button" class="pw-btn" data-pw-add>＋ رقم جديد</button><button type="button" class="pw-btn" data-pw-group${items.length ? '' : ' disabled'}>👥 ابعت لجروب</button></div>`;
     }
-    if (!items.length) h += '<p class="hint">مفيش صور مطلوبة دلوقتي ✓</p>';
     const cap = owner ? FIRST : FIRST_STAFF, shown = all ? items : items.slice(0, cap);
     h += shown.map(itemHtml).join('');
     if (items.length > cap) h += `<button type="button" class="pw-more" data-pw-more>${all ? 'اقفل القايمة ▴' : `<span>… وكمان</span> <bdi dir="ltr">${items.length - cap}</bdi> ▾`}</button>`;
