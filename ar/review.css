@@ -182,3 +182,21 @@ html.staff .subbar [data-pfor="orders"] { flex-wrap: wrap; overflow-x: visible; 
 .rv-pics .rv-pic-fine > summary { cursor: pointer; justify-content: flex-start; gap: 4px; font-weight: 400; font-size: 12.5px; color: var(--crimson-ink); list-style: none; }
 #photoWantPanel .pw-tag { display: inline-block; font-style: normal; font-weight: 700; font-size: 11px; color: var(--crimson-ink); border: 1px solid var(--crimson); border-radius: 6px; padding: 0 6px; margin-inline-end: 3px; }
 #photoWantPanel .pw-isnew .pw-nm b { font-size: 14px; }
+/* «⏳ مستنية موافقتك» (owner 2026-11-27): a photo someone else added comes to him first; big enough to judge, a tap fills the screen */
+#photoWantPanel .pw-ask-count { flex: none; margin-inline-start: auto; border: 1.5px solid var(--crimson); border-radius: 999px; padding: 1px 11px; font-size: 14px; color: var(--crimson-ink); background: var(--rose); }
+#photoWantPanel .pw-appr { border: 1.5px solid var(--crimson); border-radius: 16px; padding: 10px; margin: 0 0 12px; }
+#photoWantPanel .pw-appr h3 { margin: 0 2px 2px; font-size: 16px; color: var(--crimson-ink); }
+#photoWantPanel .pw-appr .hint { margin: 0 2px 6px; }
+#photoWantPanel .pw-ap { display: flex; align-items: flex-start; gap: 10px; border-top: 1px solid var(--line); padding: 10px 0 4px; }
+#photoWantPanel button.pw-thumb { flex: none; width: 112px; height: 112px; min-width: 0; min-height: 0; margin: 0; padding: 4px; border: 1px solid var(--line) !important; border-radius: 12px; background: #fff; box-shadow: none; cursor: zoom-in; }
+#photoWantPanel .pw-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+#photoWantPanel .pw-ab { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+#photoWantPanel .pw-ab b { font-size: 13.5px; text-align: right; overflow-wrap: anywhere; color: var(--ink); }
+#photoWantPanel .pw-ab small { font-size: 12px; color: var(--muted); }
+#photoWantPanel .pw-ab small.pw-live { color: var(--bad, #a3162f); }
+#photoWantPanel .pw-ab button.pw-btn { flex: none; width: 100%; min-height: 40px; }
+#photoWantPanel .pw-held { flex: none; font-size: 12px; color: var(--crimson-ink); background: var(--rose); border-radius: 10px; padding: 6px 8px; }
+.pw-big { position: fixed; inset: 0; z-index: 10050; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 62px 12px 20px; box-sizing: border-box; background: rgba(8, 18, 26, .93); cursor: zoom-out; }
+.pw-big img { max-width: 100%; max-height: calc(100% - 40px); border-radius: 12px; background: #fff; }
+.pw-big b { color: #fff; font-size: 15px; text-align: center; }
+.pw-big button { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0 !important; border-radius: 50%; background: #fff; color: #10222e; box-shadow: none; font-size: 20px; }

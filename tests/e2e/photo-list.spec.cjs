@@ -142,6 +142,86 @@ run('Photo list (a user with «صور مطلوبة»): the new item first; its b
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 },{home:true});
 
+// owner 2026-11-27: «لما الصور تنضاف، لأن مش أنا اللي بضيفها، تفضل معروضة مستنية موافقتي». What the server does on his answer is played here (tests/photo-pending-migration.cjs checks the real one)
+const waitingPhotos=(at)=>({ar_invoice_reviews:[],ar_photo_new:[],ar_item_reads:[],ar_photo_numbers:[],
+ ar_store_edits:[{item_id:201,img:'e/201-a.jpg',img_off:false,updated_by:'u9',updated_at:at}],
+ ar_photo_wanted:[{item_id:202,name:'EXAMPLE NEW SYR 120 ML',why:'none',added_at:at,removed_at:null}],
+ ar_photo_pending:[{id:1,item_id:201,name:'EXAMPLE SHOWN VIAL I.M.',img:'e/201-a.jpg',by_name:'موظف تجربة',live:true,status:'pending',at},
+  {id:2,item_id:202,name:'EXAMPLE NEW SYR 120 ML',img:'e/202-b.jpg',by_name:'موظف تجربة',live:false,status:'pending',at}]});
+const server=(page)=>page.evaluate(()=>{window.__fakeRpcs={ar_photo_decide:({p_id,p_ok})=>{
+ const T=window.__tables,p=T.ar_photo_pending.find((x)=>x.id===p_id&&x.status==='pending'),now=new Date().toISOString();
+ if(!p)return {ok:false,error:'gone'};
+ p.status=p_ok?'approved':'rejected';
+ const e=T.ar_store_edits.find((x)=>x.item_id===p.item_id);
+ if(p_ok){const row={item_id:p.item_id,img:p.img,img_off:false,updated_by:'u9',updated_at:now,photo_ok_at:now};if(e)Object.assign(e,row);else T.ar_store_edits.push(row)}
+ else{if(e&&e.img===p.img)Object.assign(e,{img:null,updated_by:null,photo_ok_at:null,updated_at:now});
+  const w=T.ar_photo_wanted.find((x)=>x.item_id===p.item_id),row={item_id:p.item_id,name:p.name,why:'retake',added_at:now,removed_at:null};if(w)Object.assign(w,row);else T.ar_photo_wanted.push(row)}
+ return {ok:true};}}});
+const answers=(page)=>page.evaluate(()=>window.__fakeWrites.filter((x)=>x.rpc==='ar_photo_decide').map((x)=>x.args.p_id+':'+x.args.p_ok));
+
+run('Photo approval (owner): a user\'s photos wait on top; a tap makes one big; yes shows it; no keeps it off and asks again',async({page,table})=>{
+ await page.route('**/ar-store-img/**',(r)=>r.fulfill({contentType:'image/png',body:PNG}));
+ let say=true;page.on('dialog',(d)=>say?d.accept():d.dismiss());
+ await page.evaluate((t)=>localStorage.setItem('__fakeTables',JSON.stringify(t)),waitingPhotos(new Date().toISOString()));
+ await page.reload();await server(page);
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');
+ await page.waitForSelector('#pwMain .pw-appr');
+ assert.ok(await page.evaluate(()=>document.querySelector('#pwMain').firstElementChild.classList.contains('pw-appr')),'on top of the box');
+ assert.equal(await txt(page,'#pwApprCount'),'⏳ 2');
+ assert.match(await txt(page,'#pwMain .pw-appr h3'),/⏳ مستنية موافقتك \( 2 \)/);
+ assert.deepEqual(await all(page,'#pwMain .pw-ap b'),['EXAMPLE SHOWN VIAL I.M.','EXAMPLE NEW SYR 120 ML']);
+ assert.match(await txt(page,'[data-pw-ap="1"]'),/صوّرها موظف تجربة · .* متعرضة دلوقتي: لو رفضتها تتشال ✓ تمام، خليها ✕ لأ، تتصوّر تاني/);
+ assert.match(await txt(page,'[data-pw-ap="2"]'),/✓ تمام، اعرضها/);
+ assert.equal((await names(page)).length,0,'an item whose photo waits is not asked for again');
+ await shot(page,'photo-approval-owner');
+ await page.click('[data-pw-big="2"]');await page.waitForSelector('.pw-big img');
+ assert.match(await page.getAttribute('.pw-big img','src'),/ar-store-img\/e\/202-b\.jpg$/);
+ await shot(page,'photo-approval-big');
+ await page.click('.pw-big');assert.equal(await page.$('.pw-big'),null);
+ // yes
+ await page.click('[data-pw-yes="2"]');
+ await page.waitForFunction(()=>document.querySelectorAll('#pwMain .pw-ap').length===1);
+ assert.match(await txt(page,'#pwStatus'),/اتعرضت على الصنف ✓/);
+ assert.equal((await table('ar_store_edits')).find((e)=>e.item_id===202).img,'e/202-b.jpg');
+ // no: asked first; his «cancel» changes nothing
+ say=false;await page.click('[data-pw-no="1"]');await page.waitForTimeout(300);
+ assert.deepEqual(await answers(page),['2:true']);
+ say=true;await page.click('[data-pw-no="1"]');
+ await page.waitForFunction(()=>!document.querySelector('#pwMain .pw-appr')&&document.querySelectorAll('#pwMain .pw-it').length===1);
+ assert.deepEqual(await answers(page),['2:true','1:false']);
+ assert.deepEqual(await names(page),['EXAMPLE SHOWN VIAL I.M.'],'back on the list');
+ assert.deepEqual(await all(page,'#pwMain .pw-it small'),['رفضت صورتها، مستنية صورة جديدة']);
+ assert.equal((await table('ar_store_edits')).find((e)=>e.item_id===201).img,null,'and off the item');
+ assert.equal(await shown(page,'#pwApprCount'),false);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the phone');
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+});
+
+run('Photo approval (a user): his sent photo shows as waiting, with no second camera; a refused one asks again; he decides nothing',async({page})=>{
+ await page.route('**/functions/v1/asker-store-img',async(r)=>{const b=JSON.parse(r.request().postData()||'{}');
+  await page.evaluate((id)=>window.__tables.ar_photo_pending.push({id:9,item_id:id,name:'EXAMPLE REFUSED GEL',img:'e/'+id+'-new.jpg',by_name:'موظف تجربة',live:false,status:'pending',at:new Date().toISOString()}),b.id);
+  await r.fulfill({contentType:'application/json',headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*'},body:JSON.stringify({img:'e/'+b.id+'-new.jpg',pending:true})})});
+ const at=new Date().toISOString();
+ await page.evaluate((at)=>localStorage.setItem('__fakeTables',JSON.stringify({ar_staff:[{user_id:'u1',name:'موظف تجربة',perms:['photos'],active:true}],ar_store_edits:[],ar_item_reads:[],ar_photo_new:[],
+  ar_photo_wanted:[{item_id:202,name:'EXAMPLE NEW SYR 120 ML',why:'none',added_at:at,removed_at:null},{item_id:203,name:'EXAMPLE REFUSED GEL',why:'retake',added_at:at,removed_at:null}],
+  ar_photo_pending:[{id:2,item_id:202,name:'EXAMPLE NEW SYR 120 ML',img:'e/202-b.jpg',by_name:'موظف تجربة',live:false,status:'pending',at}]})),at);
+ await page.reload();
+ await page.waitForFunction(()=>document.documentElement.classList.contains('staff'));
+ await page.waitForSelector('#staffHomePanel:not(.hidden) [data-stf-go]');
+ await page.click('#staffHomePanel [data-stf-go="photos"]');
+ await waitNames(page,2);
+ assert.equal(await page.$('#pwMain .pw-appr'),null,'no approving for a user');assert.equal(await shown(page,'#pwApprCount'),false);
+ assert.equal(await page.$('#pwMain [data-pw-photo="i:202"]'),null,'sent already: no camera');
+ assert.match(await txt(page,'[data-pw-item="i:202"]'),/صورتها وصلت، مستنية موافقة صاحب الصيدلية ⏳ مستنية الموافقة/);
+ assert.match(await txt(page,'[data-pw-item="i:203"]'),/الصورة اللي فاتت ما اتقبلتش، صوّرها تاني/);
+ assert.equal(await txt(page,'#pwCount'),'1','only what still needs a photo is counted');
+ await page.setInputFiles('#pwMain [data-pw-photo="i:203"]',{name:'box.png',mimeType:'image/png',buffer:PNG});
+ await page.waitForFunction(()=>/الصورة وصلت ✓ مستنية موافقة صاحب الصيدلية/.test(document.getElementById('pwStatus').textContent));
+ await page.waitForFunction(()=>!document.querySelector('#pwMain [data-pw-photo="i:203"]'));
+ await shot(page,'photo-approval-user');
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+},{home:true});
+
 run('Photo list: a user with every «طلبيات» tab still sees them all on a phone',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify({ar_staff:[{user_id:'u1',name:'موظف تجربة',perms:['drafts','docs','suppliers','wait','photos'],active:true}],ar_photo_wanted:[]})));
  await page.reload();
