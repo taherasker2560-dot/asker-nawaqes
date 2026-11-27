@@ -147,6 +147,8 @@
 
 /* «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27, mockup mockups/photo_list_2026-11-27.png): the box above the invoice review; a staff member with «صور مطلوبة» sees it as his own screen */
 html:not(.staff) .subbar .stf-only { display: none !important; }
+/* a staff member can have five chips under «طلبيات»: they go on a second line instead of running off the side of the phone */
+html.staff .subbar [data-pfor="orders"] { flex-wrap: wrap; overflow-x: visible; }
 #photoWantPanel.pw-empty { display: none !important; }
 #photoWantPanel .pw-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 #photoWantPanel .pw-count { flex: none; border-radius: 999px; padding: 2px 13px; font-size: 14px; background: var(--crimson); color: #fff; }

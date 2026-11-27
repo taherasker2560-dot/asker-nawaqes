@@ -29,7 +29,7 @@ const row=async(page,id)=>(await rows(page)).find(r=>r.id===id);
 run('Invoice review: the cards in box order, chips, summary, «وافق على الجاهز»',async({page})=>{
  await seed(page);await open(page);
  assert.ok(await page.isVisible('#reviewPanel'));
- assert.deepEqual(await texts(page,'[data-pfor="orders"] [data-tab]'),['الطلبيات','الفواتير','قوايم المخازن','الانتظار'],'no new small tab (the row would not fit a phone): the review is the top of «الفواتير»');
+ assert.deepEqual(await texts(page,'[data-pfor="orders"] [data-tab]:not(.stf-only)'),['الطلبيات','الفواتير','قوايم المخازن','الانتظار'],'no new small tab (the row would not fit a phone): the review is the top of «الفواتير»');
  assert.ok(await page.isVisible('#docsPanel'),'the photos card is still there');
  assert.ok(await page.evaluate(()=>!!(document.getElementById('reviewPanel').compareDocumentPosition(document.getElementById('docsPanel'))&Node.DOCUMENT_POSITION_FOLLOWING)),'the review card comes first');
  assert.deepEqual(await texts(page,'#rvMain .py-h'),['مستنية موافقتك 4','وافقت عليها (بتتدخل) 1','وقفت 1','اتدخلت 1']);

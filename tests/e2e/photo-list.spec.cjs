@@ -102,3 +102,19 @@ run('Photo list (a user with «صور مطلوبة»): the names, the camera and
  assert.equal((await table('ar_photo_wanted')).filter((r)=>r.removed_at).length,0,'a user writes nothing on the list');
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 },{home:true});
+
+run('Photo list: a user with every «طلبيات» tab still sees them all on a phone',async({page})=>{
+ await page.evaluate(()=>localStorage.setItem('__fakeTables',JSON.stringify({ar_staff:[{user_id:'u1',name:'موظف تجربة',perms:['drafts','docs','suppliers','wait','photos'],active:true}],ar_photo_wanted:[]})));
+ await page.reload();
+ await page.waitForFunction(()=>document.documentElement.classList.contains('staff'));
+ await page.waitForSelector('#staffHomePanel:not(.hidden) [data-stf-go]');
+ await page.click('#staffHomePanel [data-stf-go="photos"]');
+ await page.waitForSelector('#photoWantPanel:not(.hidden) .hint');
+ await shot(page,'photo-list-user-tabs');
+ // every chip of the row is fully on the screen (wrapped or not), none cut off at the side
+ const out=await page.$$eval('[data-pfor="orders"] [data-tab]',(b)=>b.filter((x)=>x.offsetParent!==null).map((x)=>{const r=x.getBoundingClientRect();return {t:x.textContent.trim(),cut:r.left<0||r.right>document.documentElement.clientWidth+0.5}}));
+ assert.deepEqual(out.map((x)=>x.t),['الطلبيات','الفواتير','قوايم المخازن','الانتظار','صور مطلوبة']);
+ assert.deepEqual(out.filter((x)=>x.cut),[],'no chip is cut off');
+ assert.match(await txt(page,'#pwMain'),/مفيش صور مطلوبة دلوقتي/);
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+},{home:true});
