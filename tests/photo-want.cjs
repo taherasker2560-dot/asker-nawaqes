@@ -19,6 +19,9 @@ const ok=()=>'ok';
 assert.deepEqual(P.waiting(two,ok,()=>'2026-11-20T08:00:00Z').map((r)=>r.item_id),[7],'the old choice does not count against what he added later');
 assert.deepEqual(P.waiting(two,ok,()=>null).map((r)=>r.item_id),[7]);
 assert.deepEqual(P.waiting(two,ok,()=>'2026-11-27T11:00:00Z').map((r)=>r.item_id),[],'a new photo after he added it: done');
+// brought at the same moment: the newest card first (2026-11-27: two cards of that day were last of twenty and he took them as missing); one added later still comes above them all
+const batch=[[664,'2026-11-27T17:00:00Z'],[70649,'2026-11-27T17:00:00Z'],[9000,'2026-11-27T17:00:00Z'],[70648,'2026-11-27T17:00:00Z'],[12,'2026-11-27T18:00:00Z']].map(([item_id,added_at])=>({item_id,name:'x',why:'none',added_at,removed_at:null}));
+assert.deepEqual(P.waiting(batch,()=>'none').map((r)=>r.item_id),[12,70649,70648,9000,664]);
 // what the prepared invoices bring by themselves: the items with no photo, once, with a card, not rejected, and never one already there (one he took off stays off)
 const reviews=[{id:1,status:'ready',answers:{R3:{v:'reject'}},lines:[{n:1,id:77,name:'NO PHOTO  TAB'},{n:2,id:78,name:'INTERNET TAB'},{n:3,id:79,name:'REJECTED TAB'},{n:4,name:'NEW ITEM WITH NO CARD'},{n:5,id:77,name:'NO PHOTO TAB'},{n:6,id:3,name:'HE TOOK IT OFF'}]},
  {id:2,status:'cancelled',lines:[{n:1,id:80,name:'CANCELLED INVOICE'}]},{id:3,status:'entered',lines:[{n:1,id:81,paper:'من الورقة'}]}];
