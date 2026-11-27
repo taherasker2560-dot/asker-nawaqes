@@ -14,7 +14,7 @@
   const KINDS = [['r', 'مرتجعات البيع'], ['n', 'أصناف جديدة'], ['z', 'جه ورصيده صفر']];
   const REASONS = { g: 'نواقص جت', r: 'بالطلب', b: 'كمية كبيرة', w: 'كان في الانتظار' };
   const WORDS = ['📦 الأصناف يوم بيوم', ...KINDS.map((k) => k[1]), ...Object.values(REASONS), 'اختار يوم', 'اليوم اللي قبله', 'اليوم اللي بعده', 'الرصيد والبيانات لحد', '(آخر نسخة)', 'رصيده', 'صفر',
-    'رجع', 'جه', 'الجمهور', 'ج', 'بيعه حوالي', 'في الشهر', 'صنف', 'في', 'تذكرة', 'كل يوم كان فيه كام', 'مفيش', 'لحد دلوقتي', 'مفيش في اليوم ده.', 'وهكذا لحد 90 يوم ورا',
+    'رجع', 'جه', 'الجمهور', 'ج', 'بيعه حوالي', 'في الشهر', 'صنف', 'أصناف', 'في', 'تذكرة', 'تذاكر','كل يوم كان فيه كام', 'مفيش', 'لحد دلوقتي', 'مفيش في اليوم ده.', 'وهكذا لحد 90 يوم ورا',
     'الصفحة محتاجة ملف الأصناف من اللاب: لسه ما وصلش.', 'اليوم ده لسه ما وصلش من اللاب.', 'تحديث',
     'الأيام قبل 28/11: «بالطلب» مش محسوبة، لأن فارمافلاي ما بيحفظش علامات الأيام اللي فاتت.', '«نواقص جت» مش محسوبة لليوم ده: قايمة النواقص العامة لليوم اللي قبله مش محفوظة.',
     'مرتجعات اليوم ده لسه ما وصلتش من اللاب.', 'قايمة الانتظار ما اتقرتش: «كان في الانتظار» مش ظاهر دلوقتي.'];
@@ -68,7 +68,11 @@
     return Math.abs(v - Math.round(v)) < 0.005 ? stockLib().qtyText(Math.round(v), 0, 1) : w + ' علبة';
   }
   const stockOf = (stock, id) => (stock && id != null && Array.isArray(stock.s[id]) ? { q: num(stock.s[id][0]), parts: num(stock.s[id][1]) } : null);
-  const api = { WORDS, KINDS, REASONS, parseIndex, parseDay, parseStock, waitedFor, zeroShown, linesOf, countOf, boxes, stockOf };
+  // what came back: a whole number is said as a number (a «بالقرص» card's one is one tablet, not a box); an opened box is said in its units
+  const returned = (q, parts) => (Math.abs(num(q) - Math.round(num(q))) < 0.005 ? String(Math.round(num(q))) : boxes(q, parts));
+  // Arabic counting, as he reads it: 3 to 10 take the plural
+  const counted = (n, one, few) => (n % 100 >= 3 && n % 100 <= 10 ? few : one);
+  const api = { WORDS, KINDS, REASONS, parseIndex, parseDay, parseStock, waitedFor, zeroShown, linesOf, countOf, boxes, stockOf, returned, counted };
   root.AskerDayItemsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -101,7 +105,7 @@
   const bdi = (n) => `<bdi dir="ltr">${esc(n)}</bdi>`;
   const parts = (e) => { const s = stockOf(stock, e.i); return s ? s.parts : 1; };
   function sub(e) {
-    if (kind === 'r') return `<span>رجع</span> <bdi>${esc(boxes(e.q, parts(e)))}</bdi> · ${bdi(money(e.v))} <span>ج</span> · <bdi>${esc(hm(e.t))}</bdi>`;
+    if (kind === 'r') return `<span>رجع</span> <bdi>${esc(returned(e.q, parts(e)))}</bdi> · ${bdi(money(e.v))} <span>ج</span> · <bdi>${esc(hm(e.t))}</bdi>`;
     const came = `${e.s ? `<bdi class="notr">${esc(e.s)}</bdi> · ` : ''}<span>جه</span> ${bdi(D.qtyText(e.q))}`;
     if (kind === 'n') return came + ` · <span>الجمهور</span> ${bdi(money(e.pr))}`;
     return came;
@@ -111,10 +115,10 @@
   function summary(list) {
     if (kind === 'r') {
       const tickets = new Set(list.map((e) => e.tk)).size;
-      return `<div class="di-sum"><span>${bdi(list.length)} <span>صنف</span> <span>في</span> ${bdi(tickets)} <span>تذكرة</span></span><b>${bdi(money(list.reduce((a, e) => a + e.v, 0)))} <span>ج</span></b></div>`;
+      return `<div class="di-sum"><span>${bdi(list.length)} <span>${counted(list.length, 'صنف', 'أصناف')}</span> <span>في</span> ${bdi(tickets)} <span>${counted(tickets, 'تذكرة', 'تذاكر')}</span></span><b>${bdi(money(list.reduce((a, e) => a + e.v, 0)))} <span>ج</span></b></div>`;
     }
     const by = kind === 'z' ? Object.keys(REASONS).map((w) => [w, list.filter((e) => e.why.includes(w)).length]).filter((x) => x[1]).map((x) => `<span>${REASONS[x[0]]}</span> ${bdi(x[1])}`).join(' · ') : '';
-    return `<div class="di-sum"><span>${bdi(list.length)} <span>صنف</span></span>${by ? `<small>${by}</small>` : ''}</div>`;
+    return `<div class="di-sum"><span>${bdi(list.length)} <span>${counted(list.length, 'صنف', 'أصناف')}</span></span>${by ? `<small>${by}</small>` : ''}</div>`;
   }
   function notes(day) {
     const out = [];
@@ -130,7 +134,7 @@
     const list = allDays ? index.dates : index.dates.slice(0, SHOWN_DAYS);
     return `<h3 class="dy-h"><span>كل يوم كان فيه كام</span></h3>` + list.map((d) => {
       const n = countOf(index, d, kind, wait);
-      return `<button type="button" class="di-day${d === picked ? ' on' : ''}" data-di-day="${d}"><b>${esc(dateText(d))}</b><span>${n ? `${bdi(n)} <span>صنف</span> ‹` : '<span>مفيش</span>'}</span></button>`;
+      return `<button type="button" class="di-day${d === picked ? ' on' : ''}" data-di-day="${d}"><b>${esc(dateText(d))}</b><span>${n ? `${bdi(n)} <span>${counted(n, 'صنف', 'أصناف')}</span> ‹` : '<span>مفيش</span>'}</span></button>`;
     }).join('') + (index.dates.length > SHOWN_DAYS ? `<button type="button" class="di-more" data-di-more>${allDays ? '▴' : '<span>وهكذا لحد 90 يوم ورا</span> ▾'}</button>` : '');
   }
   function draw() {
