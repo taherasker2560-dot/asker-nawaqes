@@ -7,13 +7,13 @@
   const $ = (id) => document.getElementById(id);
   const GROUP = { home: 'الرئيسية', purchases: 'المشتريات', accounts: 'الحسابات', sales: 'المبيعات', care: 'خدمة العملاء', reports: 'التقارير' };
   // the reports page and the reports that are screens of their own (ar/reports.js): no button of the bar is lit on them
-  const REPORTS = ['reportsPanel', 'dayPanel', 'closePanel', 'profitPanel', 'stockValPanel', 'salesPanel'];
+  const REPORTS = ['reportsPanel', 'dayPanel', 'closePanel', 'profitPanel', 'stockValPanel', 'salesPanel', 'dayItemsPanel'];
   const PANEL = {
     homePanel: '', shortPanel: 'النواقص', readPanel: 'الوارد', translatePanel: 'الترجمة', draftsPanel: 'الطلبيات',
     docsPanel: 'الفواتير', suppliersPanel: 'قوايم المخازن', stockPanel: 'المخزون', countPanel: 'جرد المخزون', expiryPanel: 'الصلاحيات',
     customersPanel: 'العملاء', vendorsPanel: 'الموردين', storeOrdersPanel: 'طلبات الموقع', salesPanel: 'حركة البيع',
     tempSalePanel: 'البيع المؤقت', cashPanel: 'الخزن', payPanel: 'المدفوعات', waitPanel: 'الانتظار', carePanel: '',
-    reportsPanel: '', dayPanel: 'اليوم', closePanel: 'تقفيل اليوم', profitPanel: 'الربح والهامش', stockValPanel: 'قيمة المخزون',
+    reportsPanel: '', dayPanel: 'اليوم', closePanel: 'تقفيل اليوم', profitPanel: 'الربح والهامش', stockValPanel: 'قيمة المخزون', dayItemsPanel: 'الأصناف يوم بيوم',
     photoWantPanel: 'صور مطلوبة', // last: for the owner it sits above «الفواتير», which names the screen
   };
 

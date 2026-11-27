@@ -49,6 +49,7 @@
     ['dayclose', 'تقفيل اليوم', 'التقارير', 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z'],
     ['stockval', 'قيمة المخزون', 'التقارير', 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9'],
     ['sales', 'حركة البيع', 'التقارير', 'M4 19h16M7 16V10M12 16V6M17 16v-4'],
+    ['dayitems', 'الأصناف يوم بيوم', 'التقارير', 'M4 14h5l1.5 2.5h3L15 14h5M4 14l2-9h12l2 9v5H4z'],
     // the screens that live INSIDE a section (owner 2026-11-19): [id, label, group, icon, the section it opens, the block it scrolls to]
     ['users', 'المستخدمين', 'المبيعات', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0', 'storeorders', 'siteUsers'],
     ['sitesettings', 'إعدادات الموقع', 'المبيعات', 'M4 8h9M17 8h3M4 16h3M11 16h9M15 5v6M7 13v6', 'storeorders', 'storeSettings'],

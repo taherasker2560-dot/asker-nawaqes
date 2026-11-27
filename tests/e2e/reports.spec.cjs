@@ -4,7 +4,7 @@ const {run,assert}=require('./harness.cjs');
 const ready=(page)=>page.waitForFunction(()=>window.__tables&&/\d/.test(document.getElementById('shStats')?.textContent||''));
 const names=(page,sel)=>page.$$eval(sel,b=>b.map(x=>x.textContent.replace(/\s+/g,' ').trim()));
 const vis=(page,id)=>page.isVisible('#'+id);
-const WHERE={day:'dayPanel',profit:'profitPanel',dayclose:'closePanel',cash:'cashPanel',sales:'salesPanel',custst:'customersPanel',olddebt:'customersPanel',chronic:'customersPanel',users:'storeOrdersPanel',
+const WHERE={iret:'dayItemsPanel',inew:'dayItemsPanel',izero:'dayItemsPanel',day:'dayPanel',profit:'profitPanel',dayclose:'closePanel',cash:'cashPanel',sales:'salesPanel',custst:'customersPanel',olddebt:'customersPanel',chronic:'customersPanel',users:'storeOrdersPanel',
  stockval:'stockValPanel',expiry:'expiryPanel',season:'shortPanel',vendst:'vendorsPanel',returns:'vendorsPanel',whofrom:'vendorsPanel',compare:'draftsPanel'};
 
 run('Reports: the sixth button opens one page with every report; each card opens its report with «‹ التقارير» on top',async({page})=>{
@@ -14,10 +14,10 @@ run('Reports: the sixth button opens one page with every report; each card opens
  assert.equal(await six.getAttribute('data-go'),'reports');
  await six.click();
  await page.waitForSelector('#reportsPanel:not(.hidden) .rp-card');
- assert.deepEqual(await names(page,'#rpMain h3'),['الفلوس والربح','المبيعات والعملاء','المخزون','المشتريات والموردين']);
+ assert.deepEqual(await names(page,'#rpMain h3'),['الأصناف يوم بيوم','الفلوس والربح','المبيعات والعملاء','المخزون','المشتريات والموردين']);
  const ids=await page.$$eval('#rpMain [data-rp]',(b)=>b.map(x=>x.dataset.rp));
  assert.deepEqual(ids,Object.keys(WHERE).sort((a,b)=>ids.indexOf(a)-ids.indexOf(b)));
- assert.equal(ids.length,16);
+ assert.equal(ids.length,19);
  await page.waitForFunction(()=>document.querySelector('.brand p').textContent.trim()==='التقارير');
  assert.equal(await page.$$eval('.bottomnav [data-group]:not(.secondary)',(b)=>b.length),0,'no button of the bar is lit');
  assert.equal(await vis(page,'rpBack'),false,'the page itself has no «back»');

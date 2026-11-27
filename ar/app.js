@@ -227,7 +227,7 @@
     short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', photos: 'purchases',
     customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', tempsale: 'sales', care: 'care',
     // «📊 التقارير» (ar/reports.js, owner 2026-11-26): its page and the reports that are screens of their own; no button of the bar is lit on them
-    reports: 'reports', sales: 'reports', day: 'reports', dayclose: 'reports', profit: 'reports', stockval: 'reports',
+    reports: 'reports', sales: 'reports', day: 'reports', dayclose: 'reports', profit: 'reports', stockval: 'reports', dayitems: 'reports',
   };
   const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', photos: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care', reports: 'reports' };
@@ -311,6 +311,9 @@
     // «📦 قيمة المخزون» (ar/stockvalue.js, owner 2026-11-26): what the stock is worth, store by store and day by day; owner only
     $('stockValPanel')?.classList.toggle('hidden', tab !== 'stockval');
     if (tab === 'stockval') window.AskerStockValue?.open();
+    // «الأصناف يوم بيوم» (ar/day-items.js, owner 2026-11-28): returns, new items and what arrived to an empty shelf, a day at a time; owner only
+    $('dayItemsPanel')?.classList.toggle('hidden', tab !== 'dayitems');
+    if (tab === 'dayitems') window.AskerDayItems?.open();
     // «🔒 تقفيل اليوم» (ar/close.js, owner 2026-11-26): the drawer's closes shift by shift; owner only
     $('closePanel')?.classList.toggle('hidden', tab !== 'dayclose');
     if (tab === 'dayclose') window.AskerClose?.open();
