@@ -174,3 +174,11 @@ html.staff .subbar [data-pfor="orders"] { flex-wrap: wrap; overflow-x: visible; 
 #photoWantPanel button.pw-more { display: block; width: 100%; margin: 4px 0 0; padding: 8px; border: 0 !important; background: none; color: var(--crimson-ink); box-shadow: none; font: inherit; font-size: 14px; cursor: pointer; }
 #photoWantPanel .pw-wait { flex: none; font-size: 12px; color: var(--muted); }
 #reviewPanel .rv-pic-added { margin: 4px 2px; font-size: 13px; font-weight: 700; color: var(--crimson-ink); }
+/* «➕ للقايمة» beside an item with no photo (he puts it on «صور مطلوبة» himself, 2026-11-27); a new item's line on the list wears «صنف جديد» */
+#reviewPanel button.rv-padd { flex: none; width: auto; min-width: 0; min-height: 0; margin: 0; padding: 7px 12px; border: 1.5px solid var(--line) !important; border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: none; font: inherit; font-size: 12.5px; cursor: pointer; }
+#reviewPanel button.rv-padd.on { border-color: var(--crimson) !important; background: var(--rose); color: var(--crimson-ink); font-weight: 700; }
+.rv-pic-row .rv-ptwo { flex-wrap: wrap; justify-content: flex-end; }
+.rv-pic-fine { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.rv-pics .rv-pic-fine > summary { cursor: pointer; justify-content: flex-start; gap: 4px; font-weight: 400; font-size: 12.5px; color: var(--crimson-ink); list-style: none; }
+#photoWantPanel .pw-tag { display: inline-block; font-style: normal; font-weight: 700; font-size: 11px; color: var(--crimson-ink); border: 1px solid var(--crimson); border-radius: 6px; padding: 0 6px; margin-inline-end: 3px; }
+#photoWantPanel .pw-isnew .pw-nm b { font-size: 14px; }

@@ -27,6 +27,13 @@
     if (e && (e.img_off || (e.img && e.updated_by) || e.photo_ok_at)) return 'ok';
     return photoOf(id, pics, edits) ? 'net' : 'none';
   }
+  // when a person last gave or removed the photo, or said «تمام» (null = never): an item he put on «صور مطلوبة» waits for one AFTER he put it
+  function personFixAt(id, edits) {
+    const e = edits && edits[id];
+    if (!e) return null;
+    const times = [e.updated_by && (e.img || e.img_off) ? e.updated_at : null, e.photo_ok_at].filter(Boolean).sort((a, b) => Date.parse(a) - Date.parse(b));
+    return times.length ? times[times.length - 1] : null;
+  }
   // the description: his own text, nothing if he hid it, else the shard's text
   function descFrom(id, shard, edits) {
     const e = edits && edits[id];
@@ -57,7 +64,7 @@
     return `<button type="button" class="im-th${src ? '' : ' im-none'}" data-im="${esc(id)}" aria-label="صورة الصنف وبيانه">`
       + (src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<span dir="ltr" translate="no">${esc(short(en))}</span>`) + '</button>';
   }
-  const api = { photoOf, photoState, descFrom, descHtml, thumbHtml, short, activeOf, SECTIONS, IMG_URL };
+  const api = { photoOf, photoState, personFixAt, descFrom, descHtml, thumbHtml, short, activeOf, SECTIONS, IMG_URL };
   root.AskerItemMediaLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -101,7 +108,7 @@
   async function loadEdits() {
     if (!app()) return;
     // active_ar / active_en came with migration 202611210200, photo_ok_at with 202611271200: before one, the older columns only
-    let { data, error } = await readEdits('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by,photo_ok_at');
+    let { data, error } = await readEdits('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by,photo_ok_at,updated_at');
     canConfirm = !error;
     if (error) ({ data, error } = await readEdits('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by'));
     if (error) ({ data, error } = await readEdits('item_id,img,img_off,descr,desc_off'));
@@ -342,7 +349,7 @@
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) { note(b.message || 'الصورة ما اتحفظتش، جرّب تاني.', true); return; }
-      edits[cur.id] = Object.assign({ item_id: Number(cur.id), descr: null, desc_off: false }, edits[cur.id] || {}, { img: b.img, img_off: false, updated_by: data && data.session && data.session.user && data.session.user.id });
+      edits[cur.id] = Object.assign({ item_id: Number(cur.id), descr: null, desc_off: false }, edits[cur.id] || {}, { img: b.img, img_off: false, updated_by: data && data.session && data.session.user && data.session.user.id, updated_at: new Date().toISOString() });
       last = ['اتغيّرت الصورة ✔', false]; changed(); busy = false; await draw(true);
     } catch (e) { note('النت مش مستقر، جرّب تاني.', true); } finally { busy = false; }
   }
@@ -380,12 +387,13 @@
       const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: KEY }, body: JSON.stringify({ id: Number(id), data }) });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) throw new Error(b.message || 'الصورة ما اتحفظتش');
-      edits[id] = Object.assign({ item_id: Number(id), descr: null, desc_off: false }, edits[id] || {}, { img: b.img, img_off: false, updated_by: s && s.session && s.session.user && s.session.user.id });
+      edits[id] = Object.assign({ item_id: Number(id), descr: null, desc_off: false }, edits[id] || {}, { img: b.img, img_off: false, updated_by: s && s.session && s.session.user && s.session.user.id, updated_at: new Date().toISOString() });
       changed();
       return b.img;
     },
     // «صور الأصناف» in «مراجعة الفواتير»: the state of an item's photo (null until the photo list and the fixes are read), the photo to show, and whether «تمام» can be kept (migration 202611271000)
     photoState(id) { load(); return loaded ? photoState(id, pics, edits) : null; },
+    fixedAt(id) { return personFixAt(id, edits); },
     photoSrc(id) { return photoOf(id, pics, edits); },
     canConfirm: () => canConfirm,
     // «✓ تمام»: these photos are right, never ask about them again (only photo_ok_at is written: the photo, the words and who chose them stay as they are)

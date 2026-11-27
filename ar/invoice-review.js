@@ -368,27 +368,51 @@
   let picBad = {}, picOpen = {}, picBusy = {};
   const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
   const picsOf = (r) => { const M = media(); return M ? picNeeds(r, (id) => M.photoState(id), M.canConfirm()) : { none: [], net: [], n: 0 }; };
-  // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27): once its list is on the server, a tap on a wrong internet photo puts the item on that list (its camera is up there); before it, the camera stays in the card
+  // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27, «باقى الاصناف انا اللى هدخلها من اصناف الفواتير»): once its list is on the server, HE puts an item on it from the card («➕ للقايمة», or a tap on
+  // a wrong internet photo); the camera of an item with no photo stays in the card too. Before the list, a tapped internet photo gets a camera in the card
   const wantList = () => (root.AskerPhotoWant && root.AskerPhotoWant.can() ? root.AskerPhotoWant : null);
   const wrongOf = (r, net) => { const W = wantList(); return W ? new Set(net.filter((x) => W.wanted(x.id)).map((x) => x.id)) : picBad[r.id] || new Set(); };
+  // the invoice's items whose photo a person chose or kept: nothing is asked of them, but he can put a wrong one on the list too («لو صورتها مش مظبوطه او غلط»)
+  const fineOf = (r) => {
+    const M = media(), out = [], seen = new Set();
+    if (!M || !wantList()) return out;
+    for (const l of linesOf(r)) {
+      const id = l && Number(l.id);
+      if (!(id > 0) || seen.has(id) || rejected(r, l)) continue;
+      seen.add(id);
+      if (M.photoState(id) === 'ok' && M.photoSrc(id)) out.push({ id, name: String(l.name || l.paper || '') });
+    }
+    return out;
+  };
+  let picFine = {};
+  const picTile = (r, x, on, badge) => `<button type="button" class="rv-pic-tile${on ? ' bad' : ''}" data-rv-pbad="${esc(r.id + '|' + x.id)}" aria-pressed="${on}"><img src="${esc(media().photoSrc(x.id) || '')}" alt="" loading="lazy"><small class="notr" dir="ltr">${esc(x.name)}</small>${on ? `<em>${badge}</em>` : ''}</button>`;
+  const addedLine = (x) => `<p class="rv-pic-added">✓ <bdi class="notr" dir="ltr">${esc(x.name)}</bdi> <span>اتضافت لقايمة الصور فوق</span></p>`;
   function picRow(r, x, label) {
     const k = r.id + '|' + x.id;
     const pick = (text, camera) => `<label class="rv-pcam${camera ? '' : ' rv-ppick'}">${text}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ''} hidden data-rv-pcam="${esc(k)}"></label>`;
-    return `<div class="rv-pic-row"><b class="notr" dir="ltr">${esc(x.name)}</b>${picBusy[x.id] ? '<span class="rv-pic-wait">بحفظ الصورة…</span>' : `<span class="rv-ptwo">${pick(label, true)}${pick('🖼 من الصور', false)}</span>`}</div>`;
+    const W = wantList(), on = !!(W && W.wanted(x.id));
+    const add = W ? `<button type="button" class="rv-padd${on ? ' on' : ''}" data-rv-pbad="${esc(k)}" aria-pressed="${on}">${on ? '✓ في القايمة' : '➕ للقايمة'}</button>` : '';
+    return `<div class="rv-pic-row"><b class="notr" dir="ltr">${esc(x.name)}</b>${picBusy[x.id] ? '<span class="rv-pic-wait">بحفظ الصورة…</span>' : `<span class="rv-ptwo">${pick(label, true)}${pick('🖼 من الصور', false)}${add}</span>`}</div>`;
   }
   function picsHtml(r) {
-    const p = picsOf(r);
-    if (!p.n) return '';
+    const p = picsOf(r), fine = fineOf(r);
+    if (!p.n && !fine.length) return '';
     const M = media(), W = wantList(), bad = wrongOf(r, p.net), wrong = p.net.filter((x) => bad.has(x.id)), good = p.net.length - wrong.length;
     const head = [p.none.length ? `<bdi dir="ltr">${p.none.length}</bdi> <span>من غير صورة</span>` : '', p.net.length ? `<bdi dir="ltr">${p.net.length}</bdi> <span>صورتها من النت</span>` : ''].filter(Boolean).join(' · ');
-    const open = r.id in picOpen ? picOpen[r.id] : true;
-    let h = `<details class="rv-pics" data-rv-pics="${esc(r.id)}"${open ? ' open' : ''}><summary><span>📷 صور الأصناف</span><small>${head}</small></summary>`;
+    const open = r.id in picOpen ? picOpen[r.id] : p.n > 0;
+    let h = `<details class="rv-pics" data-rv-pics="${esc(r.id)}"${open ? ' open' : ''}><summary><span>📷 صور الأصناف</span><small>${head || '<span>صورة غلط؟ ضيفها للقايمة</span>'}</small></summary>`;
     h += p.none.map((x) => picRow(r, x, '📷 صوّر')).join('');
     if (p.net.length) {
       h += `<p class="rv-hint">${W ? 'صور النت: دوسة على الغلط تضيفها لقايمة «صور مطلوبة» اللي فوق. اللي تقول عليها تمام مش هيتسأل عليها تاني.' : 'صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.'}</p><div class="rv-pic-grid">` +
-        p.net.map((x) => `<button type="button" class="rv-pic-tile${bad.has(x.id) ? ' bad' : ''}" data-rv-pbad="${esc(r.id + '|' + x.id)}" aria-pressed="${bad.has(x.id)}"><img src="${esc(M.photoSrc(x.id) || '')}" alt="" loading="lazy"><small class="notr" dir="ltr">${esc(x.name)}</small>${bad.has(x.id) ? `<em>${W ? 'للصور ✓' : 'مش تمام'}</em>` : ''}</button>`).join('') + '</div>';
-      h += W ? wrong.map((x) => `<p class="rv-pic-added">✓ <bdi class="notr" dir="ltr">${esc(x.name)}</bdi> <span>اتضافت لقايمة الصور فوق</span></p>`).join('') : wrong.map((x) => picRow(r, x, '📷 صوّرها')).join('');
+        p.net.map((x) => picTile(r, x, bad.has(x.id), W ? 'للصور ✓' : 'مش تمام')).join('') + '</div>';
+      h += W ? wrong.map(addedLine).join('') : wrong.map((x) => picRow(r, x, '📷 صوّرها')).join('');
       if (good > 0) h += `<button type="button" class="rv-pic-ok" data-rv-pok="${esc(r.id)}"><span>${wrong.length ? '✓ الباقي صوره تمام' : '✓ كلهم تمام'}</span> (<bdi dir="ltr">${good}</bdi>)</button>`;
+    }
+    if (fine.length) {
+      const picked = fine.filter((x) => W.wanted(x.id));
+      const grid = '<p class="rv-hint">لو صورة غلط دوس عليها تتضاف لقايمة «صور مطلوبة» اللي فوق.</p><div class="rv-pic-grid">' + fine.map((x) => picTile(r, x, picked.includes(x), 'للصور ✓')).join('') + '</div>' + picked.map(addedLine).join('');
+      // alone, it is the whole box; under the ones that are asked it is folded
+      h += p.n ? `<details class="rv-pic-fine" data-rv-fine="${esc(r.id)}"${picFine[r.id] || picked.length ? ' open' : ''}><summary><span>صورة غلط في صنف تاني؟</span> (<bdi dir="ltr">${fine.length}</bdi>)</summary>${grid}</details>` : grid;
     }
     return h + '</details>';
   }
@@ -411,7 +435,7 @@
     if (!W) { const s = picBad[r.id] || (picBad[r.id] = new Set()); if (s.has(id)) s.delete(id); else s.add(id); sig = signature(); draw(); return; }
     if (busy) return;
     busy = true;
-    const x = picsOf(r).net.find((y) => y.id === id);
+    const p = picsOf(r), x = p.net.concat(p.none, fineOf(r)).find((y) => y.id === id);
     try { await W.toggle(id, x ? x.name : ''); }
     catch (e) { say('ما اتحفظش: ' + (e.message || e), 'bad'); }
     finally { busy = false; openState[r.id] = true; sig = signature(); draw(); }
@@ -599,7 +623,7 @@
   }
   const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details, x.status, x.answer_key, x.answer_text, (x.options || []).length]), Object.keys(snaps),
     Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late]),
-    rows.map((r) => { const p = picsOf(r), bad = wrongOf(r, p.net); return [p.none.map((x) => x.id), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : '') + ':' + bad.has(x.id))]; }), !!wantList(), Object.keys(picBusy)]);
+    rows.map((r) => { const p = picsOf(r), bad = wrongOf(r, p.net), W = wantList(); return [p.none.map((x) => x.id + ':' + !!(W && W.wanted(x.id))), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : '') + ':' + bad.has(x.id)), fineOf(r).map((x) => x.id + ':' + media().photoSrc(x.id) + ':' + !!(W && W.wanted(x.id)))]; }), !!wantList(), Object.keys(picBusy)]);
   // never redraw under his fingers (typing a note, choosing an answer), nor while he is speaking into a box
   const typingNow = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
     !!(root.AskerVoice && root.AskerVoice.listening());
@@ -785,7 +809,7 @@
   root.AskerItemMedia?.onChange?.(followPics);
   root.AskerPhotoWant?.onChange?.(followPics);
   // «صور الأصناف» folded or opened by him stays so while the card is drawn again («toggle» does not bubble: caught on the way down)
-  $('rvMain')?.addEventListener('toggle', (e) => { const d = e.target; if (d.dataset && d.dataset.rvPics) picOpen[d.dataset.rvPics] = d.open; }, true);
+  $('rvMain')?.addEventListener('toggle', (e) => { const d = e.target; if (d.dataset && d.dataset.rvPics) picOpen[d.dataset.rvPics] = d.open; if (d.dataset && d.dataset.rvFine) picFine[d.dataset.rvFine] = d.open; }, true);
   if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-niname]')) { e.preventDefault(); niKeep(e.target.dataset.rvNiname, e.target.value); } else if (e.target.matches('[data-rv-say]')) { e.preventDefault(); main.querySelector(`[data-rv-send="${CSS.escape(e.target.dataset.rvSay)}"]`)?.click(); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
   document.addEventListener('keydown', onKey);
   $('rvRefresh')?.addEventListener('click', () => load(true));
