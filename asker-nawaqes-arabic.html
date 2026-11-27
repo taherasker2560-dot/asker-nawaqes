@@ -15,7 +15,7 @@
     <title>سيستم نواقص صيدلية عسكر</title>
     <link rel="stylesheet" href="ar/app.css?v=airy-20261119a" />
     <!-- the modern look with the new round logo (2026-11-12); remove this line for the old look -->
-    <link rel="stylesheet" href="ar/look.css?v=quick-20261127a" />
+    <link rel="stylesheet" href="ar/look.css?v=items-20261128a" />
     <!-- 2026-11-16 «كبسولة وموجة»: the new shape and motion, a layer over the two above (ar/capsule.css, ar/motion.js); remove this line for the previous look -->
     <link rel="stylesheet" href="ar/capsule.css?v=airy-20261119a" />
     <!-- 2026-11-17 the brand look: white, quiet, the calm orange and a soft green (ar/brand.css), a layer over all of the above -->
@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="ar/review.css?v=approve-20261127c" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=approve-20261127c"></script>
+    <script src="ar/i18n-en.js?v=items-20261128a"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -791,6 +791,11 @@
           <div class="sa-head"><h2>📦 قيمة المخزون</h2><button id="svRefresh" type="button" class="secondary small">تحديث</button></div>
           <div id="svMain"></div>
         </section>
+        <!-- «الأصناف يوم بيوم» (owner 2026-11-28, ar/day-items.js): sales returns, new items and old items that arrived to an empty shelf, each day, with the stock now; files day/items*.json, i_<date>.json; owner only -->
+        <section id="dayItemsPanel" class="card hidden">
+          <div class="sa-head"><h2>📦 الأصناف يوم بيوم</h2><button id="diRefresh" type="button" class="secondary small">تحديث</button></div>
+          <div id="diMain"></div>
+        </section>
         <!-- «الخزن» (owner 2026-11-15, ar/cash.js): PharmaFly's cash boxes, today's in and out, each box's statement; owner only -->
         <section id="cashPanel" class="card hidden">
           <div class="sa-head"><h2>الخزن</h2><button id="csRefresh" type="button" class="secondary small">تحديث</button></div>
@@ -1083,7 +1088,7 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=voicesale-20261122a"></script>
     <script src="ar/cache.js?v=wait-20261121a"></script>
-    <script src="ar/app.js?v=photolist-20261127a"></script>
+    <script src="ar/app.js?v=items-20261128a"></script>
     <script src="ar/staff.js?v=photolist-20261127a"></script>
     <script src="ar/suppliers.js?v=lists2-20261121a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
@@ -1098,7 +1103,8 @@
     <script src="ar/profit.js?v=basis-20261126b"></script>
     <script src="ar/close.js?v=dayclose-20261126a"></script>
     <script src="ar/stockvalue.js?v=money-20261127a"></script>
-    <script src="ar/reports.js?v=reports-20261127a"></script>
+    <script src="ar/day-items.js?v=items-20261128a"></script>
+    <script src="ar/reports.js?v=items-20261128a"></script>
     <script src="ar/po-statement.js?v=lists2-20261121a"></script>
     <script src="ar/store-orders.js?v=call-20261122a"></script>
     <script src="ar/store-settings.js?v=maxq-20261119a"></script>
@@ -1109,8 +1115,8 @@
     <script src="ar/photo-want.js?v=newcard-20261127d"></script>
     <script src="ar/stock.js?v=voicehome-20261122a"></script>
     <script src="ar/home.js?v=voicehome-20261122a"></script>
-    <script src="ar/look.js?v=photolist-20261127a"></script>
-    <script src="ar/shortcuts.js?v=photolist-20261127a"></script>
+    <script src="ar/look.js?v=items-20261128a"></script>
+    <script src="ar/shortcuts.js?v=items-20261128a"></script>
     <script src="ar/barhide.js?v=typing-20261121a" defer></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=lists3-20261121a"></script>

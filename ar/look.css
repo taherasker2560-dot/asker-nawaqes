@@ -2699,7 +2699,25 @@ button.cu-qr-close { width: 100%; min-height: 46px; border-radius: 14px; margin-
 .dy-k b.dy-c { color: var(--crimson); }
 .dy-k i { font-style: normal; display: block; margin-top: 2px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
 button.dy-go { width: 100%; margin: 8px 0 0; min-height: 42px; border-radius: 14px; background: var(--rose); color: var(--crimson-ink); border: 1.5px solid var(--crimson); font-weight: 800; box-shadow: none; }
-#dayPanel .dy-card, #profitPanel .dy-card, #closePanel .dy-card, #stockValPanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
+#dayPanel .dy-card, #profitPanel .dy-card, #closePanel .dy-card, #stockValPanel .dy-card, #dayItemsPanel .dy-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; margin: 0 0 8px; }
+/* «الأصناف يوم بيوم» (ar/day-items.js, owner 2026-11-28, mockup mockups/items_daily_reports_2026-11-27.png) */
+#dayItemsPanel .di-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+#dayItemsPanel .di-kinds button.dy-chip { font-size: 13.5px; padding: 8px 13px; border-radius: 14px; }
+#dayItemsPanel .di-sum { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 10px; background: var(--rose); color: var(--crimson-ink); border-radius: 14px; padding: 11px 13px; margin: 0 0 6px; font-size: 14px; }
+#dayItemsPanel .di-sum small { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+#dayItemsPanel .di-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+#dayItemsPanel .di-a { flex: 1; min-width: 0; }
+#dayItemsPanel .di-a b { display: block; font-size: 14px; text-align: right; overflow-wrap: anywhere; color: var(--ink); }
+#dayItemsPanel .di-a small { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+#dayItemsPanel .di-st { flex: none; max-width: 45%; font-size: 12.5px; font-weight: 700; color: var(--crimson-ink); background: var(--rose); border: 1px solid var(--line); border-radius: 12px; padding: 4px 10px; text-align: center; }
+#dayItemsPanel .di-st.di-zero { color: #9a5b00; background: #fff6e8; border-color: #f1d3a3; }
+#dayItemsPanel .di-why { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+#dayItemsPanel .di-w { font-size: 11.5px; font-weight: 700; color: var(--crimson-ink); border: 1px solid var(--crimson); border-radius: 8px; padding: 1px 7px; }
+#dayItemsPanel .di-w small { display: inline; font-weight: 400; font-size: 11px; color: var(--muted); }
+#dayItemsPanel button.di-day { display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 0; padding: 10px 6px; min-height: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; color: var(--ink); box-shadow: none; font: inherit; font-size: 13.5px; cursor: pointer; }
+#dayItemsPanel button.di-day span { color: var(--crimson); font-weight: 700; }
+#dayItemsPanel button.di-day.on { background: var(--rose); border-radius: 12px; border-bottom-color: transparent; }
+#dayItemsPanel button.di-more { display: block; width: 100%; margin: 4px 0 0; padding: 9px; border: 0; background: none; color: var(--muted); box-shadow: none; font: inherit; font-size: 13px; cursor: pointer; }
 .dy-nav { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
 button.dy-b { margin: 0; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; background: var(--card); color: var(--crimson); border: 1px solid var(--line); box-shadow: none; font-size: 18px; }
 button.dy-b:disabled { opacity: 0.35; }

@@ -11,11 +11,16 @@
     doc: 'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h5', clock: 'M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18', pill: 'M10.5 20.5a5 5 0 0 1-7-7l6-6a5 5 0 0 1 7 7zM8.5 8.5l7 7',
     users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M18 14a6 6 0 0 1 4 7', box: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
     season: 'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8', back: 'M9 6L4 11l5 5M4 11h10a5 5 0 0 1 0 10h-2', find: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14M21 21l-4.3-4.3',
-    swap: 'M7 4v16M17 4v16M4 8l3-4 3 4M14 16l3 4 3-4',
+    swap: 'M7 4v16M17 4v16M4 8l3-4 3 4M14 16l3 4 3-4', fresh: 'M12 4v16M4 12h16M6.5 6.5l11 11M17.5 6.5l-11 11', inbox: 'M4 14h5l1.5 2.5h3L15 14h5M4 14l2-9h12l2 9v5H4z',
   };
   // a card: tab = the screen that holds the report (ar/app.js showTab); chip = the customers' filter it opens on; ve = the view inside the suppliers (list = their list, find = «الصنف ده جه من مين»);
   // anchor = the block to scroll to (open = a folded block is opened)
   const GROUPS = [
+    // «الأصناف يوم بيوم» (ar/day-items.js, owner 2026-11-28, «صح ابعتها»): on top; one screen, the card picks which of the three it opens on
+    ['الأصناف يوم بيوم', [
+      { id: 'iret', tab: 'dayitems', chip: 'r', name: 'مرتجعات البيع', desc: 'الزباين رجّعت إيه', ic: 'back' },
+      { id: 'inew', tab: 'dayitems', chip: 'n', name: 'أصناف جديدة', desc: 'كروت جت في مشتريات اليوم', ic: 'fresh' },
+      { id: 'izero', tab: 'dayitems', chip: 'z', name: 'جه ورصيده صفر', desc: 'نواقص جت وبالطلب', ic: 'inbox' }]],
     ['الفلوس والربح', [
       { id: 'day', tab: 'day', name: 'اليوم', desc: 'النهارده عدّى إزاي', ic: 'cal' },
       { id: 'profit', tab: 'profit', name: 'الربح والهامش', desc: 'والصافي بعد المصروفات', ic: 'chart' },
@@ -39,7 +44,7 @@
   ];
   const ALL = GROUPS.flatMap((g) => g[1]);
   // the reports that are screens of their own: they live only on this page, so «‹ التقارير» is on top of them however they were opened
-  const OWN = ['day', 'profit', 'dayclose', 'stockval', 'sales'];
+  const OWN = ['day', 'profit', 'dayclose', 'stockval', 'sales', 'dayitems'];
   const showBack = (tab, from) => OWN.includes(tab) || (!!from && tab === from);
   const WORDS = ['📊 التقارير', '‹ التقارير', ...GROUPS.map((g) => g[0]), ...ALL.flatMap((r) => [r.name, r.desc])];
   const api = { GROUPS, ALL, OWN, ICONS, WORDS, showBack };
@@ -74,7 +79,7 @@
     if (!r) return;
     run++;
     from = r.tab; // set before the screen opens, so its «‹ التقارير» stays
-    if (r.chip) root.AskerCustomers?.preset?.(r.chip); // before the screen draws, so its first drawing is already on this filter
+    if (r.chip) (r.tab === 'dayitems' ? root.AskerDayItems : root.AskerCustomers)?.preset?.(r.chip); // before the screen draws, so its first drawing is already on this filter
     root.AskerApp?.showTab?.(r.tab);
     if (r.ve === 'list') root.AskerVendors?.home?.();
     window.scrollTo({ top: 0 });
