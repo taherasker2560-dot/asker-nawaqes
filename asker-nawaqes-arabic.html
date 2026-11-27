@@ -22,10 +22,10 @@
     <link rel="stylesheet" href="ar/brand.css?v=nobless-20261117a" />
     <link rel="stylesheet" href="ar/bars.css?v=bars-20261121a" />
     <link rel="stylesheet" href="ar/airy.css?v=bars-20261121f" />
-<link rel="stylesheet" href="ar/review.css?v=itempics-20261127a" />
+<link rel="stylesheet" href="ar/review.css?v=photolist-20261127a" />
     <!-- English (owner 2026-11-12, «أ»): the dictionary and the translator run first, so in English nothing shows in Arabic
          first; in Arabic (the default) they do nothing. The voice and the WhatsApp messages to the warehouses stay Arabic. -->
-    <script src="ar/i18n-en.js?v=quick-20261127a"></script>
+    <script src="ar/i18n-en.js?v=photolist-20261127a"></script>
     <script src="ar/i18n.js?v=plural-20261117a"></script>
   </head>
   <body>
@@ -207,7 +207,8 @@
             <button type="button" class="chip" data-tab="drafts">الطلبيات</button
             ><button type="button" class="chip" data-tab="docs">الفواتير</button
             ><button type="button" class="chip" data-tab="suppliers">قوايم المخازن</button
-            ><button type="button" class="chip" data-tab="wait">الانتظار</button>
+            ><button type="button" class="chip" data-tab="wait">الانتظار</button
+            ><button type="button" class="chip stf-only" data-tab="photos">صور مطلوبة</button>
           </div>
           <div class="chips" data-pfor="stock" role="group" aria-label="مخزون" hidden>
             <button type="button" class="chip" data-tab="stock">المخزون</button
@@ -543,6 +544,13 @@
             ><input id="spDate" type="date" style="width: 100%; padding: 10px; font-size: 16px" />
             <button id="spUpload" type="button">ارفع القايمة</button>
           </details>
+        </section>
+
+        <!-- «📷 صور مطلوبة» (owner 2026-11-27, ar/photo-want.js): the items whose box photo is wanted, above the invoice review; the owner sends the list to his WhatsApp numbers; a staff member with «صور مطلوبة» takes the photos -->
+        <section id="photoWantPanel" class="card hidden pw-empty">
+          <h2 class="pw-h"><span>📷 صور مطلوبة</span><b id="pwCount" class="pw-count notr" hidden></b></h2>
+          <p id="pwStatus" class="status"></p>
+          <div id="pwMain"></div>
         </section>
 
         <!-- «🧾 مراجعة الفواتير» (owner 2026-11-21, ar/invoice-review.js): the invoices Claude has read and prepared, before they are entered in PharmaFly; he answers the notes and approves; owner only -->
@@ -1075,8 +1083,8 @@
     <script src="ar/data-age.js?v=times-20261113a"></script>
     <script src="ar/fuzzy.js?v=voicesale-20261122a"></script>
     <script src="ar/cache.js?v=wait-20261121a"></script>
-    <script src="ar/app.js?v=reports-20261127a"></script>
-    <script src="ar/staff.js?v=wabiz-20261120a"></script>
+    <script src="ar/app.js?v=photolist-20261127a"></script>
+    <script src="ar/staff.js?v=photolist-20261127a"></script>
     <script src="ar/suppliers.js?v=lists2-20261121a"></script>
     <script src="ar/docs.js?v=docs-20261108a"></script>
     <script src="ar/qty-input.js?v=numsel-20261122a"></script>
@@ -1097,11 +1105,12 @@
     <script src="ar/site-users.js?v=people-20261119a"></script>
     <script src="ar/statement-pdf.js?v=airy-20261119a"></script>
     <script src="store/edit.js?v=edit-20261114a"></script>
-    <script src="ar/item-media.js?v=itempics-20261127a"></script>
+    <script src="ar/item-media.js?v=photolist-20261127a"></script>
+    <script src="ar/photo-want.js?v=photolist-20261127a"></script>
     <script src="ar/stock.js?v=voicehome-20261122a"></script>
     <script src="ar/home.js?v=voicehome-20261122a"></script>
-    <script src="ar/look.js?v=reports-20261127a"></script>
-    <script src="ar/shortcuts.js?v=reports-20261127a"></script>
+    <script src="ar/look.js?v=photolist-20261127a"></script>
+    <script src="ar/shortcuts.js?v=photolist-20261127a"></script>
     <script src="ar/barhide.js?v=typing-20261121a" defer></script>
     <!-- alerts (expiry, sales mix-ups, customers' limits) and the notifications with a sound per section (2026-11-12) -->
     <script src="ar/alerts.js?v=lists3-20261121a"></script>
@@ -1114,7 +1123,7 @@
 <script src="ar/cash.js?v=dayclose-20261126a"></script>
 <script src="ar/pay.js?v=apps-20261119a"></script>
 <script src="ar/waitlist.js?v=waitsell-20261122a"></script>
-<script src="ar/invoice-review.js?v=itempics-20261127a"></script>
+<script src="ar/invoice-review.js?v=photolist-20261127a"></script>
 <script src="ar/item-actions.js?v=ia-20261120c"></script>
 <script src="ar/music.js?v=advert-20261119b"></script>
 <script src="ar/notes.js?v=music-20261119b"></script>

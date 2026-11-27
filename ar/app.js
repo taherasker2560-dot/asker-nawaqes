@@ -224,12 +224,12 @@
   // a [data-tab], and a section (and a group of «المشتريات») remembers the small tab you were on.
   const GROUP_OF = {
     home: 'home',
-    short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases',
+    short: 'purchases', read: 'purchases', translate: 'purchases', bags: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', photos: 'purchases',
     customers: 'accounts', vendors: 'accounts', cash: 'accounts', pay: 'accounts', ops: 'accounts', wait: 'purchases', storeorders: 'sales', tempsale: 'sales', care: 'care',
     // «📊 التقارير» (ar/reports.js, owner 2026-11-26): its page and the reports that are screens of their own; no button of the bar is lit on them
     reports: 'reports', sales: 'reports', day: 'reports', dayclose: 'reports', profit: 'reports', stockval: 'reports',
   };
-  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
+  const PGROUP_OF = { short: 'short', read: 'short', translate: 'short', bags: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', photos: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const lastTab = { home: 'home', purchases: 'short', accounts: 'customers', sales: 'storeorders', care: 'care', reports: 'reports' };
   const lastPTab = { short: 'short', orders: 'drafts', stock: 'stock' };
   function showTab(tab) {
@@ -285,6 +285,10 @@
     const reviewOn = tab === 'docs' && !(window.AskerStaff && window.AskerStaff.isStaff && window.AskerStaff.isStaff());
     $('reviewPanel')?.classList.toggle('hidden', !reviewOn);
     if (reviewOn) window.AskerInvReview?.open(); else window.AskerInvReview?.close();
+    // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27): above the review for the owner; a staff member with «صور مطلوبة» has it as his own tab (names, camera, the phone's photos)
+    const wantOn = reviewOn || tab === 'photos';
+    $('photoWantPanel')?.classList.toggle('hidden', !wantOn);
+    if (wantOn) window.AskerPhotoWant?.open(!(window.AskerStaff && window.AskerStaff.isStaff && window.AskerStaff.isStaff())); else window.AskerPhotoWant?.close();
     $('draftsPanel')?.classList.toggle('hidden', tab !== 'drafts');
     if (tab === 'drafts') { window.AskerRepInvoices?.open(); window.AskerPoStatement?.open(); window.AskerOrderCompare?.open(); window.AskerOrderDrafts?.open(); }
     $('stockPanel')?.classList.toggle('hidden', tab !== 'stock');

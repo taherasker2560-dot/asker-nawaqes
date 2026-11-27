@@ -18,7 +18,7 @@ const DEFAULT_SITE = 'https://taherasker2560-dot.github.io/asker-nawaqes/asker-n
 const TIMEOUT_MS = 15000;
 // the sections a person can be given (the bot's tabs) and the extras of «البيع المؤقت» and the search on top
 // 'care' = «خدمة العملاء ← الرسايل» (owner 2026-11-13, our own messages page)
-export const PERMS = ['short', 'read', 'translate', 'drafts', 'docs', 'suppliers', 'stock', 'count', 'expiry', 'customers', 'storeorders', 'tempsale', 'care', 'search', 'return', 'credit', 'returns', 'wait'];
+export const PERMS = ['short', 'read', 'translate', 'drafts', 'docs', 'suppliers', 'stock', 'count', 'expiry', 'customers', 'storeorders', 'tempsale', 'care', 'search', 'return', 'credit', 'returns', 'wait', 'photos'];
 export const cleanPerms = (p: unknown): string[] => Array.isArray(p) ? [...new Set(p.filter((x): x is string => typeof x === 'string' && PERMS.includes(x)))] : [];
 
 const list = (v: string | undefined) => String(v || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);

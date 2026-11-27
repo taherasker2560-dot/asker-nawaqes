@@ -8,6 +8,7 @@ const all=(page,sel)=>page.$$eval(sel,(b,f)=>b.map(new Function('x','return ('+f
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhWMjWwAAAABJRU5ErkJggg==','base64');
 const seedAndReload=async(page)=>{
  await page.evaluate(()=>{
+  localStorage.setItem('__fakeFail','ar_photo_wanted'); // before «صور مطلوبة» is on the server: the camera stays inside the card (with the list: tests/e2e/photo-list.spec.cjs)
   const lines=[101,102,103,104,105,106].map((id,i)=>({n:i+1,paper:'دوا مثال '+(i+1),qty:1,disc:20,exp:'082029',id,name:'EXAMPLE '+id+' TAB',total:10}));
   lines.push({n:7,paper:'صنف جديد مثال',qty:1,disc:20,exp:'082029',name:'NEW EXAMPLE',total:10},{...lines[0],n:8});
   localStorage.setItem('__fakeTables',JSON.stringify({

@@ -86,13 +86,25 @@
     ]).then(changed);
     return ready;
   }
+  // every row: the server hands out 1,000 at most per read, and each «تمام» adds one, so they are read page by page
+  const PAGE = 1000, MAX_PAGES = 40;
+  async function readEdits(cols) {
+    const c = app(), rows = [];
+    for (let i = 0; i < MAX_PAGES; i++) {
+      const { data, error } = await c.from('ar_store_edits').select(cols).order('item_id').range(i * PAGE, i * PAGE + PAGE - 1);
+      if (error) return { data: null, error };
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE) break;
+    }
+    return { data: rows, error: null };
+  }
   async function loadEdits() {
-    const c = app(); if (!c) return;
-    // active_ar / active_en came with migration 202611210200, photo_ok_at with 202611271000: before one, the older columns only
-    let { data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by,photo_ok_at');
+    if (!app()) return;
+    // active_ar / active_en came with migration 202611210200, photo_ok_at with 202611271200: before one, the older columns only
+    let { data, error } = await readEdits('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by,photo_ok_at');
     canConfirm = !error;
-    if (error) ({ data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by'));
-    if (error) ({ data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off'));
+    if (error) ({ data, error } = await readEdits('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by'));
+    if (error) ({ data, error } = await readEdits('item_id,img,img_off,descr,desc_off'));
     if (!error && Array.isArray(data)) { edits = {}; for (const r of data) edits[r.item_id] = r; loaded = true; }
   }
   const lang = () => { try { return localStorage.getItem('asker-lang') === 'en' ? 'en' : 'ar'; } catch (e) { return 'ar'; } };
@@ -358,6 +370,8 @@
 
   root.AskerItemMedia = {
     load, open,
+    // the fixes read again (a photo a staff member took on his own phone since this page opened: «صور مطلوبة»)
+    reload: () => loadEdits().then(changed),
     // set an item's photo from a picture the page already has (a data: URL), through the same function as the sheet's phone photo (owner / staff session).
     // Used by «مراجعة الفواتير»: a new item's box photo becomes its photo once its PharmaFly card exists (owner 2026-11-22). Throws with the function's message on a refusal.
     async upload(id, data) {

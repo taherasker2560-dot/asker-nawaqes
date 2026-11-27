@@ -144,3 +144,33 @@
 .rv-pic-tile em { position: absolute; top: -7px; right: 6px; background: var(--bad, #a3162f); color: #fff; border-radius: 999px; font-size: 10px; font-style: normal; font-weight: 700; padding: 1px 7px; }
 .rv-pics button.rv-pic-ok { width: 100%; margin: 6px 0 2px; border: 1.5px solid var(--crimson) !important; border-radius: 14px; background: var(--rose); color: var(--crimson-ink); font-weight: 800; box-shadow: none; }
 .rv-pic-n { flex: none; font-size: 11.5px; font-weight: 700; color: var(--crimson); white-space: nowrap; }
+
+/* «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27, mockup mockups/photo_list_2026-11-27.png): the box above the invoice review; a staff member with «صور مطلوبة» sees it as his own screen */
+html:not(.staff) .subbar .stf-only { display: none !important; }
+/* a staff member can have five chips under «طلبيات»: they go on a second line instead of running off the side of the phone */
+html.staff .subbar [data-pfor="orders"] { flex-wrap: wrap; overflow-x: visible; }
+#photoWantPanel.pw-empty { display: none !important; }
+#photoWantPanel .pw-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#photoWantPanel .pw-count { flex: none; border-radius: 999px; padding: 2px 13px; font-size: 14px; background: var(--crimson); color: #fff; }
+#photoWantPanel .pw-num { border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px 12px; margin: 0 0 10px; }
+#photoWantPanel .pw-nh { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#photoWantPanel .pw-nh b { min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
+#photoWantPanel .pw-last { display: block; color: var(--muted); font-size: 12.5px; }
+#photoWantPanel .pw-two { display: flex; gap: 8px; margin: 8px 0 0; }
+#photoWantPanel button.pw-btn { flex: 1; width: auto; min-width: 0; min-height: 44px; margin: 0; padding: 8px; border: 1.5px solid var(--line) !important; border-radius: 14px; background: var(--card); color: var(--ink); box-shadow: none; font: inherit; font-size: 14px; cursor: pointer; }
+#photoWantPanel button.pw-btn.main { border-color: var(--crimson) !important; background: var(--rose); color: var(--crimson-ink); font-weight: 700; }
+#photoWantPanel button.pw-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+#photoWantPanel .pw-add { margin: 8px 0; }
+#photoWantPanel .pw-add input { width: 100%; box-sizing: border-box; margin: 0 0 8px; }
+#photoWantPanel .pw-it { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px dashed var(--line); }
+#photoWantPanel .pw-it:first-child { border-top: 0; }
+#photoWantPanel .pw-two + .pw-it, #photoWantPanel .pw-num + .pw-it { margin-top: 10px; }
+#photoWantPanel .pw-nm { flex: 1; min-width: 0; }
+#photoWantPanel .pw-nm b { display: block; font-size: 13.5px; text-align: right; overflow-wrap: anywhere; color: var(--ink); }
+#photoWantPanel .pw-nm small { display: block; font-size: 12px; color: var(--muted); }
+#photoWantPanel .pw-cam { flex: none; display: grid; place-items: center; width: 48px; height: 44px; margin: 0; padding: 0; border: 1.5px solid var(--crimson); border-radius: 14px; background: var(--rose); font-size: 20px; cursor: pointer; }
+#photoWantPanel .pw-cam.pw-gal { border-color: var(--line); background: var(--card); }
+#photoWantPanel button.pw-x { flex: none; width: 34px; min-width: 0; min-height: 34px; margin: 0; padding: 0; border: 0 !important; background: none; color: var(--muted); box-shadow: none; font: inherit; font-size: 17px; cursor: pointer; }
+#photoWantPanel button.pw-more { display: block; width: 100%; margin: 4px 0 0; padding: 8px; border: 0 !important; background: none; color: var(--crimson-ink); box-shadow: none; font: inherit; font-size: 14px; cursor: pointer; }
+#photoWantPanel .pw-wait { flex: none; font-size: 12px; color: var(--muted); }
+#reviewPanel .rv-pic-added { margin: 4px 2px; font-size: 13px; font-weight: 700; color: var(--crimson-ink); }

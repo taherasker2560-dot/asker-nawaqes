@@ -356,6 +356,9 @@
   let picBad = {}, picOpen = {}, picBusy = {};
   const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
   const picsOf = (r) => { const M = media(); return M ? picNeeds(r, (id) => M.photoState(id), M.canConfirm()) : { none: [], net: [], n: 0 }; };
+  // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27): once its list is on the server, a tap on a wrong internet photo puts the item on that list (its camera is up there); before it, the camera stays in the card
+  const wantList = () => (root.AskerPhotoWant && root.AskerPhotoWant.can() ? root.AskerPhotoWant : null);
+  const wrongOf = (r, net) => { const W = wantList(); return W ? new Set(net.filter((x) => W.wanted(x.id)).map((x) => x.id)) : picBad[r.id] || new Set(); };
   function picRow(r, x, label) {
     const k = r.id + '|' + x.id;
     const pick = (text, camera) => `<label class="rv-pcam${camera ? '' : ' rv-ppick'}">${text}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ''} hidden data-rv-pcam="${esc(k)}"></label>`;
@@ -364,15 +367,15 @@
   function picsHtml(r) {
     const p = picsOf(r);
     if (!p.n) return '';
-    const M = media(), bad = picBad[r.id] || new Set(), wrong = p.net.filter((x) => bad.has(x.id)), good = p.net.length - wrong.length;
+    const M = media(), W = wantList(), bad = wrongOf(r, p.net), wrong = p.net.filter((x) => bad.has(x.id)), good = p.net.length - wrong.length;
     const head = [p.none.length ? `<bdi dir="ltr">${p.none.length}</bdi> <span>من غير صورة</span>` : '', p.net.length ? `<bdi dir="ltr">${p.net.length}</bdi> <span>صورتها من النت</span>` : ''].filter(Boolean).join(' · ');
     const open = r.id in picOpen ? picOpen[r.id] : true;
     let h = `<details class="rv-pics" data-rv-pics="${esc(r.id)}"${open ? ' open' : ''}><summary><span>📷 صور الأصناف</span><small>${head}</small></summary>`;
     h += p.none.map((x) => picRow(r, x, '📷 صوّر')).join('');
     if (p.net.length) {
-      h += '<p class="rv-hint">صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.</p><div class="rv-pic-grid">' +
-        p.net.map((x) => `<button type="button" class="rv-pic-tile${bad.has(x.id) ? ' bad' : ''}" data-rv-pbad="${esc(r.id + '|' + x.id)}" aria-pressed="${bad.has(x.id)}"><img src="${esc(M.photoSrc(x.id) || '')}" alt="" loading="lazy"><small class="notr" dir="ltr">${esc(x.name)}</small>${bad.has(x.id) ? '<em>مش تمام</em>' : ''}</button>`).join('') + '</div>';
-      h += wrong.map((x) => picRow(r, x, '📷 صوّرها')).join('');
+      h += `<p class="rv-hint">${W ? 'صور النت: دوسة على الغلط تضيفها لقايمة «صور مطلوبة» اللي فوق. اللي تقول عليها تمام مش هيتسأل عليها تاني.' : 'صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.'}</p><div class="rv-pic-grid">` +
+        p.net.map((x) => `<button type="button" class="rv-pic-tile${bad.has(x.id) ? ' bad' : ''}" data-rv-pbad="${esc(r.id + '|' + x.id)}" aria-pressed="${bad.has(x.id)}"><img src="${esc(M.photoSrc(x.id) || '')}" alt="" loading="lazy"><small class="notr" dir="ltr">${esc(x.name)}</small>${bad.has(x.id) ? `<em>${W ? 'للصور ✓' : 'مش تمام'}</em>` : ''}</button>`).join('') + '</div>';
+      h += W ? wrong.map((x) => `<p class="rv-pic-added">✓ <bdi class="notr" dir="ltr">${esc(x.name)}</bdi> <span>اتضافت لقايمة الصور فوق</span></p>`).join('') : wrong.map((x) => picRow(r, x, '📷 صوّرها')).join('');
       if (good > 0) h += `<button type="button" class="rv-pic-ok" data-rv-pok="${esc(r.id)}"><span>${wrong.length ? '✓ الباقي صوره تمام' : '✓ كلهم تمام'}</span> (<bdi dir="ltr">${good}</bdi>)</button>`;
     }
     return h + '</details>';
@@ -389,10 +392,22 @@
     } catch (e) { say('الصورة ما اتحفظتش: ' + (e.message || e), 'bad'); }
     finally { URL.revokeObjectURL(url); delete picBusy[id]; sig = signature(); draw(); }
   }
+  // a tap on an internet photo: wrong (or taken back)
+  async function picWrong(rid, id) {
+    const W = wantList(), r = find(rid);
+    if (!r) return;
+    if (!W) { const s = picBad[r.id] || (picBad[r.id] = new Set()); if (s.has(id)) s.delete(id); else s.add(id); sig = signature(); draw(); return; }
+    if (busy) return;
+    busy = true;
+    const x = picsOf(r).net.find((y) => y.id === id);
+    try { await W.toggle(id, x ? x.name : ''); }
+    catch (e) { say('ما اتحفظش: ' + (e.message || e), 'bad'); }
+    finally { busy = false; openState[r.id] = true; sig = signature(); draw(); }
+  }
   async function picConfirm(rid) {
     const r = find(rid), M = media();
     if (!r || !M || busy) return;
-    const bad = picBad[r.id] || new Set(), ids = picsOf(r).net.map((x) => x.id).filter((id) => !bad.has(id));
+    const net = picsOf(r).net, bad = wrongOf(r, net), ids = net.map((x) => x.id).filter((id) => !bad.has(id));
     busy = true;
     try { await M.confirm(ids); say('تمام ✓ مش هيتسأل عليهم تاني', 'good'); }
     catch (e) { say('ما اتحفظش: ' + (e.message || e), 'bad'); }
@@ -572,7 +587,7 @@
   }
   const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details, x.status, x.answer_key, x.answer_text, (x.options || []).length]), Object.keys(snaps),
     Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late]),
-    rows.map((r) => { const p = picsOf(r); return [p.none.map((x) => x.id), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : ''))]; }), Object.entries(picBad).map(([k, s]) => [k, [...s]]), Object.keys(picBusy)]);
+    rows.map((r) => { const p = picsOf(r), bad = wrongOf(r, p.net); return [p.none.map((x) => x.id), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : '') + ':' + bad.has(x.id))]; }), !!wantList(), Object.keys(picBusy)]);
   // never redraw under his fingers (typing a note, choosing an answer), nor while he is speaking into a box
   const typingNow = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
     !!(root.AskerVoice && root.AskerVoice.listening());
@@ -601,6 +616,8 @@
       const before = sig; rows = next; sig = signature();
       if (force || (sig !== before && !typingNow())) draw();
       say('');
+      // the items with no photo go to «📷 صور مطلوبة» by themselves (not waited for: the invoices never wait for it)
+      root.AskerPhotoWant?.noteReviews?.(next);
     } catch (e) {
       say('مقدرتش أجيب الفواتير المتجهزة: ' + (e.message || e), 'bad');
     } finally { loading = false; }
@@ -708,7 +725,7 @@
     if ((el = g('data-rv-shot'))) { const [r, i] = split(el.dataset.rvShot); return viewer(r, Number(i)); }
     if ((el = g('data-rv-niok'))) return niKeep(el.dataset.rvNiok);
     if ((el = g('data-rv-pok'))) return picConfirm(el.dataset.rvPok);
-    if ((el = g('data-rv-pbad'))) { const [r, id] = split(el.dataset.rvPbad), s = picBad[r] || (picBad[r] = new Set()); if (s.has(Number(id))) s.delete(Number(id)); else s.add(Number(id)); sig = signature(); draw(); return; }
+    if ((el = g('data-rv-pbad'))) { const [r, id] = split(el.dataset.rvPbad); return picWrong(r, Number(id)); }
     if ((el = g('data-rv-niedit'))) { niEdit = el.dataset.rvNiedit; sig = signature(); draw(); const i = document.querySelector(`[data-rv-niname="${CSS.escape(niEdit)}"]`); if (i) { i.focus(); i.select(); } return; }
     if ((el = g('data-rv-nisave'))) { const i = document.querySelector(`[data-rv-niname="${CSS.escape(el.dataset.rvNisave)}"]`); return niKeep(el.dataset.rvNisave, i ? i.value : ''); }
     if ((el = g('data-rv-toggle'))) { const r = find(el.dataset.rvToggle); if (r) { openState[r.id] = !isOpen(r); el.closest('.rv-card').classList.toggle('open', openState[r.id]); } }
@@ -750,7 +767,9 @@
   function close() { clearInterval(timer); timer = null; clearTimeout(niTimer); niTimer = null; shot && shot.remove(); shot = null; }
   const main = $('rvMain');
   // the photos' list or a fix arrived after the cards were drawn: they are drawn again (not under his fingers)
-  root.AskerItemMedia?.onChange?.(() => { if (panelOn() && rows.length) { const next = signature(); if (next !== sig && !typingNow()) { sig = next; draw(); } } });
+  const followPics = () => { if (panelOn() && rows.length) { const next = signature(); if (next !== sig && !typingNow()) { sig = next; draw(); } } };
+  root.AskerItemMedia?.onChange?.(followPics);
+  root.AskerPhotoWant?.onChange?.(followPics);
   // «صور الأصناف» folded or opened by him stays so while the card is drawn again («toggle» does not bubble: caught on the way down)
   $('rvMain')?.addEventListener('toggle', (e) => { const d = e.target; if (d.dataset && d.dataset.rvPics) picOpen[d.dataset.rvPics] = d.open; }, true);
   if (main) { main.addEventListener('click', onClick); main.addEventListener('change', onChange); main.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; if (e.target.matches('[data-rv-price]')) { e.preventDefault(); priceEnter(e.target); } else if (e.target.matches('[data-rv-niname]')) { e.preventDefault(); niKeep(e.target.dataset.rvNiname, e.target.value); } else if (e.target.matches('[data-rv-say]')) { e.preventDefault(); main.querySelector(`[data-rv-send="${CSS.escape(e.target.dataset.rvSay)}"]`)?.click(); } else if (e.target.matches('[data-rv-toggle]')) e.target.click(); }); }
