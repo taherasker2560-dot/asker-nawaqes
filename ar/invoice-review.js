@@ -368,13 +368,16 @@
   let picBad = {}, picOpen = {}, picBusy = {};
   const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
   const picsOf = (r) => { const M = media(); return M ? picNeeds(r, (id) => M.photoState(id), M.canConfirm()) : { none: [], net: [], n: 0 }; };
-  // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27): once its list is on the server, a tap on a wrong internet photo puts the item on that list (its camera is up there); before it, the camera stays in the card
+  // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27, «باقى الاصناف انا اللى هدخلها من اصناف الفواتير»): once its list is on the server, HE puts an item on it from the card («➕ للقايمة», or a tap on
+  // a wrong internet photo); the camera of an item with no photo stays in the card too. Before the list, a tapped internet photo gets a camera in the card
   const wantList = () => (root.AskerPhotoWant && root.AskerPhotoWant.can() ? root.AskerPhotoWant : null);
   const wrongOf = (r, net) => { const W = wantList(); return W ? new Set(net.filter((x) => W.wanted(x.id)).map((x) => x.id)) : picBad[r.id] || new Set(); };
   function picRow(r, x, label) {
     const k = r.id + '|' + x.id;
     const pick = (text, camera) => `<label class="rv-pcam${camera ? '' : ' rv-ppick'}">${text}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ''} hidden data-rv-pcam="${esc(k)}"></label>`;
-    return `<div class="rv-pic-row"><b class="notr" dir="ltr">${esc(x.name)}</b>${picBusy[x.id] ? '<span class="rv-pic-wait">بحفظ الصورة…</span>' : `<span class="rv-ptwo">${pick(label, true)}${pick('🖼 من الصور', false)}</span>`}</div>`;
+    const W = wantList(), on = !!(W && W.wanted(x.id));
+    const add = W ? `<button type="button" class="rv-padd${on ? ' on' : ''}" data-rv-pbad="${esc(k)}" aria-pressed="${on}">${on ? '✓ في القايمة' : '➕ للقايمة'}</button>` : '';
+    return `<div class="rv-pic-row"><b class="notr" dir="ltr">${esc(x.name)}</b>${picBusy[x.id] ? '<span class="rv-pic-wait">بحفظ الصورة…</span>' : `<span class="rv-ptwo">${pick(label, true)}${pick('🖼 من الصور', false)}${add}</span>`}</div>`;
   }
   function picsHtml(r) {
     const p = picsOf(r);
@@ -383,6 +386,7 @@
     const head = [p.none.length ? `<bdi dir="ltr">${p.none.length}</bdi> <span>من غير صورة</span>` : '', p.net.length ? `<bdi dir="ltr">${p.net.length}</bdi> <span>صورتها من النت</span>` : ''].filter(Boolean).join(' · ');
     const open = r.id in picOpen ? picOpen[r.id] : true;
     let h = `<details class="rv-pics" data-rv-pics="${esc(r.id)}"${open ? ' open' : ''}><summary><span>📷 صور الأصناف</span><small>${head}</small></summary>`;
+    if (W && p.none.length) h += '<p class="rv-hint">«➕ للقايمة» تحط الصنف في «صور مطلوبة» اللي فوق.</p>';
     h += p.none.map((x) => picRow(r, x, '📷 صوّر')).join('');
     if (p.net.length) {
       h += `<p class="rv-hint">${W ? 'صور النت: دوسة على الغلط تضيفها لقايمة «صور مطلوبة» اللي فوق. اللي تقول عليها تمام مش هيتسأل عليها تاني.' : 'صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.'}</p><div class="rv-pic-grid">` +
@@ -411,7 +415,7 @@
     if (!W) { const s = picBad[r.id] || (picBad[r.id] = new Set()); if (s.has(id)) s.delete(id); else s.add(id); sig = signature(); draw(); return; }
     if (busy) return;
     busy = true;
-    const x = picsOf(r).net.find((y) => y.id === id);
+    const p = picsOf(r), x = p.net.concat(p.none).find((y) => y.id === id);
     try { await W.toggle(id, x ? x.name : ''); }
     catch (e) { say('ما اتحفظش: ' + (e.message || e), 'bad'); }
     finally { busy = false; openState[r.id] = true; sig = signature(); draw(); }
@@ -599,7 +603,7 @@
   }
   const signature = () => JSON.stringify([rows.map((r) => [r.id, r.status, r.owner_note, r.answers, r.notes, r.lines, r.result, r.ord, r.total]), stops.map((x) => [x.id, x.ref_id, x.title, x.details, x.status, x.answer_key, x.answer_text, (x.options || []).length]), Object.keys(snaps),
     Object.entries(ni).map(([k, x]) => [k, x.id, x.status, !!niPics[x.id], !!x.late]),
-    rows.map((r) => { const p = picsOf(r), bad = wrongOf(r, p.net); return [p.none.map((x) => x.id), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : '') + ':' + bad.has(x.id))]; }), !!wantList(), Object.keys(picBusy)]);
+    rows.map((r) => { const p = picsOf(r), bad = wrongOf(r, p.net), W = wantList(); return [p.none.map((x) => x.id + ':' + !!(W && W.wanted(x.id))), p.net.map((x) => x.id + ':' + (media() ? media().photoSrc(x.id) : '') + ':' + bad.has(x.id))]; }), !!wantList(), Object.keys(picBusy)]);
   // never redraw under his fingers (typing a note, choosing an answer), nor while he is speaking into a box
   const typingNow = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('#rvMain') && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) ||
     !!(root.AskerVoice && root.AskerVoice.listening());
