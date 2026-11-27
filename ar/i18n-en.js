@@ -2695,6 +2695,8 @@ window.AskerEN = {
   "مسمعتش حاجة، دوس واتكلم تاني.": "Heard nothing: tap and speak again.",
   "📷 صوّر العلبة": "📷 Photograph the box",
   "📷 صور الأصناف": "📷 Item photos",
+  "⚡ سريع": "⚡ Quick",
+  "الكارت ملغي في فارمافلاي، عدّل الزرار": "Cancelled card in PharmaFly: fix the button",
   "من غير صورة": "with no photo",
   "صورتها من النت": "with an internet photo",
   "صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.": "Internet photos: tap a wrong one to mark it, then photograph it. The ones you confirm are never asked again.",
