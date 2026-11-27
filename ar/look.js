@@ -14,6 +14,7 @@
     customersPanel: 'العملاء', vendorsPanel: 'الموردين', storeOrdersPanel: 'طلبات الموقع', salesPanel: 'حركة البيع',
     tempSalePanel: 'البيع المؤقت', cashPanel: 'الخزن', payPanel: 'المدفوعات', waitPanel: 'الانتظار', carePanel: '',
     reportsPanel: '', dayPanel: 'اليوم', closePanel: 'تقفيل اليوم', profitPanel: 'الربح والهامش', stockValPanel: 'قيمة المخزون',
+    photoWantPanel: 'صور مطلوبة', // last: for the owner it sits above «الفواتير», which names the screen
   };
 
   // 1) where you are

@@ -13,12 +13,12 @@
   const SECTIONS = [
     ['tempsale', 'البيع المؤقت', 'المبيعات'], ['return', 'المرتجع (في البيع المؤقت)', 'المبيعات'], ['credit', 'البيع للعملاء الآجل', 'المبيعات'], ['storeorders', 'الموقع', 'المبيعات'],
     ['stock', 'المخزون', 'المخزون'], ['count', 'جرد المخزون', 'المخزون'], ['expiry', 'الصلاحيات', 'المخزون'], ['returns', 'تجهيز المرتجعات (جوه الصلاحيات)', 'المخزون'],
-    ['short', 'النواقص', 'المشتريات'], ['read', 'الوارد', 'المشتريات'], ['translate', 'الترجمة', 'المشتريات'], ['drafts', 'الطلبيات', 'المشتريات'], ['docs', 'الفواتير', 'المشتريات'], ['suppliers', 'قوايم المخازن', 'المشتريات'], ['wait', 'الانتظار (طلب مش موجود، وكلّم دول)', 'المشتريات'],
+    ['short', 'النواقص', 'المشتريات'], ['read', 'الوارد', 'المشتريات'], ['translate', 'الترجمة', 'المشتريات'], ['drafts', 'الطلبيات', 'المشتريات'], ['docs', 'الفواتير', 'المشتريات'], ['suppliers', 'قوايم المخازن', 'المشتريات'], ['wait', 'الانتظار (طلب مش موجود، وكلّم دول)', 'المشتريات'], ['photos', 'صور مطلوبة', 'المشتريات'],
     ['customers', 'العملاء', 'الحسابات'], ['care', 'رسايل العملاء', 'خدمة العملاء'], ['search', 'البحث اللي فوق الأقسام', 'عام'],
   ];
   // the bot's tabs a staff member can be given, and their place in the bottom bar
-  const GROUP = { short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', wait: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', customers: 'accounts', storeorders: 'sales', tempsale: 'sales', care: 'care' };
-  const PGROUP = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
+  const GROUP = { short: 'purchases', read: 'purchases', translate: 'purchases', drafts: 'purchases', docs: 'purchases', suppliers: 'purchases', wait: 'purchases', photos: 'purchases', stock: 'purchases', count: 'purchases', expiry: 'purchases', customers: 'accounts', storeorders: 'sales', tempsale: 'sales', care: 'care' };
+  const PGROUP = { short: 'short', read: 'short', translate: 'short', drafts: 'orders', docs: 'orders', suppliers: 'orders', wait: 'orders', photos: 'orders', stock: 'stock', count: 'stock', expiry: 'stock' };
   const TABS = Object.keys(GROUP);
   // «returns» (preparing the returns statement) lives inside «الصلاحيات»: it opens that tab for him even when «الصلاحيات» itself is not open
   const allowedTabs = (perms) => TABS.filter((t) => (perms || []).includes(t) || (t === 'expiry' && (perms || []).includes('returns')));
@@ -149,7 +149,7 @@
     drawHome(tabs);
   }
   // his home: big buttons for the sections open for him
-  const ICON = { care: '💬', tempsale: '🧾', storeorders: '🛒', stock: '📦', count: '📋', expiry: '⏳', short: '📉', read: '📥', translate: '🔤', drafts: '📝', docs: '🧾', suppliers: '🏬', wait: '📝', customers: '👥' };
+  const ICON = { care: '💬', tempsale: '🧾', storeorders: '🛒', stock: '📦', count: '📋', expiry: '⏳', short: '📉', read: '📥', translate: '🔤', drafts: '📝', docs: '🧾', suppliers: '🏬', wait: '📝', photos: '📷', customers: '👥' };
   function drawHome(tabs) {
     const box = $('staffHomePanel');
     if (!box) return;
