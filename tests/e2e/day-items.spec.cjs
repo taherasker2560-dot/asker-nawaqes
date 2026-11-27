@@ -36,11 +36,11 @@ run('Items by day: the three cards of «التقارير», the rows with the st
  assert.equal(await page.$eval('[data-di-kind="z"]',(b)=>b.classList.contains('on')),true,'the card he tapped picked the report');
  assert.deepEqual(await all(page,'#diMain .di-row b.notr'),['EXAMPLE GENERAL CAPS','EXAMPLE WAITED GEL','EXAMPLE SLOW CREAM','EXAMPLE ORDERED DROPS'],'by arrival; the plain one and the cancelled wait are not shown');
  assert.deepEqual(await all(page,'#diMain .di-why'),['نواقص جت','كان في الانتظار','كمية كبيرة بيعه حوالي 0.7 في الشهر','بالطلب']);
- assert.match(await txt(page,'#diMain .di-sum'),/4 صنف .*نواقص جت 1 · بالطلب 1 · كمية كبيرة 1 · كان في الانتظار 1/);
+ assert.match(await txt(page,'#diMain .di-sum'),/4 أصناف .*نواقص جت 1 · بالطلب 1 · كمية كبيرة 1 · كان في الانتظار 1/);
  assert.deepEqual(await all(page,'#diMain .di-st'),['رصيده : 2 علبة','رصيده : 1 علبة','رصيده : 6 علب','رصيده : صفر']);
  assert.match(await txt(page,'#diMain .dy-stamp'),/الرصيد والبيانات لحد 12:20 ص \(آخر نسخة\)/);
  assert.match(await txt(page,'#diMain'),/الأيام قبل 28\/11: «بالطلب» مش محسوبة/);
- assert.match(await txt(page,'[data-di-day="2026-11-27"]'),/27 نوفمبر 4 صنف ‹/,'the day\'s count with the waited one');
+ assert.match(await txt(page,'[data-di-day="2026-11-27"]'),/27 نوفمبر 4 أصناف ‹/,'the day\'s count with the waited one');
  assert.match(await txt(page,'[data-di-day="2026-11-26"]'),/مفيش/);
  await shot(page,'items-zero');
  // returns: the latest first, the loose units said

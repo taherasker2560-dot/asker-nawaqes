@@ -31,6 +31,9 @@ assert.equal(P.countOf(index, '2026-01-01', 'n', []), 0);
 assert.equal(P.boxes(20, 1), '20 علبة'); assert.equal(P.boxes(3, 3), '3 علب'); assert.equal(P.boxes(3.6667, 3), '3 علب + 2 وحدة'); assert.equal(P.boxes(0.5, 1), '½ علبة'); assert.equal(P.boxes(0.9999, 2), '1 علبة');
 const stock = P.parseStock({ data_at: '2026-11-28 10:05:00', s: { 7: [0, 2] } });
 assert.deepEqual(P.stockOf(stock, 7), { q: 0, parts: 2 }); assert.equal(P.stockOf(stock, 8), null); assert.equal(P.stockOf(stock, null), null);
+// what came back, and Arabic counting
+assert.equal(P.returned(4, 1), '4'); assert.equal(P.returned(1, 30), '1', 'a loose tablet is one, not a box'); assert.equal(P.returned(0.667, 3), '2 وحدة'); assert.equal(P.returned(0.5, 1), '½ علبة');
+assert.deepEqual([1, 2, 3, 6, 10, 11, 15, 103].map((n) => P.counted(n, 'صنف', 'أصناف')), ['صنف', 'صنف', 'أصناف', 'أصناف', 'أصناف', 'صنف', 'صنف', 'أصناف']);
 // the English
 for (const s of P.WORDS) assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s));
 console.log('PASS: items by day: the files, the waiting list, the empty-shelf reasons, the counts, boxes and units, the English');
