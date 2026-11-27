@@ -59,7 +59,8 @@ run('Invoice review: a new item\'s box photo is read, shown under its line, kept
  assert.equal(V.answers.N2.t,'EXAMPLE SHAMPOO 250ML','his name stays');
  assert.deepEqual([V.answers.N3.v,V.answers.N3.t],['item','EXAMPLE CREAM 50GM'],'the reading\'s name kept for the line he did not answer');
  // the laptop enters it and makes card 70626 for line 2: the box photo becomes that item's photo, once, and the reading is «applied»
- await page.evaluate(()=>{window.__up=[];window.AskerItemMedia.upload=async(id,data)=>{window.__up.push([id,String(data).slice(0,23)]);return 'e/x.jpg'};
+ // as the real one for the owner: the photo goes on the item (the line under the card says so only when it is there: since 2026-11-27 a user's photo waits for the owner instead)
+ await page.evaluate(()=>{window.__up=[];window.AskerItemMedia.upload=async(id,data)=>{window.__up.push([id,String(data).slice(0,23)]);(window.__tables.ar_store_edits||(window.__tables.ar_store_edits=[])).push({item_id:id,img:'e/x.jpg',img_off:false,updated_by:'u1',updated_at:new Date().toISOString()});await window.AskerItemMedia.reload();return {img:'e/x.jpg',pending:false}};
   Object.assign(window.__tables.ar_invoice_reviews[0],{status:'entered',done_at:new Date().toISOString(),result:{msg:'اتدخلت',new_items:[{n:2,code:70626}]}})});
  await page.click('#rvRefresh');
  await page.waitForFunction(()=>window.__up&&window.__up.length===1,null,{timeout:8000});
