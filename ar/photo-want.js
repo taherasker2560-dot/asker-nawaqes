@@ -2,8 +2,10 @@
    … للمستخدمين معايا بحيث يصور من جوه السيستم او يضيف من الصور»; mockup mockups/photo_list_2026-11-27.png, his «كمل»).
    The owner: above «مراجعة الفواتير». (His correction the same day: «صور الصنف الجديد تبقى اول الاصناف فى صور مطلوبه … تدخل تلقائى اما باقى الاصناف انا اللى هدخلها من اصناف الفواتير».)
    NEW items (no PharmaFly card yet) come FIRST and by themselves: the server lists them when the invoice is prepared (ar_photo_new, migration 202611271700). Their box photo goes the same way as the
-   invoice card's «📷 صوّر العلبة» (ar_item_reads, kind new_item): the laptop reads it and it becomes the new card's photo. Every OTHER item is here only because he put it, from the invoice card.
-   A line leaves once its photo is sent (a new item) or a person's photo is saved / «تمام» (another item), or with his ✕. His WhatsApp numbers: the whole list or only what is new since the last time;
+   invoice card's «📷 صوّر العلبة» (ar_item_reads, kind new_item): the laptop reads it and it becomes the new card's photo. UNDER them (his second word: «سيب الاصناف اللى ملهاش صورة اوتوماتيك عادى
+   بس تحت الاصناف الجديده»): the items of the prepared invoices with NO photo, by themselves; and the ones he adds from an invoice card because their photo is wrong, whoever chose it.
+   A line leaves once its photo is sent (a new item), once an item with none gets a person's photo / «تمام», once one he added gets a NEW photo / «تمام» after he added it, or with his ✕.
+   His WhatsApp numbers: the whole list or only what is new since the last time;
    he presses send in WhatsApp. A staff member with «صور مطلوبة»: the names, the camera and the phone's photos; nothing else (tables ar_photo_wanted / ar_photo_numbers, migration 202611271200). */
 (function (root) {
   'use strict';
@@ -26,13 +28,35 @@
     }
     return out.sort(newestFirst);
   }
-  // the items he put on the list that still wait: not taken off, and no person's photo yet. stateOf = AskerItemMedia.photoState ('none' | 'net' | 'ok', null = the photos are not read yet: nothing is shown)
-  function waiting(rows, stateOf) {
+  // the other items that still wait, not taken off. stateOf = AskerItemMedia.photoState ('none' | 'net' | 'ok', null = the photos are not read yet: nothing is shown).
+  // One that came by itself (no photo) waits until it has a person's photo. One HE added waits even if a person had chosen its photo: until a new one, or «تمام», AFTER he added it
+  // (fixedAt = AskerItemMedia.fixedAt: when a person last gave, removed or kept its photo)
+  function waiting(rows, stateOf, fixedAt) {
     return (rows || []).filter((r) => {
       if (!r || r.removed_at) return false;
       const st = stateOf(Number(r.item_id));
-      return st != null && st !== 'ok';
+      if (st == null) return false;
+      if (r.why !== 'picked') return st !== 'ok';
+      const at = fixedAt ? fixedAt(Number(r.item_id)) : null;
+      return !(at && Date.parse(at) > Date.parse(r.added_at));
     }).map((r) => ({ ...r, kind: 'item', key: 'i:' + r.item_id })).sort(newestFirst);
+  }
+  // the items of the prepared invoices that have no photo and are not in the table yet (a rejected line goes back to the supplier; one he took off stays off)
+  function autoRows(reviews, have, stateOf) {
+    const out = [], seen = new Set((have || []).map((r) => Number(r.item_id)));
+    for (const r of reviews || []) {
+      if (!r || r.status === 'cancelled') continue;
+      const ans = r.answers && typeof r.answers === 'object' ? r.answers : {};
+      for (const l of Array.isArray(r.lines) ? r.lines : []) {
+        const id = l && Number(l.id);
+        if (!(id > 0) || seen.has(id) || (ans['R' + l.n] && ans['R' + l.n].v === 'reject') || stateOf(id) !== 'none') continue;
+        const name = String(l.name || l.paper || '').replace(/\s+/g, ' ').trim().slice(0, 250);
+        if (!name) continue;
+        seen.add(id);
+        out.push({ item_id: id, name, why: 'none' });
+      }
+    }
+    return out;
   }
   const sameDay = (a, b) => { const x = new Date(a), y = new Date(b); return !isNaN(x) && x.toDateString() === y.toDateString(); };
   // the small line under a name
@@ -41,7 +65,8 @@
       if (e.retry) return 'الصورة ما اتقرتش، صوّرها تاني';
       return owner && e.supplier ? 'من فاتورة ' + e.supplier : 'صوّر العلبة من قدّام';
     }
-    return owner ? 'إنت ضفتها من المراجعة' : 'صوّرها أو هاتها من الصور';
+    if (!owner) return 'صوّرها أو هاتها من الصور';
+    return e.why === 'picked' ? 'إنت ضفتها من المراجعة' : 'من غير صورة';
   }
   // what is new for a number: added after the last time the list was opened for it (never sent = all of it)
   const newSince = (list, at) => (at ? list.filter((r) => Date.parse(r.added_at) > Date.parse(at)) : list.slice());
@@ -55,7 +80,7 @@
     return /^\d{10,15}$/.test(d) ? d : '';
   }
   const localPhone = (d) => (/^201\d{9}$/.test(String(d)) ? '0' + String(d).slice(2) : String(d));
-  const api = { newWaiting, waiting, why, newSince, waText, intlPhone, localPhone };
+  const api = { newWaiting, waiting, autoRows, why, newSince, waText, intlPhone, localPhone };
   root.AskerPhotoWantLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -65,6 +90,7 @@
   const db = () => root.AskerApp && root.AskerApp.client;
   const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
   const stateOf = (id) => { const M = media(); return M ? M.photoState(id) : null; };
+  const fixedAt = (id) => { const M = media(); return M && M.fixedAt ? M.fixedAt(id) : null; };
   let rows = [], newRows = [], reads = [], numbers = [], ready = false, owner = false, showing = false, all = false, adding = false, busy = {}, timer = null, sig = '';
   const listeners = [];
   const told = () => { for (const f of listeners) try { f(); } catch (e) { /* the invoice cards are not on screen */ } };
@@ -99,7 +125,7 @@
     if (!x.error) reads = x.data || [];
   }
   // the new ones first, then the ones he put
-  const list = () => newWaiting(newRows, reads).concat(waiting(rows, stateOf));
+  const list = () => newWaiting(newRows, reads).concat(waiting(rows, stateOf, fixedAt));
 
   const pick = (key, text, camera, label) => `<label class="pw-cam${camera ? '' : ' pw-gal'}" aria-label="${label}">${text}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ''} hidden data-pw-photo="${esc(key)}"></label>`;
   function itemHtml(e) {
@@ -131,7 +157,7 @@
     const cnt = $('pwCount');
     if (cnt) { cnt.textContent = items.length ? String(items.length) : ''; cnt.hidden = !items.length; }
     if (!ready) { box.innerHTML = owner ? '' : '<p class="hint">القايمة لسه مش متاحة. جرّب كمان شوية.</p>'; return; }
-    let h = items.length ? '' : '<p class="hint">مفيش صور مطلوبة دلوقتي ✓</p>' + (owner ? '<p class="hint">الصنف الجديد بيدخل هنا لوحده أول ما فاتورته تتجهّز. وأي صنف تاني تضيفه إنت من أصناف الفاتورة.</p>' : '');
+    let h = items.length ? '' : '<p class="hint">مفيش صور مطلوبة دلوقتي ✓</p>' + (owner ? '<p class="hint">الصنف الجديد واللي من غير صورة بيدخلوا هنا لوحدهم. ولو صنف صورته غلط، ضيفه من أصناف الفاتورة.</p>' : '');
     if (owner) {
       h += numbers.map((n) => numberHtml(n, items)).join('');
       h += adding
@@ -157,19 +183,31 @@
 
   // ---------- what the invoice cards use (ar/invoice-review.js) ----------
   const row = (id) => rows.find((r) => Number(r.item_id) === Number(id));
-  const wanted = (id) => { const r = row(id); return !!(r && !r.removed_at); };
-  // the invoice review saw invoices: a new line the list does not know yet = the list is read again (the server has already added it)
+  // on the list and still waiting (one that got its new photo may be added again)
+  const wanted = (id) => waiting(rows, stateOf, fixedAt).some((e) => Number(e.item_id) === Number(id));
+  // the invoice review saw invoices. A new line the list does not know yet = the list is read again (the server has already added it). The items with no photo are added here, by the owner's
+  // page (only it can tell which have none); one he took off stays off
   async function noteReviews(reviews) {
-    if (!db()) return;
-    const known = new Set(newRows.map((r) => r.review_id + '|' + r.line_n));
-    const unseen = (reviews || []).some((r) => r && r.status !== 'cancelled' && (Array.isArray(r.lines) ? r.lines : []).some((l) => l && !(Number(l.id) > 0) && !known.has(r.id + '|' + l.n)));
-    if (ready && !unseen) return;
-    try { owner = true; await media()?.load(); if (await read()) { redraw(); told(); } } catch (e) { /* the list is a help: the invoices are shown without it */ }
+    const M = media();
+    if (!M || !db()) return;
+    owner = true;
+    try {
+      await M.load();
+      const known = new Set(newRows.map((r) => r.review_id + '|' + r.line_n));
+      const unseen = (reviews || []).some((r) => r && r.status !== 'cancelled' && (Array.isArray(r.lines) ? r.lines : []).some((l) => l && !(Number(l.id) > 0) && !known.has(r.id + '|' + l.n)));
+      if (!ready || unseen) { if (!(await read())) return; redraw(); told(); }
+      const add = autoRows(reviews, rows, stateOf);
+      if (!add.length) return;
+      const at = new Date().toISOString();
+      const { error } = await db().from('ar_photo_wanted').upsert(add.map((x) => ({ ...x, added_at: at, removed_at: null })), { onConflict: 'item_id', ignoreDuplicates: true });
+      if (error) return;
+      await read(); redraw(); told();
+    } catch (e) { /* the list is a help: the invoices are shown without it */ }
   }  // he puts an item of an invoice on the list (a wrong internet photo, or none); the same tap again takes it back
   async function toggle(id, name) {
     const c = db(), r = row(id);
     if (!c || !ready) throw new Error('القايمة لسه مش متاحة');
-    const on = !(r && !r.removed_at), at = new Date().toISOString();
+    const on = !wanted(id), at = new Date().toISOString();
     const next = on ? { item_id: Number(id), name: String(name || (r && r.name) || id).slice(0, 250), why: 'picked', added_at: at, removed_at: null } : { ...r, removed_at: at };
     const { error } = await c.from('ar_photo_wanted').upsert(next, { onConflict: 'item_id' });
     if (error) throw new Error(error.message || String(error));

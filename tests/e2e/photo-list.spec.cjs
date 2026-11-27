@@ -17,7 +17,7 @@ run('Photo list (owner), nothing waiting: the box is still there, says why, and 
  await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');
  await page.waitForSelector('#pwMain [data-pw-add]');
  assert.ok(await shown(page,'#photoWantPanel'),'he finds it before any invoice arrives');
- assert.match(await txt(page,'#pwMain'),/مفيش صور مطلوبة دلوقتي ✓ الصنف الجديد بيدخل هنا لوحده أول ما فاتورته تتجهّز\. وأي صنف تاني تضيفه إنت من أصناف الفاتورة\./);
+ assert.match(await txt(page,'#pwMain'),/مفيش صور مطلوبة دلوقتي ✓ الصنف الجديد واللي من غير صورة بيدخلوا هنا لوحدهم\. ولو صنف صورته غلط، ضيفه من أصناف الفاتورة\./);
  assert.equal(await page.isDisabled('[data-pw-group]'),true,'nothing to send yet');
  await page.click('[data-pw-add]');await page.fill('#pwPhone','0100 000 0100');await page.click('[data-pw-save]');
  await page.waitForSelector('#pwMain .pw-num');
@@ -27,8 +27,8 @@ run('Photo list (owner), nothing waiting: the box is still there, says why, and 
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 });
 
-// his correction the same day: «صور الصنف الجديد تبقى اول الاصناف فى صور مطلوبه … تدخل تلقائى اما باقى الاصناف انا اللى هدخلها من اصناف الفواتير»
-run('Photo list (owner): the new item is first and there by itself; the others only when he adds them from the card; numbers, WhatsApp, ✕ and the camera',async({page,table})=>{
+// his word the same day: the new items first and by themselves; «سيب الاصناف اللى ملهاش صورة اوتوماتيك عادى بس تحت الاصناف الجديده»; and he adds any item whose photo is wrong
+run('Photo list (owner): the new item first, the ones with no photo under it by themselves; he adds a wrong photo from the card; numbers, WhatsApp, ✕ and the camera',async({page,table})=>{
  await photoFn(page);
  page.on('dialog',(d)=>d.accept());
  await page.evaluate(()=>{
@@ -37,33 +37,35 @@ run('Photo list (owner): the new item is first and there by itself; the others o
   const at=new Date(Date.now()-3600e3).toISOString();
   localStorage.setItem('__fakeTables',JSON.stringify({
    ar_invoice_reviews:[{id:11,batch:'b',ord:1,supplier:'مورد مثال',doc_no:'900001',paper_date:'2026-11-27',total:50,photos:[],lines,notes:[],answers:{},owner_note:null,status:'ready',result:null,created_at:new Date().toISOString(),done_at:null}],
-   ar_store_edits:[{item_id:102,img:'e/102-a.jpg',img_off:false,updated_by:null},{item_id:103,img:'e/103-a.jpg',img_off:false,updated_by:'u9'},{item_id:105,img:'e/105-a.jpg',img_off:false,updated_by:null}],
+   ar_store_edits:[{item_id:102,img:'e/102-a.jpg',img_off:false,updated_by:null},{item_id:103,img:'e/103-a.jpg',img_off:false,updated_by:'u9',updated_at:'2026-11-20T08:00:00Z'},{item_id:105,img:'e/105-a.jpg',img_off:false,updated_by:null}],
    ar_photo_new:[{review_id:11,line_n:'5',name:'شامبو جديد مثال',supplier:'مورد مثال',gone:false,removed_at:null,added_at:at}],   // the server lists it when the invoice is prepared
    ar_item_reads:[],ar_photo_wanted:[],ar_photo_numbers:[]}));
  });
  await page.reload();
  await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');
- await waitNames(page,1);
- assert.deepEqual(await names(page),['شامبو جديد مثال'],'the new item, by itself; an item with no photo is NOT added by itself');
- assert.match(await txt(page,'#pwMain .pw-it small'),/صنف جديد من فاتورة مورد مثال/);
+ await waitNames(page,2);
+ assert.deepEqual(await names(page),['شامبو جديد مثال','EXAMPLE NOPHOTO 500MG 20 TAB'],'the new item first, the one with no photo under it, both by themselves');
+ assert.deepEqual((await all(page,'#pwMain .pw-it small')),['صنف جديد من فاتورة مورد مثال','من غير صورة']);
  assert.ok(await page.evaluate(()=>!!(document.getElementById('photoWantPanel').compareDocumentPosition(document.getElementById('reviewPanel'))&4)),'above the review');
  assert.equal(await shown(page,'.subbar [data-tab="photos"]'),false,'the staff chip is not the owner\'s');
- await page.waitForTimeout(600);
- assert.equal((await table('ar_photo_wanted')).length,0);
- // he adds one from the invoice's items, takes it back, adds it again; a wrong internet photo the same way
+ // in the card: the one with no photo says it is on the list; a tap takes it off, another puts it back
  await page.click('[data-rv-toggle="11"] .rv-t');await page.waitForSelector('#rvMain .rv-pics .rv-padd');
- assert.match(await txt(page,'[data-rv-pbad="11|101"]'),/➕ للقايمة/);
- await page.click('[data-rv-pbad="11|101"]');await waitNames(page,2);
  assert.match(await txt(page,'[data-rv-pbad="11|101"]'),/✓ في القايمة/);
  await page.click('[data-rv-pbad="11|101"]');await waitNames(page,1);
- assert.ok((await table('ar_photo_wanted')).find((r)=>r.item_id===101).removed_at,'taken back');
+ assert.ok((await table('ar_photo_wanted')).find((r)=>r.item_id===101).removed_at,'taken off');
+ await page.click('#rvRefresh');await page.waitForTimeout(600);
+ assert.equal((await names(page)).length,1,'one he took off does not come back by itself');
  await page.click('[data-rv-pbad="11|101"]');await waitNames(page,2);
+ // a wrong internet photo, and a wrong one a person had chosen
  await new Promise((ok)=>setTimeout(ok,30));
  await page.click('[data-rv-pbad="11|102"]');await waitNames(page,3);
  assert.match(await txt(page,'[data-rv-pbad="11|102"]'),/للصور ✓/);
- assert.match(await txt(page,'.rv-pic-added'),/✓ EXAMPLE INTERNET 120 ML SYRUP اتضافت لقايمة الصور فوق/);
- assert.deepEqual(await names(page),['شامبو جديد مثال','EXAMPLE INTERNET 120 ML SYRUP','EXAMPLE NOPHOTO 500MG 20 TAB'],'the new item stays first, also over ones added after it');
- assert.equal((await txt(page,'#pwCount')),'3');
+ assert.match(await txt(page,'.rv-pic-fine > summary'),/صورة غلط في صنف تاني؟ \( 1 \)/);
+ await page.click('.rv-pic-fine > summary');await new Promise((ok)=>setTimeout(ok,30));
+ await page.click('[data-rv-pbad="11|103"]');await waitNames(page,4);
+ assert.match(await txt(page,'.rv-pic-fine'),/✓ EXAMPLE CHOSEN CREAM اتضافت لقايمة الصور فوق/);
+ assert.deepEqual(await names(page),['شامبو جديد مثال','EXAMPLE CHOSEN CREAM','EXAMPLE INTERNET 120 ML SYRUP','EXAMPLE NOPHOTO 500MG 20 TAB'],'the new item stays first, also over ones added after it');
+ assert.equal((await txt(page,'#pwCount')),'4');
  assert.match(await txt(page,'.rv-pic-ok'),/✓ الباقي صوره تمام \( 1 \)/);
  // a number of his, and the message: the new one first and marked
  await page.click('[data-pw-add]');
@@ -78,10 +80,12 @@ run('Photo list (owner): the new item is first and there by itself; the others o
  await page.waitForFunction(()=>window.__tables.ar_photo_numbers[0].last_sent_at);
  const url=await page.evaluate(()=>window.__opened[0]);
  assert.ok(url.startsWith('https://wa.me/201000000100?text='),url);
- assert.match(decodeURIComponent(url.split('?text=')[1]),/1\) شامبو جديد مثال \(صنف جديد\)\n2\) EXAMPLE INTERNET 120 ML SYRUP\n3\) EXAMPLE NOPHOTO 500MG 20 TAB/);
+ assert.match(decodeURIComponent(url.split('?text=')[1]),/1\) شامبو جديد مثال \(صنف جديد\)\n2\) EXAMPLE CHOSEN CREAM\n3\) EXAMPLE INTERNET 120 ML SYRUP\n4\) EXAMPLE NOPHOTO 500MG 20 TAB/);
  await page.waitForFunction(()=>document.querySelector('[data-pw-send$="|new"]')?.disabled);
  await new Promise((ok)=>setTimeout(ok,30));
- await page.click('[data-rv-pbad="11|105"]');await waitNames(page,4);
+ await page.click('[data-rv-pbad="11|105"]');await page.waitForFunction(()=>document.getElementById('pwCount').textContent==='5');
+ // every new item stays in sight; of the others the first three, the rest behind «… وكمان»
+ assert.equal((await names(page)).length,4);assert.match(await txt(page,'[data-pw-more]'),/… وكمان 1 ▾/);
  await page.waitForFunction(()=>!document.querySelector('[data-pw-send$="|new"]').disabled);
  await page.click('[data-pw-send$="|new"]');
  const second=decodeURIComponent((await page.evaluate(()=>window.__opened[1])).split('?text=')[1]);
@@ -89,13 +93,15 @@ run('Photo list (owner): the new item is first and there by itself; the others o
  await page.click('[data-pw-group]');
  assert.ok((await page.evaluate(()=>window.__opened[2])).startsWith('https://wa.me/?text='),'to a group: WhatsApp asks which chat');
  // his ✕ on the new item: gone, and it does not come back
- await page.click('[data-pw-x="n:11|5"]');await waitNames(page,3);
+ await page.click('[data-pw-x="n:11|5"]');await page.waitForFunction(()=>document.getElementById('pwCount').textContent==='4');
  assert.ok((await table('ar_photo_new'))[0].removed_at);
  await page.click('#rvRefresh');await page.waitForTimeout(700);
  assert.ok(!(await names(page)).includes('شامبو جديد مثال'));
- // the camera on another item: the photo becomes its photo and it leaves
+ // the camera on another item: the photo becomes its photo and it leaves; also one a person had chosen before (the new photo is after he added it)
  await page.setInputFiles('#pwMain [data-pw-photo="i:102"]',{name:'box.png',mimeType:'image/png',buffer:PNG});
  await page.waitForFunction(()=>/الصورة بقت صورة الصنف/.test(document.getElementById('pwStatus').textContent));
+ await page.waitForFunction(()=>document.getElementById('pwCount').textContent==='3');
+ await page.setInputFiles('#pwMain [data-pw-photo="i:103"]',{name:'box.png',mimeType:'image/png',buffer:PNG});
  await waitNames(page,2);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the phone');
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
