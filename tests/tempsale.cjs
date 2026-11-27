@@ -111,4 +111,12 @@ assert.equal(T.parseExp('11/2026',n0),'2026-11','this month is read (a sale refu
 {const ls=[];const l=T.addItem(ls,{item_id:66713,name:'COLD CAPS 20',price:36,parts:2,vp:true});assert.equal(l.vp,true);assert.deepEqual([l.p,l.pu],[36,18]);
 T.setPrice(l,'40');assert.deepEqual([l.p,l.pu],[40,20]);l.w=1;assert.equal(T.lineTotal(l),60);T.setPrice(l,0);assert.equal(l.p,40,'0 is refused');T.setPrice(l,'abc');assert.equal(l.p,40);T.setPrice(l,-5);assert.equal(l.p,40);
 T.setPrice(l,'37,5');assert.deepEqual([l.p,l.pu],[37.5,18.75]);assert.equal(T.addItem([],{item_id:1,name:'X',price:5,parts:1}).vp,false,'an ordinary item has no price box');}
+// «⚡ سريع» (2026-11-27): the grid from the count file's q: bad rows dropped, pages in order, the widest column, a button's own item when no list has it
+const Q = require('../ar/tempsale.js');
+const qr = Q.quickRows([{ d: 1, r: 0, c: 0, t: 'ب', i: 7, sp: 5, p: 0 }, { d: 0, r: 2, c: 5, t: '', n: 'ALPHA', i: 8, sp: 3.5, p: 4, e: true, off: 1 }, { d: 0, r: 0, c: 0, i: 0 }, null]);
+assert.deepEqual(qr.map((x) => [x.d, x.r, x.c, x.t, x.i, x.p, x.off]), [[1, 0, 0, 'ب', 7, 1, false], [0, 2, 5, 'ALPHA', 8, 4, true]]);
+assert.deepEqual(Q.quickPages(qr), [0, 1]);
+assert.equal(Q.quickCols(qr), 6);
+assert.deepEqual(Q.quickItem(qr[1]), { item_id: 8, name: 'ALPHA', arabic_name: '', price: 3.5, parts: 4, packs: 0, units: 0, nostock: true, sold0: true, hasExp: true });
+assert.deepEqual(Q.quickRows(undefined), []);
 console.log('PASS: temp sale: sticker = 100000 + code, boxes + units, expiry lines, the bill, the limit, the row, the bills, the typed expiry, the list');

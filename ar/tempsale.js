@@ -208,7 +208,15 @@
     if (!bills.length) bills.push(blankBill());
     return { cur: Math.min(Math.max(0, Math.floor(Number(raw && raw.cur)) || 0), bills.length - 1), bills };
   }
-  const api = { stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, setPrice, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
+  // ---- «⚡ سريع» (owner 2026-11-27, «ابعت»): PharmaFly's own quick-sale grid (table HandyItems), carried in the count file's `q` by the laptop (Hub\count\BUILD_COUNT.ps1):
+  // each button {d: page, r: row, c: column, t: the button's name, i: item, n, sp: price, p: parts, e: has an expiry, vp, off: a cancelled card}. His places are kept.
+  const quickRows = (list) => (Array.isArray(list) ? list : []).filter((q) => q && Number(q.i) > 0 && Number(q.d) >= 0 && Number(q.r) >= 0 && Number(q.c) >= 0)
+    .map((q) => ({ d: Number(q.d), r: Number(q.r), c: Number(q.c), t: String(q.t || q.n || ''), i: Number(q.i), n: String(q.n || ''), sp: Number(q.sp) || 0, p: Number(q.p) > 1 ? Number(q.p) : 1, e: !!q.e, vp: !!q.vp, off: !!q.off }));
+  const quickPages = (rows) => [...new Set(rows.map((q) => q.d))].sort((a, b) => a - b);
+  const quickCols = (rows) => rows.reduce((m, q) => Math.max(m, q.c + 1), 1);
+  // a button whose item has no stock and was not sold this year: it goes in like any item with no stock, from the button's own data
+  const quickItem = (q) => ({ item_id: q.i, name: q.n || q.t, arabic_name: '', price: q.sp, parts: q.p, packs: 0, units: 0, nostock: true, sold0: true, hasExp: q.e });
+  const api = { quickRows, quickPages, quickCols, quickItem, stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, setPrice, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -234,6 +242,10 @@
   let batches = null, batchAt = 0, batchData = '', batchP = null, expFor = null;
   // the items SOLD in the last 12 months that have no stock (z of the same file; owner 2026-11-21): rows [code, name, price, parts, has an expiry, Arabic name]
   let zRows = [], zItems = [], zById = new Map();
+  // the quick buttons and how he left them (open or folded, which page), on this phone
+  const QKKEY = 'asker-ts-quick';
+  let quick = [], qk = null;
+  const qkState = () => { if (!qk) { const v = load(QKKEY, null); qk = { open: !v || v.open !== false, page: Number((v && v.page) || 0) }; } return qk; };
   let stopped = new Set(); // customers whose credit the owner stopped
   // «الفكة»: the amount off (−) or added (+) on this bill; any change in the lines clears it
   let adj = 0, adjOpen = false, adjSign = -1;
@@ -317,6 +329,31 @@
     zItems = rows.map((r) => ({ item_id: Number(r[0]), name: String(r[1] || ''), arabic_name: String(r[5] || ''), price: Number(r[2]) || 0, parts: Number(r[3]) > 1 ? Number(r[3]) : 1, packs: 0, units: 0, nostock: true, sold0: true, hasExp: !!r[4] }));
     zById = new Map(zItems.map((x) => [x.item_id, x]));
   }
+  function useQuick(list) { quick = quickRows(list); drawQuick(); }
+  // under the search, so what he types shows right under the box: the buttons step aside while there is text (and while the camera is open)
+  function showQuick() {
+    const el = $('tsQuick');
+    if (el) el.classList.toggle('hidden', !quick.length || way === 'scan' || !!($('tsQ') && $('tsQ').value.trim()));
+  }
+  function drawQuick() {
+    const el = $('tsQuick');
+    if (!el) return;
+    if (!quick.length) { el.innerHTML = ''; return showQuick(); }
+    const s = qkState(), pages = quickPages(quick), page = pages.includes(s.page) ? s.page : pages[0];
+    const head = `<div class="ts-qk-head"><button type="button" class="ts-qk-toggle" data-ts-qk aria-expanded="${s.open}"><span>⚡ سريع</span> <span aria-hidden="true">${s.open ? '▴' : '▾'}</span></button>` +
+      (s.open ? `<div class="ts-qk-pages">${pages.map((d, k) => `<button type="button" class="ts-qk-page${d === page ? ' on' : ''}" data-ts-qkpage="${d}" aria-pressed="${d === page}">${k + 1}</button>`).join('')}</div>` : '') + '</div>';
+    const grid = s.open ? `<div class="ts-qk-grid" style="grid-template-columns:repeat(${quickCols(quick)},minmax(0,1fr))">` + quick.map((q, k) => (q.d === page
+      ? `<button type="button" class="ts-qk-btn${q.off ? ' off' : ''}" data-ts-quick="${k}" style="grid-row:${q.r + 1};grid-column:${q.c + 1}"><span class="notr${/[A-Za-z]{6}/.test(q.t) ? ' ts-qk-lat' : ''}" dir="auto">${esc(q.t)}</span></button>` : '')).join('') + '</div>' : '';
+    el.innerHTML = head + grid;
+    showQuick();
+  }
+  async function quickTap(k) {
+    const q = quick[k];
+    if (!q) return;
+    if (q.off) return say('tsFind', 'الكارت ملغي في فارمافلاي، عدّل الزرار', 'bad');
+    const it = byId.get(q.i) || zById.get(q.i) || quickItem(q);
+    if (await pick(it)) say('tsFind', 'اتضاف: ' + nameOf(it), 'ok');
+  }
   // their Arabic names (the search is often typed in Arabic): asked once from the items table, then kept with the rest
   async function loadZNames() {
     try {
@@ -347,12 +384,13 @@
         // keep the Arabic names already found for the same items
         const had = new Map(zRows.filter((r) => r[5] !== undefined).map((r) => [r[0], r[5]]));
         const z = (d.z || []).map((it) => { const r = [Number(it.i), it.n, it.sp, it.p, it.e ? 1 : 0]; if (had.has(r[0])) r.push(had.get(r[0])); return r; });
-        useBatches(rows, d.data_at); useZ(z); useVz(vz); batchAt = Date.now(); batchFail = 0;
-        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows, z, vz });
+        const q = d.q || [];
+        useBatches(rows, d.data_at); useZ(z); useVz([...vz, ...q.filter((x) => x && x.vp).map((x) => Number(x.i))]); useQuick(q); batchAt = Date.now(); batchFail = 0;
+        keep(XKEY, { at: Date.now(), data_at: d.data_at, rows, z, vz: [...vpZ], q });
         loadZNames();
       } catch (e) {
         batchFail = Date.now();
-        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); useZ(Array.isArray(c.z) ? c.z : []); useVz(c.vz); batchAt = c.at; } }
+        if (!batches) { const c = load(XKEY, null); if (c && Array.isArray(c.rows) && Date.now() - c.at < 36 * 36e5) { useBatches(c.rows, c.data_at); useZ(Array.isArray(c.z) ? c.z : []); useVz(c.vz); useQuick(c.q); batchAt = c.at; } }
       }
       batchP = null;
     })();
@@ -525,6 +563,7 @@
   async function find() {
     const q = $('tsQ').value.trim();
     $('tsClear').classList.toggle('hidden', !q);
+    showQuick();
     if (way === 'code') {
       const code = stickerCode(q);
       if (!q) { $('tsHits').innerHTML = ''; return say('tsFind', ''); }
@@ -547,6 +586,7 @@
     $('tsQ').value = '';
     $('tsHits').innerHTML = '';
     $('tsClear').classList.add('hidden');
+    showQuick();
   }
   function setWay(w) {
     way = w;
@@ -558,6 +598,7 @@
     $('tsHits').innerHTML = '';
     say('tsFind', '');
     $('tsSearch').classList.toggle('hidden', w === 'scan');
+    showQuick();
     if (w === 'scan') startScan(); else stopScan();
   }
 
@@ -1135,6 +1176,9 @@
       if (t.id === 'tsCam') return nextCam();
       if (t.dataset.tsBill != null) return switchBill(Number(t.dataset.tsBill));
       if (t.hasAttribute('data-ts-billadd')) return newBill();
+      if (t.hasAttribute('data-ts-qk')) { const s = qkState(); s.open = !s.open; keep(QKKEY, s); return drawQuick(); }
+      if (t.dataset.tsQkpage != null) { const s = qkState(); s.page = Number(t.dataset.tsQkpage); keep(QKKEY, s); return drawQuick(); }
+      if (t.dataset.tsQuick != null) return quickTap(Number(t.dataset.tsQuick));
       if (t.dataset.tsAdd) {
         closeHits();
         const it = await itemByCode(Number(t.dataset.tsAdd));
@@ -1179,6 +1223,7 @@
   }
   async function open() {
     bind();
+    drawQuick();
     loadBatches();   // the expiry batches: fresh each time the screen opens, never waited for here
     if (!ready) {
       ready = true;
