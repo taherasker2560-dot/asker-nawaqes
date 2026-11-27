@@ -20,6 +20,13 @@
     if (e && e.img) return IMG_URL + e.img;
     return pics && pics[id] ? 'store/img/' + pics[id] : null;
   }
+  // is the item's photo good (owner 2026-11-27, «تطلبها في مراجعة المشتريات»)? 'none' = no photo; 'net' = a photo nobody of ours chose (the site's own list or the night search);
+  // 'ok' = a person took or picked it (the photo function writes updated_by), said «تمام» (photo_ok_at), or removed it on purpose. Only 'none' and 'net' are asked for.
+  function photoState(id, pics, edits) {
+    const e = edits && edits[id];
+    if (e && (e.img_off || (e.img && e.updated_by) || e.photo_ok_at)) return 'ok';
+    return photoOf(id, pics, edits) ? 'net' : 'none';
+  }
   // the description: his own text, nothing if he hid it, else the shard's text
   function descFrom(id, shard, edits) {
     const e = edits && edits[id];
@@ -50,7 +57,7 @@
     return `<button type="button" class="im-th${src ? '' : ' im-none'}" data-im="${esc(id)}" aria-label="صورة الصنف وبيانه">`
       + (src ? `<img src="${esc(src)}" alt="" loading="lazy">` : `<span dir="ltr" translate="no">${esc(short(en))}</span>`) + '</button>';
   }
-  const api = { photoOf, descFrom, descHtml, thumbHtml, short, activeOf, SECTIONS, IMG_URL };
+  const api = { photoOf, photoState, descFrom, descHtml, thumbHtml, short, activeOf, SECTIONS, IMG_URL };
   root.AskerItemMediaLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -58,7 +65,7 @@
   // ---------- the page ----------
   const app = () => root.AskerApp && root.AskerApp.client;
   const editLib = () => root.AskerStoreEditLib || { fitSize: (w, h) => ({ w, h }), descFromForm: (v) => v };
-  let pics = {}, edits = {}, alts = null, canEdit = null, ready = null;
+  let pics = {}, edits = {}, alts = null, canEdit = null, ready = null, canConfirm = false, loaded = false;
   const shards = {};
   const listeners = [];
   // the small photos already on screen follow (the photo list came, or he fixed one)
@@ -81,10 +88,12 @@
   }
   async function loadEdits() {
     const c = app(); if (!c) return;
-    // active_ar / active_en came with migration 202611210200: before it, the older columns only
-    let { data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off,active_ar,active_en');
+    // active_ar / active_en came with migration 202611210200, photo_ok_at with 202611271000: before one, the older columns only
+    let { data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by,photo_ok_at');
+    canConfirm = !error;
+    if (error) ({ data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off,active_ar,active_en,updated_by'));
     if (error) ({ data, error } = await c.from('ar_store_edits').select('item_id,img,img_off,descr,desc_off'));
-    if (!error && Array.isArray(data)) { edits = {}; for (const r of data) edits[r.item_id] = r; }
+    if (!error && Array.isArray(data)) { edits = {}; for (const r of data) edits[r.item_id] = r; loaded = true; }
   }
   const lang = () => { try { return localStorage.getItem('asker-lang') === 'en' ? 'en' : 'ar'; } catch (e) { return 'ar'; } };
   function shard(id) {
@@ -321,7 +330,7 @@
       });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) { note(b.message || 'الصورة ما اتحفظتش، جرّب تاني.', true); return; }
-      edits[cur.id] = Object.assign({ item_id: Number(cur.id), descr: null, desc_off: false }, edits[cur.id] || {}, { img: b.img, img_off: false });
+      edits[cur.id] = Object.assign({ item_id: Number(cur.id), descr: null, desc_off: false }, edits[cur.id] || {}, { img: b.img, img_off: false, updated_by: data && data.session && data.session.user && data.session.user.id });
       last = ['اتغيّرت الصورة ✔', false]; changed(); busy = false; await draw(true);
     } catch (e) { note('النت مش مستقر، جرّب تاني.', true); } finally { busy = false; }
   }
@@ -357,9 +366,22 @@
       const r = await fetch(FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: KEY }, body: JSON.stringify({ id: Number(id), data }) });
       const b = await r.json().catch(() => ({}));
       if (!r.ok || !b.img) throw new Error(b.message || 'الصورة ما اتحفظتش');
-      edits[id] = Object.assign({ item_id: Number(id), descr: null, desc_off: false }, edits[id] || {}, { img: b.img, img_off: false });
+      edits[id] = Object.assign({ item_id: Number(id), descr: null, desc_off: false }, edits[id] || {}, { img: b.img, img_off: false, updated_by: s && s.session && s.session.user && s.session.user.id });
       changed();
       return b.img;
+    },
+    // «صور الأصناف» in «مراجعة الفواتير»: the state of an item's photo (null until the photo list and the fixes are read), the photo to show, and whether «تمام» can be kept (migration 202611271000)
+    photoState(id) { load(); return loaded ? photoState(id, pics, edits) : null; },
+    photoSrc(id) { return photoOf(id, pics, edits); },
+    canConfirm: () => canConfirm,
+    // «✓ تمام»: these photos are right, never ask about them again (only photo_ok_at is written: the photo, the words and who chose them stay as they are)
+    async confirm(ids) {
+      const at = new Date().toISOString(), rows = ids.map((id) => ({ item_id: Number(id), photo_ok_at: at }));
+      if (!rows.length) return;
+      const { error } = await app().from('ar_store_edits').upsert(rows, { onConflict: 'item_id' });
+      if (error) throw new Error(error.message || String(error));
+      for (const id of ids) edits[id] = Object.assign({ item_id: Number(id), img: null, img_off: false, descr: null, desc_off: false }, edits[id] || {}, { photo_ok_at: at });
+      changed();
     },
     // a card's small photo; title / en are what the sheet shows on top
     thumb(id, en, title) {

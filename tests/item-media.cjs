@@ -41,4 +41,14 @@ for (const t of ['📷 صوّر المادة الفعالة من العلبة', 
 }
 assert.deepEqual(bad, [], 'untranslated: ' + bad.join(' | '));
 assert.equal(I.translate('✍️ احفظ'), '✍️ Save'); assert.equal(I.translate('💊 المادة الفعالة'), '💊 Active ingredient');
+// the photo's state (2026-11-27, «صور الأصناف»): none / net (nobody of ours chose it) / ok
+const PS = require('../ar/item-media.js').photoState;
+const P = { 1: 'a.jpg', 6: 'f.jpg' };
+assert.equal(PS(2, P, {}), 'none');
+assert.equal(PS(1, P, {}), 'net', "the site's own list");
+assert.equal(PS(3, P, { 3: { img: 'e/3.jpg', updated_by: null } }), 'net', 'the night search');
+assert.equal(PS(3, P, { 3: { img: 'e/3.jpg', updated_by: 'u1' } }), 'ok', 'a person took or picked it');
+assert.equal(PS(1, P, { 1: { img: null, updated_by: 'u1' } }), 'net', 'a person who only wrote the description did not choose the photo');
+assert.equal(PS(4, P, { 4: { img_off: true } }), 'ok', 'removed on purpose: not asked');
+assert.equal(PS(6, P, { 6: { img: null, photo_ok_at: '2026-11-27T01:00:00Z' } }), 'ok', 'kept with «تمام»');
 console.log('item-media ok');
