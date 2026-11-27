@@ -71,6 +71,32 @@ run('Invoice review: a new item\'s box photo is read, shown under its line, kept
  assert.equal(await page.$('#rvMain [data-rv-cam]'),null,'no camera on an entered invoice');
 });
 
+// 2026-11-27 (card 28 of 11-23: the card was made, its code was never written on the invoice, and the box photo stayed on the invoice): the system finds the new card by its exact name,
+// also for an invoice that already left the page; it never guesses between two names, and never replaces a photo a person gave the card
+run('Invoice review: a new card whose code was not written is found by its exact name, and its box photo reaches it',async({page})=>{
+ await page.evaluate(()=>{
+  const old=new Date(Date.now()-5*864e5).toISOString();
+  const card=(id,lines,answers)=>({id,batch:'b',ord:id,supplier:'مورد مثال',doc_no:'88'+id,paper_date:'2026-11-22',total:100,photos:[],lines,notes:[],answers,owner_note:null,status:'entered',result:{msg:'اتدخلت'},created_at:old,done_at:old});
+  const line=(n)=>({n,paper:'صنف جديد مثال '+n,qty:1,disc:20,exp:'082029',id:0,name:'',total:100});
+  const read=(id,review,n,name)=>({id,review_id:review,line_n:String(n),kind:'new_item',status:'done',result:{found:true,name_en:name},img_b64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',created_at:old});
+  localStorage.setItem('__fakeTables',JSON.stringify({
+   ar_invoice_reviews:[card(28,[line(1),line(2),line(3),line(4)],{N2:{v:'item',read:'r2',t:'EXAMPLE HIS OWN NAME 50ML'}})],
+   ar_item_reads:[read('r1',28,1,'EXAMPLE SUNSCREEN 75ML'),read('r2',28,2,'EXAMPLE READ NAME'),read('r3',28,3,'EXAMPLE TWIN CREAM'),read('r4',28,4,'EXAMPLE HAS PHOTO GEL')],
+   ar_store_items:[{id:501,name:'EXAMPLE SUNSCREEN 75ML'},{id:502,name:'EXAMPLE HIS OWN NAME 50ML'},{id:503,name:'EXAMPLE TWIN CREAM'},{id:504,name:'EXAMPLE TWIN CREAM'},{id:505,name:'EXAMPLE HAS PHOTO GEL'}],
+   ar_store_edits:[{item_id:505,img:'e/505-a.jpg',img_off:false,updated_by:'u9'}]}));
+ });
+ await page.addInitScript(()=>{window.__up=[];document.addEventListener('DOMContentLoaded',()=>{const M=window.AskerItemMedia;if(M)M.upload=async(id)=>{window.__up.push(id);return 'e/x.jpg'}})});
+ await page.reload();
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');
+ await page.waitForFunction(()=>window.__tables.ar_item_reads.filter(x=>x.status==='applied').length===3,null,{timeout:15000});
+ assert.deepEqual(await page.evaluate(()=>[...window.__up].sort()),[501,502],'by the reading\'s name, and by the name he kept; not between two of one name; a person\'s photo stays');
+ assert.deepEqual(await page.evaluate(()=>window.__tables.ar_item_reads.map(x=>x.id+':'+x.status)),['r1:applied','r2:applied','r3:done','r4:applied']);
+ assert.equal(await page.$('#rvMain .rv-card'),null,'the old invoice itself is not shown again');
+ await page.click('#rvRefresh');await page.waitForTimeout(600);
+ assert.equal(await page.evaluate(()=>window.__up.length),2,'each photo once');
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+});
+
 // 2026-11-26 (card 41, «مش لاقى مكان ادخل فيه صور الاصناف الجديده»): in a cosmetics invoice a new item that needs no price was folded under «زي آخر مرة» with no camera,
 // and after approval the camera of every line was gone
 const cosmetics=(page)=>page.evaluate(()=>{

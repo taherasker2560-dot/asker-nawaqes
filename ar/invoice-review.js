@@ -240,7 +240,7 @@
     const name = niName(r, l, s), mine = !!answersOf(r)['N' + l.n], pic = niPics[s.id];
     const meta = [res.form, Number(res.count) > 0 ? `العلبة فيها ${res.count}` : '', res.company, Number(res.price) > 0 ? `السعر على العلبة ${money(res.price)}` : 'السعر مش على العلبة']
       .filter(Boolean).map((x) => `<span class="notr">${esc(x)}</span>`).join(' · ');
-    const code = niCodeOf(r, l);
+    const code = niCodeOf(r, l) || s.card || null;
     const edit = niEdit === k && editable
       ? `<div class="rv-ni-edit"><input type="text" dir="ltr" maxlength="120" autocapitalize="characters" value="${esc(name)}" data-rv-niname="${esc(k)}" aria-label="اسم الصنف"><button type="button" class="rv-yes on" data-rv-nisave="${esc(k)}">احفظ</button></div>`
       : '';
@@ -275,20 +275,32 @@
       await niApply(list);
     } catch (e) { /* the readings are a help: the invoice is shown without them */ }
   }
-  // after the invoice is entered: the box photo becomes the new card's photo (once)
+  // the one item whose PharmaFly name is exactly the name kept for a new line (two of that name, or none = nothing is guessed)
+  async function niCardByName(name) {
+    const t = String(name || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    if (t.length < 4) return null;
+    const { data, error } = await db().from('ar_store_items').select('id,name').eq('name', t).limit(2);
+    return !error && data && data.length === 1 && Number(data[0].id) > 0 ? Number(data[0].id) : null;
+  }
+  // after the invoice is entered: the box photo becomes the new card's photo (once). The card is the code the laptop wrote when it marked the invoice «entered»; when that was left out
+  // (2026-11-23, card 28: the card was made and the box photo never reached it), the system finds it by its exact name, once the card has come from PharmaFly. A photo a person gave the
+  // card meanwhile stays: the box photo never replaces it.
   async function niApply(list) {
     const M = root.AskerItemMedia;
     if (!M || !M.upload) return;
     for (const r of list) {
       if (r.status !== 'entered') continue;
       for (const l of linesOf(r)) {
-        const code = l && !l.id && niCodeOf(r, l), s = code && ni[niKey(r, l)];
+        const s = l && !l.id && ni[niKey(r, l)];
         if (!s || s.status !== 'done' || !niPics[s.id] || s.uploading) continue;
         s.uploading = true;
         try {
-          await M.upload(code, await niSmall(niPics[s.id], 800));
+          const code = niCodeOf(r, l) || (await niCardByName(niName(r, l, s)));
+          if (!code) { s.uploading = false; continue; }
+          if (!(M.photoState && M.photoState(code) === 'ok')) await M.upload(code, await niSmall(niPics[s.id], 800));
           await db().from('ar_item_reads').update({ status: 'applied' }).eq('id', s.id);
           s.status = 'applied';
+          s.card = code;
         } catch (e) { s.uploading = false; }
       }
     }
@@ -606,7 +618,9 @@
           for (const x of signed || []) if (x && x.path && x.signedUrl) urls[x.path] = x.signedUrl;
         } catch (e) { /* a photo that cannot be shown is not a reason to hide the invoice */ }
       }
-      await loadNi(next);
+      // an entered card that left the page but has a new line is looked at too: the server keeps it while its box photo waits for the item's card
+      const late = (data || []).filter((r) => r.status === 'entered' && !next.includes(r) && linesOf(r).some((l) => l && !l.id));
+      await loadNi(next.concat(late));
       // the purchase robot's open stops (the table is shared with the sales robot's questions: only «card:<id>:<kind>» ones are used; none = nothing shows)
       try {
         const { data: sd, error: se } = await db().from('ar_robot_reports').select('id,created_at,job,ref_id,title,details,status,options,answer_key,answer_text').in('status', ['open', 'answered']).order('created_at', { ascending: true }).limit(40);
