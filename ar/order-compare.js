@@ -39,6 +39,8 @@
     cancelled_me: () => ['إنت لغيته من أمر الشرا', 'own'],
     // what the order builder itself kept out at the cut (owner 2026-11-28: «التقرير يكتب السقف لما يكون هو السبب»), from its own record of that run
     cap: () => ['السقف مسكه: ميزانية الأمر كانت كملت', 'warn'],
+    // a medicine the system had in its order on 2 nights and he did not buy goes to the back of the queue (owner's «ا» 2026-11-28, «أمر الشرا يتعلم من طلبه»)
+    back: () => ['ما اشتريتوش ليلتين فرجع آخر الدور، والسقف مسكه', 'warn'],
     got_today: () => ['كان وصل في نفس اليوم: السيستم مش بيطلبه مرتين في اليوم', 'warn'],
     asked: () => ['صنف جديد أو «بالطلب»: مش بيدخل الأمر غير لما تضيفه', 'gray'],
     not_now: () => ['إنت دوست عليه «مش دلوقتي»', 'own'],

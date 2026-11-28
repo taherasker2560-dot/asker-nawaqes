@@ -98,6 +98,7 @@ run('orders card: no file yet = says so; an old file = warns; a late night = say
 });
 // the owner 2026-11-28: when the cap (or another rule of the builder) kept an item out of the order, the report says so, in both languages
 const KEPT=[['cap','FEROGLOBIN SYR','السقف مسكه: ميزانية الأمر كانت كملت','Held by the cap: the order\'s budget was full'],
+ ['back','ANTINAL 200MG','ما اشتريتوش ليلتين فرجع آخر الدور، والسقف مسكه','You did not buy it on 2 nights, so it went to the back of the queue, and the cap held it'],
  ['got_today','CONGESTAL 20TAB','كان وصل في نفس اليوم: السيستم مش بيطلبه مرتين في اليوم','It had arrived the same day: the system does not order it twice in a day'],
  ['asked','NEW CREAM 50GM','صنف جديد أو «بالطلب»: مش بيدخل الأمر غير لما تضيفه','A new or «on request» item: it does not enter the order until you add it'],
  ['not_now','OZEMPIC PEN','إنت دوست عليه «مش دلوقتي»','You tapped «Not now» on it'],
