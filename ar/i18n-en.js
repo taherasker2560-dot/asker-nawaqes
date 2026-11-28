@@ -3026,6 +3026,11 @@ window.AskerEN = {
   "للفم": "mouth",
   "اختار الصلاحية": "Choose the expiry",
   "البديل اللي تختاره بينزل مكان الصنف ده · القرار للصيدلي": "The alternative you pick takes this item's place · the pharmacist decides",
-  "اتبدّل: {0} مكان {1}": "Swapped: {0} instead of {1}"
+  "اتبدّل: {0} مكان {1}": "Swapped: {0} instead of {1}",
+  "↩️ رجّعه": "↩️ Return it",
+  "كام علبة ترجع؟": "How many boxes to return?",
+  "على فاتورة": "on the invoice",
+  "اللي جه بيها": "it came on",
+  "أكبر من رصيدك.": "More than your stock."
  }
 };

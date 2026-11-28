@@ -38,7 +38,11 @@
     return dates.length ? { today: isDate(o.today) ? String(o.today) : dates[0], dataAt: String(o.data_at || ''), days, dates } : null;
   }
   const line = (x) => ({ i: x.i == null ? null : num(x.i), n: String(x.n || ''), q: num(x.q), v: num(x.v), t: String(x.t || ''), tk: num(x.tk), s: String(x.s || ''), pr: num(x.pr), at: String(x.at || ''),
-    why: arr(x.why).map(String).filter((w) => REASONS[w]), m: x.m == null ? null : num(x.m) });
+    why: arr(x.why).map(String).filter((w) => REASONS[w]), m: x.m == null ? null : num(x.m),
+    // the invoice a return goes against (the laptop, 2026-11-28): mv = its ar_vendor_moves id, ex = the lot's expiry, ed = its day (a customer's return only)
+    mv: x.mv == null || !num(x.mv) ? null : num(x.mv), ex: /^\d{4}-\d\d-\d\d$/.test(String(x.ex || '')) ? String(x.ex) : '', ed: String(x.ed || '') });
+  // «↩️ رجّعه» (owner 2026-11-28): how many boxes to offer = what is in hand, not more than what came (or came back) on that line; 0 = nothing to return
+  const offerBoxes = (inHand, came) => { const h = Math.max(0, num(inHand)), c = num(came) > 0 ? num(came) : h; return Math.round(Math.min(h, c) * 100) / 100; };
   function parseDay(o) {
     if (!o || typeof o !== 'object' || !isDate(o.date)) return null;
     const ok = o.ok || {}, list = (a) => arr(a).filter((x) => x && x.n).map(line);
@@ -105,7 +109,7 @@
   const returned = (q, parts) => (Math.abs(num(q) - Math.round(num(q))) < 0.005 ? String(Math.round(num(q))) : boxes(q, parts));
   // Arabic counting, as he reads it: 3 to 10 take the plural
   const counted = (n, one, few) => (n % 100 >= 3 && n % 100 <= 10 ? few : one);
-  const api = { WORDS, KINDS, REASONS, QUICK, MAX_SPAN, parseIndex, parseDay, parseStock, waitedFor, zeroShown, linesOf, countOf, figures, spanOf, fitRange, lastDays, shiftRange, datesIn, boxes, stockOf, returned, counted };
+  const api = { WORDS, KINDS, REASONS, QUICK, MAX_SPAN, parseIndex, parseDay, parseStock, waitedFor, zeroShown, linesOf, countOf, figures, spanOf, fitRange, lastDays, shiftRange, datesIn, boxes, stockOf, returned, counted, offerBoxes };
   root.AskerDayItemsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -175,7 +179,40 @@
     return came;
   }
   const chips = (e) => (kind !== 'z' ? '' : '<div class="di-why">' + e.why.map((w) => `<span class="di-w di-w-${w}"><span>${REASONS[w]}</span>${w === 'b' && e.m != null ? ` <small><span>بيعه حوالي</span> ${bdi(e.m)} <span>في الشهر</span></small>` : ''}</span>`).join('') + '</div>');
-  const row = (e) => `<div class="di-row"><div class="di-a"><b class="notr" dir="auto">${esc(e.n)}</b><small>${sub(e)}</small>${chips(e)}</div>${pill(e.i)}</div>`;
+  // ---------- «↩️ رجّعه» (owner 2026-11-28: «زرار في كل صنف اللي انا عايز ارجعه يتعمل له عمليه مرتجع … على فاتورته اللى جاى بيها»): the owner only. It marks the lot for return
+  // (ar_return_marks, ar/return-marks.js): it goes to the list «↩️ مرتجعات» the staff with «تجهيز المرتجعات» prepare; it closes by itself when the return is entered in PharmaFly.
+  const retKey = (d, e) => `${d}|${kind}|${e.i}|${e.mv}`;
+  let retOpen = '', retQty = '', retNote = '';
+  const lotOf = (e) => ({ move: e.mv, item: e.i, x: e.ex || null });
+  const shortD = (s) => (/^\d{4}-\d\d-\d\d$/.test(s) ? `${Number(s.slice(8))}/${Number(s.slice(5, 7))}` : '');
+  function retBlock(e, d) {
+    const RM = root.AskerReturnMarks, L = root.AskerReturnMarksLib;
+    if (!RM || !RM.canMark() || e.i == null || !e.mv) return '';
+    const m = RM.markOf(lotOf(e));
+    if (m) {
+      const prepared = m.status === 'prepared';
+      return `<div class="di-ret"><span class="rm-chip ${prepared ? 'prepared' : 'marked'}">${prepared ? '✓ اتجهّز للإرجاع' : '↩️ مطلوب إرجاعه'} · ${esc(L ? L.boxesText(m.units, m.k) : m.units)}</span>` +
+        `<button type="button" class="secondary" data-di-unmark="${esc(m.id)}">شيل العلامة</button></div>`;
+    }
+    const s = stockOf(stock, e.i);
+    if (!s || !(s.q > 0.0005)) return '';   // nothing in hand to send back
+    const key = retKey(d, e);
+    if (retOpen === key) {
+      const who = String(e.s || '').split('،')[0].trim(), day = shortD(e.ed || d);
+      return `<div class="di-ret di-ret-box"><label><span>كام علبة ترجع؟</span> <input type="text" inputmode="decimal" dir="ltr" size="4" value="${esc(retQty)}" data-di-qty></label>` +
+        `<p class="di-ret-inv"><span>على فاتورة</span> ${who ? `<span class="di-ret-who notr">${esc(who)}</span> ` : ''}<span>اللي جه بيها</span>${day ? ` <bdi>(${esc(day)})</bdi>` : ''}</p>` +
+        `<div class="di-ret-acts"><button type="button" data-di-ret-ok="${esc(key)}">↩️ رجّعه</button><button type="button" class="secondary" data-di-ret-x>إلغاء</button></div>` +
+        (retNote ? `<p class="status bad">${esc(retNote)}</p>` : '') + '</div>';
+    }
+    return `<div class="di-ret"><button type="button" class="secondary" data-di-ret="${esc(key)}">↩️ رجّعه</button></div>`;
+  }
+  const row = (e, d) => `<div class="di-row"><div class="di-a"><b class="notr" dir="auto">${esc(e.n)}</b><small>${sub(e)}</small>${chips(e)}${retBlock(e, d)}</div>${pill(e.i)}</div>`;
+  // the line a key belongs to (the open days only)
+  function lineOfKey(key) {
+    const [d, k, i, mv] = key.split('|'), day = cache[d];
+    if (!day || k !== kind) return null;
+    return linesOf(day, kind, wait).find((e) => String(e.i) === i && String(e.mv) === mv) || null;
+  }
   // inside an open day: what its line cannot say (the tickets of the returns; why the empty-shelf ones are shown), then its items
   function inside(d) {
     const day = cache[d];
@@ -187,7 +224,7 @@
     let head = '';
     if (kind === 'r') { const t = new Set(list.map((e) => e.tk)).size; head = `<span>في</span> ${many(t, 'تذكرة', 'تذاكر')}`; }
     if (kind === 'z') head = Object.keys(REASONS).map((w) => [w, list.filter((e) => e.why.includes(w)).length]).filter((x) => x[1]).map((x) => `<span>${REASONS[x[0]]}</span> ${bdi(x[1])}`).join(' · ');
-    return late + (head ? `<p class="di-in">${head}</p>` : '') + list.map(row).join('');
+    return late + (head ? `<p class="di-in">${head}</p>` : '') + list.map((e) => row(e, d)).join('');
   }
   function periodCard() {
     const first = index.dates[index.dates.length - 1], len = spanOf(from, to);
@@ -235,7 +272,8 @@
     bind();
     const mine = ++seq;
     loading = !index; cache = {}; asked = {}; draw();
-    const [i, s, w] = await Promise.all([download('day/items.json'), download('day/items_stock.json'), readWait()]);
+    const RM = root.AskerReturnMarks;
+    const [i, s, w] = await Promise.all([download('day/items.json'), download('day/items_stock.json'), readWait(), RM && RM.canMark() ? RM.ensure().catch(() => {}) : null]);
     if (mine !== seq) return;
     loading = false; index = parseIndex(i); stock = parseStock(s); wait = w;
     if (!index) return draw();
@@ -271,8 +309,34 @@
         const d = el.dataset.diOpen;
         if (opened.has(d)) opened.delete(d); else opened.add(d);
         draw(); read(wanted());
+        return;
       }
+      // «↩️ رجّعه»: ask how many boxes (what is in hand, up to what came), then mark the lot on its invoice
+      const RM = root.AskerReturnMarks;
+      if ((el = t('[data-di-ret]'))) {
+        const e2 = lineOfKey(el.dataset.diRet), s = e2 ? stockOf(stock, e2.i) : null;
+        retOpen = el.dataset.diRet; retNote = ''; retQty = e2 && s ? String(offerBoxes(s.q, e2.q)) : '';
+        draw(); const inp = $('dayItemsPanel').querySelector('[data-di-qty]'); if (inp) { inp.focus(); inp.select(); }
+        return;
+      }
+      if (t('[data-di-ret-x]')) { retOpen = ''; retNote = ''; draw(); return; }
+      if ((el = t('[data-di-ret-ok]')) && RM) {
+        const e2 = lineOfKey(el.dataset.diRetOk), s = e2 ? stockOf(stock, e2.i) : null;
+        if (!e2 || !s) return;
+        const n = Number(String(retQty).replace(/[٠-٩]/g, (c) => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(',', '.').replace('٫', '.'));
+        if (!(n > 0)) { retNote = 'اكتب عدد العلب اللي هترجعها.'; draw(); return; }
+        if (n > s.q + 0.001) { retNote = 'أكبر من رصيدك.'; draw(); return; }
+        const k = s.parts > 1 ? s.parts : 1;
+        el.disabled = true;
+        RM.mark(lotOf(e2), Math.round(n * k * 100) / 100).then((res) => {
+          if (res && res.ok) { retOpen = ''; retNote = ''; } else retNote = RM.errText(res && res.error);
+          draw();
+        });
+        return;
+      }
+      if ((el = t('[data-di-unmark]')) && RM) { RM.unmark(el.dataset.diUnmark).then((res) => { retNote = res && res.ok ? '' : RM.errText(res && res.error); draw(); }); }
     });
+    p.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('[data-di-qty]')) retQty = e.target.value; });
     p.addEventListener('change', (e) => {
       if (!index || !e.target.value || (e.target.id !== 'diFrom' && e.target.id !== 'diTo')) return;
       const side = e.target.id === 'diFrom' ? 'from' : 'to';
