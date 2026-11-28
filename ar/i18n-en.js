@@ -2783,6 +2783,7 @@ window.AskerEN = {
   "صور النت: دوسة على الغلط تضيفها لقايمة «صور مطلوبة» اللي فوق. اللي تقول عليها تمام مش هيتسأل عليها تاني.": "Internet photos: tap a wrong one to add it to «Photos wanted» above. The ones you confirm are never asked again.",
   "للصور ✓": "On the list ✓",
   "اتضافت لقايمة الصور فوق": "added to the photo list above",
+  "صورتها وصلت ومستنية موافقتك فوق": "its photo came and waits for your yes above",
   "صورتها وصلت، مستنية موافقة صاحب الصيدلية": "Its photo arrived, waiting for the owner's approval",
   "رفضت صورتها، مستنية صورة جديدة": "You refused its photo, waiting for a new one",
   "الصورة اللي فاتت ما اتقبلتش، صوّرها تاني": "The last photo was not accepted, take it again",

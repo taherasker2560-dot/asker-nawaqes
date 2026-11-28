@@ -197,6 +197,24 @@ run('Photo approval (owner): a user\'s photos wait on top; a tap makes one big; 
  await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
 });
 
+// owner 2026-11-28: «هل هتفضل كل فاتورة تعرض أصنافها حتى لو كنا أكدناها مرة قبل كده؟»: an item whose photo already came and waits for his yes is not asked again in an invoice card
+run('Photo approval (owner): in an invoice card, an item whose photo waits for his yes asks nothing, it only says it waits',async({page})=>{
+ const at=new Date().toISOString();
+ const t=waitingPhotos(at);
+ t.ar_invoice_reviews=[{id:11,batch:'b',ord:1,supplier:'مورد مثال',doc_no:'900001',paper_date:'2026-11-27',total:20,photos:[],notes:[],answers:{},owner_note:null,status:'ready',result:null,created_at:at,done_at:null,
+  lines:[{n:1,paper:'دوا مثال 1',qty:1,disc:20,exp:'082029',id:202,name:'EXAMPLE NEW SYR 120 ML',total:10},{n:2,paper:'دوا مثال 2',qty:1,disc:20,exp:'082029',id:101,name:'EXAMPLE NOPHOTO TAB',total:10}]}];
+ await page.evaluate((t)=>localStorage.setItem('__fakeTables',JSON.stringify(t)),t);
+ await page.reload();
+ await page.click('[data-pgroup="orders"]');await page.click('[data-tab="docs"]');
+ await page.waitForSelector('#pwMain .pw-appr');
+ await page.click('[data-rv-toggle="11"] .rv-t');await page.waitForSelector('#rvMain .rv-pics');
+ assert.deepEqual(await all(page,'.rv-pic-row b'),['EXAMPLE NOPHOTO TAB'],'only the one nobody photographed gets a camera');
+ assert.match(await txt(page,'.rv-pics'),/⏳ EXAMPLE NEW SYR 120 ML صورتها وصلت ومستنية موافقتك فوق/);
+ assert.equal(await txt(page,'[data-rv="11"] .rv-pic-n'),'📷 1','the waiting one is not counted');
+ await shot(page,'photo-approval-in-card');
+ await page.evaluate(()=>localStorage.removeItem('__fakeTables'));
+});
+
 run('Photo approval (a user): his sent photo shows as waiting, with no second camera; a refused one asks again; he decides nothing',async({page})=>{
  await page.route('**/functions/v1/asker-store-img',async(r)=>{const b=JSON.parse(r.request().postData()||'{}');
   await page.evaluate((id)=>window.__tables.ar_photo_pending.push({id:9,item_id:id,name:'EXAMPLE REFUSED GEL',img:'e/'+id+'-new.jpg',by_name:'موظف تجربة',live:false,status:'pending',at:new Date().toISOString()}),b.id);
