@@ -40,7 +40,17 @@
     return [`مرتجعات للمورد ${g.vendor_name}:`, ...lines, `الإجمالي: ${g.rows.length} صنف`].join('\n');
   }
   const statementAll = (groups) => (groups || []).map(statementText).join('\n\n');
-  const api = { OPEN, keyOf, boxesText, groupByVendor, statementText, statementAll };
+  // where the return stands in PharmaFly (owner 2026-11-28: «اول ما ادوس على الزرار» the robot enters it; the mark stays on the list until the goods are prepared,
+  // migration 202611281800): entered = a return «~<number>» took it all; else what the laptop's robot said on it
+  function entryState(r) {
+    if (!r) return null;
+    if (num(r.returned_units) >= num(r.units) && num(r.units) > 0) return { kind: 'done', text: '📄 اتسجل مرتجع في فارمافلاي' };
+    if (r.robot_state === 'typing') return { kind: 'busy', text: '🤖 الروبوت بيسجّله في فارمافلاي' };
+    if (r.robot_state === 'saved') return { kind: 'busy', text: '🤖 اتسجل، مستني نسخة فارمافلاي' };
+    if (r.robot_state === 'stopped') return { kind: 'stop', text: '🤖 الروبوت وقف' + (r.robot_note ? ': ' + String(r.robot_note) : '') };
+    return { kind: 'wait', text: '⏳ مستني يتسجل في فارمافلاي' };
+  }
+  const api = { OPEN, keyOf, boxesText, groupByVendor, statementText, statementAll, entryState };
   root.AskerReturnMarksLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -112,11 +122,12 @@
   // ---------- the view ----------
   // the item's small photo at the start of a row (owner 2026-11-21): a tap opens «تعديل الصنف»; a mark always carries the item's number
   const photoOf = (r) => (root.AskerItemMedia && r.item_id != null ? root.AskerItemMedia.thumb(r.item_id, r.item_name || '', r.item_ar || r.item_name || '') : '');
+  const entryHtml = (r) => { const s = entryState(r); return s ? `<small class="rm-entry rm-entry-${s.kind}">${esc(s.text)}</small>` : '' };
   function rowHtml(r) {
     const prepared = r.status === 'prepared';
     return `<div class="sd-row rm-row${prepared ? ' prepared' : ''}">${photoOf(r)}<div class="sd-main"><span class="sd-name notr" dir="auto">${esc(r.item_ar || r.item_name)}</span>` +
       (r.item_ar ? `<small class="notr" dir="ltr">${esc(r.item_name)}</small>` : '') +
-      `<small class="sd-doc"><span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invNo(r.code))}</bdi> · <span>اتدخلت</span> <bdi class="notr" dir="ltr">${esc(dayFull(r.invoiced_at))}</bdi></small>` +
+      `<small class="sd-doc"><span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invNo(r.code))}</bdi> · <span>اتدخلت</span> <bdi class="notr" dir="ltr">${esc(dayFull(r.invoiced_at))}</bdi></small>` + entryHtml(r) +
       `<div class="rm-ctl"><span class="rm-chip ${prepared ? 'prepared' : 'marked'}">${prepared ? `<span>✓ اتجهّز</span>${r.prepared_by ? ` · <bdi class="notr">${esc(r.prepared_by)}</bdi>` : ''}` : '<span>مطلوب إرجاعه</span>'}</span>` +
       (canPrepare() ? `<button type="button" class="secondary" data-rm-prep="${esc(r.id)}" data-done="${prepared ? '0' : '1'}">${prepared ? 'فكّ التجهيز' : '✓ اتجهّز'}</button>` : '') +
       (canMark() ? `<button type="button" class="secondary" data-rm-unmark="${esc(r.id)}">شيل العلامة</button>` : '') + '</div></div>' +
@@ -143,7 +154,7 @@
     }
     const done = rows.filter((r) => r.status === 'returned');
     const back = done.length ? `<details class="al-week"><summary>اترجعت (آخر 14 يوم): ${done.length} صنف</summary>${done.map((r) => `<div class="sd-row rm-row">${photoOf(r)}<div class="sd-main"><span class="sd-name notr" dir="auto">${esc(r.item_ar || r.item_name)}</span><small><bdi class="notr">${esc(r.vendor_name || '')}</bdi> · <span>فاتورة رقم</span> <bdi class="notr" dir="ltr">${esc(invNo(r.code))}</bdi></small></div><div class="sd-exp"><b dir="ltr">${esc(expShort(r.expiry))}</b><small>${esc(boxesText(r.units, r.k))}</small></div></div>`).join('')}</details>` : '';
-    box.innerHTML = '<p class="hint">الأصناف اللي علّمت عليها «إرجاع» من قايمة «فواتير». البيان بيتبعت للموظفين يجهزوا الأصناف، ولما المرتجع يتدخل في فارمافلاي الصنف بيتقفل لوحده.</p>' +
+    box.innerHTML = '<p class="hint">الأصناف اللي علّمت عليها «إرجاع». المرتجع بيتسجل في فارمافلاي، والبيان بيتبعت للموظفين يجهزوا الأصناف، والصنف بيفضل هنا لحد ما يتجهّز.</p>' +
       (note ? `<p class="status bad">${esc(note)}</p>` : '') + body + back;
   }
   function show(el) {
