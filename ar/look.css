@@ -2714,10 +2714,25 @@ button.dy-go { width: 100%; margin: 8px 0 0; min-height: 42px; border-radius: 14
 #dayItemsPanel .di-why { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
 #dayItemsPanel .di-w { font-size: 11.5px; font-weight: 700; color: var(--crimson-ink); border: 1px solid var(--crimson); border-radius: 8px; padding: 1px 7px; }
 #dayItemsPanel .di-w small { display: inline; font-weight: 400; font-size: 11px; color: var(--muted); }
-#dayItemsPanel button.di-day { display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 0; padding: 10px 6px; min-height: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; color: var(--ink); box-shadow: none; font: inherit; font-size: 13.5px; cursor: pointer; }
-#dayItemsPanel button.di-day span { color: var(--crimson); font-weight: 700; }
-#dayItemsPanel button.di-day.on { background: var(--rose); border-radius: 12px; border-bottom-color: transparent; }
-#dayItemsPanel button.di-more { display: block; width: 100%; margin: 4px 0 0; padding: 9px; border: 0; background: none; color: var(--muted); box-shadow: none; font: inherit; font-size: 13px; cursor: pointer; }
+/* the period (owner 2026-11-28): the quick lengths, «من يوم» and «لحد يوم» between the two arrows, then one line per day that opens in place */
+#dayItemsPanel .di-quick { display: flex; gap: 6px; margin: 0 0 9px; }
+#dayItemsPanel .di-quick button.dy-chip { flex: 1; min-width: 0; font-size: 13px; padding: 8px 2px; border-radius: 14px; }
+#dayItemsPanel .di-range { display: flex; align-items: center; gap: 5px; }
+#dayItemsPanel .di-range button.dy-b { flex: none; min-width: 32px; width: 32px; min-height: 32px; }
+#dayItemsPanel .di-range .di-date { flex: 1; min-width: 0; display: block; padding: 6px 8px; }
+#dayItemsPanel .di-range .di-date small { display: block; font-size: 11.5px; }
+#dayItemsPanel .di-range .di-date span { display: block; font-size: 13px; white-space: nowrap; }
+#dayItemsPanel .di-hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#dayItemsPanel button.di-all { flex: none; width: auto; margin: 0; min-height: 0; padding: 6px 12px; border-radius: 14px; border: 1.5px solid var(--crimson); background: var(--card); color: var(--crimson-ink); box-shadow: none; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+#dayItemsPanel .di-block { border: 1.5px solid transparent; border-bottom: 1px solid var(--line); }
+#dayItemsPanel .di-block.open { border: 1.5px solid var(--crimson); border-radius: 14px; padding: 0 7px 4px; margin: 6px 0; }
+#dayItemsPanel button.di-dl { display: flex; align-items: center; gap: 7px; width: 100%; margin: 0; padding: 10px 1px; min-height: 0; border: 0 !important; border-radius: 0; background: none; color: var(--ink); box-shadow: none; font: inherit; font-size: 13px; cursor: pointer; }
+#dayItemsPanel .di-block.open button.di-dl { border-bottom: 1px solid var(--line) !important; }
+#dayItemsPanel .di-dl b { flex: none; min-width: 84px; text-align: start; white-space: nowrap; }
+#dayItemsPanel .di-bar { flex: 1; min-width: 24px; height: 8px; border-radius: 9px; background: var(--rose); overflow: hidden; }
+#dayItemsPanel .di-bar i { display: block; height: 100%; border-radius: 9px; background: var(--crimson); }
+#dayItemsPanel .di-n { flex: none; white-space: nowrap; color: var(--crimson-ink); font-size: 12.5px; }
+#dayItemsPanel .di-in { margin: 7px 2px 0; font-size: 12.5px; color: var(--muted); }
 .dy-nav { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
 button.dy-b { margin: 0; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; background: var(--card); color: var(--crimson); border: 1px solid var(--line); box-shadow: none; font-size: 18px; }
 button.dy-b:disabled { opacity: 0.35; }

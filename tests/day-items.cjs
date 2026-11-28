@@ -34,6 +34,27 @@ assert.deepEqual(P.stockOf(stock, 7), { q: 0, parts: 2 }); assert.equal(P.stockO
 // what came back, and Arabic counting
 assert.equal(P.returned(4, 1), '4'); assert.equal(P.returned(1, 30), '1', 'a loose tablet is one, not a box'); assert.equal(P.returned(0.667, 3), '2 وحدة'); assert.equal(P.returned(0.5, 1), '½ علبة');
 assert.deepEqual([1, 2, 3, 6, 10, 11, 15, 103].map((n) => P.counted(n, 'صنف', 'أصناف')), ['صنف', 'صنف', 'أصناف', 'أصناف', 'أصناف', 'صنف', 'صنف', 'أصناف']);
+// ---- over a period (owner 2026-11-28: «من يوم كذا ليوم كذا لحد شهر») ----
+const F = '2026-08-29', L = '2026-11-28';   // the days the laptop keeps: first .. today
+assert.equal(P.MAX_SPAN, 31); assert.equal(P.spanOf('2026-11-27', '2026-11-27'), 1); assert.equal(P.spanOf('2026-11-21', '2026-11-27'), 7);
+assert.deepEqual(P.lastDays(7, '2026-11-27', F), { from: '2026-11-21', to: '2026-11-27' });
+assert.deepEqual(P.lastDays(30, '2026-09-05', F), { from: F, to: '2026-09-05' }, 'not before the first day kept');
+// one end moved: it stays where he put it, the other follows
+assert.deepEqual(P.fitRange('2026-11-20', '2026-11-27', 'from', F, L), { from: '2026-11-20', to: '2026-11-27' });
+assert.deepEqual(P.fitRange('2026-11-28', '2026-11-27', 'from', F, L), { from: '2026-11-28', to: '2026-11-28' }, 'from after to: one day');
+assert.deepEqual(P.fitRange('2026-11-21', '2026-11-10', 'to', F, L), { from: '2026-11-10', to: '2026-11-10' });
+assert.deepEqual(P.fitRange('2026-10-01', '2026-11-27', 'from', F, L), { from: '2026-10-01', to: '2026-10-31' }, 'a month at most, from the day he chose');
+assert.deepEqual(P.fitRange('2026-10-01', '2026-11-27', 'to', F, L), { from: '2026-10-28', to: '2026-11-27' }, 'a month at most, up to the day he chose');
+assert.deepEqual(P.fitRange('2026-01-01', '2027-01-01', 'to', F, L), { from: '2026-10-29', to: L });
+// the arrows move the whole period; nothing past the ends
+assert.deepEqual(P.shiftRange('2026-11-21', '2026-11-27', -1, F, L), { from: '2026-11-14', to: '2026-11-20' });
+assert.deepEqual(P.shiftRange('2026-11-27', '2026-11-27', 1, F, L), { from: '2026-11-28', to: '2026-11-28' });
+assert.equal(P.shiftRange('2026-11-22', L, 1, F, L), null); assert.equal(P.shiftRange(F, '2026-09-04', -1, F, L), null);
+assert.deepEqual(P.datesIn(index, '2026-11-27', '2026-11-28'), ['2026-11-28', '2026-11-27']);
+// a day's line: from the index until its file is read, then from the file; a return's value only when known
+const iv = P.parseIndex({ today: L, days: { '2026-11-27': { r: 6, rv: 226, nw: 4, z: 1, zo: [], ok: {} }, '2026-11-26': { r: 2, nw: 0, z: 0, zo: [], ok: {} } } });
+assert.deepEqual(P.figures(iv, '2026-11-27', 'r', []), { n: 6, v: 226 }); assert.deepEqual(P.figures(iv, '2026-11-26', 'r', []), { n: 2, v: null }); assert.deepEqual(P.figures(iv, '2026-11-27', 'n', []), { n: 4, v: null });
+assert.deepEqual(P.figures(iv, '2026-11-27', 'r', [], day), { n: 1, v: 29 });
 // the English
 for (const s of P.WORDS) assert.doesNotMatch(I.translate(s), /[؀-ۿ]/, 'Arabic left in English: ' + s + ' → ' + I.translate(s));
 console.log('PASS: items by day: the files, the waiting list, the empty-shelf reasons, the counts, boxes and units, the English');

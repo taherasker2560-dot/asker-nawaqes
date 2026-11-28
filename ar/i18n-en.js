@@ -2825,7 +2825,20 @@ window.AskerEN = {
   "الأيام قبل 28/11: «بالطلب» مش محسوبة، لأن فارمافلاي ما بيحفظش علامات الأيام اللي فاتت.": "Before 28/11, «by request» is not worked out: PharmaFly keeps no history of the ticks.",
   "«نواقص جت» مش محسوبة لليوم ده: قايمة النواقص العامة لليوم اللي قبله مش محفوظة.": "«Shortage arrived» is not worked out for this day: the general list of the day before was not kept.",
   "مرتجعات اليوم ده لسه ما وصلتش من اللاب.": "This day's returns have not arrived from the laptop yet.",
-  "قايمة الانتظار ما اتقرتش: «كان في الانتظار» مش ظاهر دلوقتي.": "The waiting list could not be read: «was waited for» is not shown now."
+  "قايمة الانتظار ما اتقرتش: «كان في الانتظار» مش ظاهر دلوقتي.": "The waiting list could not be read: «was waited for» is not shown now.",
+  "أسبوع": "Week",
+  "15 يوم": "15 days",
+  "شهر": "Month",
+  "من يوم": "From",
+  "لحد يوم": "To",
+  "تختار أي يومين، وأقصى فترة شهر.": "Pick any two days; a month at most.",
+  "الفترة اللي قبلها": "The period before",
+  "الفترة اللي بعدها": "The period after",
+  "الأيام": "Days",
+  "افتح كل الأيام": "Open all days",
+  "اقفل كل الأيام": "Close all days",
+  "دوس على أي يوم تتفتح أصنافه تحته. تقدر تفتح كذا يوم مع بعض.": "Tap a day to see its items under it. Several can be open at once.",
+  "«نواقص جت» مش محسوبة لبعض الأيام دي: قايمة النواقص العامة لليوم اللي قبلها مش محفوظة.": "«Shortage arrived» is not worked out for some of these days: the general list of the day before was not kept."
  },
  "phrases": {
   "آخر خصم": "last discount",
