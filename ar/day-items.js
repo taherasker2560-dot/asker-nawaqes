@@ -1,8 +1,11 @@
 /* «الأصناف يوم بيوم» (owner 2026-11-27/28: «بيان مرتجعات المبيعات اليومي بالاصناف… وبيان بالاصناف الجديدة لوحده، وبيان بالاصناف اللي جت الصيدلية وكان رصيدها 0… لكل يوم… وجنبه رصيده الحالي»,
-   then «صح ابعتها» to the rule; mockup mockups/items_daily_reports_2026-11-27.png). Three reports of «📊 التقارير» on one screen, a day at a time, up to 90 days back:
+   then «صح ابعتها» to the rule; mockup mockups/items_daily_reports_2026-11-27.png). Three reports of «📊 التقارير» on one screen:
    «مرتجعات البيع» (what customers brought back; a company return is not one), «أصناف جديدة» (a card made that day that came on that day's purchases), and «جه ورصيده صفر»: an OLD item that arrived
    with nothing on the shelf AND (1) «نواقص جت»: it was in the general shortage list the day before, or (2) «بالطلب»: it had no shortage tick at all before he ordered it (even if he ticked it to get it),
    or (3) «كمية كبيرة»: it sells one or two boxes a month and many came at once, or (4) «كان في الانتظار»: a customer was waiting for it. A fast item shown in its bag because it ran out is not listed.
+   OVER A PERIOD (his word after the first release, 2026-11-28: «لو كل يوم لازم أخشه لوحده فما بقاش شايف الباقي عشان أقارن… من يوم كذا ليوم كذا لحد شهر، براحتي»; «ا» to the drawing):
+   «من يوم» to «لحد يوم», a month at most (يوم / أسبوع / 15 يوم / شهر), the period's total, one line per day with its count and a bar to compare by eye (returns: by value; the others: by count),
+   a tap opens a day's items under it, several can be open, or all of them; one day alone = «يوم» or the same date twice. The arrows move the whole period back and forth.
    Beside every item: its stock now, from the last copy. Data (owner only): day/items.json, day/i_<date>.json, day/items_stock.json, written by the laptop (Hub\day\BUILD_ITEMS.ps1, read only); the
    waiting list (ar_waitlist) is matched here. Nothing is written from here. */
 (function (root) {
@@ -13,10 +16,13 @@
   const arr = (x) => (Array.isArray(x) ? x : x == null ? [] : [x]);
   const KINDS = [['r', 'مرتجعات البيع'], ['n', 'أصناف جديدة'], ['z', 'جه ورصيده صفر']];
   const REASONS = { g: 'نواقص جت', r: 'بالطلب', b: 'كمية كبيرة', w: 'كان في الانتظار' };
-  const WORDS = ['📦 الأصناف يوم بيوم', ...KINDS.map((k) => k[1]), ...Object.values(REASONS), 'اختار يوم', 'اليوم اللي قبله', 'اليوم اللي بعده', 'الرصيد والبيانات لحد', '(آخر نسخة)', 'رصيده', 'صفر',
-    'رجع', 'جه', 'الجمهور', 'ج', 'بيعه حوالي', 'في الشهر', 'صنف', 'أصناف', 'في', 'تذكرة', 'تذاكر','كل يوم كان فيه كام', 'مفيش', 'لحد دلوقتي', 'مفيش في اليوم ده.', 'وهكذا لحد 90 يوم ورا',
+  const QUICK = [[1, 'يوم'], [7, 'أسبوع'], [15, '15 يوم'], [30, 'شهر']];
+  const MAX_SPAN = 31;          // «لحد شهر»
+  const WORDS = ['📦 الأصناف يوم بيوم', ...KINDS.map((k) => k[1]), ...Object.values(REASONS), ...QUICK.map((q) => q[1]), 'من يوم', 'لحد يوم', 'تختار أي يومين، وأقصى فترة شهر.', 'الفترة اللي قبلها', 'الفترة اللي بعدها',
+    'الرصيد والبيانات لحد', '(آخر نسخة)', 'رصيده', 'صفر', 'رجع', 'جه', 'الجمهور', 'ج', 'بيعه حوالي', 'في الشهر', 'صنف', 'أصناف', 'يوم', 'أيام', 'في', 'تذكرة', 'تذاكر', 'الأيام', 'افتح كل الأيام', 'اقفل كل الأيام',
+    'دوس على أي يوم تتفتح أصنافه تحته. تقدر تفتح كذا يوم مع بعض.', 'مفيش', 'مفيش في اليوم ده.', 'بحمّل…',
     'الصفحة محتاجة ملف الأصناف من اللاب: لسه ما وصلش.', 'اليوم ده لسه ما وصلش من اللاب.', 'تحديث',
-    'الأيام قبل 28/11: «بالطلب» مش محسوبة، لأن فارمافلاي ما بيحفظش علامات الأيام اللي فاتت.', '«نواقص جت» مش محسوبة لليوم ده: قايمة النواقص العامة لليوم اللي قبله مش محفوظة.',
+    'الأيام قبل 28/11: «بالطلب» مش محسوبة، لأن فارمافلاي ما بيحفظش علامات الأيام اللي فاتت.', '«نواقص جت» مش محسوبة لبعض الأيام دي: قايمة النواقص العامة لليوم اللي قبلها مش محفوظة.',
     'مرتجعات اليوم ده لسه ما وصلتش من اللاب.', 'قايمة الانتظار ما اتقرتش: «كان في الانتظار» مش ظاهر دلوقتي.'];
 
   // ---------- pure helpers (also used by tests/day-items.cjs) ----------
@@ -26,7 +32,7 @@
     const days = {};
     for (const k of Object.keys(o.days).filter(isDate)) {
       const d = o.days[k] || {}, ok = d.ok || {};
-      days[k] = { r: num(d.r), n: num(d.nw), z: num(d.z), zo: arr(d.zo).map(num), ok: { r: !!ok.r, g: !!ok.g, q: !!ok.q } };
+      days[k] = { r: num(d.r), n: num(d.nw), z: num(d.z), zo: arr(d.zo).map(num), rv: d.rv == null ? null : num(d.rv), ok: { r: !!ok.r, g: !!ok.g, q: !!ok.q } };
     }
     const dates = Object.keys(days).sort().reverse();
     return dates.length ? { today: isDate(o.today) ? String(o.today) : dates[0], dataAt: String(o.data_at || ''), days, dates } : null;
@@ -56,6 +62,33 @@
     if (kind !== 'z') return d[kind];
     return d.z + d.zo.filter((id) => waitedFor(wait, id, date, null)).length;
   }
+  // a day's line in the period: how many, and for returns their value (null until it is known); the day's own file, once read, is the last word
+  function figures(index, date, kind, wait, day) {
+    const n = day ? linesOf(day, kind, wait).length : countOf(index, date, kind, wait);
+    let v = null;
+    if (kind === 'r') v = day ? day.r.reduce((a, e) => a + e.v, 0) : index.days[date] && index.days[date].rv;
+    return { n, v: v == null ? null : v };
+  }
+  // ---------- the period ----------
+  const spanOf = (from, to) => Math.round((Date.parse(to + 'T12:00:00Z') - Date.parse(from + 'T12:00:00Z')) / 864e5) + 1;
+  const within = (d, first, last) => (d < first ? first : d > last ? last : d);
+  // he moved one end (changed = 'from' | 'to'): that end is his; the other follows so the period is in order and a month at most
+  function fitRange(from, to, changed, first, last) {
+    let a = within(from, first, last), b = within(to, first, last);
+    if (a > b) { if (changed === 'from') b = a; else a = b; }
+    if (spanOf(a, b) > MAX_SPAN) { if (changed === 'from') b = D.addDays(a, MAX_SPAN - 1); else a = D.addDays(b, -(MAX_SPAN - 1)); }
+    return { from: a, to: b };
+  }
+  // «أسبوع», «شهر»…: that many days ending where the period ends now
+  const lastDays = (len, to, first) => ({ from: within(D.addDays(to, -(len - 1)), first, to), to });
+  // an arrow: the same length just before (dir < 0) or just after; null = nothing there
+  function shiftRange(from, to, dir, first, last) {
+    if (dir < 0 ? from <= first : to >= last) return null;
+    const len = spanOf(from, to);
+    const a = dir < 0 ? D.addDays(from, -len) : D.addDays(to, 1), b = D.addDays(a, len - 1);
+    return { from: within(a, first, last), to: within(b, first, last) };
+  }
+  const datesIn = (index, from, to) => index.dates.filter((d) => d >= from && d <= to);   // newest first
   // a quantity in boxes as the shelf has it: whole boxes and the loose units of an opened one; a fraction of an item with no units stays a fraction
   function boxes(q, parts) {
     const p = num(parts), v = Math.max(0, num(q));
@@ -72,7 +105,7 @@
   const returned = (q, parts) => (Math.abs(num(q) - Math.round(num(q))) < 0.005 ? String(Math.round(num(q))) : boxes(q, parts));
   // Arabic counting, as he reads it: 3 to 10 take the plural
   const counted = (n, one, few) => (n % 100 >= 3 && n % 100 <= 10 ? few : one);
-  const api = { WORDS, KINDS, REASONS, parseIndex, parseDay, parseStock, waitedFor, zeroShown, linesOf, countOf, boxes, stockOf, returned, counted };
+  const api = { WORDS, KINDS, REASONS, QUICK, MAX_SPAN, parseIndex, parseDay, parseStock, waitedFor, zeroShown, linesOf, countOf, figures, spanOf, fitRange, lastDays, shiftRange, datesIn, boxes, stockOf, returned, counted };
   root.AskerDayItemsLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -82,8 +115,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const db = () => root.AskerApp && root.AskerApp.client;
-  let index = null, stock = null, wait = [], waitOk = true, kind = 'r', picked = '', cache = {}, seq = 0, loading = false, allDays = false;
-  const SHOWN_DAYS = 14;
+  let index = null, stock = null, wait = [], waitOk = true, kind = 'r', from = '', to = '', opened = new Set(), cache = {}, asked = {}, seq = 0, loading = false;
   async function download(path) {
     if (!db()) return null;
     try {
@@ -97,12 +129,44 @@
       waitOk = !error; return error ? [] : data || [];
     } catch (e) { waitOk = false; return []; }
   }
+  // the days' files, four at a time, each once; the screen is drawn again as they come
+  async function read(dates) {
+    const need = dates.filter((d) => cache[d] === undefined && !asked[d]);
+    if (!need.length) return;
+    const mine = seq;
+    need.forEach((d) => { asked[d] = true; });
+    const worker = async () => {
+      for (let d = need.shift(); d !== undefined; d = need.shift()) {
+        const o = await download('day/i_' + d + '.json');
+        if (mine !== seq) return;
+        cache[d] = o ? parseDay(o) : null; delete asked[d];
+        draw();
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+  }
+  const figs = (d) => figures(index, d, kind, wait, cache[d]);
+  const inPeriod = () => datesIn(index, from, to);
+  // what is open when a period is shown: the newest day that has something (one day alone is always open)
+  function openFirst() {
+    const days = inPeriod(), hit = days.find((d) => figs(d).n > 0);
+    opened = new Set(days.length === 1 ? days : hit ? [hit] : []);
+  }
+  // the files the screen needs now: the open days, and on the returns any day of the period whose value the index does not carry (a laptop file from before it did)
+  const wanted = () => [...new Set([...opened, ...(kind === 'r' ? inPeriod().filter((d) => index.days[d].rv == null) : [])])];
+  function setRange(r) {
+    if (!r) return;
+    from = r.from; to = r.to; openFirst(); draw();
+    read(wanted());
+  }
+  const bdi = (n) => `<bdi dir="ltr">${esc(n)}</bdi>`;
+  const shortDay = (d) => `${dateText(d).split(' ')[0]} ${Number(d.slice(8))}/${Number(d.slice(5, 7))}`;
+  const many = (n, one, few) => `${bdi(n)} <span>${counted(n, one, few)}</span>`;
   const pill = (id) => {
     const s = stockOf(stock, id);
     if (!s) return '';
     return s.q > 0.0005 ? `<span class="di-st"><span>رصيده</span>: <bdi>${esc(boxes(s.q, s.parts))}</bdi></span>` : '<span class="di-st di-zero"><span>رصيده</span>: <span>صفر</span></span>';
   };
-  const bdi = (n) => `<bdi dir="ltr">${esc(n)}</bdi>`;
   const parts = (e) => { const s = stockOf(stock, e.i); return s ? s.parts : 1; };
   function sub(e) {
     if (kind === 'r') return `<span>رجع</span> <bdi>${esc(returned(e.q, parts(e)))}</bdi> · ${bdi(money(e.v))} <span>ج</span> · <bdi>${esc(hm(e.t))}</bdi>`;
@@ -112,71 +176,73 @@
   }
   const chips = (e) => (kind !== 'z' ? '' : '<div class="di-why">' + e.why.map((w) => `<span class="di-w di-w-${w}"><span>${REASONS[w]}</span>${w === 'b' && e.m != null ? ` <small><span>بيعه حوالي</span> ${bdi(e.m)} <span>في الشهر</span></small>` : ''}</span>`).join('') + '</div>');
   const row = (e) => `<div class="di-row"><div class="di-a"><b class="notr" dir="auto">${esc(e.n)}</b><small>${sub(e)}</small>${chips(e)}</div>${pill(e.i)}</div>`;
-  function summary(list) {
-    if (kind === 'r') {
-      const tickets = new Set(list.map((e) => e.tk)).size;
-      return `<div class="di-sum"><span>${bdi(list.length)} <span>${counted(list.length, 'صنف', 'أصناف')}</span> <span>في</span> ${bdi(tickets)} <span>${counted(tickets, 'تذكرة', 'تذاكر')}</span></span><b>${bdi(money(list.reduce((a, e) => a + e.v, 0)))} <span>ج</span></b></div>`;
-    }
-    const by = kind === 'z' ? Object.keys(REASONS).map((w) => [w, list.filter((e) => e.why.includes(w)).length]).filter((x) => x[1]).map((x) => `<span>${REASONS[x[0]]}</span> ${bdi(x[1])}`).join(' · ') : '';
-    return `<div class="di-sum"><span>${bdi(list.length)} <span>${counted(list.length, 'صنف', 'أصناف')}</span></span>${by ? `<small>${by}</small>` : ''}</div>`;
+  // inside an open day: what its line cannot say (the tickets of the returns; why the empty-shelf ones are shown), then its items
+  function inside(d) {
+    const day = cache[d];
+    if (day === undefined) return '<p class="hint">بحمّل…</p>';
+    if (!day) return '<p class="hint">اليوم ده لسه ما وصلش من اللاب.</p>';
+    const list = linesOf(day, kind, wait);
+    const late = kind === 'r' && !day.ok.r ? '<p class="hint">مرتجعات اليوم ده لسه ما وصلتش من اللاب.</p>' : '';
+    if (!list.length) return late + '<p class="hint">مفيش في اليوم ده.</p>';
+    let head = '';
+    if (kind === 'r') { const t = new Set(list.map((e) => e.tk)).size; head = `<span>في</span> ${many(t, 'تذكرة', 'تذاكر')}`; }
+    if (kind === 'z') head = Object.keys(REASONS).map((w) => [w, list.filter((e) => e.why.includes(w)).length]).filter((x) => x[1]).map((x) => `<span>${REASONS[x[0]]}</span> ${bdi(x[1])}`).join(' · ');
+    return late + (head ? `<p class="di-in">${head}</p>` : '') + list.map(row).join('');
   }
-  function notes(day) {
+  function periodCard() {
+    const first = index.dates[index.dates.length - 1], len = spanOf(from, to);
+    const quick = `<div class="di-quick">${QUICK.map(([k, label]) => `<button type="button" class="dy-chip${k === len ? ' on' : ''}" data-di-quick="${k}" aria-pressed="${k === len}">${label}</button>`).join('')}</div>`;
+    const box = (id, label, value) => `<label class="dy-date di-date"><small>${label}</small><span>📅 <bdi>${esc(shortDay(value))}</bdi></span><input id="${id}" type="date" min="${esc(first)}" max="${esc(index.today)}" value="${esc(value)}" aria-label="${label}" /></label>`;
+    return `<div class="dy-card">${quick}<div class="di-range"><button type="button" class="dy-b" data-di-shift="-1" aria-label="الفترة اللي قبلها"${from <= first ? ' disabled' : ''}>›</button>` +
+      box('diFrom', 'من يوم', from) + box('diTo', 'لحد يوم', to) +
+      `<button type="button" class="dy-b" data-di-shift="1" aria-label="الفترة اللي بعدها"${to >= index.today ? ' disabled' : ''}>‹</button></div>` +
+      '<p class="hint">تختار أي يومين، وأقصى فترة شهر.</p>' +
+      `<div class="dy-stamp"><span>الرصيد والبيانات لحد</span> <bdi>${esc(hm(String((stock && stock.dataAt) || index.dataAt).slice(11, 16)))}</bdi> <span>(آخر نسخة)</span></div></div>`;
+  }
+  // what the whole period is missing, said once
+  function periodNotes(days) {
     const out = [];
-    if (kind === 'r' && !day.ok.r) out.push('مرتجعات اليوم ده لسه ما وصلتش من اللاب.');
     if (kind === 'z') {
-      if (!day.ok.q) out.push('الأيام قبل 28/11: «بالطلب» مش محسوبة، لأن فارمافلاي ما بيحفظش علامات الأيام اللي فاتت.');
-      if (!day.ok.g) out.push('«نواقص جت» مش محسوبة لليوم ده: قايمة النواقص العامة لليوم اللي قبله مش محفوظة.');
+      if (days.some((d) => !index.days[d].ok.q)) out.push('الأيام قبل 28/11: «بالطلب» مش محسوبة، لأن فارمافلاي ما بيحفظش علامات الأيام اللي فاتت.');
+      if (days.some((d) => !index.days[d].ok.g)) out.push('«نواقص جت» مش محسوبة لبعض الأيام دي: قايمة النواقص العامة لليوم اللي قبلها مش محفوظة.');
       if (!waitOk) out.push('قايمة الانتظار ما اتقرتش: «كان في الانتظار» مش ظاهر دلوقتي.');
     }
     return out.map((x) => `<p class="hint">${x}</p>`).join('');
-  }
-  function dayList() {
-    const list = allDays ? index.dates : index.dates.slice(0, SHOWN_DAYS);
-    return `<h3 class="dy-h"><span>كل يوم كان فيه كام</span></h3>` + list.map((d) => {
-      const n = countOf(index, d, kind, wait);
-      return `<button type="button" class="di-day${d === picked ? ' on' : ''}" data-di-day="${d}"><b>${esc(dateText(d))}</b><span>${n ? `${bdi(n)} <span>${counted(n, 'صنف', 'أصناف')}</span> ‹` : '<span>مفيش</span>'}</span></button>`;
-    }).join('') + (index.dates.length > SHOWN_DAYS ? `<button type="button" class="di-more" data-di-more>${allDays ? '▴' : '<span>وهكذا لحد 90 يوم ورا</span> ▾'}</button>` : '');
   }
   function draw() {
     const main = $('diMain');
     if (!main) return;
     if (!index) { main.innerHTML = loading ? '' : '<p class="hint">الصفحة محتاجة ملف الأصناف من اللاب: لسه ما وصلش.</p>'; return; }
-    const first = index.dates[index.dates.length - 1], day = cache[picked];
     const tabs = `<div class="di-kinds">${KINDS.map(([k, label]) => `<button type="button" class="dy-chip${k === kind ? ' on' : ''}" data-di-kind="${k}" aria-pressed="${k === kind}">${label}</button>`).join('')}</div>`;
-    const nav = `<div class="dy-card"><div class="dy-pick"><button type="button" class="dy-b" data-di-prev aria-label="اليوم اللي قبله"${picked <= first ? ' disabled' : ''}>›</button>` +
-      `<label class="dy-date"><span>${esc(dateText(picked))}</span><small>📅 <span>اختار يوم</span></small><input id="diDate" type="date" min="${esc(first)}" max="${esc(index.today)}" value="${esc(picked)}" aria-label="اختار يوم" /></label>` +
-      `<button type="button" class="dy-b" data-di-next aria-label="اليوم اللي بعده"${picked >= index.today ? ' disabled' : ''}>‹</button></div>` +
-      `<div class="dy-stamp"><span>الرصيد والبيانات لحد</span> <bdi>${esc(hm(String((stock && stock.dataAt) || index.dataAt).slice(11, 16)))}</bdi> <span>(آخر نسخة)</span></div></div>`;
-    let body;
-    if (day === undefined) body = '';
-    else if (!day) body = '<p class="hint">اليوم ده لسه ما وصلش من اللاب.</p>';
-    else {
-      const list = linesOf(day, kind, wait);
-      body = notes(day) + (list.length ? summary(list) + list.map(row).join('') : `<p class="hint">مفيش في اليوم ده.</p>`);
-    }
-    main.innerHTML = tabs + nav + body + dayList();
-  }
-  async function show(date) {
-    picked = date;
-    draw();
-    if (cache[date] === undefined) {
-      const mine = seq, o = await download('day/i_' + date + '.json');
-      if (mine !== seq) return;
-      cache[date] = o ? parseDay(o) : null;
-      if (picked === date) draw();
-    }
+    const days = inPeriod(), all = days.map((d) => ({ d, ...figs(d) }));
+    const total = all.reduce((a, x) => a + x.n, 0), valued = kind === 'r' && all.every((x) => x.v != null);
+    const sum = `<div class="di-sum"><span>${days.length > 1 ? many(days.length, 'يوم', 'أيام') + ' · ' : ''}${many(total, 'صنف', 'أصناف')}</span>${valued ? `<b>${bdi(money(all.reduce((a, x) => a + x.v, 0)))} <span>ج</span></b>` : ''}</div>`;
+    const bar = (x) => (kind === 'r' && valued ? x.v : x.n);
+    const max = Math.max(0, ...all.map(bar));
+    const lines = all.map((x) => {
+      const isOpen = opened.has(x.d), width = max > 0 && bar(x) > 0 ? Math.max(4, Math.round((bar(x) / max) * 100)) : 0;
+      const what = x.n ? `${many(x.n, 'صنف', 'أصناف')}${kind === 'r' && x.v != null ? ` · ${bdi(money(x.v))} <span>ج</span>` : ''}` : '<span>مفيش</span>';
+      return `<div class="di-block${isOpen ? ' open' : ''}"><button type="button" class="di-dl" data-di-open="${x.d}" aria-expanded="${isOpen}"><b>${esc(shortDay(x.d))}</b><span class="di-bar"><i style="width:${width}%"></i></span>` +
+        `<span class="di-n">${what} <span aria-hidden="true">${isOpen ? '▴' : '▾'}</span></span></button>${isOpen ? inside(x.d) : ''}</div>`;
+    }).join('');
+    const withSome = all.filter((x) => x.n > 0).map((x) => x.d), allOpen = withSome.length > 0 && withSome.every((d) => opened.has(d));
+    const head = days.length > 1
+      ? `<div class="di-hd"><h3 class="dy-h"><span>الأيام</span></h3>${withSome.length ? `<button type="button" class="di-all" data-di-all>${allOpen ? 'اقفل كل الأيام' : 'افتح كل الأيام'}</button>` : ''}</div><p class="hint">دوس على أي يوم تتفتح أصنافه تحته. تقدر تفتح كذا يوم مع بعض.</p>`
+      : '';
+    main.innerHTML = tabs + periodCard() + sum + periodNotes(days) + head + lines;
   }
   async function open() {
     bind();
     const mine = ++seq;
-    loading = !index; cache = {}; allDays = false; draw();
+    loading = !index; cache = {}; asked = {}; draw();
     const [i, s, w] = await Promise.all([download('day/items.json'), download('day/items_stock.json'), readWait()]);
     if (mine !== seq) return;
     loading = false; index = parseIndex(i); stock = parseStock(s); wait = w;
     if (!index) return draw();
-    // today; just after midnight, when nothing has happened yet, the day that is over
+    // a week ending today; just after midnight, when nothing has happened yet, ending on the day that is over
     const y = addDays(index.today, -1), empty = !KINDS.some(([k]) => countOf(index, index.today, k, wait));
-    await show(empty && index.days[y] ? y : index.days[index.today] ? index.today : index.dates[0]);
+    const end = empty && index.days[y] ? y : index.days[index.today] ? index.today : index.dates[0];
+    setRange(lastDays(7, end, index.dates[index.dates.length - 1]));
   }
   // «📊 التقارير» opens it on the report he tapped
   const preset = (k) => { if (KINDS.some((x) => x[0] === k)) kind = k; };
@@ -187,15 +253,30 @@
     p.addEventListener('click', (e) => {
       const t = (s) => e.target.closest(s);
       let el;
-      if ((el = t('[data-di-kind]'))) { kind = el.dataset.diKind; draw(); return; }
-      if ((el = t('[data-di-day]'))) { show(el.dataset.diDay); window.scrollTo({ top: 0 }); return; }
-      if (t('[data-di-prev]')) { const k = index.dates.find((d) => d < picked); if (k) show(k); return; }
-      if (t('[data-di-next]')) { const k = index.dates.slice().reverse().find((d) => d > picked); if (k) show(k); return; }
-      if (t('[data-di-more]')) { allDays = !allDays; draw(); }
+      if (!index) return;
+      const first = index.dates[index.dates.length - 1];
+      if ((el = t('[data-di-kind]'))) {
+        kind = el.dataset.diKind;
+        if (![...opened].some((d) => figs(d).n > 0)) openFirst();
+        draw(); read(wanted()); return;
+      }
+      if ((el = t('[data-di-quick]'))) { setRange(lastDays(Number(el.dataset.diQuick), to, first)); return; }
+      if ((el = t('[data-di-shift]'))) { setRange(shiftRange(from, to, Number(el.dataset.diShift), first, index.today)); return; }
+      if (t('[data-di-all]')) {
+        const some = inPeriod().filter((d) => figs(d).n > 0);
+        opened = some.every((d) => opened.has(d)) ? new Set() : new Set(some);
+        draw(); read(wanted()); return;
+      }
+      if ((el = t('[data-di-open]'))) {
+        const d = el.dataset.diOpen;
+        if (opened.has(d)) opened.delete(d); else opened.add(d);
+        draw(); read(wanted());
+      }
     });
     p.addEventListener('change', (e) => {
-      if (e.target.id !== 'diDate' || !index || !e.target.value) return;
-      const v = e.target.value; show(index.days[v] ? v : index.dates.find((d) => d <= v) || index.dates[index.dates.length - 1]);
+      if (!index || !e.target.value || (e.target.id !== 'diFrom' && e.target.id !== 'diTo')) return;
+      const side = e.target.id === 'diFrom' ? 'from' : 'to';
+      setRange(fitRange(side === 'from' ? e.target.value : from, side === 'to' ? e.target.value : to, side, index.dates[index.dates.length - 1], index.today));
     });
     $('diRefresh')?.addEventListener('click', () => { open(); });
   }
