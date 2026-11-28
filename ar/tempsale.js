@@ -57,6 +57,16 @@
     lines.push(line);
     return line;
   }
+  // «🔁 بدائل» on a bill line (owner 2026-11-28: «عاوزة لو اختارته ينزل مكان الصنف الاساسى اللى بحثت عنه و نزلته الفاتورة»): the chosen alternative takes
+  // the line's place in the bill, with its quantity; its own price, parts and stock; its expiry is asked again (x = null), as when an item is added.
+  // Units stay only on an item that splits (else the line keeps at least one box).
+  function swapItem(line, it) {
+    const base = Number(it.price) || 0, k = Number(it.parts) > 1 ? Number(it.parts) : 1;
+    Object.assign(line, { c: Number(it.item_id ?? it.id), n: String(it.name || ''), ar: String(it.arabic_name || ''), k, base, p: priceOf(base, k, 'pack'), pu: priceOf(base, k, 'unit'),
+      x: null, bs: null, xmiss: false, vp: !!it.vp, sp: Number(it.packs) || 0, su: Number(it.units) || 0, nostock: !!it.nostock, sold0: false });
+    if (!(k > 1) && line.w) { line.q = Math.max(1, line.q); line.w = 0; }
+    return line;
+  }
   // «سعر متغيّر» (PharmaFly's Items.VariableSalesPrice; owner 2026-11-22, for everyone who sells: «يظهر لي خانة اغير فيها السعر»): the box's price
   // typed on the line, the unit's price follows (price ÷ parts); nothing at or below 0. The robot types this price in PharmaFly's «أدخل سعر البيع».
   function setPrice(line, v) {
@@ -216,7 +226,7 @@
   const quickCols = (rows) => rows.reduce((m, q) => Math.max(m, q.c + 1), 1);
   // a button whose item has no stock and was not sold this year: it goes in like any item with no stock, from the button's own data
   const quickItem = (q) => ({ item_id: q.i, name: q.n || q.t, arabic_name: '', price: q.sp, parts: q.p, packs: 0, units: 0, nostock: true, sold0: true, hasExp: q.e });
-  const api = { quickRows, quickPages, quickCols, quickItem, stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, setQty, setPrice, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
+  const api = { quickRows, quickPages, quickCols, quickItem, stickerRead, overStock, expInfo, parseExp, stripBox, mainBack, stickerCode, priceOf, lineTotal, total, addItem, swapItem, setQty, setPrice, sellable, blankBill, cleanBills, MAX_BILLS, overLimit, account, balText, roundOptions, due, record, qtyText, countText, money, merged };
   root.AskerTempSaleLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -782,7 +792,36 @@
       const e = expInfo(l.x), more = e.gone ? ' · <span>منتهية</span>' : e.soon ? ' · <span>قربت</span>' : '';
       return `<div class="ts-exp${e.soon ? ' soon' : ''}"><span>${esc(e.text)} ✓${more}</span>${l.sold0 || batchInfo(l.c).state === 'list' ? '<button type="button" class="linklike" data-ts-xchg>تغيير</button>' : ''}</div>`;
     }
+    // an alternative that took a line's place (no expiry yet): its batch is chosen, never taken for him
+    if (!l.sold0 && kind !== 'return' && batchInfo(l.c).state === 'list') return '<div class="ts-exp none"><span>اختار الصلاحية</span><button type="button" class="linklike" data-ts-xchg>اختار</button></div>';
     return l.xmiss ? '<div class="ts-exp none"><span>الصلاحية مش متاحة دلوقتي</span></div>' : '';
+  }
+  // ---------- «🔁 بدائل» on a bill line (owner 2026-11-28; the list and its rules: ar/home.js, ar_store_generic) ----------
+  const subsOpen = new WeakSet();
+  // the ingredient list arrives after the bill was drawn: the buttons appear
+  if (root.addEventListener) root.addEventListener('asker-subs', () => { if (cart.length && $('tsCart')) drawCart(); });
+  // the alternatives of a line that have stock now, from this screen's stock list; none on a return
+  function lineSubs(l) {
+    const H = root.AskerHomeLib, S = root.AskerHome && root.AskerHome.subs ? root.AskerHome.subs() : null;
+    if (!H || !H.subsOf || !S || kind === 'return') return [];
+    const asIt = (r) => ({ id: r.item_id, en: r.name, ar: r.arabic_name, stock: { packs: r.packs, units: r.units, price: r.price, parts: r.parts }, price: r.price });
+    const me = { id: l.c, en: l.n, stock: { packs: l.sp, units: l.su, price: l.base }, price: l.base };
+    return H.subsOf(me, S, { get: (id) => { const r = byId.get(Number(id)); return r ? asIt(r) : undefined; } });
+  }
+  function subsChip(l, list) {
+    return list.length ? `<button type="button" class="chip ts-subs-b${subsOpen.has(l) ? ' on' : ''}" data-ts-subs>🔁 بدائل (${list.length})</button>` : '';
+  }
+  function subsPanel(l, list) {
+    if (!list.length || !subsOpen.has(l)) return '';
+    const H = root.AskerHomeLib, lib = root.AskerStockLib, S = root.AskerHome.subs(), w = H.subsWhy(S && S.byItem.get(String(l.c)));
+    const rows = list.map((x) => {
+      const s = x.it.stock, q = lib ? lib.qtyText(s.packs, s.units, s.parts) : '', d = H.diffText(x.diff);
+      return `<button type="button" class="hs-sub" data-ts-swap="${esc(x.it.id)}"><span class="hs-sub-n" dir="ltr">${esc(x.it.en)}</span><span class="hs-sub-q">${esc(q)}</span>` +
+        `<span class="hs-sub-p">${x.price != null ? esc(money(x.price)) : '—'}</span>` + (d ? `<span class="hs-sub-d ${x.diff < 0 ? 'lo' : x.diff > 0 ? 'hi' : ''}">${esc(d)}</span>` : '') +
+        (x.sure ? '' : '<span class="tag warn">اتأكد</span>') + '</button>';
+    }).join('');
+    return `<div class="hs-subs ts-subs"><div class="hs-subs-w"><span dir="ltr" translate="no">${esc(w.ing)}</span>${w.form ? ` · <span>${esc(w.form)}</span>` : ''}</div>${rows}` +
+      '<div class="hs-subs-f">البديل اللي تختاره بينزل مكان الصنف ده · القرار للصيدلي</div></div>';
   }
   // «سعر متغيّر»: the tag and the box's price, typed (PharmaFly's price shown beside it once it is changed)
   function vpRow(l) {
@@ -808,9 +847,10 @@
       box.innerHTML = cart.map((l, i) => {
         const head = `<div class="ts-l1"><strong class="notr">${esc(nameOf(l))}</strong><span class="ts-amt">${esc(money(lineTotal(l)))}</span></div>${lineInfo(l)}${expRow(l)}${vpRow(l)}`;
         const calc = l.q > 0 && l.w > 0 ? `<div class="ts-calc"><span>${esc(l.q)}</span> × <span>${esc(money(l.p))}</span> + <span>${esc(l.w)}</span> × <span>${esc(money(l.pu))}</span></div>` : '';
+        const alts = lineSubs(l);
         return `<div class="ts-line" data-i="${i}">${photoRow(l.c, l.n, nameOf(l), head)}
         <div class="ts-qrow">${qbox(l, 'q')}${qbox(l, 'w')}</div>${calc}
-        <div class="ts-l2"><span class="ts-code">كود ${esc(l.c)}</span><button type="button" class="ts-del" data-ts-del aria-label="شيل الصنف">✕</button></div></div>`;
+        <div class="ts-l2"><span class="ts-code">كود ${esc(l.c)}</span>${subsChip(l, alts)}<button type="button" class="ts-del" data-ts-del aria-label="شيل الصنف">✕</button></div>${subsPanel(l, alts)}</div>`;
       }).reverse().join('') +
         `<div class="ts-total"><span>الإجمالي (تقريبي)</span><b>${esc(money(total(cart)))}</b></div>` + adjHtml();
     }
@@ -1196,6 +1236,24 @@
         if (l.sold0) { openType({ item_id: l.c, name: l.n, arabic_name: l.ar }, l, kind === 'return' ? 'return' : ''); return; }
         const info = batchInfo(l.c);
         if (info.state === 'list') openExp({ item_id: l.c, name: l.n, arabic_name: l.ar }, info, l);
+        return;
+      }
+      if (l && t.hasAttribute('data-ts-subs')) { if (subsOpen.has(l)) subsOpen.delete(l); else subsOpen.add(l); return drawCart(); }
+      // the chosen alternative takes this line's place (owner 2026-11-28), then its batch is asked as when it is added
+      if (l && t.dataset.tsSwap) {
+        const it = byId.get(Number(t.dataset.tsSwap));
+        if (!it) return;
+        const was = nameOf(l);
+        swapItem(l, it);
+        if (isVp(l.c)) l.vp = true;
+        subsOpen.delete(l);
+        clearAdj(); drawCart();
+        say('tsFind', `اتبدّل: ${nameOf(l)} مكان ${was}`, 'ok');
+        const wait = (p) => Promise.race([p, new Promise((r) => setTimeout(r, 4000))]);
+        if (batchP) await wait(batchP); else if (!batches) await wait(loadBatches());
+        const info = batchInfo(l.c);
+        if (info.state === 'list') openExp({ item_id: l.c, name: l.n, arabic_name: l.ar }, info, l);
+        else if (info.state === 'unknown') { l.xmiss = true; drawCart(); }
         return;
       }
       if (l && t.hasAttribute('data-ts-del')) { cart.splice(Number(line.dataset.i), 1); clearAdj(); return drawCart(); }
