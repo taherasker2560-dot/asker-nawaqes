@@ -97,7 +97,7 @@
       const st = src.cancel && it.id != null ? cancelState(it, src.cancel.get(String(it.id))) : null;
       if (st && st.hidden) { it.cancel = st; gone.push(it); } else { if (st) it.cancelNote = st; visible.push(it); }
     }
-    return { items, extra, visible, gone };
+    return { items, extra, visible, gone, byId };
   }
   // ---------- «الملغى» (owner 2026-11-20/21: «الاخفاء هيبقا عالملغى أو اللي جنب اسمه ملغى أو اللي ليه اسم تاني بسعر اعلى … والأصناف اللي ما عليهاش حركة من سنتين …
   // ويرجع بشكل أوتوماتيك لو دخل مشتريات بعدين») ----------
@@ -206,7 +206,73 @@
     }
     return diff.length ? 'وفي القوايم ' + diff.join(' · ') : '';
   }
-  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists, listPriceText, parseCancel, cancelState, cancelWhy };
+  // ---------- «🔁 بدائل» (owner 2026-11-28, after the drawing: «انا عاوز يظهر البدايل حتى لو فيه رصيد للصنف احيانا العميل حاجه بسعر اعلى او اقل») ----------
+  // rows = ar_store_generic {item_id, gkey, confident, ingredients, form} (Store\generic\generic.txt, Store\generic\INGREDIENT.md): the same gkey = the same active
+  // ingredients, strengths and form (an injection's key carries its route and pack too). The store shows only the sure ones; here an unsure one says «اتأكد».
+  function buildSubs(rows) {
+    const byItem = new Map(), byKey = new Map();
+    for (const r of rows || []) {
+      if (!r || r.item_id == null || !r.gkey) continue;
+      const id = String(r.item_id);
+      byItem.set(id, { gkey: String(r.gkey), sure: !!r.confident, ing: String(r.ingredients || ''), form: String(r.form || '') });
+      if (!byKey.has(r.gkey)) byKey.set(String(r.gkey), []);
+      byKey.get(String(r.gkey)).push(id);
+    }
+    return { byItem, byKey };
+  }
+  const stockOf = (it) => { const s = it && it.stock; return s ? (num(s.packs) || 0) + (num(s.units) || 0) : 0; };
+  const priceOf = (it) => { const s = it && it.stock; return s && num(s.price) > 0 ? num(s.price) : it && num(it.price) > 0 ? num(it.price) : null; };
+  // the alternatives of one item that have stock now, cheapest first (no price last), up to 8; diff = their price against this item's; sure = both lines checked
+  function subsOf(it, subs, byId, max = 8) {
+    if (!it || it.id == null || !subs || !byId) return [];
+    const me = subs.byItem.get(String(it.id));
+    if (!me) return [];
+    const p0 = priceOf(it), out = [];
+    for (const id of subs.byKey.get(me.gkey) || []) {
+      if (id === String(it.id)) continue;
+      const a = byId.get(id);
+      if (!a || a.cancel || stockOf(a) <= 0) continue;
+      const p = priceOf(a);
+      out.push({ it: a, price: p, diff: p != null && p0 != null ? r2(p - p0) : null, sure: me.sure && subs.byItem.get(id).sure });
+    }
+    out.sort((x, y) => (x.price ?? Infinity) - (y.price ?? Infinity) || String(x.it.en).localeCompare(String(y.it.en)));
+    return out.slice(0, max);
+  }
+  // «أرخص بـ 6 ج» / «أغلى بـ 86 ج» / «نفس السعر»
+  const diffText = (d) => (d == null ? '' : d < 0 ? `أرخص بـ ${r2(-d)} ج` : d > 0 ? `أغلى بـ ${r2(d)} ج` : 'نفس السعر');
+  const FORM_AR = { tab: 'أقراص', tab_mr: 'أقراص ممتدة المفعول', cap: 'كبسول', eff: 'فوار', sach: 'أكياس', syrup: 'شراب', susp: 'معلق', oral_drops: 'نقط بالفم', eye: 'للعين', ear: 'للودن',
+    nasal: 'للأنف', cream: 'كريم', oint: 'مرهم', gel: 'جل', lotion: 'لوشن', spray_skin: 'سبراي', inhaler: 'بخاخ صدر', inj: 'حقن', supp: 'لبوس', vaginal: 'مهبلي', patch: 'لزقة', mouth: 'للفم', other: '' };
+  // the key in words: «pantoprazole 40mg» + «أقراص»; an injection: «ceftriaxone 1g» + «حقن عضل»
+  function subsWhy(m) {
+    if (!m) return { ing: '', form: '' };
+    const parts = m.ing.split(';').map((x) => x.trim());
+    const route = (parts.find((x) => /^route /.test(x)) || '').replace(/^route /, '');
+    const r = route === 'im' ? ' عضل' : route === 'iv' ? ' وريد' : route === 'sc' ? ' تحت الجلد' : '';
+    return { ing: parts[0] || '', form: (FORM_AR[m.form] ?? m.form) + (m.form === 'inj' ? r : '') };
+  }
+  // «pantoprazole» typed: the items whose active ingredient has every typed English word (4 letters at least in all), one group per strength and form,
+  // the groups with more stock first; in a group the items with stock first, then by price
+  function ingredientGroups(q, subs, byId, maxGroups = 6) {
+    const text = String(q || '');
+    if (!subs || !byId || /[^\x00-\x7f]/.test(text)) return [];
+    const words = text.toLowerCase().match(/[a-z]{3,}/g) || [];
+    if (!words.length || words.join('').length < 4) return [];
+    const groups = new Map();
+    for (const [id, m] of subs.byItem) {
+      const ws = m.ing.split(';')[0].toLowerCase().match(/[a-z]+/g) || [];
+      if (!words.every((w) => ws.some((x) => x.startsWith(w)))) continue;
+      const it = byId.get(id);
+      if (!it || it.cancel) continue;
+      if (!groups.has(m.gkey)) groups.set(m.gkey, { gkey: m.gkey, m, items: [], have: 0 });
+      const g = groups.get(m.gkey);
+      g.items.push(it);
+      if (stockOf(it) > 0) g.have++;
+    }
+    for (const g of groups.values()) g.items.sort((a, b) => (stockOf(b) > 0) - (stockOf(a) > 0) || (priceOf(a) ?? Infinity) - (priceOf(b) ?? Infinity) || String(a.en).localeCompare(String(b.en)));
+    return [...groups.values()].sort((a, b) => b.have - a.have || b.items.length - a.items.length || a.gkey.localeCompare(b.gkey)).slice(0, maxGroups);
+  }
+  const api = { buildIndex, marks, offersText, bestOffers, buysText, supName, shortDate, inScope, SCOPE_WORDS, offerRows, buysVsLists, listPriceText, parseCancel, cancelState, cancelWhy,
+    buildSubs, subsOf, diffText, subsWhy, ingredientGroups };
   root.AskerHomeLib = api;
   if (typeof module !== 'undefined') module.exports = api;
   if (typeof document === 'undefined') return;
@@ -223,6 +289,8 @@
   let catalog = null, catLoading = null, catFail = '';
   let buys = null, buysLoading = null; // «آخر شرا» (ar_item_buys): quiet when the table is not there yet
   let cancelRows = null, cancelMap = null, cancelLoading = null; // «الملغى» (ar_item_cancel_sets + ar_item_cancel_restored): quiet when the tables are not there yet
+  let subs = null, subsLoading = null; // «🔁 بدائل» (ar_store_generic): the owner and the staff the server lets read it; nobody else sees the box
+  const subsOpen = new Set(); // the cards (in stock) whose «🔁 بدائل» he opened
   // the owner and the staff who may search read the cancelled lists; only the owner has «الملغى» and «ارجعه»
   const isOwner = () => !(root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff());
   let scope = 'all'; // the button under the box; every page open starts on «الكل», so nothing is hidden by a forgotten choice
@@ -324,6 +392,14 @@
       .catch(() => { if (!cancelRows) { cancelRows = []; cancelMap = new Map(); } }) // not there yet (before its migration) or no line: the kept copy stays, else nothing is cancelled
       .finally(() => { cancelLoading = null; indexIds(); draw(); });
   }
+  // the active ingredients (about 2,800 short rows), kept on the phone like the items; not readable (staff without the right) = no box, quietly
+  function loadSubs() {
+    if (subs || subsLoading || !db()) return;
+    subsLoading = keptOrRead('hs-subs-v1', () => readAll('ar_store_generic', 'item_id,gkey,confident,ingredients,form', 'item_id'), (all) => { subs = buildSubs(all); draw(); })
+      .then((all) => { subs = buildSubs(all); })
+      .catch(() => { subs = buildSubs([]); })
+      .finally(() => { subsLoading = null; draw(); });
+  }
   // «الملغى» is the owner's button (staff never see it)
   function showScopeChip() { const b = document.querySelector('#hsScope [data-scope="cancelled"]'); if (b) b.classList.toggle('hidden', !isOwner()); }
   function loadLines() {
@@ -355,7 +431,7 @@
     if (root.AskerStaff && root.AskerStaff.isStaff && root.AskerStaff.isStaff() && !(root.AskerStaff.can && root.AskerStaff.can('search'))) return;
     preloaded = true;
     showScopeChip();
-    loadCatalog(); loadLines(); loadBuys(); loadCancel(); askStock();
+    loadCatalog(); loadLines(); loadBuys(); loadCancel(); loadSubs(); askStock();
   }
   let stockAsked = false;
   function askStock() {
@@ -417,9 +493,41 @@
       ${table ? `<table class="hs-offers-t">${table}</table>` : ''}
       ${bought ? `<div class="hs-buys">${esc(bought)}</div>` : ''}
       ${offers ? `<div class="hs-offers">${esc(offers)}</div>` : ''}
+      ${subsBox(it)}
       ${appsRow(it)}
       ${actionsRow(it)}
     </div>`;
+  }
+  // one alternative (or one item of an ingredient group): name, stock, price, and against the item he looks at «أرخص بـ / أغلى بـ»; a tap opens its card
+  function subRow(x) {
+    const lib = stockLib(), n = stockOf(x.it);
+    const q = n > 0 ? (lib.qtyText ? lib.qtyText(x.it.stock.packs, x.it.stock.units, x.it.stock.parts) : String(n)) : 'ملوش رصيد';
+    const d = diffText(x.diff);
+    return `<button type="button" class="hs-sub" data-sub="${esc(x.it.id)}"><span class="hs-sub-n" dir="ltr">${esc(x.it.en || x.it.ar)}</span>` +
+      `<span class="hs-sub-q${n > 0 ? '' : ' zero'}">${esc(q)}</span><span class="hs-sub-p">${x.price != null ? esc(r2(x.price) + ' ج') : '—'}</span>` +
+      (d ? `<span class="hs-sub-d ${x.diff < 0 ? 'lo' : x.diff > 0 ? 'hi' : ''}">${esc(d)}</span>` : '') + (x.sure ? '' : '<span class="tag warn">اتأكد</span>') + '</button>';
+  }
+  const whyLine = (m) => { const w = subsWhy(m); return `<div class="hs-subs-w"><span dir="ltr" translate="no">${esc(w.ing)}</span>${w.form ? ` · <span>${esc(w.form)}</span>` : ''}</div>`; };
+  // «🔁 بدائل»: open under an item with no stock; a button «🔁 بدائل (3)» under an item in stock (owner 2026-11-28: a customer may want a cheaper or a dearer one)
+  function subsBox(it) {
+    if (scope === 'lists' || scope === 'cancelled' || !subs || !index) return '';
+    const list = subsOf(it, subs, index.byId);
+    if (!list.length) return '';
+    const inStock = stockOf(it) > 0, open = !inStock || subsOpen.has(it.key);
+    if (!open) return `<div class="hs-subs-c"><button type="button" class="chip" data-subs>🔁 بدائل (${list.length})</button></div>`;
+    return `<div class="hs-subs"><div class="hs-subs-h">🔁 بدائل عندك رصيدها</div>${whyLine(subs.byItem.get(String(it.id)))}` +
+      list.map(subRow).join('') + '<div class="hs-subs-f">نفس المادة والتركيز والشكل · القرار للصيدلي</div>' +
+      (inStock ? '<button type="button" class="chip hs-subs-x" data-subs>اقفل البدائل</button>' : '') + '</div>';
+  }
+  // «💊 بالمادة الفعالة» on top of the cards when the typed English words are an active ingredient (pantoprazole, para…)
+  function ingBlock(q) {
+    if (scope === 'lists' || scope === 'cancelled' || !subs || !index) return '';
+    const gs = ingredientGroups(q, subs, index.byId);
+    if (!gs.length) return '';
+    return '<div class="hs-ing"><div class="hs-subs-h">💊 بالمادة الفعالة</div>' + gs.map((g) => `<div class="hs-ing-g">${whyLine(g.m)}` +
+      (g.have ? `<div class="hs-ing-n"><span class="tag good">${g.have} عندك</span></div>` : '') +
+      g.items.slice(0, 12).map((it) => subRow({ it, price: priceOf(it), diff: null, sure: g.m.sure })).join('') + '</div>').join('') +
+      '<div class="hs-subs-f">نفس المادة والتركيز والشكل · القرار للصيدلي</div></div>';
   }
   // «⚙️ عمليات وتقارير» (owner 2026-11-20, ar/item-actions.js): the item's reports and operations, for any item that has a PharmaFly code (in stock or not); not for staff (phase 1)
   function actionsRow(it) {
@@ -474,7 +582,7 @@
     if (!on) { $('hsItems').innerHTML = ''; $('hsLinesBox').classList.add('hidden'); $('hsCx')?.classList.add('hidden'); editing = null; return say(''); }
     if (editing && document.activeElement && document.activeElement.id === 'hsAr') return; // never wipe what is being typed
     showScopeChip();
-    loadCatalog(); loadLines(); loadBuys(); loadCancel(); askStock();
+    loadCatalog(); loadLines(); loadBuys(); loadCancel(); loadSubs(); askStock();
     if (scope === 'cancelled' && !isOwner()) scope = 'all';
     const ix = currentIndex();
     // «الكل» and the other buttons leave the cancelled items out; «الملغى» (owner) holds only them
@@ -488,7 +596,8 @@
     // «اب كير امبول»: «اصناف تانية غريبة كده ملهاش علاقة بيه»)
     const extra = lines && (scope === 'all' || scope === 'lists') ? fz().rank(q, ix.extra, (l) => l._h, 10, { strict: true, min: 0.6 }) : [];
     shown = new Map(hits.map((it) => [it.key, it]));
-    $('hsItems').innerHTML = hits.map(card).join('');
+    const ing = ingBlock(q);
+    $('hsItems').innerHTML = ing + hits.map(card).join('');
     // the owner is told when the same name has cancelled items too (so a missing item is never taken for «not in the system»)
     const cx = $('hsCx');
     if (cx) {
@@ -502,7 +611,7 @@
     const age = root.AskerStock && scope !== 'lists' ? root.AskerStock.age() : ''; // «القوايم» = the warehouses only
     const wait = [catLoading ? 'بحمّل كل أصناف السيستم…' : catFail, linesLoading ? 'بحمّل قوايم المخازن…' : linesFail].filter(Boolean).join(' · ');
     const where = SCOPE_WORDS[scope] || '';
-    if (!hits.length && !extra.length) return say(wait || (where ? `مفيش صنف بالاسم ده ${where}. دوس «الكل» تدوّر في كله.` : 'مفيش صنف بالاسم ده.'), catFail || linesFail ? 'bad' : '');
+    if (!hits.length && !extra.length && !ing) return say(wait || (where ? `مفيش صنف بالاسم ده ${where}. دوس «الكل» تدوّر في كله.` : 'مفيش صنف بالاسم ده.'), catFail || linesFail ? 'bad' : '');
     say([(hits.length === 25 ? 'أقرب 25 صنف' : `${hits.length} صنف`) + (where ? ' ' + where : ''), age, wait].filter(Boolean).join(' · '), catFail || linesFail ? 'bad' : '');
   }
   function openEditor(key) {
@@ -564,10 +673,18 @@
     });
     $('hsCx')?.addEventListener('click', () => pickScope('cancelled')); // «وفيه 5 في «الملغى» بالاسم ده · شوفهم»
     $('hsItems')?.addEventListener('click', async (e) => {
+      // an alternative (or an item of an ingredient group): its own card comes up, by its name in the box
+      const sub = e.target.closest('[data-sub]');
+      if (sub) {
+        const a = index && index.byId.get(String(sub.dataset.sub));
+        if (a) { box.value = a.en || a.ar; editing = null; draw(); $('hsQ')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); }
+        return;
+      }
       const cardEl = e.target.closest('[data-k]');
       if (!cardEl) return;
       const key = cardEl.dataset.k, it = shown.get(key);
       if (!it) return;
+      if (e.target.closest('[data-subs]')) { if (subsOpen.has(key)) subsOpen.delete(key); else subsOpen.add(key); cardEl.outerHTML = card(it); return; }
       if (e.target.closest('[data-ia]')) { if (root.AskerItemActions) root.AskerItemActions.open(it); return; }
       const back = e.target.closest('[data-restore]');
       if (back) return restoreItem(it, back);
