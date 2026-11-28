@@ -16,7 +16,7 @@ assert.deepEqual(R('manual'),['إنت حطيته بإيدك في أمر الشر
 assert.deepEqual(R('postponed'),['إنت أجّلته (نقلته لكل الشركات)','own']);
 assert.deepEqual(R('cancelled_me'),['إنت لغيته من أمر الشرا','own']);
 // what the order builder kept out itself (owner 2026-11-28): the cap is said as the cap, never «missed»
-assert.deepEqual(R('cap'),['السقف مسكه: ميزانية الأمر كانت كملت','warn']);assert.deepEqual(R('got_today'),['كان وصل في نفس اليوم: السيستم مش بيطلبه مرتين في اليوم','warn']);
+assert.deepEqual(R('cap'),['السقف مسكه: ميزانية الأمر كانت كملت','warn']);assert.deepEqual(R('back'),['ما اشتريتوش ليلتين فرجع آخر الدور، والسقف مسكه','warn']);assert.deepEqual(R('got_today'),['كان وصل في نفس اليوم: السيستم مش بيطلبه مرتين في اليوم','warn']);
 assert.deepEqual(R('asked'),['صنف جديد أو «بالطلب»: مش بيدخل الأمر غير لما تضيفه','gray']);assert.deepEqual(R('not_now'),['إنت دوست عليه «مش دلوقتي»','own']);assert.deepEqual(R('dup_same'),['إنت قلت إنه نفس صنف تاني','own']);
 assert.deepEqual(R('closed_auto'),['السيستم قفل سطره قبل الطلب (الرصيد رجع أو خرج من الحقيبة)','gray']);
 assert.equal(R('unknown')[1],'gray');assert.deepEqual(R('gs'),['في النواقص العامة','gray']);

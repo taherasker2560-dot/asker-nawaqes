@@ -178,6 +178,7 @@ window.AskerEN = {
  "🔵 في أمر السيستم وما وصلش": "🔵 In the system's order, did not arrive",
  "🟢 اتطلبوا ووصلوا": "🟢 Ordered and arrived",
  "السقف مسكه: ميزانية الأمر كانت كملت": "Held by the cap: the order's budget was full",
+ "ما اشتريتوش ليلتين فرجع آخر الدور، والسقف مسكه": "You did not buy it on 2 nights, so it went to the back of the queue, and the cap held it",
  "كان وصل في نفس اليوم: السيستم مش بيطلبه مرتين في اليوم": "It had arrived the same day: the system does not order it twice in a day",
  "صنف جديد أو «بالطلب»: مش بيدخل الأمر غير لما تضيفه": "A new or «on request» item: it does not enter the order until you add it",
  "إنت دوست عليه «مش دلوقتي»": "You tapped «Not now» on it",
