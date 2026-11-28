@@ -395,10 +395,12 @@
   // the active ingredients (about 2,800 short rows), kept on the phone like the items; not readable (staff without the right) = no box, quietly
   function loadSubs() {
     if (subs || subsLoading || !db()) return;
-    subsLoading = keptOrRead('hs-subs-v1', () => readAll('ar_store_generic', 'item_id,gkey,confident,ingredients,form', 'item_id'), (all) => { subs = buildSubs(all); draw(); })
+    // «البيع المؤقت» draws its bill again when they arrive (its «🔁 بدائل» on a bill line, ar/tempsale.js)
+    const told = () => { try { root.dispatchEvent(new Event('asker-subs')); } catch (e) {} };
+    subsLoading = keptOrRead('hs-subs-v1', () => readAll('ar_store_generic', 'item_id,gkey,confident,ingredients,form', 'item_id'), (all) => { subs = buildSubs(all); draw(); told(); })
       .then((all) => { subs = buildSubs(all); })
       .catch(() => { subs = buildSubs([]); })
-      .finally(() => { subsLoading = null; draw(); });
+      .finally(() => { subsLoading = null; draw(); told(); });
   }
   // «الملغى» is the owner's button (staff never see it)
   function showScopeChip() { const b = document.querySelector('#hsScope [data-scope="cancelled"]'); if (b) b.classList.toggle('hidden', !isOwner()); }
@@ -717,7 +719,8 @@
     const box = $('hsQ');
     if (box && box.value) { box.value = ''; editing = null; draw(); }
   }
-  root.AskerHome = { draw, close, open: () => {}, idOf };
+  // subs(): the active ingredients for «البيع المؤقت» (read once, here; null until they arrive, then the event «asker-subs»)
+  root.AskerHome = { draw, close, open: () => {}, idOf, subs: () => { loadSubs(); return subs; } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
   else bind();
 })(typeof window === 'undefined' ? globalThis : window);

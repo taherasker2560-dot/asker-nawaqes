@@ -3023,6 +3023,9 @@ window.AskerEN = {
   "حقن تحت الجلد": "injection SC",
   "مهبلي": "vaginal",
   "لزقة": "patch",
-  "للفم": "mouth"
+  "للفم": "mouth",
+  "اختار الصلاحية": "Choose the expiry",
+  "البديل اللي تختاره بينزل مكان الصنف ده · القرار للصيدلي": "The alternative you pick takes this item's place · the pharmacist decides",
+  "اتبدّل: {0} مكان {1}": "Swapped: {0} instead of {1}"
  }
 };
