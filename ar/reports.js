@@ -37,6 +37,9 @@
       { id: 'expiry', tab: 'expiry', name: 'الصلاحيات', desc: 'منتهي وقرب ينتهي', ic: 'clock' },
       { id: 'season', tab: 'short', anchor: 'seasonBox', open: true, name: 'قبل الموسم', desc: 'اللي بيعه بيزيد', ic: 'season' }]],
     ['المشتريات والموردين', [
+      // «↩️ المرتجعات المطلوبة» (owner 2026-11-28: «جهز الريبورت على طول بعدها … بالحاجات اللي هتترجع»): the items he marked «↩️ رجّعه» / «↩️ إرجاع», by supplier, where each stands in
+      // PharmaFly, the statement for the staff; the list «↩️ مرتجعات» of «الصلاحيات» (ar/return-marks.js), open the moment he presses the button
+      { id: 'retmarks', tab: 'expiry', alview: 'returns', name: 'المرتجعات المطلوبة', desc: 'هتترجع وحالتها', ic: 'back' },
       { id: 'vendst', tab: 'vendors', ve: 'list', name: 'كشف حساب مورد', desc: 'وفواتيره', ic: 'doc' },
       { id: 'returns', tab: 'vendors', ve: 'list', anchor: 'rtBox', name: 'كشف المرتجعات', desc: 'اللي لسه ما راحتش', ic: 'back' },
       { id: 'whofrom', tab: 'vendors', ve: 'find', name: 'الصنف جه من مين', desc: 'كل مرات شراه', ic: 'find' },
@@ -80,7 +83,9 @@
     run++;
     from = r.tab; // set before the screen opens, so its «‹ التقارير» stays
     if (r.chip) (r.tab === 'dayitems' ? root.AskerDayItems : root.AskerCustomers)?.preset?.(r.chip); // before the screen draws, so its first drawing is already on this filter
+    if (r.alview) root.AskerAlerts?.show?.(r.alview);   // the view inside the screen (before and after it opens, so its first drawing is already that view)
     root.AskerApp?.showTab?.(r.tab);
+    if (r.alview) setTimeout(() => root.AskerAlerts?.show?.(r.alview), 0);
     if (r.ve === 'list') root.AskerVendors?.home?.();
     window.scrollTo({ top: 0 });
     if (r.ve === 'find') root.AskerVendors?.findItem?.();

@@ -7,10 +7,11 @@ const R = require('../ar/reports.js');
 const S = require('../ar/shortcuts.js');
 require('../ar/i18n-en.js'); require('../ar/i18n.js'); const I = global.AskerI18n; I._use(global.AskerEN);
 
-// five groups, nineteen reports, each once, each opening a screen the page really has (the three of «الأصناف يوم بيوم» on top since 2026-11-28: one screen)
+// five groups, twenty reports, each once, each opening a screen the page really has (the three of «الأصناف يوم بيوم» on top since 2026-11-28: one screen)
 assert.deepEqual(R.GROUPS.map((g) => g[0]), ['الأصناف يوم بيوم', 'الفلوس والربح', 'المبيعات والعملاء', 'المخزون', 'المشتريات والموردين']);
-assert.equal(R.ALL.length, 19);
-assert.equal(new Set(R.ALL.map((r) => r.id)).size, 19);
+assert.equal(R.ALL.length, 20);
+assert.equal(new Set(R.ALL.map((r) => r.id)).size, 20);
+assert.equal(R.ALL.find((r) => r.id === 'retmarks').alview, 'returns', '«المرتجعات المطلوبة» opens the returns view of «الصلاحيات» (owner 2026-11-28)');
 const app = fs.readFileSync(path.join(__dirname, '..', 'ar', 'app.js'), 'utf8');
 const groupOf = app.slice(app.indexOf('const GROUP_OF = {'), app.indexOf('const PGROUP_OF'));
 for (const r of R.ALL) assert.ok(new RegExp('\\b' + r.tab + ': \'').test(groupOf), 'a screen of the page: ' + r.tab);

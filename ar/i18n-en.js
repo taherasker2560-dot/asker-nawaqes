@@ -3038,6 +3038,8 @@ window.AskerEN = {
   "🤖 الروبوت وقف": "🤖 The robot stopped",
   "🤖 الروبوت وقف: {0}": "🤖 The robot stopped: {0}",
   "⏳ مستني يتسجل في فارمافلاي": "⏳ Waiting to be entered in PharmaFly",
+  "المرتجعات المطلوبة": "Returns to make",
+  "هتترجع وحالتها": "To go back, and where each stands",
   "الأصناف اللي علّمت عليها «إرجاع». المرتجع بيتسجل في فارمافلاي، والبيان بيتبعت للموظفين يجهزوا الأصناف، والصنف بيفضل هنا لحد ما يتجهّز.": "The items you marked «return». The return is entered in PharmaFly, the statement goes to the staff to prepare the goods, and the item stays here until it is prepared."
  }
 };
