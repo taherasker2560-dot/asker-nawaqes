@@ -3031,6 +3031,13 @@ window.AskerEN = {
   "كام علبة ترجع؟": "How many boxes to return?",
   "على فاتورة": "on the invoice",
   "اللي جه بيها": "it came on",
-  "أكبر من رصيدك.": "More than your stock."
+  "أكبر من رصيدك.": "More than your stock.",
+  "📄 اتسجل مرتجع في فارمافلاي": "📄 Entered as a return in PharmaFly",
+  "🤖 الروبوت بيسجّله في فارمافلاي": "🤖 The robot is entering it in PharmaFly",
+  "🤖 اتسجل، مستني نسخة فارمافلاي": "🤖 Entered, waiting for PharmaFly's copy",
+  "🤖 الروبوت وقف": "🤖 The robot stopped",
+  "🤖 الروبوت وقف: {0}": "🤖 The robot stopped: {0}",
+  "⏳ مستني يتسجل في فارمافلاي": "⏳ Waiting to be entered in PharmaFly",
+  "الأصناف اللي علّمت عليها «إرجاع». المرتجع بيتسجل في فارمافلاي، والبيان بيتبعت للموظفين يجهزوا الأصناف، والصنف بيفضل هنا لحد ما يتجهّز.": "The items you marked «return». The return is entered in PharmaFly, the statement goes to the staff to prepare the goods, and the item stays here until it is prepared."
  }
 };
