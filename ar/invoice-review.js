@@ -151,16 +151,18 @@
   // ---- «صور الأصناف» (owner 2026-11-27: «أي صنف ملوش صورة… أو صورته مش تمام أول ما يدخل مشتريات تطلب صورته» → «تطلبها في مراجعة المشتريات») ----
   // the invoice's items (each once; a new item without a card yet has its own box photo; a rejected line goes back) whose photo is missing ('none') or is one nobody of ours chose ('net').
   // stateOf(id) = AskerItemMedia.photoState; the internet ones are asked only once «تمام» can be kept (canConfirm: after migration 202611271000)
-  function picNeeds(r, stateOf, canConfirm) {
-    const none = [], net = [], seen = new Set();
+  // heldOf(id) = someone already sent a photo that waits for his yes (ar/photo-want.js, owner 2026-11-27 night): nothing is asked of it again, the card only says it waits
+  function picNeeds(r, stateOf, canConfirm, heldOf) {
+    const none = [], net = [], held = [], seen = new Set();
     for (const l of linesOf(r)) {
       const id = l && Number(l.id);
       if (!(id > 0) || seen.has(id) || rejected(r, l)) continue;
       seen.add(id);
       const st = stateOf(id), x = { id, name: String(l.name || l.paper || '') };
-      if (st === 'none') none.push(x); else if (st === 'net' && canConfirm) net.push(x);
+      if (st !== 'none' && st !== 'net') continue;
+      if (heldOf && heldOf(id)) held.push(x); else if (st === 'none') none.push(x); else if (canConfirm) net.push(x);
     }
-    return { none, net, n: none.length + net.length };
+    return { none, net, held, n: none.length + net.length };
   }
   const api = { picNeeds, STATUS, money, openNotes, parseNum, askLines, priceOf, effPrice, changedPrice, rejected, openPrices, compact, expMonths, expKind, needs, validPrice, discFor, discOf, expiryText, sumLines, check, canApprove, flagged, answerText, chip, sections, cleanReady, summary, need, when, buyRef, buyStops, buyOf, BUY_HEAD, BUY_CHIP, stopParts, answerKind, stopOptions, OPT_HELP, ANSWER_HEAD, ANSWER_NEXT };
   root.AskerInvReviewLib = api;
@@ -374,7 +376,7 @@
   // ---------- «صور الأصناف»: the camera for an item with no photo; the internet photos side by side, a tap marks a wrong one, «تمام» keeps the rest for good ----------
   let picBad = {}, picOpen = {}, picBusy = {};
   const media = () => (root.AskerItemMedia && root.AskerItemMedia.photoState ? root.AskerItemMedia : null);
-  const picsOf = (r) => { const M = media(); return M ? picNeeds(r, (id) => M.photoState(id), M.canConfirm()) : { none: [], net: [], n: 0 }; };
+  const picsOf = (r) => { const M = media(), W = root.AskerPhotoWant; return M ? picNeeds(r, (id) => M.photoState(id), M.canConfirm(), W && W.held ? (id) => W.held(id) : null) : { none: [], net: [], held: [], n: 0 }; };
   // «📷 صور مطلوبة» (ar/photo-want.js, owner 2026-11-27, «باقى الاصناف انا اللى هدخلها من اصناف الفواتير»): once its list is on the server, HE puts an item on it from the card («➕ للقايمة», or a tap on
   // a wrong internet photo); the camera of an item with no photo stays in the card too. Before the list, a tapped internet photo gets a camera in the card
   const wantList = () => (root.AskerPhotoWant && root.AskerPhotoWant.can() ? root.AskerPhotoWant : null);
@@ -403,12 +405,13 @@
   }
   function picsHtml(r) {
     const p = picsOf(r), fine = fineOf(r);
-    if (!p.n && !fine.length) return '';
+    if (!p.n && !fine.length && !p.held.length) return '';
     const M = media(), W = wantList(), bad = wrongOf(r, p.net), wrong = p.net.filter((x) => bad.has(x.id)), good = p.net.length - wrong.length;
     const head = [p.none.length ? `<bdi dir="ltr">${p.none.length}</bdi> <span>من غير صورة</span>` : '', p.net.length ? `<bdi dir="ltr">${p.net.length}</bdi> <span>صورتها من النت</span>` : ''].filter(Boolean).join(' · ');
     const open = r.id in picOpen ? picOpen[r.id] : p.n > 0;
     let h = `<details class="rv-pics" data-rv-pics="${esc(r.id)}"${open ? ' open' : ''}><summary><span>📷 صور الأصناف</span><small>${head || '<span>صورة غلط؟ ضيفها للقايمة</span>'}</small></summary>`;
     h += p.none.map((x) => picRow(r, x, '📷 صوّر')).join('');
+    h += p.held.map((x) => `<p class="rv-pic-added">⏳ <bdi class="notr" dir="ltr">${esc(x.name)}</bdi> <span>صورتها وصلت ومستنية موافقتك فوق</span></p>`).join('');
     if (p.net.length) {
       h += `<p class="rv-hint">${W ? 'صور النت: دوسة على الغلط تضيفها لقايمة «صور مطلوبة» اللي فوق. اللي تقول عليها تمام مش هيتسأل عليها تاني.' : 'صور النت: دوسة على الغلط تعلّمها «مش تمام» وتصوّرها. اللي تقول عليها تمام مش هيتسأل عليها تاني.'}</p><div class="rv-pic-grid">` +
         p.net.map((x) => picTile(r, x, bad.has(x.id), W ? 'للصور ✓' : 'مش تمام')).join('') + '</div>';

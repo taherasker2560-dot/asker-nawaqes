@@ -132,7 +132,10 @@ assert.equal(L.answerKind({ status: 'answered', answer_key: null, answer_text: '
 // «صور الأصناف» (2026-11-27): each item once; no new item (it has its own box photo), no rejected line; the internet ones only once «تمام» can be kept
 const pr = { lines: [{ n: 1, id: 101, name: 'A' }, { n: 2, id: 102, name: 'B' }, { n: 3, id: 103, name: 'C' }, { n: 4, name: 'NEW' }, { n: 5, id: 101, name: 'A' }, { n: 6, id: 105, name: 'E' }], answers: { R6: { v: 'reject' } } };
 const stOf = (id) => ({ 101: 'none', 102: 'net', 103: 'ok', 105: 'none' })[id] || null;
-assert.deepEqual(require('../ar/invoice-review.js').picNeeds(pr, stOf, true), { none: [{ id: 101, name: 'A' }], net: [{ id: 102, name: 'B' }], n: 2 });
+assert.deepEqual(require('../ar/invoice-review.js').picNeeds(pr, stOf, true), { none: [{ id: 101, name: 'A' }], net: [{ id: 102, name: 'B' }], held: [], n: 2 });
+// a photo someone already sent waits for his yes: not asked again, only said (owner 2026-11-28: «هل هتفضل كل فاتورة تعرض أصنافها حتى لو كنا أكدناها؟»)
+assert.deepEqual(require('../ar/invoice-review.js').picNeeds(pr, stOf, true, (id) => id === 101), { none: [], net: [{ id: 102, name: 'B' }], held: [{ id: 101, name: 'A' }], n: 1 });
+assert.equal(require('../ar/invoice-review.js').picNeeds(pr, stOf, true, (id) => id === 103).held.length, 0, 'a photo already fine is never «waiting»');
 assert.deepEqual(require('../ar/invoice-review.js').picNeeds(pr, stOf, false).net, [], 'before the server change only the items with no photo are asked');
 assert.equal(require('../ar/invoice-review.js').picNeeds(pr, () => null, true).n, 0, 'nothing is asked before the photos are read');
 console.log('PASS: invoice review helpers');
