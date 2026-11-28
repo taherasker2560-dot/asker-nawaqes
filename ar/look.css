@@ -2930,3 +2930,12 @@ button.rv-opt.rv-opt-main { background: var(--rose); }
 .hs-subs-c { margin-top: 8px; }
 .hs-subs-c .chip, .hs-subs-x { margin: 0; }
 .hs-subs-x { margin-top: 6px; }
+/* «↩️ رجّعه» on the items of «الأصناف يوم بيوم» (owner 2026-11-28): the same look as «↩️ إرجاع» on the short-dated list */
+#dayItemsPanel .di-ret { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+#dayItemsPanel .di-ret button { padding: 4px 10px; font-size: 13px; min-height: 0; }
+#dayItemsPanel .di-ret-box { flex-direction: column; align-items: stretch; padding: 8px 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--tint); }
+#dayItemsPanel .di-ret-box label { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+#dayItemsPanel .di-ret-box input { width: 4.2em; padding: 4px 6px; text-align: center; font-weight: 700; }
+#dayItemsPanel .di-ret-inv { margin: 0; font-size: 12px; color: var(--muted); }
+#dayItemsPanel .di-ret-who { font-weight: 700; color: var(--ink); }
+#dayItemsPanel .di-ret-acts { display: flex; gap: 8px; }
