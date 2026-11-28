@@ -96,6 +96,29 @@ run('orders card: no file yet = says so; an old file = warns; a late night = say
  await page.waitForFunction(()=>!document.getElementById('cmpEmpty').classList.contains('hidden'));
  assert.ok(!(await page.isVisible('#cmpMain')));
 });
+// the owner 2026-11-28: when the cap (or another rule of the builder) kept an item out of the order, the report says so, in both languages
+const KEPT=[['cap','FEROGLOBIN SYR','السقف مسكه: ميزانية الأمر كانت كملت','Held by the cap: the order\'s budget was full'],
+ ['got_today','CONGESTAL 20TAB','كان وصل في نفس اليوم: السيستم مش بيطلبه مرتين في اليوم','It had arrived the same day: the system does not order it twice in a day'],
+ ['asked','NEW CREAM 50GM','صنف جديد أو «بالطلب»: مش بيدخل الأمر غير لما تضيفه','A new or «on request» item: it does not enter the order until you add it'],
+ ['not_now','OZEMPIC PEN','إنت دوست عليه «مش دلوقتي»','You tapped «Not now» on it'],
+ ['dup_same','PANADOL EXTRA','إنت قلت إنه نفس صنف تاني','You said it is the same as another item']];
+const keptNight=()=>night('2026-11-29',3,0,0,{final:true,arrived_only_items:KEPT.map(([why,name],k)=>({id:300+k,name,why,arr:arr(14,1)}))});
+const whyTexts=(page)=>page.$$eval('#cmpGroups [data-grp="ao"] .cmp-row',r=>r.map(x=>x.querySelector('.cmp-why').textContent.trim()));
+run('orders card: what the system itself kept out of the order is said as it is',async({page})=>{
+ await put(page,file([keptNight()]));
+ await openOrders(page);
+ await page.waitForSelector('#cmpMain:not(.hidden)');
+ assert.deepEqual(await whyTexts(page),KEPT.map(x=>x[2]));
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth),'fits the phone');
+ if(process.env.SHOT_DIR)await (await page.$('#cmpBox')).screenshot({path:process.env.SHOT_DIR+'/order-compare-kept.png'});
+ await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
+ await page.reload();
+ await page.waitForFunction(()=>window.__tables);
+ await put(page,file([keptNight()]));
+ await openOrders(page);
+ await page.waitForSelector('#cmpMain:not(.hidden)');
+ assert.deepEqual(await whyTexts(page),KEPT.map(x=>x[3]));
+});
 run('orders card in English: the texts are drawn from codes, so they translate; item names stay',async({page})=>{
  await page.evaluate(()=>localStorage.setItem('asker-lang','en'));
  await page.reload();
